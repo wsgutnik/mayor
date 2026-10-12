@@ -10,6 +10,7 @@ import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catal
 import { getFrontage } from "../sim/blocks";
 import { depthShade, lotCentre, lotKerb, lotModelCells, lotYaw } from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
+import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
@@ -78,8 +79,8 @@ const SPECIES_SCALE: Record<Species, [number, number]> = {
   tree_palm: [0.9, 1.3], bush: [0.8, 1.4], bush_flowers: [0.9, 1.3], rock: [0.6, 1.5],
 };
 /** Vehicle props: which GLB each kind of mover uses. */
-const CAR_MODELS = ["car_sedan", "car_hatch", "car_suv", "van"];
-const VEHICLE_PROPS = [...CAR_MODELS, "truck", "bus", "train"];
+const CAR_MODELS = CAR_LOOKS;
+const VEHICLE_PROPS = [...new Set<string>([...CAR_LOOKS, ...TRUCK_LOOKS, ...BUS_LOOKS, ...Object.values(FLEET_BY_ROLE).flat(), "truck", "bus", "train"])];
 const BOAT_PROPS = ["boat_motor", "boat_sail", "boat_ferry"];
 
 /** Minimum time between full scene rebuilds. */
@@ -1096,9 +1097,9 @@ export class CityRenderer {
       const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
       if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
       if (v.kind === 1) {
-        place("truck", p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17, baseY);
+        place(pickLook(TRUCK_LOOKS, v.id), p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17, baseY);
       } else {
-        place(CAR_MODELS[v.id % CAR_MODELS.length], p.x, p.z, p.hx, p.hz, col.set(CAR[(v.id * 7) % CAR.length]), [0.42, 0.17, 0.22], 0.17, baseY);
+        place(pickLook(CAR_MODELS, v.id), p.x, p.z, p.hx, p.hz, col.set(CAR[(v.id * 7) % CAR.length]), [0.42, 0.17, 0.22], 0.17, baseY);
       }
     }
     for (const v of t.transit) {
@@ -1110,7 +1111,7 @@ export class CityRenderer {
       const dh = w.deckH[rt];
       const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
       if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
-      place(v.kind === "bus" ? "bus" : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
+      place(v.kind === "bus" ? pickLook(BUS_LOOKS, v.id) : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
         v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3, baseY);
     }
     for (const m of [this.vehicleMesh, ...this.vehMeshes.values()]) {

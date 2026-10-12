@@ -14,10 +14,11 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | M19 Água | feito | margem contínua, normais, reflexo, espuma, níveis de qualidade |
 | M20 Render | feito | terreno em camadas, texturas HD, sombras, tone mapping, LOD, níveis de qualidade |
 | M21 Vias e sinalização | feito | mão única, rotatória, semáforos com fases, props de calçada |
+| Frota de veículos | feito | 23 variantes paramétricas: carros (táxi, polícia, minivan, picape…), vans, caminhões (baú, lixo, utilitário, betoneira, prancha, tanque), semis (baú, contêiner), ônibus (urbano, articulado, escolar, dois andares, rodoviário, mini) |
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
 
-Testes: 263 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 266 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
@@ -49,6 +50,7 @@ CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cad
 
 - Kit de subsolo em GLB (tubos, bombas, válvulas) e peças de lote (jardim, estacionamento, praça, calçada de esquina): o `muse-world` não terminou; o jogo usa geometria procedural.
 - Props a partir do Kenney City Kit Roads (semáforos, postes, placas, barreiras): fontes em `third_party/`, conversão não feita.
+- Mobiliário convertido do pacote de transporte (abrigos, banco, jardineira, poste, quiosque, máquina de bilhetes, placa) está em `blender/props_fleet.py`, mas ainda não ligado aos props de calçada.
 - Entradas 31 (estação de ônibus) e 33 (terminal de carga) têm modelo mas nenhuma função no jogo; 32 (estação de trem) é o modelo das estações de metrô.
 
 ## Próximos passos

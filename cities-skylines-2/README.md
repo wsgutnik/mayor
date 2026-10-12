@@ -46,6 +46,7 @@ npm run build   # tipos + bundle em dist/
   texturizados, sombras suaves do sol que seguem a câmera, tone mapping, LOD por distância e três níveis de qualidade (baixa, média, alta).
 - M21: vias e sinalização. Rua e avenida de mão única (setas), ferramenta de rotatória, semáforos com fases e tráfego que para no vermelho,
   e props de calçada (postes, placas, hidrantes, lixeiras, pedestres, abrigos) por densidade de qualidade.
+- Frota: 11 modelos de carro (táxi, minivan, picape…), 10 de caminhão e semi-reboque e 9 de ônibus (articulado, de dois andares, escolar, rodoviário), escolhidos por veículo; polícia, lixo e utilitário já existem como props para uso futuro.
 - Kit de prédios completo: estação de ônibus, estação de trem (usada nas estações de metrô) e terminal de carga (31 a 33).
 
 Documentação do processo, pesquisa e plano: [docs/process/](docs/process/). Progresso detalhado: [PROGRESS.md](PROGRESS.md). Guia para agentes: [AGENTS.md](AGENTS.md).
