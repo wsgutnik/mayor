@@ -9,6 +9,7 @@ import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry } from "../sim/catalog";
 import { loadGlb, LoadedModel } from "./glb-models";
 import { WaterSurface, makeNoiseTexture } from "./water";
+import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 
 const ZONE_TILE = {
@@ -108,6 +109,9 @@ export class CityRenderer {
   private boatReady = new Set<string>();
   private boats: { x: number; z: number; a: number; speed: number; turn: number; prop: string; phase: number }[] = [];
   private whiteTint = new THREE.Color("#ffffff");
+  private grassTex!: THREE.Texture;
+  private ambience!: Ambience;
+  private asphaltTex!: THREE.Texture;
   private lastFrame = 0;
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
@@ -145,6 +149,16 @@ export class CityRenderer {
     this.renderer.setPixelRatio(this.pixelRatio);
     this.container.appendChild(this.renderer.domElement);
 
+    const texLoader = new THREE.TextureLoader();
+    const detail = (file: string) => {
+      const t = texLoader.load(`/textures/${file}.png`);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      return t;
+    };
+    this.grassTex = detail("grass");
+    this.asphaltTex = detail("asphalt");
     this.scene.background = new THREE.Color("#a9c8e8");
     this.scene.fog = new THREE.Fog("#a9c8e8", 90, 260);
     this.hemi = new THREE.HemisphereLight("#ffffff", "#6b7a5a", 1.35);
@@ -160,7 +174,7 @@ export class CityRenderer {
     // Size-independent parts: ribbons, previews, shared models and window materials.
     this.roadMesh = new THREE.Mesh(
       new THREE.BufferGeometry(),
-      new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+      new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: this.asphaltTex, color: new THREE.Color(1.35, 1.35, 1.35) }),
     );
     this.roadMesh.frustumCulled = false;
     this.scene.add(this.roadMesh);
@@ -184,6 +198,8 @@ export class CityRenderer {
     this.plainMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.models = buildModels();
     this.noiseTex = makeNoiseTexture(128);
+    this.ambience = new Ambience(this.scene);
+    this.ambience.setMapSize(this.world.size);
     const fallback = new THREE.BoxGeometry(0.01, 0.01, 0.01);
     for (const name of VEHICLE_PROPS) {
       const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), 320);
@@ -431,8 +447,10 @@ export class CityRenderer {
     );
     this.terrain = new THREE.Mesh(
       this.terrainGeo,
-      new THREE.MeshLambertMaterial({ vertexColors: true }),
+      new THREE.MeshLambertMaterial({ vertexColors: true, map: this.grassTex, color: new THREE.Color(1.3, 1.3, 1.3) }),
     );
+    // one texture repeat per three tiles gives the ground grain without visible tiling
+    this.grassTex.repeat.set(n / 3, n / 3);
   }
 
   private updateTerrain(): void {
@@ -462,6 +480,7 @@ export class CityRenderer {
     this.updateTerrain();
     this.rebuildRoads();
     let nz = 0, nl = 0;
+    const smoke: SmokeSource[] = [];
     const treeCounts = new Map<THREE.InstancedMesh, number>();
     const counts = new Map<THREE.InstancedMesh, number>();
     const tint = new THREE.Color();
@@ -473,6 +492,7 @@ export class CityRenderer {
         const i = idx(w, x, y);
         const h = tileHeight(w, x, y);
         if (w.facility[i]) {
+          if (w.facility[i] === 1) smoke.push({ x: x + 0.7, y: h + 0.85, z: y + 0.72, strength: 1 });
           const mesh = this.fMeshes.get(w.facility[i] as FacilityKind);
           if (mesh) this.placeModel(mesh, counts, x, y, h, 1, tint.setScalar(1));
         } else if (w.road[i]) {
@@ -513,6 +533,7 @@ export class CityRenderer {
           const l = w.level[i];
           if (l) {
             const r = hash(x, y);
+            if (z === 3 && l >= 2) smoke.push({ x: x + 0.72, y: h + (l === 3 ? 0.95 : 0.7), z: y + 0.3, strength: l === 3 ? 0.8 : 0.5 });
             const variants = zoneEntries(z, l).length;
             const mesh = this.bMeshes.get(`${z}-${l}-${Math.min(variants - 1, Math.floor(tileHash(x + 17, y + 29) * variants))}`);
             const shade = 0.9 + r * 0.2;
@@ -547,6 +568,7 @@ export class CityRenderer {
         if (nl >= this.lampMesh.instanceMatrix.count) break;
       }
     }
+    this.ambience.setSources(smoke);
     this.lampMesh.count = nl;
     this.lampMesh.instanceMatrix.needsUpdate = true;
     if (this.lampMesh.instanceColor) this.lampMesh.instanceColor.needsUpdate = true;
@@ -599,6 +621,7 @@ export class CityRenderer {
     const pos: number[] = [];
     const col: number[] = [];
     const ind: number[] = [];
+    const uvs: number[] = [];
     const c = new THREE.Color();
     const strip = (samples: Pt[], halfW: number, lift: number, color: string, offset = 0, dashed = false) => {
       if (tint) c.copy(tint); else c.set(color);
@@ -619,6 +642,7 @@ export class CityRenderer {
         const vi = pos.length / 3;
         pos.push(p.x + ox + nx * halfW, y, p.z + oz + nz * halfW, p.x + ox - nx * halfW, y, p.z + oz - nz * halfW);
         col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+        uvs.push((p.x + ox + nx * halfW) / 0.6, (p.z + oz + nz * halfW) / 0.6, (p.x + ox - nx * halfW) / 0.6, (p.z + oz - nz * halfW) / 0.6);
         if (!first) ind.push(vi - 2, vi - 1, vi, vi - 1, vi + 1, vi);
         prevOn = true;
       }
@@ -650,6 +674,7 @@ export class CityRenderer {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
     g.setIndex(ind);
     g.computeVertexNormals();
     return g;
@@ -746,6 +771,7 @@ export class CityRenderer {
       this.disposeWorldResources();
       this.world = world;
       this.buildWorldResources();
+      this.ambience.setMapSize(world.size);
       this.rig.setBounds(world.size);
     }
     this.world = world;
@@ -1015,6 +1041,7 @@ export class CityRenderer {
     const time = now / 1000;
     this.water?.update(time, this.dayLevel, this.skyCol);
     this.updateBoats(dt, time);
+    this.ambience.update(time, dt, this.dayLevel, this.skyCol);
     this.updateVehicles();
     if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();

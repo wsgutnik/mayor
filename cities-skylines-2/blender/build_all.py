@@ -47,6 +47,18 @@ def load_modules():
 
 def main():
     opts = parse()
+    # The GLBs carry UVs, tints and material names; the game supplies the shared textures and this table.
+    os.makedirs(opts["out"], exist_ok=True)
+    with open(os.path.join(opts["out"], "patterns.json"), "w") as fh:
+        # name -> [texture, world size of one repeat, base colour]; the game applies the tint itself
+        json.dump({k: [lib.PATTERN[k][0] if k in lib.PATTERN else None, lib.PATTERN[k][1] if k in lib.PATTERN else None, v[0]]
+                   for k, v in lib.PALETTE.items()}, fh, indent=1)
+    tex_out = os.path.join(opts["out"], "..", "textures")
+    os.makedirs(tex_out, exist_ok=True)
+    import shutil
+    for f in os.listdir(lib.TEXTURE_DIR):
+        if f.endswith(".png"):
+            shutil.copy(os.path.join(lib.TEXTURE_DIR, f), os.path.join(tex_out, f))
     load_modules()
     os.makedirs(opts["out"], exist_ok=True)
     if opts["previews"]:

@@ -8,6 +8,7 @@ Conventions (match the game):
     intensity up at night.
 """
 import math
+import os
 import random
 
 import bmesh
@@ -86,6 +87,26 @@ PALETTE = {
 }
 
 
+TEXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "textures")
+
+# palette name -> (texture, world size of one texture repeat). "window" cells map 0..1 per quad.
+PATTERN = {}
+for _n in ("white", "wall_cream", "wall_beige", "wall_white", "wall_grey", "wall_blue", "wall_red", "wall_green", "wall_yellow", "wall_navy"):
+    PATTERN[_n] = ("plaster", 0.5)
+PATTERN.update({
+    "wall_brick": ("brick", 0.4), "wall_wood": ("wood", 0.35), "bench_wood": ("wood", 0.2), "bark": ("wood", 0.2), "trunk": ("wood", 0.2),
+    "roof_blue": ("roof_tile", 0.3), "roof_red": ("roof_tile", 0.3), "roof_slate": ("roof_tile", 0.3), "roof_green": ("roof_tile", 0.3),
+    "roof_flat": ("gravel", 0.35), "roof_dark": ("gravel", 0.35),
+    "concrete": ("concrete", 0.5), "slab": ("concrete", 0.5), "paving": ("paving", 0.3), "asphalt": ("asphalt", 0.5),
+    "grass": ("grass", 0.25), "hedge": ("leaf", 0.12), "tree_green": ("leaf", 0.12), "tree_dark": ("leaf", 0.12),
+    "leaf_a": ("leaf", 0.18), "leaf_b": ("leaf", 0.18), "leaf_c": ("leaf", 0.18), "leaf_pine": ("leaf", 0.18), "leaf_pine_b": ("leaf", 0.18),
+    "leaf_pink": ("leaf", 0.18), "leaf_autumn": ("leaf", 0.18), "leaf_dry": ("leaf", 0.18), "palm_frond": ("leaf", 0.18),
+    "metal": ("metal", 0.3), "metal_dark": ("metal", 0.3), "lamp_pole": ("metal", 0.3),
+    "glass_blue": ("glass_curtain", 0.5), "rock": ("concrete", 0.3),
+    "glass_dark": ("window", None), "glow_window": ("window", None),
+})
+
+
 def hex_rgba(h):
     h = h.lstrip("#")
     return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + (1.0,)
@@ -95,21 +116,52 @@ def _srgb_to_linear(c):
     return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
 
 
+def _image(name):
+    path = os.path.join(TEXTURE_DIR, name + ".png")
+    img = bpy.data.images.get(name + ".png")
+    if img is None:
+        img = bpy.data.images.load(path)
+    return img
+
+
 def material(name):
-    """Create (or reuse) a palette material."""
+    """Create (or reuse) a palette material; patterned ones get a tileable texture multiplied by the tint."""
     m = bpy.data.materials.get(name)
     if m:
         return m
     base, rough, emi, strength = PALETTE[name]
     m = bpy.data.materials.new(name)
     m.use_nodes = True
-    bsdf = m.node_tree.nodes.get("Principled BSDF")
+    nodes, links = m.node_tree.nodes, m.node_tree.links
+    bsdf = nodes.get("Principled BSDF")
     r, g, b, _ = hex_rgba(base)
-    bsdf.inputs["Base Color"].default_value = (_srgb_to_linear(r), _srgb_to_linear(g), _srgb_to_linear(b), 1.0)
+    tint = (_srgb_to_linear(r), _srgb_to_linear(g), _srgb_to_linear(b), 1.0)
+    bsdf.inputs["Base Color"].default_value = tint
     bsdf.inputs["Roughness"].default_value = rough
+    pat = PATTERN.get(name)
+    if pat and os.path.exists(os.path.join(TEXTURE_DIR, pat[0] + ".png")):
+        tex = nodes.new("ShaderNodeTexImage")
+        tex.image = _image(pat[0])
+        tex.interpolation = "Linear"
+        tex.extension = "REPEAT"
+        if pat[0] == "window":
+            links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])      # panes carry their own colour
+        else:
+            mix = nodes.new("ShaderNodeMix")
+            mix.data_type = "RGBA"
+            mix.blend_type = "MULTIPLY"
+            mix.inputs[0].default_value = 1.0
+            mix.inputs[7].default_value = tint
+            links.new(tex.outputs["Color"], mix.inputs[6])
+            links.new(mix.outputs[2], bsdf.inputs["Base Color"])
     if emi:
         er, eg, eb, _ = hex_rgba(emi)
-        bsdf.inputs["Emission Color"].default_value = (_srgb_to_linear(er), _srgb_to_linear(eg), _srgb_to_linear(eb), 1.0)
+        if name == "glow_window" and os.path.exists(os.path.join(TEXTURE_DIR, "window_glow.png")):
+            etex = nodes.new("ShaderNodeTexImage")
+            etex.image = _image("window_glow")
+            links.new(etex.outputs["Color"], bsdf.inputs["Emission Color"])
+        else:
+            bsdf.inputs["Emission Color"].default_value = (_srgb_to_linear(er), _srgb_to_linear(eg), _srgb_to_linear(eb), 1.0)
         bsdf.inputs["Emission Strength"].default_value = strength
     m.diffuse_color = hex_rgba(base)
     return m
@@ -294,9 +346,88 @@ class Model:
             self.box(0, -d / 2 + 0.035, 0.03, w * 0.86, 0.03, 0.035, "hedge", roof="hedge")
             self.box(-w / 2 + 0.035, 0.0, 0.03, 0.03, d * 0.7, 0.035, "hedge", roof="hedge")
 
+    # -- dressing helpers used by the detailed models -----------------------
+    def balcony(self, cx, y_wall, z, w, depth=0.07, mat="concrete", rail="glass_blue"):
+        """A slab sticking out of a front wall at y = y_wall (front faces -Y), with a glass rail."""
+        self.box(cx, y_wall - depth / 2, z, w, depth, 0.012, mat, roof=mat)
+        self._quad([(cx - w / 2, y_wall - depth, z + 0.012), (cx + w / 2, y_wall - depth, z + 0.012), (cx + w / 2, y_wall - depth, z + 0.055), (cx - w / 2, y_wall - depth, z + 0.055)], rail)
+        self._quad([(cx + w / 2, y_wall - depth, z + 0.012), (cx + w / 2, y_wall, z + 0.012), (cx + w / 2, y_wall, z + 0.055), (cx + w / 2, y_wall - depth, z + 0.055)], rail)
+        self._quad([(cx - w / 2, y_wall, z + 0.012), (cx - w / 2, y_wall - depth, z + 0.012), (cx - w / 2, y_wall - depth, z + 0.055), (cx - w / 2, y_wall, z + 0.055)], rail)
+
+    def door(self, cx, y_wall, z, w=0.06, h=0.1, mat="wall_wood", frame="white"):
+        self.box(cx, y_wall - 0.004, z, w + 0.016, 0.008, h + 0.01, frame)
+        self._quad([(cx - w / 2, y_wall - 0.009, z), (cx + w / 2, y_wall - 0.009, z), (cx + w / 2, y_wall - 0.009, z + h), (cx - w / 2, y_wall - 0.009, z + h)], mat)
+
+    def steps(self, cx, y_wall, z, w, n=3, depth=0.04, rise=0.012, mat="concrete"):
+        for i in range(n):
+            self.box(cx, y_wall - depth * (i + 0.5), z + i * rise, w, depth, rise * (n - i), mat, roof=mat)
+
+    def fence(self, x0, y0, x1, y1, h=0.05, mat="metal_dark", posts=5):
+        """A low fence run between two points on the ground (posts and a top rail)."""
+        self.box((x0 + x1) / 2, (y0 + y1) / 2, 0.03 + h * 0.8, abs(x1 - x0) + 0.006, abs(y1 - y0) + 0.006, 0.006, mat)
+        for i in range(posts):
+            t = i / (posts - 1)
+            self.box(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 0.03, 0.007, 0.007, h, mat)
+
+    def ac_unit(self, cx, cy, z, w=0.07, d=0.05, h=0.035):
+        self.box(cx, cy, z, w, d, h, "metal", roof="metal_dark")
+        self.cyl(cx - w * 0.2, cy, z + h, 0.014, 0.004, "metal_dark", seg=6)
+
+    def parked_car(self, cx, cy, mat="sign_blue", along="x"):
+        """A tiny car for lots and car parks (about 30 triangles)."""
+        l, w = (0.12, 0.06) if along == "x" else (0.06, 0.12)
+        self.box(cx, cy, 0.033, l, w, 0.028, mat, roof=mat)
+        cl, cw = (0.062, 0.05) if along == "x" else (0.05, 0.062)
+        self.box(cx - (0.008 if along == "x" else 0), cy - (0.008 if along == "y" else 0), 0.061, cl, cw, 0.024, "glass_dark", roof=mat)
+
+    def skylight(self, cx, cy, z, w=0.08, d=0.06):
+        self.box(cx, cy, z, w, d, 0.014, "glass_blue", roof="glass_blue")
+
+    def sign(self, cx, y_wall, z, w, h, mat="sign_red"):
+        self.box(cx, y_wall - 0.007, z, w, 0.014, h, mat, roof=mat)
+
+    def chimney(self, cx, cy, z, h=0.12, w=0.045, mat="wall_brick"):
+        self.box(cx, cy, z, w, w, h, mat)
+        self.box(cx, cy, z + h, w + 0.014, w + 0.014, 0.012, "concrete")
+
     # -- output -----------------------------------------------------------
+    def _uv_and_ao(self):
+        """Box-projected UVs (windows map 0..1 per quad) and a ground-to-top shading ramp as vertex colour."""
+        uv = self.bm.loops.layers.uv.new("UVMap")
+        col = self.bm.loops.layers.color.new("Col")
+        for f in self.bm.faces:
+            name = self.slots[f.material_index] if f.material_index < len(self.slots) else ""
+            pat = PATTERN.get(name)
+            n = f.normal
+            if pat and pat[0] == "window" and len(f.loops) == 4:
+                for lp, (u, v) in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+                    lp[uv].uv = (u, v)
+            else:
+                scale = pat[1] if pat and pat[1] else 0.5
+                ax, ay, az = abs(n.x), abs(n.y), abs(n.z)
+                for lp in f.loops:
+                    p = lp.vert.co
+                    if az >= ax and az >= ay:
+                        lp[uv].uv = (p.x / scale, p.y / scale)
+                    elif ax >= ay:
+                        lp[uv].uv = (p.y / scale, p.z / scale)
+                    else:
+                        lp[uv].uv = (p.x / scale, p.z / scale)
+            vertical = abs(n.z) < 0.5
+            for lp in f.loops:
+                z = lp.vert.co.z
+                if vertical and not (pat and pat[0] == "window"):
+                    t = max(0.0, min(1.0, (z - 0.03) / 0.35))
+                    ao = 0.66 + 0.34 * (t * t * (3 - 2 * t))
+                elif not vertical and z < 0.06:
+                    ao = 0.92   # paving and lawn: faint
+                else:
+                    ao = 1.0
+                lp[col] = (ao, ao, ao, 1.0)
+
     def build(self):
         bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=0.00005)
+        self._uv_and_ao()
         me = bpy.data.meshes.new(self.name)
         self.bm.to_mesh(me)
         self.bm.free()
@@ -324,6 +455,7 @@ def export_glb(ob, path):
     bpy.ops.export_scene.gltf(
         filepath=path, export_format="GLB", use_selection=True, export_yup=True, export_apply=True,
         export_materials="EXPORT", export_cameras=False, export_lights=False,
+        export_image_format="NONE", export_texcoords=True, export_vertex_color="ACTIVE",
     )
 
 

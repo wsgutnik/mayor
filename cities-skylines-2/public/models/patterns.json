@@ -1,0 +1,327 @@
+{
+ "white": [
+  "plaster",
+  0.5,
+  "#f1eee6"
+ ],
+ "wall_cream": [
+  "plaster",
+  0.5,
+  "#eadfc8"
+ ],
+ "wall_beige": [
+  "plaster",
+  0.5,
+  "#d9c7a3"
+ ],
+ "wall_white": [
+  "plaster",
+  0.5,
+  "#f3f1ea"
+ ],
+ "wall_grey": [
+  "plaster",
+  0.5,
+  "#bfc3c8"
+ ],
+ "wall_brick": [
+  "brick",
+  0.4,
+  "#b5654a"
+ ],
+ "wall_wood": [
+  "wood",
+  0.35,
+  "#a8683a"
+ ],
+ "wall_blue": [
+  "plaster",
+  0.5,
+  "#3f5f93"
+ ],
+ "wall_red": [
+  "plaster",
+  0.5,
+  "#c23b32"
+ ],
+ "wall_green": [
+  "plaster",
+  0.5,
+  "#2f8a55"
+ ],
+ "wall_yellow": [
+  "plaster",
+  0.5,
+  "#e6b84a"
+ ],
+ "wall_navy": [
+  "plaster",
+  0.5,
+  "#1f3558"
+ ],
+ "roof_blue": [
+  "roof_tile",
+  0.3,
+  "#2c4a86"
+ ],
+ "roof_red": [
+  "roof_tile",
+  0.3,
+  "#b8402f"
+ ],
+ "roof_slate": [
+  "roof_tile",
+  0.3,
+  "#4a5565"
+ ],
+ "roof_flat": [
+  "gravel",
+  0.35,
+  "#6d747d"
+ ],
+ "roof_dark": [
+  "gravel",
+  0.35,
+  "#2b303a"
+ ],
+ "roof_green": [
+  "roof_tile",
+  0.3,
+  "#3f7a4e"
+ ],
+ "glass_blue": [
+  "glass_curtain",
+  0.5,
+  "#5b94d0"
+ ],
+ "glass_dark": [
+  "window",
+  null,
+  "#3d5a82"
+ ],
+ "slab": [
+  "concrete",
+  0.5,
+  "#aeb4bb"
+ ],
+ "hedge": [
+  "leaf",
+  0.12,
+  "#3b8a47"
+ ],
+ "glow_window": [
+  "window",
+  null,
+  "#3d5a82"
+ ],
+ "glow_sign": [
+  null,
+  null,
+  "#f5c04a"
+ ],
+ "concrete": [
+  "concrete",
+  0.5,
+  "#c9ccd0"
+ ],
+ "asphalt": [
+  "asphalt",
+  0.5,
+  "#4b4f56"
+ ],
+ "paving": [
+  "paving",
+  0.3,
+  "#d8d2c4"
+ ],
+ "metal": [
+  "metal",
+  0.3,
+  "#a9b0b8"
+ ],
+ "metal_dark": [
+  "metal",
+  0.3,
+  "#59616b"
+ ],
+ "grass": [
+  "grass",
+  0.25,
+  "#6fae5a"
+ ],
+ "tree_green": [
+  "leaf",
+  0.12,
+  "#3f8a45"
+ ],
+ "tree_dark": [
+  "leaf",
+  0.12,
+  "#2c6a3a"
+ ],
+ "trunk": [
+  "wood",
+  0.2,
+  "#7a5a3a"
+ ],
+ "water": [
+  null,
+  null,
+  "#4aa3d8"
+ ],
+ "sign_red": [
+  null,
+  null,
+  "#d63a3a"
+ ],
+ "sign_green": [
+  null,
+  null,
+  "#2c9a55"
+ ],
+ "sign_blue": [
+  null,
+  null,
+  "#2f6fd0"
+ ],
+ "sign_orange": [
+  null,
+  null,
+  "#ee8a2c"
+ ],
+ "black": [
+  null,
+  null,
+  "#1b1d22"
+ ],
+ "leaf_a": [
+  "leaf",
+  0.18,
+  "#4c9a46"
+ ],
+ "leaf_b": [
+  "leaf",
+  0.18,
+  "#3a8040"
+ ],
+ "leaf_c": [
+  "leaf",
+  0.18,
+  "#68b251"
+ ],
+ "leaf_pine": [
+  "leaf",
+  0.18,
+  "#2c6a3f"
+ ],
+ "leaf_pine_b": [
+  "leaf",
+  0.18,
+  "#24583a"
+ ],
+ "leaf_pink": [
+  "leaf",
+  0.18,
+  "#f0a3c4"
+ ],
+ "leaf_autumn": [
+  "leaf",
+  0.18,
+  "#e0802c"
+ ],
+ "leaf_dry": [
+  "leaf",
+  0.18,
+  "#9aa04a"
+ ],
+ "palm_frond": [
+  "leaf",
+  0.18,
+  "#3f9a4a"
+ ],
+ "bark": [
+  "wood",
+  0.2,
+  "#6e4e34"
+ ],
+ "rock": [
+  "concrete",
+  0.3,
+  "#8c8a82"
+ ],
+ "flower_red": [
+  null,
+  null,
+  "#d8453a"
+ ],
+ "flower_yellow": [
+  null,
+  null,
+  "#f2c230"
+ ],
+ "car_body": [
+  null,
+  null,
+  "#ffffff"
+ ],
+ "car_glass": [
+  null,
+  null,
+  "#26323f"
+ ],
+ "tire": [
+  null,
+  null,
+  "#17181b"
+ ],
+ "rim": [
+  null,
+  null,
+  "#b9bfc7"
+ ],
+ "headlight": [
+  null,
+  null,
+  "#fff1c0"
+ ],
+ "glow_head": [
+  null,
+  null,
+  "#fff1c0"
+ ],
+ "glow_tail": [
+  null,
+  null,
+  "#a01818"
+ ],
+ "glow_lamp": [
+  null,
+  null,
+  "#f5e6b0"
+ ],
+ "lamp_pole": [
+  "metal",
+  0.3,
+  "#3a3f47"
+ ],
+ "bench_wood": [
+  "wood",
+  0.2,
+  "#8a5a34"
+ ],
+ "hull_white": [
+  null,
+  null,
+  "#f2f4f6"
+ ],
+ "hull_blue": [
+  null,
+  null,
+  "#2d5fa8"
+ ],
+ "sail": [
+  null,
+  null,
+  "#f7f3e8"
+ ]
+}
