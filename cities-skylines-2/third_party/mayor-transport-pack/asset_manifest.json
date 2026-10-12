@@ -1,0 +1,668 @@
+{
+  "project": "MAYOR",
+  "version": "0.1.0",
+  "units": "meters",
+  "coordinate_system": "right-handed Z-up, forward -Y",
+  "assets": [
+    {
+      "id": "compact_hatchback",
+      "category": "cars",
+      "file": "assets/compact_hatchback.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        3.903,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "midsize_sedan",
+      "category": "cars",
+      "file": "assets/midsize_sedan.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        4.803,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "suv_crossover",
+      "category": "cars",
+      "file": "assets/suv_crossover.glb",
+      "objects": 24,
+      "bounds_m": [
+        2.09,
+        4.603,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "electric_city_car",
+      "category": "cars",
+      "file": "assets/electric_city_car.glb",
+      "objects": 25,
+      "bounds_m": [
+        1.87,
+        3.653,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "taxi_sedan",
+      "category": "cars",
+      "file": "assets/taxi_sedan.glb",
+      "objects": 25,
+      "bounds_m": [
+        1.87,
+        4.803,
+        1.91
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "police_patrol",
+      "category": "cars",
+      "file": "assets/police_patrol.glb",
+      "objects": 26,
+      "bounds_m": [
+        1.87,
+        4.803,
+        1.93
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "family_minivan",
+      "category": "cars",
+      "file": "assets/family_minivan.glb",
+      "objects": 24,
+      "bounds_m": [
+        2.09,
+        4.953,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "cargo_van",
+      "category": "cars",
+      "file": "assets/cargo_van.glb",
+      "objects": 24,
+      "bounds_m": [
+        2.09,
+        5.103,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "sports_coupe",
+      "category": "cars",
+      "file": "assets/sports_coupe.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        4.403,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "station_wagon",
+      "category": "cars",
+      "file": "assets/station_wagon.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        4.903,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "luxury_sedan",
+      "category": "cars",
+      "file": "assets/luxury_sedan.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        4.803,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "compact_suv",
+      "category": "cars",
+      "file": "assets/compact_suv.glb",
+      "objects": 24,
+      "bounds_m": [
+        2.09,
+        4.603,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "full_size_suv",
+      "category": "cars",
+      "file": "assets/full_size_suv.glb",
+      "objects": 24,
+      "bounds_m": [
+        2.09,
+        5.403,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "convertible",
+      "category": "cars",
+      "file": "assets/convertible.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        4.603,
+        1.6
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "rideshare_sedan",
+      "category": "cars",
+      "file": "assets/rideshare_sedan.glb",
+      "objects": 24,
+      "bounds_m": [
+        1.87,
+        4.803,
+        1.695
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "small_pickup",
+      "category": "cars",
+      "file": "assets/small_pickup.glb",
+      "objects": 27,
+      "bounds_m": [
+        2.09,
+        5.418,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "panel_minivan",
+      "category": "cars",
+      "file": "assets/panel_minivan.glb",
+      "objects": 24,
+      "bounds_m": [
+        2.09,
+        5.103,
+        1.99
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "ambulance_van",
+      "category": "cars",
+      "file": "assets/ambulance_van.glb",
+      "objects": 28,
+      "bounds_m": [
+        2.09,
+        5.103,
+        2.225
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "pickup_truck",
+      "category": "trucks",
+      "file": "assets/pickup_truck.glb",
+      "objects": 20,
+      "bounds_m": [
+        3.13,
+        6.384,
+        2.785
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "box_truck",
+      "category": "trucks",
+      "file": "assets/box_truck.glb",
+      "objects": 27,
+      "bounds_m": [
+        3.13,
+        8.23,
+        3.555
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_tractor_truck",
+      "category": "trucks",
+      "file": "assets/semi_tractor_truck.glb",
+      "objects": 27,
+      "bounds_m": [
+        3.13,
+        6.53,
+        2.785
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "garbage_truck",
+      "category": "trucks",
+      "file": "assets/garbage_truck.glb",
+      "objects": 28,
+      "bounds_m": [
+        3.13,
+        8.23,
+        3.4
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "flatbed_truck",
+      "category": "trucks",
+      "file": "assets/flatbed_truck.glb",
+      "objects": 28,
+      "bounds_m": [
+        3.13,
+        8.23,
+        2.785
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "tanker_truck",
+      "category": "trucks",
+      "file": "assets/tanker_truck.glb",
+      "objects": 27,
+      "bounds_m": [
+        3.13,
+        8.23,
+        3.48
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "cement_mixer",
+      "category": "trucks",
+      "file": "assets/cement_mixer.glb",
+      "objects": 27,
+      "bounds_m": [
+        3.13,
+        8.23,
+        3.38
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "utility_boom_truck",
+      "category": "trucks",
+      "file": "assets/utility_boom_truck.glb",
+      "objects": 29,
+      "bounds_m": [
+        3.13,
+        8.23,
+        5.275
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_daycab",
+      "category": "semi_trucks",
+      "file": "assets/semi_daycab.glb",
+      "objects": 29,
+      "bounds_m": [
+        2.59,
+        6.833,
+        4.15
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_sleeper",
+      "category": "semi_trucks",
+      "file": "assets/semi_sleeper.glb",
+      "objects": 30,
+      "bounds_m": [
+        2.59,
+        6.833,
+        4.15
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_box_trailer",
+      "category": "semi_trucks",
+      "file": "assets/semi_box_trailer.glb",
+      "objects": 56,
+      "bounds_m": [
+        2.59,
+        13.628,
+        4.375
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_container_hauler",
+      "category": "semi_trucks",
+      "file": "assets/semi_container_hauler.glb",
+      "objects": 64,
+      "bounds_m": [
+        2.59,
+        13.628,
+        4.375
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_refrigerated",
+      "category": "semi_trucks",
+      "file": "assets/semi_refrigerated.glb",
+      "objects": 57,
+      "bounds_m": [
+        2.59,
+        13.628,
+        4.375
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_flatbed",
+      "category": "semi_trucks",
+      "file": "assets/semi_flatbed.glb",
+      "objects": 43,
+      "bounds_m": [
+        2.59,
+        13.628,
+        4.15
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_tanker",
+      "category": "semi_trucks",
+      "file": "assets/semi_tanker.glb",
+      "objects": 44,
+      "bounds_m": [
+        2.59,
+        13.628,
+        4.16
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "semi_car_carrier",
+      "category": "semi_trucks",
+      "file": "assets/semi_car_carrier.glb",
+      "objects": 55,
+      "bounds_m": [
+        2.59,
+        13.628,
+        4.71
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "standard_city_bus",
+      "category": "buses",
+      "file": "assets/standard_city_bus.glb",
+      "objects": 34,
+      "bounds_m": [
+        2.641,
+        12.089,
+        3.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "articulated_bus",
+      "category": "buses",
+      "file": "assets/articulated_bus.glb",
+      "objects": 57,
+      "bounds_m": [
+        2.641,
+        18.089,
+        3.65
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "shuttle_bus",
+      "category": "buses",
+      "file": "assets/shuttle_bus.glb",
+      "objects": 28,
+      "bounds_m": [
+        2.641,
+        7.089,
+        3.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "school_bus",
+      "category": "buses",
+      "file": "assets/school_bus.glb",
+      "objects": 32,
+      "bounds_m": [
+        2.641,
+        10.089,
+        3.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "double_decker_bus",
+      "category": "buses",
+      "file": "assets/double_decker_bus.glb",
+      "objects": 35,
+      "bounds_m": [
+        2.641,
+        12.089,
+        4.23
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "coach_intercity_bus",
+      "category": "buses",
+      "file": "assets/coach_intercity_bus.glb",
+      "objects": 34,
+      "bounds_m": [
+        2.641,
+        13.089,
+        3.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "electric_minibus",
+      "category": "buses",
+      "file": "assets/electric_minibus.glb",
+      "objects": 28,
+      "bounds_m": [
+        2.641,
+        7.089,
+        3.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "small_bus_shelter",
+      "category": "transit_infrastructure",
+      "file": "assets/small_bus_shelter.glb",
+      "objects": 15,
+      "bounds_m": [
+        5.0,
+        3.4,
+        3.042
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "premium_glass_shelter",
+      "category": "transit_infrastructure",
+      "file": "assets/premium_glass_shelter.glb",
+      "objects": 15,
+      "bounds_m": [
+        7.0,
+        3.4,
+        3.042
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "bus_stop_sign",
+      "category": "transit_infrastructure",
+      "file": "assets/bus_stop_sign.glb",
+      "objects": 4,
+      "bounds_m": [
+        0.83,
+        0.58,
+        3.34
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "roadside_bench",
+      "category": "transit_infrastructure",
+      "file": "assets/roadside_bench.glb",
+      "objects": 4,
+      "bounds_m": [
+        1.65,
+        0.525,
+        1.44
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "route_information_kiosk",
+      "category": "transit_infrastructure",
+      "file": "assets/route_information_kiosk.glb",
+      "objects": 3,
+      "bounds_m": [
+        1.1,
+        0.463,
+        3.0
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "ticket_machine",
+      "category": "transit_infrastructure",
+      "file": "assets/ticket_machine.glb",
+      "objects": 3,
+      "bounds_m": [
+        0.85,
+        0.676,
+        2.06
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "street_bollard",
+      "category": "transit_infrastructure",
+      "file": "assets/street_bollard.glb",
+      "objects": 1,
+      "bounds_m": [
+        0.23,
+        0.23,
+        0.94
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "trash_can",
+      "category": "transit_infrastructure",
+      "file": "assets/trash_can.glb",
+      "objects": 2,
+      "bounds_m": [
+        0.55,
+        0.56,
+        0.985
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "street_planter",
+      "category": "transit_infrastructure",
+      "file": "assets/street_planter.glb",
+      "objects": 5,
+      "bounds_m": [
+        1.5,
+        0.8,
+        1.425
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "streetlight",
+      "category": "transit_infrastructure",
+      "file": "assets/streetlight.glb",
+      "objects": 3,
+      "bounds_m": [
+        1.575,
+        0.38,
+        4.52
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "raised_platform_stop",
+      "category": "stations",
+      "file": "assets/raised_platform_stop.glb",
+      "objects": 19,
+      "bounds_m": [
+        6.15,
+        15.0,
+        3.18
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "neighborhood_bus_bay",
+      "category": "stations",
+      "file": "assets/neighborhood_bus_bay.glb",
+      "objects": 20,
+      "bounds_m": [
+        10.025,
+        15.0,
+        3.19
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "medium_bus_terminal",
+      "category": "stations",
+      "file": "assets/medium_bus_terminal.glb",
+      "objects": 31,
+      "bounds_m": [
+        18.525,
+        28.0,
+        4.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    },
+    {
+      "id": "urban_transit_hub",
+      "category": "stations",
+      "file": "assets/urban_transit_hub.glb",
+      "objects": 40,
+      "bounds_m": [
+        25.875,
+        38.0,
+        4.36
+      ],
+      "orientation": "front_-Y_up_Z"
+    }
+  ]
+}
