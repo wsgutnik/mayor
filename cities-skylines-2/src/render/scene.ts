@@ -8,7 +8,7 @@ import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
 import { getFrontage } from "../sim/blocks";
-import { depthShade, lotCentre, lotKerb, lotModelCells, lotYaw } from "./lots";
+import { depthShade, lotCentre, lotFrontTile, lotKerb, lotModelCells, lotYaw } from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
@@ -121,6 +121,7 @@ export class CityRenderer {
   private signalPole!: THREE.InstancedMesh;
   private signalLamp!: THREE.InstancedMesh;
   /** Per signal-lamp instance: true when its arm runs north-south. */
+  private signalPoleH = 1.1;
   private signalLampNs: boolean[] = [];
   private lastSignalKey = "";
   private propDensitySeen = -1;
@@ -387,6 +388,10 @@ export class CityRenderer {
       if (!this.sized.includes(this.signalPole)) return;
       this.signalPole.geometry = model.geometry;
       this.signalPole.material = model.materials;
+      // The Blender pole is about a third of the procedural one: keep the lit lamp on its head, not floating above it.
+      model.geometry.computeBoundingBox();
+      this.signalPoleH = Math.max(0.1, model.geometry.boundingBox!.max.y);
+      this.seenRevision = -1;
     });
     this.signalLamp = new THREE.InstancedMesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: "#ffffff" }), 256);
     this.signalLamp.count = 0;
@@ -655,7 +660,10 @@ export class CityRenderer {
         for (let x = lot.x; x < lot.x + lot.w; x++) hLot += tileHeight(w, x, y);
       }
       hLot /= area;
-      const kerb = lotKerb(lot);
+      // The kerb strip belongs on a road edge: skip lots whose front is not actually a road tile.
+      const front = lotFrontTile(lot);
+      const onRoad = !!front && inBounds(w, front.x, front.y) && w.road[idx(w, front.x, front.y)] > 0;
+      const kerb = onRoad ? lotKerb(lot) : null;
       if (kerb && nk < this.kerbs.instanceMatrix.count) {
         d.position.set(kerb.x, heightAt(w, kerb.x, kerb.z) + 0.06, kerb.z);
         d.scale.set(Math.max(0.08, kerb.w - 0.04), 0.14, Math.max(0.08, kerb.d - 0.02));
@@ -818,7 +826,9 @@ export class CityRenderer {
         d.updateMatrix();
         this.signalPole.setMatrixAt(n, d.matrix);
         this.signalPole.setColorAt(n, tint);
-        d.position.set(cx - arm.dx * 0.09, y + 1.1, cz - arm.dz * 0.09);
+        const k = this.signalPoleH / 1.1;
+        d.position.set(cx - arm.dx * 0.09 * k, y + this.signalPoleH * 0.92, cz - arm.dz * 0.09 * k);
+        d.scale.setScalar(Math.max(0.35, k));
         d.updateMatrix();
         this.signalLamp.setMatrixAt(n, d.matrix);
         this.signalLampNs.push(Math.abs(arm.dx) <= Math.abs(arm.dz));

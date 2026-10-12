@@ -46,6 +46,14 @@ export function lotKerb(lot: Footprint & Pick<WorldLot, "facing" | "depthFromRoa
   return null;
 }
 
+/** The tile just beyond the middle of a lot's front edge (where the road should be), or null without a facing. */
+export function lotFrontTile(lot: Footprint & Pick<WorldLot, "facing">): { x: number; y: number } | null {
+  const { dx, dy } = lot.facing;
+  if (dy !== 0) return { x: lot.x + Math.floor(lot.w / 2), y: dy > 0 ? lot.y + lot.h : lot.y - 1 };
+  if (dx !== 0) return { x: dx > 0 ? lot.x + lot.w : lot.x - 1, y: lot.y + Math.floor(lot.h / 2) };
+  return null;
+}
+
 /** Brightness for an empty-lot pad by kerb depth (0..3): the front row is full, rear rows shade off. */
 export function depthShade(depth: number): number {
   return depth < 0 ? 0.55 : Math.max(0.6, 1 - depth * 0.13);

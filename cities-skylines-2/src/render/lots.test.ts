@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { depthShade, lotCentre, lotKerb, lotModelCells, lotYaw } from "./lots";
+import { depthShade, lotCentre, lotFrontTile, lotKerb, lotModelCells, lotYaw } from "./lots";
 
 describe("lot layout", () => {
   it("yaws models to face the street", () => {
@@ -41,4 +41,13 @@ describe("lot layout", () => {
     expect(depthShade(3)).toBeLessThan(depthShade(2));
     expect(depthShade(-1)).toBeLessThan(depthShade(3));
   });
+
+  it("finds the tile in front of a lot's front edge", () => {
+    expect(lotFrontTile({ x: 4, y: 8, w: 3, h: 2, facing: { dx: 0, dy: 1 } })).toEqual({ x: 5, y: 10 });
+    expect(lotFrontTile({ x: 4, y: 8, w: 3, h: 2, facing: { dx: 0, dy: -1 } })).toEqual({ x: 5, y: 7 });
+    expect(lotFrontTile({ x: 4, y: 8, w: 3, h: 2, facing: { dx: 1, dy: 0 } })).toEqual({ x: 7, y: 9 });
+    expect(lotFrontTile({ x: 4, y: 8, w: 3, h: 2, facing: { dx: -1, dy: 0 } })).toEqual({ x: 3, y: 9 });
+    expect(lotFrontTile({ x: 4, y: 8, w: 1, h: 1, facing: { dx: 0, dy: 0 } })).toBeNull();
+  });
 });
+

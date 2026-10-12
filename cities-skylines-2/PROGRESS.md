@@ -18,7 +18,7 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
 
-Testes: 265 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 266 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
@@ -35,6 +35,8 @@ Abertos: buscas lineares no grafo de estradas (O(S²) na reconstrução), verifi
 lotes validados só no tile âncora ao sincronizar.
 
 ## Limitações conhecidas
+
+- M24 (separação de níveis) em produção com o Muse (`muse-grade`).
 
 - Pontes e túneis não têm separação de níveis: cruzar outra rua cria um nó.
 - A mediana da avenida para antes do canto em curvas fechadas.
