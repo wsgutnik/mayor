@@ -1,42 +1,17 @@
 import * as THREE from "three";
 import { CityState } from "../sim/sim";
 import {
-  ZONE, FAC, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, FacilityKind, idx, tileHeight, isLand, World,
+  ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, FacilityKind, idx, tileHeight, isLand, World,
   RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt, Biome,
 } from "../sim/world";
 import { CameraRig } from "./camera";
+import { buildModels, makeWindowTextures, VARIANTS } from "./models";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
-
-const BUILD_H = {
-  [ZONE.RES]: [0, 0.55, 1.0, 1.7],
-  [ZONE.COM]: [0, 0.7, 1.5, 2.6],
-  [ZONE.IND]: [0, 0.6, 0.9, 1.2],
-} as const;
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
   [ZONE.COM]: new THREE.Color("#4a8fe0"),
   [ZONE.IND]: new THREE.Color("#e0b43a"),
-} as const;
-
-const BUILD_COLOR = {
-  [ZONE.RES]: new THREE.Color("#c9d8c0"),
-  [ZONE.COM]: new THREE.Color("#b6c9ea"),
-  [ZONE.IND]: new THREE.Color("#d8c690"),
-} as const;
-
-/** Facility look: [height, footprint, color]. */
-const FACILITY_LOOK = {
-  [FAC.POWER]: [1.9, 0.7, new THREE.Color("#f2c230")],
-  [FAC.WATER]: [1.0, 0.7, new THREE.Color("#39b6e8")],
-  [FAC.SEWAGE]: [0.6, 0.8, new THREE.Color("#8a6a4a")],
-  [FAC.LANDFILL]: [0.45, 0.9, new THREE.Color("#7d848c")],
-  [FAC.POLICE]: [0.9, 0.8, new THREE.Color("#2f5fd0")],
-  [FAC.FIRE]: [0.9, 0.8, new THREE.Color("#e0453a")],
-  [FAC.CLINIC]: [0.8, 0.8, new THREE.Color("#e8eef5")],
-  [FAC.SCHOOL]: [0.8, 0.9, new THREE.Color("#f08a3c")],
-  [FAC.PARK]: [0.1, 0.96, new THREE.Color("#3fa34d")],
-  [FAC.METRO]: [0.7, 0.9, new THREE.Color("#7a5fd0")],
 } as const;
 
 /** 0 = off, a COVER bit, or LAND_VALUE_LAYER. */
@@ -98,8 +73,6 @@ export class CityRenderer {
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
-  private buildings!: THREE.InstancedMesh;
-  private facilities!: THREE.InstancedMesh;
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
   private vehicleMesh!: THREE.InstancedMesh;
@@ -112,7 +85,10 @@ export class CityRenderer {
   private seenRevision = -1;
   private dummy = new THREE.Object3D();
   private world: World;
-  private buildingMat!: THREE.MeshLambertMaterial;
+  private winMat!: THREE.MeshLambertMaterial;
+  private plainMat!: THREE.MeshLambertMaterial;
+  private bMeshes = new Map<string, THREE.InstancedMesh>();
+  private fMeshes = new Map<number, THREE.InstancedMesh>();
 
   constructor(private container: HTMLElement, state: CityState) {
     this.world = state.world;
@@ -165,8 +141,21 @@ export class CityRenderer {
     this.previewMesh.visible = false;
     this.scene.add(this.previewMesh);
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
-    this.buildingMat = new THREE.MeshLambertMaterial({ color: "#ffffff", emissive: new THREE.Color("#ffd9a0"), emissiveIntensity: 0 });
-    this.buildings = mk(this.buildingMat);
+    const tex = makeWindowTextures();
+    this.winMat = new THREE.MeshLambertMaterial({
+      map: tex.map, vertexColors: true, emissive: new THREE.Color("#ffd98a"), emissiveMap: tex.glow, emissiveIntensity: 0,
+    });
+    this.plainMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const models = buildModels();
+    const mkModel = (geo: THREE.BufferGeometry, capacity: number) => {
+      const m = new THREE.InstancedMesh(geo, [this.winMat, this.plainMat], capacity);
+      m.count = 0;
+      m.frustumCulled = false;
+      this.scene.add(m);
+      return m;
+    };
+    for (const [k, g] of models.buildings) this.bMeshes.set(k, mkModel(g, Math.ceil(cap / 2)));
+    for (const [k, g] of models.facilities) this.fMeshes.set(k, mkModel(g, Math.ceil(cap / 4)));
     this.trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.17, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: "#ffffff" }), cap);
     this.trees.count = 0;
     this.trees.frustumCulled = false;
@@ -175,7 +164,6 @@ export class CityRenderer {
     this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.vehicleMesh.count = 0;
-    this.facilities = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
 
     const water = new THREE.Mesh(
@@ -238,22 +226,19 @@ export class CityRenderer {
     const w = this.world;
     this.updateTerrain();
     this.rebuildRoads();
-    let nz = 0, nb = 0, nf = 0, nt = 0;
+    let nz = 0, nt = 0;
+    const counts = new Map<THREE.InstancedMesh, number>();
+    const tint = new THREE.Color();
     const look = BIOME_LOOK[w.biome];
     const leaf = look.leaf.map((c) => new THREE.Color(c));
     const d = this.dummy;
-    const color = new THREE.Color();
     for (let y = 0; y < w.size; y++) {
       for (let x = 0; x < w.size; x++) {
         const i = idx(w, x, y);
         const h = tileHeight(w, x, y);
         if (w.facility[i]) {
-          const [fh, fw, fc] = FACILITY_LOOK[w.facility[i] as FacilityKind];
-          d.position.set(x + 0.5, h + 0.04 + fh / 2, y + 0.5);
-          d.scale.set(fw, fh, fw);
-          d.updateMatrix();
-          this.facilities.setMatrixAt(nf, d.matrix);
-          this.facilities.setColorAt(nf++, fc);
+          const mesh = this.fMeshes.get(w.facility[i] as FacilityKind);
+          if (mesh) this.placeModel(mesh, counts, x, y, h, 1, tint.setScalar(1));
         } else if (w.road[i]) {
           // Drawn as ribbons (see buildRoadGeometry).
         } else if (!w.zone[i]) {
@@ -278,13 +263,9 @@ export class CityRenderer {
           const l = w.level[i];
           if (l) {
             const r = hash(x, y);
-            const bh = BUILD_H[z][l] * (0.85 + r * 0.3);
-            d.position.set(x + 0.5, h + 0.04 + bh / 2, y + 0.5);
-            d.scale.set(0.62 + r * 0.14, bh, 0.62 + (1 - r) * 0.14);
-            d.updateMatrix();
-            this.buildings.setMatrixAt(nb, d.matrix);
-            color.copy(BUILD_COLOR[z]).offsetHSL(0, 0, (r - 0.5) * 0.1 - (l - 1) * 0.03);
-            this.buildings.setColorAt(nb++, color);
+            const mesh = this.bMeshes.get(`${z}-${l}-${Math.floor(hash(x + 17, y + 29) * VARIANTS)}`);
+            const shade = 0.9 + r * 0.2;
+            if (mesh) this.placeModel(mesh, counts, x, y, h, 0.92 + r * 0.2, tint.setScalar(shade));
           }
         }
       }
@@ -292,11 +273,39 @@ export class CityRenderer {
     this.trees.count = nt;
     this.trees.instanceMatrix.needsUpdate = true;
     if (this.trees.instanceColor) this.trees.instanceColor.needsUpdate = true;
-    for (const [m, n] of [[this.zones, nz], [this.buildings, nb], [this.facilities, nf]] as const) {
-      m.count = n;
+    this.zones.count = nz;
+    this.zones.instanceMatrix.needsUpdate = true;
+    if (this.zones.instanceColor) this.zones.instanceColor.needsUpdate = true;
+    for (const m of [...this.bMeshes.values(), ...this.fMeshes.values()]) {
+      m.count = counts.get(m) ?? 0;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+  }
+
+  /** Yaw so a model's front (+z) faces the adjacent road, else a stable pseudo-random side. */
+  private facing(x: number, y: number): number {
+    const w = this.world;
+    const road = (nx: number, ny: number) => inBounds(w, nx, ny) && w.road[ny * w.size + nx] > 0;
+    if (road(x, y + 1)) return 0;
+    if (road(x + 1, y)) return Math.PI / 2;
+    if (road(x, y - 1)) return Math.PI;
+    if (road(x - 1, y)) return -Math.PI / 2;
+    return Math.floor(hash(x + 5, y + 9) * 4) * (Math.PI / 2);
+  }
+
+  private placeModel(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, x: number, y: number, h: number, scaleY: number, tint: THREE.Color): void {
+    const n = counts.get(mesh) ?? 0;
+    if (n >= mesh.instanceMatrix.count) return;
+    const d = this.dummy;
+    d.position.set(x + 0.5, h + 0.04, y + 0.5);
+    d.rotation.set(0, this.facing(x, y), 0);
+    d.scale.set(1, scaleY, 1);
+    d.updateMatrix();
+    mesh.setMatrixAt(n, d.matrix);
+    mesh.setColorAt(n, tint);
+    counts.set(mesh, n + 1);
+    d.rotation.set(0, 0, 0);
   }
 
   private groundY(x: number, z: number): number {
@@ -457,7 +466,7 @@ export class CityRenderer {
     this.sun.intensity = (0.15 + 1.7 * day) * (raining ? 0.5 : 1);
     this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6);
     this.hemi.intensity = (0.4 + 0.95 * day) * (raining ? 0.8 : 1);
-    this.buildingMat.emissiveIntensity = (1 - day) * 0.32;
+    this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
     this.rainOn = raining;
     this.rain.visible = raining;
   }

@@ -12,6 +12,8 @@ npm test        # regras da simulação
 npm run build   # tipos + bundle em dist/
 ```
 
+- M11: modelos 3D procedurais (casas, blocos, torres de vidro, galpões, fábricas) e instalações; janelas por textura que acendem à noite; prédios viram para a rua.
+
 ## Controles
 
 | | Mouse | Toque |
