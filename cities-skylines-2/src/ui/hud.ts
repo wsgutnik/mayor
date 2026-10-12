@@ -63,6 +63,7 @@ const ROAD_MODES: { mode: RoadMode; label: string; icon: string; hint: string }[
 ];
 
 export interface HudHooks {
+  onMenu(): void;
   onRoad(type: RoadType, mode: RoadMode): void;
   onCreateLine(): void;
   onLineVehicles(id: number, delta: number): void;
@@ -129,6 +130,7 @@ export class Hud {
   private linesSig = "";
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private lvEl!: HTMLElement;
+  private skyEl!: HTMLElement;
   private trafficFill!: HTMLElement;
   private trafficVal!: HTMLElement;
   private flyView!: HTMLElement;
@@ -154,7 +156,7 @@ export class Hud {
     top.innerHTML = `
       <div class="stat"><span class="lbl">Population</span><b data-k="pop">0</b></div>
       <div class="stat"><span class="lbl">Jobs</span><b data-k="jobs">0</b></div>
-      <div class="stat date"><span class="lbl">Date</span><b data-k="date"></b></div>
+      <div class="stat date"><span class="lbl">Date <span data-k="sky"></span></span><b data-k="date"></b></div>
       <div class="stat"><span class="lbl">Balance</span><b data-k="money"></b><small data-k="delta"></small></div>`;
     this.popEl = top.querySelector('[data-k="pop"]')!;
     this.jobsEl = top.querySelector('[data-k="jobs"]')!;
@@ -170,6 +172,11 @@ export class Hud {
       this.speedBtns.push(b);
     });
     top.appendChild(speed);
+    const menu = el("button", "speed-btn menu-btn", "☰");
+    menu.title = "Menu: save, load, new city";
+    menu.addEventListener("click", () => this.hooks.onMenu());
+    speed.appendChild(menu);
+    this.skyEl = top.querySelector('[data-k="sky"]')!;
     this.root.appendChild(top);
   }
 
@@ -323,6 +330,11 @@ export class Hud {
     this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === type));
     this.roadModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
     if (notify) this.hooks.onRoad(type, mode);
+  }
+
+  setSky(tod: number, raining: boolean): void {
+    const night = tod < 0.22 || tod > 0.78;
+    this.skyEl.textContent = raining ? "🌧" : night ? "🌙" : "☀";
   }
 
   setHint(text: string): void {

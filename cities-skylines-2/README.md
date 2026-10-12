@@ -36,4 +36,6 @@ npm run build   # tipos + bundle em dist/
 - M6: transporte público. Paradas de ônibus (em ruas e avenidas) e estações de metrô (em qualquer terreno livre);
   linhas circulares criadas tocando as paradas em ordem; ônibus usam as vias e entram no tráfego, trens vão em linha reta.
   Passageiros pagam tarifa, tiram carros da rua, elevam o valor do solo e a felicidade. Painel de linhas com veículos e remoção.
-- Próximo: M7 (salvar/carregar, ciclo dia e noite, clima).
+- M7: menu (☰) com 3 slots de save, autosave mensal, nova cidade por seed; ciclo dia e noite com janelas acesas;
+  chuva (determinística por dia e seed) que deixa o trânsito 15% mais lento. Saves ficam em localStorage (~90 KB).
+- Próximo: M8 (PWA offline, Tauri para Mac e Windows, ícones, desempenho no iPad).

@@ -1,20 +1,22 @@
 import "./ui/style.css";
 import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
-import { newTraffic, tickTraffic } from "./sim/traffic";
+import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
+import { Menu } from "./ui/menu";
+import { AUTOSAVE, loadFrom, saveTo, slotInfo } from "./storage";
 import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, toolColor } from "./ui/hud";
 import { Pt, ROAD_NAME, RoadType, tileHeight } from "./sim/world";
 
-const state: CityState = newCity(1337);
+let state: CityState = newCity(1337);
 const app = document.getElementById("app")!;
 const view = document.createElement("div");
 view.className = "view";
 app.appendChild(view);
 
 const renderer = new CityRenderer(view, state);
-const traffic = newTraffic(state.world.size);
+let traffic: TrafficState = newTraffic(state.world.size);
 renderer.setTraffic(traffic);
 let tool: ToolId = "road";
 let speed = 1;
@@ -39,6 +41,7 @@ const hud = new Hud(app, {
   onOverlay: (layer) => renderer.setOverlay(layer),
   onRoad: (t, m) => { roadType = t; roadMode = m; cancelDraft(); refreshHint(); },
   onFinishRoad: () => cancelDraft(),
+  onMenu: () => menu.toggle(),
   onCreateLine: () => {
     const kind = tool === "metroline" ? "metro" : "bus";
     const res = createLine(state, kind, lineDraft);
@@ -54,6 +57,31 @@ const hud = new Hud(app, {
 });
 hud.setTool(tool);
 hud.setSpeed(speed);
+
+/** Replace the running city (load or new game); everything player-facing resets with it. */
+function useCity(next: CityState): void {
+  state = next;
+  traffic = newTraffic(state.world.size);
+  renderer.setWorld(state.world);
+  renderer.setTraffic(traffic);
+  cancelDraft();
+  seenFires = state.fires;
+  lastMonthSaved = Math.floor(state.day / 30);
+}
+
+const menu = new Menu(app, {
+  info: (slot) => slotInfo(slot),
+  onSave: (n) => {
+    const r = saveTo(String(n), state);
+    hud.showToast(r.ok ? `Saved to slot ${n}` : r.reason);
+  },
+  onLoad: (slot) => {
+    const r = loadFrom(slot);
+    if (r.ok) { useCity(r.state); hud.showToast("City loaded"); } else hud.showToast(r.reason);
+  },
+  onNew: (seed) => { useCity(newCity(seed)); hud.showToast(`New city, seed ${seed}`); },
+});
+if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast("Autosave found: open the menu to continue"), 800);
 
 const lineTool = () => tool === "busline" || tool === "metroline";
 const placing = () => (tool === "road" && roadMode !== "paint") || lineTool();
@@ -199,11 +227,16 @@ bindInput(renderer, {
 });
 
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") cancelDraft();
+  if (e.key === "Escape") {
+    if (menu.isOpen) menu.close(); else cancelDraft();
+  }
 });
 
 // Fixed-step sim: 2 days/second at 1x.
 let seenFires = 0;
+let lastMonthSaved = Math.floor(state.day / 30);
+/** Time of day, 0..1; a full cycle takes 90 s at 1x. */
+let tod = 0.34;
 let acc = 0;
 let prev = performance.now();
 const DAY_MS = 500;
@@ -215,6 +248,14 @@ function frame(now: number) {
     while (acc >= DAY_MS) { step(state); acc -= DAY_MS; }
   }
   tickTraffic(state, traffic, (dt / 1000) * speed);
+  tod = (tod + ((dt / 1000) * speed) / 90) % 1;
+  renderer.setAtmosphere(tod, state.raining);
+  hud.setSky(tod, state.raining);
+  const month = Math.floor(state.day / 30);
+  if (month !== lastMonthSaved) {
+    lastMonthSaved = month;
+    saveTo(AUTOSAVE, state);
+  }
   if (state.fires !== seenFires) {
     hud.showToast("Fire! A building burned down. Build a fire station.");
     seenFires = state.fires;
@@ -226,4 +267,9 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 // Debug/test hook.
-(window as unknown as { __city: unknown }).__city = { state, renderer, traffic, tileHeight };
+(window as unknown as { __city: unknown }).__city = {
+  get state() { return state; },
+  get traffic() { return traffic; },
+  renderer, tileHeight,
+  setTod: (v: number) => { tod = v; },
+};

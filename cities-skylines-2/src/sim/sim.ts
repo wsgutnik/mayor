@@ -1,4 +1,5 @@
 import { makeRng } from "./rng";
+import { isRaining } from "./weather";
 import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, generateWorld, idx, inBounds,
@@ -87,6 +88,8 @@ export interface CityState {
   landValue: number;
   /** Buildings lost to fire since the game began. */
   fires: number;
+  /** Rain slows road traffic; derived from the day and seed. */
+  raining: boolean;
   /** Daily passengers, fare income and share of commuters on transit. */
   transit: { riders: number; income: number; share: number };
   /** Share of vehicles crawling (0..1), smoothed; written by tickTraffic. */
@@ -122,6 +125,7 @@ export function newCity(seed = 1337, size = 96): CityState {
     coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 },
     landValue: 0,
     fires: 0,
+    raining: false,
     transit: { riders: 0, income: 0, share: 0 },
     congestion: 0,
     vehicles: 0,
@@ -376,11 +380,23 @@ function recount(s: CityState): void {
   };
 }
 
+/** Rebuild everything derived from the player's world (after loading a save). */
+export function refreshDerived(s: CityState): void {
+  const w = s.world;
+  rebuildRoadRaster(w);
+  updateConnectivity(w);
+  updateCoverage(w);
+  updateLandValue(w);
+  recount(s);
+  w.revision++;
+}
+
 /** Advance the simulation by one day. */
 export function step(s: CityState): void {
   const w = s.world;
   if (w.connectivityDirty) updateConnectivity(w);
   if (w.coverageDirty) updateCoverage(w);
+  s.raining = isRaining(s.day, s.rngState);
   if (s.day % 5 === 0) updateLandValue(w);
   const rng = makeRng(s.rngState ^ (s.day * 2654435761));
   const demandOf = [0, s.demand.r, s.demand.c, s.demand.i];

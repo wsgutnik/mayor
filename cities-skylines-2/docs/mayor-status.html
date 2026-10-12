@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M6 concluído. M7 em seguida.",
-    summary: "Agora há ônibus e metrô: o jogador coloca paradas e estações, liga em linhas circulares e compra veículos. Passageiros pagam tarifa, tiram carros da rua e valorizam a vizinhança.",
-    screenshot: { src: "img/m6-transit.jpg", caption: "M6: uma linha de ônibus de três paradas sobre a avenida e uma linha de metrô entre duas estações roxas; o painel à direita controla veículos por linha." },
+    headline: "M7 concluído. M8 em seguida.",
+    summary: "O jogo agora salva e carrega, abre cidades novas por seed, tem ciclo de dia e noite com janelas acesas e chuva que atrasa o trânsito. Falta empacotar para Mac, Windows e iPad.",
+    screenshot: { src: "img/m7-menu.jpg", caption: "M7: menu com logo, autosave, três slots e nova cidade por seed; ao fundo, a cidade à noite sob chuva." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -172,16 +172,25 @@ npm run dev</pre>
       { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "done" },
       { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "done" },
       { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "done" },
-      { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "active" },
-      { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "todo" }
+      { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "done" },
+      { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "active" }
     ],
     checks: [
-      { ok: true, text: "56 testes passando, incluindo linhas, ridership, metrô e efeitos no tráfego" },
+      { ok: true, text: "63 testes passando, incluindo ida e volta de save, estado derivado recomputado, saves corrompidos e clima" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
-      { ok: true, text: "Jogado no navegador: paradas, linha de ônibus, estações de metrô, linha de metrô e painel de linhas" },
+      { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
       { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8); quadros por segundo reais só medidos no navegador do Mac" }
     ],
     log: [
+      { date: "2026-10-12", title: "M7 · Persistência e meta", items: [
+        "Salvar e carregar em três slots e autosave no início de cada mês, em localStorage (cerca de 90 KB por cidade)",
+        "O save guarda só o que o jogador criou; cobertura, conectividade e valor do solo são recalculados ao carregar",
+        "Saves danificados ou de outra versão são recusados com mensagem clara em vez de quebrar o jogo",
+        "Menu (☰) com logo, continuar autosave e nova cidade por seed",
+        "Ciclo de dia e noite: sol, céu, névoa e janelas acesas; um ciclo dura 90 s a 1x",
+        "Chuva por frente de cinco dias, determinística por dia e seed, com gotas e trânsito 15% mais lento",
+        "Interno: o jogo carrega outra cidade sem recriar a cena, trocando o mundo no renderizador"
+      ] },
       { date: "2026-10-12", title: "M6 · Transporte público", items: [
         "Paradas de ônibus em ruas e avenidas e estações de metrô em qualquer terreno livre (raio 6 e 9)",
         "Linhas circulares criadas tocando as paradas em ordem; validação de rota por estrada para ônibus",

@@ -67,6 +67,10 @@ export class CityRenderer {
   private scene = new THREE.Scene();
   private terrain!: THREE.Mesh;
   private terrainGeo!: THREE.PlaneGeometry;
+  private hemi!: THREE.HemisphereLight;
+  private sun!: THREE.DirectionalLight;
+  private rain!: THREE.LineSegments;
+  private rainOn = false;
   private roadMesh!: THREE.Mesh;
   private metroMesh!: THREE.Mesh;
   private stopMesh!: THREE.InstancedMesh;
@@ -87,6 +91,7 @@ export class CityRenderer {
   private seenRevision = -1;
   private dummy = new THREE.Object3D();
   private world: World;
+  private buildingMat!: THREE.MeshLambertMaterial;
 
   constructor(private container: HTMLElement, state: CityState) {
     this.world = state.world;
@@ -97,10 +102,12 @@ export class CityRenderer {
 
     this.scene.background = new THREE.Color("#a9c8e8");
     this.scene.fog = new THREE.Fog("#a9c8e8", 90, 260);
-    this.scene.add(new THREE.HemisphereLight("#ffffff", "#6b7a5a", 1.35));
-    const sun = new THREE.DirectionalLight("#fff4de", 1.8);
-    sun.position.set(-40, 70, 30);
-    this.scene.add(sun);
+    this.hemi = new THREE.HemisphereLight("#ffffff", "#6b7a5a", 1.35);
+    this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight("#fff4de", 1.8);
+    this.sun.position.set(-40, 70, 30);
+    this.scene.add(this.sun);
+    this.buildRain();
 
     this.rig = new CameraRig(1, size);
     this.rig.target.set(8, 0, this.world.entry.y + 0.5);
@@ -135,7 +142,8 @@ export class CityRenderer {
     this.previewMesh.visible = false;
     this.scene.add(this.previewMesh);
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
-    this.buildings = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.buildingMat = new THREE.MeshLambertMaterial({ color: "#ffffff", emissive: new THREE.Color("#ffd9a0"), emissiveIntensity: 0 });
+    this.buildings = mk(this.buildingMat);
     this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
@@ -358,6 +366,56 @@ export class CityRenderer {
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
+  private buildRain(): void {
+    const N = 700;
+    const g = new THREE.BufferGeometry();
+    const p = new Float32Array(N * 6);
+    for (let i = 0; i < N; i++) {
+      const x = (Math.random() - 0.5) * 70, y = Math.random() * 32, z = (Math.random() - 0.5) * 70;
+      p.set([x, y, z, x - 0.05, y + 0.9, z], i * 6);
+    }
+    g.setAttribute("position", new THREE.BufferAttribute(p, 3));
+    this.rain = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: "#bcd0e6", transparent: true, opacity: 0.55 }));
+    this.rain.frustumCulled = false;
+    this.rain.visible = false;
+    this.scene.add(this.rain);
+  }
+
+  /** Swap in another world of the same size (load / new city). */
+  setWorld(world: World): void {
+    this.world = world;
+    this.seenRevision = -1;
+    this.overlaySeen = -1;
+    this.overlayLvSeen = -1;
+  }
+
+  /**
+   * Time of day (0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset) and weather.
+   * Drives light, sky, fog and window glow.
+   */
+  setAtmosphere(tod: number, raining: boolean): void {
+    const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+    const elev = Math.sin((tod - 0.25) * Math.PI * 2);
+    const day = clamp01(elev * 1.3 + 0.25);
+    const dusk = clamp01(1 - Math.abs(elev) * 3.2) * (elev > -0.3 ? 1 : 0);
+    const sky = new THREE.Color("#0a1224").lerp(new THREE.Color("#a9c8e8"), day);
+    sky.lerp(new THREE.Color("#f0a070"), dusk * 0.45);
+    if (raining) sky.lerp(new THREE.Color("#6f7d8c"), 0.55);
+    (this.scene.background as THREE.Color).copy(sky);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.color.copy(sky);
+    fog.near = raining ? 40 : 90;
+    fog.far = raining ? 150 : 260;
+    const a = (tod - 0.25) * Math.PI * 2;
+    this.sun.position.set(-Math.cos(a) * 60, Math.max(6, Math.sin(a) * 70 + 8), 30);
+    this.sun.intensity = (0.15 + 1.7 * day) * (raining ? 0.5 : 1);
+    this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6);
+    this.hemi.intensity = (0.4 + 0.95 * day) * (raining ? 0.8 : 1);
+    this.buildingMat.emissiveIntensity = (1 - day) * 0.32;
+    this.rainOn = raining;
+    this.rain.visible = raining;
+  }
+
   /** Traffic whose vehicles are drawn and whose loads colour the traffic infoview. */
   setTraffic(t: TrafficState): void {
     this.traffic = t;
@@ -534,6 +592,16 @@ export class CityRenderer {
       this.rebuild();
     }
     this.frame++;
+    if (this.rainOn) {
+      const pos = this.rain.geometry.attributes.position as THREE.BufferAttribute;
+      const a = pos.array as Float32Array;
+      for (let i = 0; i < a.length; i += 6) {
+        a[i + 1] -= 0.9; a[i + 4] -= 0.9;
+        if (a[i + 1] < 0) { a[i + 1] += 32; a[i + 4] += 32; }
+      }
+      pos.needsUpdate = true;
+      this.rain.position.set(this.rig.target.x, 0, this.rig.target.z);
+    }
     this.updateVehicles();
     if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();

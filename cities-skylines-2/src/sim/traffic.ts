@@ -2,6 +2,7 @@ import { makeRng } from "./rng";
 import { CityState } from "./sim";
 import { ROAD, World, ZONE, idx, inBounds, TransitKind } from "./world";
 import { straightTiles } from "./transit";
+import { RAIN_SPEED_FACTOR } from "./weather";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
 export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7 };
@@ -264,7 +265,7 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
   t.vehicles.push({ id: t.nextId++, kind, tiles, pts: smoothPath(w, tiles), progress: 0, speedFactor: 1 });
 }
 
-function moveTransit(w: World, t: TrafficState, dt: number): void {
+function moveTransit(w: World, t: TrafficState, dt: number, weather: number): void {
   for (const v of t.transit) {
     if (v.dwell > 0) { v.dwell -= dt; continue; }
     if (!v.tiles.length) continue;
@@ -274,7 +275,7 @@ function moveTransit(w: World, t: TrafficState, dt: number): void {
       const cls = w.road[tile];
       if (!cls) { v.progress = v.tiles.length; continue; }
       const f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
-      speed = ROAD_SPEED[cls] * f * 0.9;
+      speed = ROAD_SPEED[cls] * f * 0.9 * weather;
     }
     v.progress += speed * dt;
     if (v.progress >= v.tiles.length - 1) {
@@ -308,7 +309,7 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   for (const v of t.transit) {
     if (v.kind === "bus" && v.tiles.length) t.load[v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))]]++;
   }
-  moveTransit(w, t, dt);
+  moveTransit(w, t, dt, s.raining ? RAIN_SPEED_FACTOR : 1);
 
   let slow = 0;
   const alive: Vehicle[] = [];
@@ -319,7 +320,7 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     const f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
     v.speedFactor = f;
     if (f < 0.6) slow++;
-    v.progress += ROAD_SPEED[cls] * f * dt;
+    v.progress += ROAD_SPEED[cls] * f * (s.raining ? RAIN_SPEED_FACTOR : 1) * dt;
     if (v.progress >= v.tiles.length - 1) { t.completed++; continue; }
     alive.push(v);
   }
