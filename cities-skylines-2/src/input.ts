@@ -68,12 +68,13 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   };
 
   const down = (e: PointerEvent) => {
-    el.setPointerCapture(e.pointerId);
+    try { el.setPointerCapture(e.pointerId); } catch { /* the pointer vanished already; still track it */ }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     prev = { x: e.clientX, y: e.clientY };
     downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
     travelled = 0;
-    if (pointers.size === 2) {
+    // A second (or a stray third) contact turns the stroke into a camera gesture.
+    if (pointers.size >= 2) {
       mode = "gesture";
       last = null;
       gesture = measure();
@@ -125,6 +126,14 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     }
   };
 
+  /** The system took the touch away (call, palm rejection): drop it without firing a tap. */
+  const cancel = (e: PointerEvent) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) gesture = null;
+    if (pointers.size === 0) { mode = "none"; last = null; }
+    else if (mode === "gesture") mode = "none";
+  };
+
   const wheel = (e: WheelEvent) => {
     e.preventDefault();
     r.rig.zoom(Math.exp(e.deltaY * 0.0012));
@@ -153,7 +162,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   el.addEventListener("pointerdown", down);
   el.addEventListener("pointermove", move);
   el.addEventListener("pointerup", up);
-  el.addEventListener("pointercancel", up);
+  el.addEventListener("pointercancel", cancel);
   el.addEventListener("wheel", wheel, { passive: false });
   el.addEventListener("contextmenu", ctx);
   window.addEventListener("keydown", keydown);
@@ -164,7 +173,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     el.removeEventListener("pointerdown", down);
     el.removeEventListener("pointermove", move);
     el.removeEventListener("pointerup", up);
-    el.removeEventListener("pointercancel", up);
+    el.removeEventListener("pointercancel", cancel);
     el.removeEventListener("wheel", wheel);
     el.removeEventListener("contextmenu", ctx);
     window.removeEventListener("keydown", keydown);

@@ -1,0 +1,44 @@
+/*
+ * Touch, safe-area and accessibility pass (from the iPad review). Loaded after style.css so it wins on
+ * equal specificity; kept in its own file so feature work in style.css never conflicts with it.
+ */
+:root {
+  --panel: rgba(16, 24, 38, 0.9);
+  --muted: #b3c2d8;
+}
+
+/* Tap targets of at least 44 px on controls that were smaller. */
+.speed-btn { min-width: 44px; min-height: 44px; }
+.line-row { grid-template-columns: 10px 1fr auto auto 44px 18px 44px 44px; }
+.line-row button { min-width: 44px; min-height: 44px; }
+.menu button { min-height: 44px; }
+.tool { min-height: 52px; }
+
+/* The services header is a real button now. */
+button.svc-head {
+  width: 100%; background: transparent; border: 0; padding: 0; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+
+/* Keyboard and switch-control focus. */
+:where(button, select, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Portrait iPad (768 px): the centred top bar would sit on the left column. */
+@media (max-width: 900px) {
+  .left-col { top: calc(76px + var(--safe-top)); }
+}
+
+/* Keep full-screen menus clear of the notch and the home indicator. */
+.menu-backdrop {
+  padding-top: max(16px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.001ms !important; animation-duration: 0.001ms !important; }
+}

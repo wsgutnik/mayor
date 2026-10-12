@@ -69,6 +69,7 @@ const PT: Record<string, string> = {
   "City hall (one per city): happiness and tax income": "Prefeitura (uma por cidade): felicidade e arrecadação",
   "Substation: extends the power network (radius 14)": "Subestação: estende a rede de energia (raio 14)",
   "There is already a city hall": "Já existe uma prefeitura",
+  "Pause": "Pausar", "Speed": "Velocidade", "Fewer vehicles": "Menos veículos", "More vehicles": "Mais veículos", "Remove line": "Remover linha",
   "Preferences": "Preferências", "Pop {n}": "Pop. {n}",
   // preferences
   "General": "Geral", "Graphics": "Gráficos", "Gameplay": "Jogabilidade", "Controls": "Controles",

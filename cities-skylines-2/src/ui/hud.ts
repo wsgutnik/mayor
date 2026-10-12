@@ -173,6 +173,7 @@ export class Hud {
   }
 
   destroy(): void {
+    clearTimeout(this.toastTimer);
     this.root.remove();
   }
 
@@ -195,12 +196,14 @@ export class Hud {
     const speed = el("div", "speed");
     [["⏸", 0], ["▶", 1], ["▶▶", 2], ["▶▶▶", 4]].forEach(([label, v]) => {
       const b = el("button", "speed-btn", String(label));
+      b.setAttribute("aria-label", v === 0 ? tr("Pause") : `${tr("Speed")} ${v}x`);
       b.addEventListener("click", () => this.hooks.onSpeed(v as number));
       speed.appendChild(b);
       this.speedBtns.push(b);
     });
     const menu = el("button", "speed-btn menu-btn", `<img class="ic-img sm" src="/ui/kit/ico-engrenagem.png" alt="">`);
     menu.title = tr("Menu: save, load, new city");
+    menu.setAttribute("aria-label", tr("Menu: save, load, new city"));
     menu.addEventListener("click", () => this.hooks.onMenu());
     speed.appendChild(menu);
     top.appendChild(speed);
@@ -229,8 +232,12 @@ export class Hud {
     col.appendChild(ind);
 
     const p = el("div", "panel services");
-    const head = el("div", "svc-head toggle", `<span>${tr("Services")} ▾</span><b></b>`);
-    head.addEventListener("click", () => p.classList.toggle("collapsed"));
+    const head = el("button", "svc-head toggle", `<span>${tr("Services")} ▾</span><b></b>`);
+    head.setAttribute("aria-expanded", "true");
+    head.addEventListener("click", () => {
+      p.classList.toggle("collapsed");
+      head.setAttribute("aria-expanded", String(!p.classList.contains("collapsed")));
+    });
     p.appendChild(head);
     for (const r2 of SERVICE_ROWS) p.appendChild(this.svcRow(r2.label, r2.color, "none", (f, v) => this.svc.set(r2.key, { fill: f, val: v })));
     for (const r2 of CIVIC_ROWS) p.appendChild(this.svcRow(r2.label, r2.color, "0%", (f, v) => this.civ.set(r2.key, { fill: f, val: v })));
@@ -461,7 +468,7 @@ export class Hud {
     for (const l of s.world.lines) {
       const row = el("div", "line-row",
         `<i style="background:${l.color}"></i><span class="ln">${lineName(l.name)}</span><span class="lm">${l.stops.length} ${tr("stops")}</span>` +
-        `<button data-d="-1">−</button><b>${l.vehicles}</b><button data-d="1">+</button><button data-x>✕</button>`);
+        `<button data-d="-1" aria-label="${tr("Fewer vehicles")}">−</button><b>${l.vehicles}</b><button data-d="1" aria-label="${tr("More vehicles")}">+</button><button data-x aria-label="${tr("Remove line")}">✕</button>`);
       row.querySelector<HTMLButtonElement>('[data-d="-1"]')!.addEventListener("click", () => this.hooks.onLineVehicles(l.id, -1));
       const plus = row.querySelector<HTMLButtonElement>('[data-d="1"]')!;
       plus.disabled = l.vehicles >= MAX_LINE_VEHICLES;

@@ -1,4 +1,5 @@
 import "./ui/style.css";
+import "./ui/touch.css";
 import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
