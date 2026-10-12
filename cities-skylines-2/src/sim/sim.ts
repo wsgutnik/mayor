@@ -6,6 +6,7 @@ import {
   isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
 } from "./world";
+import { addSegment, rebuildNodes, removeSegment } from "./roads";
 
 export type FacilityTool =
   | "power" | "water" | "sewage" | "landfill"
@@ -207,7 +208,7 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
   return { ok: true, tiles, newTiles, cost };
 }
 
-/** Build a road segment: flatten and clear the ground it covers, then charge for new tiles. */
+/** Build a road: flatten and clear the ground it covers, then charge for new tiles. */
 export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
   const plan = planRoad(s, type, pts);
   if (!plan.ok) return { ok: false, reason: plan.reason! };
@@ -218,7 +219,9 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
     w.zone[i] = 0;
     w.level[i] = 0;
   }
-  w.segments.push({ id: w.nextSegmentId++, type, pts: pts.map((p) => ({ ...p })), tiles: plan.tiles });
+  // The graph snaps the ends to nearby nodes, splits T-junction sides and
+  // crossings, and upgrades roads paved over along the same path.
+  addSegment(w, type, pts);
   rebuildRoadRaster(w);
   s.money -= plan.cost;
   s.monthExpenses += plan.cost;
@@ -261,8 +264,11 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     }
     if (w.facility[i] === FAC.METRO) removeStopAt(w, i);
     if (w.road[i]) {
-      // Bulldozing a road removes the whole segment it belongs to.
-      w.segments = w.segments.filter((seg) => seg.fixed || !seg.tiles.includes(i));
+      // Bulldozing a road removes every segment covering the tile; the graph
+      // merges straight joints back and drops orphaned nodes.
+      for (const seg of [...w.segments]) {
+        if (!seg.fixed && seg.tiles.includes(i)) removeSegment(w, seg.id);
+      }
       rebuildRoadRaster(w);
       // Every bus stop that lost its road goes with it, not only the one under the cursor.
       for (const stop of [...w.stops]) {
@@ -420,6 +426,7 @@ function recount(s: CityState): void {
 /** Rebuild everything derived from the player's world (after loading a save). */
 export function refreshDerived(s: CityState): void {
   const w = s.world;
+  rebuildNodes(w);
   rebuildRoadRaster(w);
   updateConnectivity(w);
   updateCoverage(w);

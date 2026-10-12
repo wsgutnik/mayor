@@ -1,4 +1,5 @@
 import { makeRng } from "./rng";
+import type { RoadNode } from "./roads";
 
 export const ZONE = { NONE: 0, RES: 1, COM: 2, IND: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
@@ -88,6 +89,9 @@ export interface RoadSegment {
   pts: Pt[];
   /** Tile indices this segment occupies. */
   tiles: number[];
+  /** Graph endpoints: ids into World.nodes. Absent in old saves; rebuilt on load. */
+  a: number;
+  b: number;
   /** The pre-built entry road cannot be removed. */
   fixed?: boolean;
 }
@@ -104,6 +108,9 @@ export interface World {
   road: Uint8Array;
   segments: RoadSegment[];
   nextSegmentId: number;
+  /** Junction graph: every segment end attaches to one of these. Rebuilt on load. */
+  nodes: RoadNode[];
+  nextNodeId: number;
   stops: Stop[];
   lines: TransitLine[];
   nextTransitId: number;
@@ -210,6 +217,8 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     road: new Uint8Array(size * size),
     segments: [],
     nextSegmentId: 1,
+    nodes: [],
+    nextNodeId: 1,
     stops: [],
     lines: [],
     nextTransitId: 1,
@@ -231,9 +240,15 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     for (let x = 0; x <= 5; x++) heights[y * s + x] = 0.35;
   }
   const entryTiles = entryRoadTiles(world);
+  const na = world.nextNodeId++, nb = world.nextNodeId++;
+  world.nodes.push(
+    { id: na, x: 0.5, z: ey + 0.5, segs: [world.nextSegmentId] },
+    { id: nb, x: 2.5, z: ey + 0.5, segs: [world.nextSegmentId] },
+  );
   world.segments.push({
     id: world.nextSegmentId++, type: 1, fixed: true, tiles: entryTiles,
     pts: [{ x: 0.5, z: ey + 0.5 }, { x: 2.5, z: ey + 0.5 }],
+    a: na, b: nb,
   });
   rebuildRoadRaster(world);
   return world;

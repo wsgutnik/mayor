@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CityState } from "../sim/sim";
 import {
   ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
-  RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt, Biome,
+  RoadType, Pt, inBounds, heightAt, Biome,
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
@@ -11,6 +11,7 @@ import { loadGlb, LoadedModel } from "./glb-models";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
+import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
@@ -639,173 +640,16 @@ export class CityRenderer {
   }
 
   /**
-   * Ribbon geometry for road segments: asphalt strip plus a centre line or median.
-   * `tint` replaces the per-class colours (used for the build preview).
+   * Simple strips without junctions: road preview ghosts and metro tracks.
+   * The live network renders through buildRoadNetworkGeometry (see rebuildRoads).
    */
   private buildRoadGeometry(segs: { type: RoadType; pts: Pt[]; width?: number; color?: string; lift?: number }[], tint?: THREE.Color): THREE.BufferGeometry {
-    const pos: number[] = [];
-    const col: number[] = [];
-    const ind: number[] = [];
-    const uvs: number[] = [];
-    const c = new THREE.Color();
-    const strip = (samples: Pt[], halfW: number, lift: number, color: string, offset = 0, dashed = false) => {
-      if (tint) c.copy(tint); else c.set(color);
-      let prevOn = false;
-      for (let i = 0; i < samples.length; i++) {
-        // dashes: two samples on, two off (about one tile each at 0.5 spacing)
-        const on = !dashed || i % 4 < 2;
-        if (!on) { prevOn = false; continue; }
-        const first = !prevOn;
-        const a = samples[Math.max(0, i - 1)], b = samples[Math.min(samples.length - 1, i + 1)];
-        let tx = b.x - a.x, tz = b.z - a.z;
-        const l = Math.hypot(tx, tz) || 1;
-        tx /= l; tz /= l;
-        const nx = -tz, nz = tx;
-        const p = samples[i];
-        const y = this.groundY(p.x, p.z) + lift;
-        const ox = nx * offset, oz = nz * offset;
-        const vi = pos.length / 3;
-        pos.push(p.x + ox + nx * halfW, y, p.z + oz + nz * halfW, p.x + ox - nx * halfW, y, p.z + oz - nz * halfW);
-        col.push(c.r, c.g, c.b, c.r, c.g, c.b);
-        uvs.push((p.x + ox + nx * halfW) / 0.6, (p.z + oz + nz * halfW) / 0.6, (p.x + ox - nx * halfW) / 0.6, (p.z + oz - nz * halfW) / 0.6);
-        if (!first) ind.push(vi - 2, vi - 1, vi, vi - 1, vi + 1, vi);
-        prevOn = true;
-      }
-    };
-    segs.forEach((seg, n) => {
-      const samples = curvePoints(seg.pts, 0.5);
-      const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
-      if (seg.color) { strip(samples, (seg.width ?? 0.3) / 2, lift, seg.color); return; }
-      const total = ROAD_DRAW_WIDTH[seg.type];
-      if (seg.type === 3) {
-        strip(samples, total / 2, lift, "#4a4f57");
-        strip(samples, 0.14, lift + 0.01, "#b8bec6");
-        strip(samples, 0.012, lift + 0.012, "#e8e4c8", total * 0.25, true);
-        strip(samples, 0.012, lift + 0.012, "#e8e4c8", -total * 0.25, true);
-        return;
-      }
-      // Asphalt with a kerb and pavement on each side; the drawn width includes both pavements.
-      const kerb = seg.type === 1 ? 0.07 : 0.09;
-      const hw = total / 2 - kerb;
-      strip(samples, hw, lift, "#3b3f46");
-      for (const side of [-1, 1]) strip(samples, kerb / 2, lift + 0.006, "#c4c7cc", side * (hw + kerb / 2));
-      if (seg.type === 1) strip(samples, 0.012, lift + 0.01, "#d8d4b0", 0, true);
-      else {
-        strip(samples, 0.16, lift + 0.01, "#5f8a4a");
-        strip(samples, 0.012, lift + 0.011, "#e8e4c8", hw * 0.5, true);
-        strip(samples, 0.012, lift + 0.011, "#e8e4c8", -hw * 0.5, true);
-      }
-    });
-    // Zebra crossings and stop lines on every street/avenue arm that meets a junction (3+ road ends in one spot).
-    if (!tint) {
-      // Arms: every street/avenue end that touches another road segment (end-to-end or T-junction).
-      const near = new Map<string, Set<number>>();
-      segs.forEach((seg, n) => {
-        if (seg.color || seg.pts.length < 2) return;
-        for (const q of curvePoints(seg.pts, 0.5)) {
-          const key = `${Math.round(q.x)},${Math.round(q.z)}`;
-          const set = near.get(key) ?? new Set<number>();
-          set.add(n);
-          near.set(key, set);
-        }
-      });
-      const touches = (p: Pt, self: number): boolean => {
-        for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
-          const set = near.get(`${Math.round(p.x) + ox},${Math.round(p.z) + oz}`);
-          if (set) for (const id of set) if (id !== self) return true;
-        }
-        return false;
-      };
-      const arms: { p: Pt; dx: number; dz: number; type: RoadType; lift: number }[] = [];
-      segs.forEach((seg, n) => {
-        if (seg.color || seg.type === 3 || seg.pts.length < 2) return;
-        const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
-        const last = seg.pts.length - 1;
-        for (const [i, j] of [[0, 1], [last, last - 1]] as const) {
-          const p = seg.pts[i], q = seg.pts[j];
-          if (!touches(p, n)) continue;
-          const l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
-          arms.push({ p, dx: (q.x - p.x) / l, dz: (q.z - p.z) / l, type: seg.type, lift });
-        }
-      });
-      const quad = (cx: number, cz: number, ax: number, az: number, hl: number, hw: number, lift: number, color: string) => {
-        // ax,az = unit direction along the quad's length
-        const bx = -az, bz = ax;
-        c.set(color);
-        const vi = pos.length / 3;
-        for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-          const x = cx + ax * hl * u + bx * hw * v, z = cz + az * hl * u + bz * hw * v;
-          pos.push(x, this.groundY(x, z) + lift, z);
-          col.push(c.r, c.g, c.b);
-          uvs.push(x / 0.6, z / 0.6);
-        }
-        ind.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
-      };
-      // Junction and corner patches: a pavement disc under an asphalt disc at every road end, so segments that meet at an
-      // angle join with rounded kerb corners instead of leaving wedge gaps, and dead ends close with a round cap.
-      const halfW = (type: RoadType): number => ROAD_DRAW_WIDTH[type] / 2 - (type === 1 ? 0.07 : 0.09);
-      const fan = (cx: number, cz: number, r: number, lift: number, color: string): void => {
-        c.set(color);
-        const n = 24, vi = pos.length / 3;
-        pos.push(cx, this.groundY(cx, cz) + lift, cz);
-        col.push(c.r, c.g, c.b);
-        uvs.push(cx / 0.6, cz / 0.6);
-        for (let k = 0; k < n; k++) {
-          const a = (k / n) * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-          pos.push(x, this.groundY(x, z) + lift, z);
-          col.push(c.r, c.g, c.b);
-          uvs.push(x / 0.6, z / 0.6);
-        }
-        for (let k = 0; k < n; k++) ind.push(vi, vi + 1 + k, vi + 1 + ((k + 1) % n));
-      };
-      const nodes: { x: number; z: number; r: number; lift: number; kerb: number; tee: boolean }[] = [];
-      segs.forEach((seg, n) => {
-        if (seg.color || seg.type === 3 || seg.pts.length < 2) return;
-        const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
-        const kerb = seg.type === 1 ? 0.07 : 0.09;
-        const last = seg.pts.length - 1;
-        for (const i of [0, last]) {
-          const p = seg.pts[i];
-          const r = halfW(seg.type);
-          // A stem ending on the side of another road (T-junction) only gets asphalt; a kerb ring would cut across that road.
-          const meetsEnd = segs.some((o, id) => id !== n && !o.color && o.pts.length > 1 &&
-            [o.pts[0], o.pts[o.pts.length - 1]].some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.9));
-          const tee = !meetsEnd && touches(p, n);
-          const hit = nodes.find((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.9);
-          if (hit) { hit.r = Math.max(hit.r, r); hit.lift = Math.max(hit.lift, lift); hit.kerb = Math.max(hit.kerb, kerb); hit.tee = hit.tee && tee; }
-          else nodes.push({ x: p.x, z: p.z, r, lift, kerb, tee });
-        }
-      });
-      for (const nd of nodes) {
-        if (!nd.tee) fan(nd.x, nd.z, nd.r + nd.kerb, nd.lift + 0.012, "#c4c7cc");
-        fan(nd.x, nd.z, nd.r, nd.lift + 0.02, "#3b3f46");
-      }
-      {
-        for (const a of arms) {
-          const hw = ROAD_DRAW_WIDTH[a.type] / 2 - (a.type === 1 ? 0.07 : 0.09);
-          const d = 0.8;                                     // distance of the crossing from the junction centre
-          const cx = a.p.x + a.dx * d, cz = a.p.z + a.dz * d;
-          const stripes = Math.max(4, Math.round(hw * 9));
-          for (let k = 0; k < stripes; k++) {
-            const t = ((k + 0.5) / stripes) * 2 - 1;        // across the road
-            quad(cx - a.dz * hw * t * 0.9, cz + a.dx * hw * t * 0.9, a.dx, a.dz, 0.13, hw * 0.9 / stripes * 0.5, a.lift + 0.028, "#f1f1ea");
-          }
-          quad(a.p.x + a.dx * (d + 0.14), a.p.z + a.dz * (d + 0.14), -a.dz, a.dx, hw * 0.92, 0.012, a.lift + 0.028, "#f1f1ea");
-        }
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
-    g.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-    g.setIndex(ind);
-    g.computeVertexNormals();
-    return g;
+    return buildStripGeometry(segs, (x, z) => this.groundY(x, z), tint);
   }
 
   private rebuildRoads(): void {
     this.roadMesh.geometry.dispose();
-    this.roadMesh.geometry = this.buildRoadGeometry(this.world.segments as RoadSegment[]);
+    this.roadMesh.geometry = buildRoadNetworkGeometry(this.world, (x, z) => this.groundY(x, z));
     this.rebuildTransit();
   }
 

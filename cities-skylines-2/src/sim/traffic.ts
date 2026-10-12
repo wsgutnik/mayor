@@ -1,6 +1,7 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
 import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity } from "./world";
+import { SignalInfo, signalNodes, signalPhase } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
 
@@ -60,6 +61,11 @@ export interface TrafficState {
   shops: number[];
   factories: number[];
   jobs: number[];
+  /** Game seconds driven (signal phases derive from this). */
+  time: number;
+  /** Signalised nodes, refreshed when the world revision moves. */
+  sigRev: number;
+  sigNodes: SignalInfo[];
 }
 
 export function newTraffic(size: number, seed = 7): TrafficState {
@@ -67,7 +73,38 @@ export function newTraffic(size: number, seed = 7): TrafficState {
     vehicles: [], transit: [], transitRevision: -1, load: new Uint16Array(size * size), completed: 0, nextId: 1,
     rng: makeRng(seed), spawnCarry: 0, truckCarry: 0, listRevision: -1,
     homes: [], shops: [], factories: [], jobs: [],
+    time: 0, sigRev: -1, sigNodes: [],
   };
+}
+
+/** Crawl factor while entering a signalised junction against a red light. */
+const RED_CRAWL = 0.3;
+
+/**
+ * 1 when the route from `tile` to `next` may proceed, RED_CRAWL when it enters
+ * a signalised node against the phase. Allocation-free over the cached nodes.
+ */
+function redCrawl(w: World, t: TrafficState, tile: number, next: number, phase: 0 | 1): number {
+  const hx = (next % w.size) - (tile % w.size);
+  const hz = ((next / w.size) | 0) - ((tile / w.size) | 0);
+  if (hx === 0 && hz === 0) return 1;
+  const hl = Math.hypot(hx, hz);
+  const cx = (tile % w.size) + 0.5, cz = ((tile / w.size) | 0) + 0.5;
+  for (const sn of t.sigNodes) {
+    const vx = sn.x - cx, vz = sn.z - cz;
+    const d = Math.hypot(vx, vz);
+    if (d > 1.7 || d < 1e-6) continue;
+    if ((vx * hx + vz * hz) / (d * hl) < 0.5) continue; // not heading at this node
+    const ux = hx / hl, uz = hz / hl;
+    let best = 0, bd = -Infinity;
+    for (let k = 0; k < sn.arms.length; k++) {
+      // The arm being travelled: its outward direction opposes the heading.
+      const s = -(sn.arms[k].dx * ux + sn.arms[k].dz * uz);
+      if (s > bd) { bd = s; best = k; }
+    }
+    if (bd > 0.3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return RED_CRAWL;
+  }
+  return 1;
 }
 
 // ---------------------------------------------------------------- pathfinding
@@ -325,13 +362,22 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   }
   moveTransit(w, t, dt, s.raining ? RAIN_SPEED_FACTOR : 1);
 
+  if (t.sigRev !== w.revision) {
+    t.sigRev = w.revision;
+    t.sigNodes = signalNodes(w);
+  }
+  t.time += dt;
+  const phase = signalPhase(t.time);
+
   let slow = 0;
   const alive: Vehicle[] = [];
   for (const v of t.vehicles) {
-    const tile = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
+    const at = Math.min(v.tiles.length - 1, Math.floor(v.progress));
+    const tile = v.tiles[at];
     const cls = w.road[tile];
     if (!cls) continue;
-    const f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
+    let f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
+    if (f > RED_CRAWL && t.sigNodes.length) f = Math.min(f, redCrawl(w, t, tile, v.tiles[Math.min(v.tiles.length - 1, at + 1)], phase));
     v.speedFactor = f;
     if (f < 0.6) slow++;
     v.progress += ROAD_SPEED[cls] * f * (s.raining ? RAIN_SPEED_FACTOR : 1) * dt;
