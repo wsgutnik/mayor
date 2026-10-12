@@ -20,7 +20,7 @@ const PT: Record<string, string> = {
   "Off": "Desligado",
   // hints
   "Drag to move the camera": "Arraste para mover a câmera",
-  "Paint roads": "Pinte estradas",
+  "Draw roads": "Desenhe estradas: toque no início e depois no fim", "Paint roads": "Pinte estradas",
   "Zone residential": "Zona residencial", "Zone commercial": "Zona comercial", "Zone industrial": "Zona industrial",
   "Remove roads, zones and facilities": "Remove estradas, zonas e instalações",
   "Place a power plant (feeds the road grid)": "Coloque uma usina (alimenta a rede das estradas)",

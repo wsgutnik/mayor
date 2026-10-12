@@ -33,7 +33,7 @@ let tool: ToolId = "road";
 let overlay: OverlayLayer = 0;
 let speed = 1;
 let roadType: RoadType = 1;
-let roadMode: RoadMode = "paint";
+let roadMode: RoadMode = "line";
 
 /** Points already placed for the road being drawn (start, and the bend in curve mode). */
 let draft: Pt[] = [];
@@ -149,7 +149,7 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast(tr("Autosave found: open the menu to continue")), 800);
 
 const lineTool = () => tool === "busline" || tool === "metroline";
-const placing = () => (tool === "road" && roadMode !== "paint") || lineTool();
+const placing = () => tool === "road" || lineTool();
 
 function cancelDraft(): void {
   draft = [];

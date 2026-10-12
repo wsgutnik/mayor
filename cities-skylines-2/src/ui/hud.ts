@@ -13,7 +13,7 @@ interface ToolDef { id: ToolId; label: string; hint: string; color: string; icon
 
 const T: Record<string, ToolDef> = {
   pan: { id: "pan", label: "Move", hint: "Drag to move the camera", color: "#ffffff", icon: { glyph: "✋" } },
-  road: { id: "road", label: "Roads", hint: "Paint roads", color: "#9aa3b2", icon: { img: "kit/ico-estrada" } },
+  road: { id: "road", label: "Roads", hint: "Draw roads", color: "#9aa3b2", icon: { img: "kit/ico-estrada" } },
   res: { id: "res", label: "Residential", hint: "Zone residential", color: "#4fbf6a", icon: { img: "kit/tile-residential" } },
   com: { id: "com", label: "Commercial", hint: "Zone commercial", color: "#4a8fe0", icon: { img: "kit/tile-commercial" } },
   ind: { id: "ind", label: "Industrial", hint: "Zone industrial", color: "#e0b43a", icon: { img: "kit/tile-industrial" } },
@@ -48,7 +48,6 @@ const SERVICE_TOOLS = [
 const TRANSIT_TOOLS = ["busstop", "metro", "busline", "metroline"];
 
 const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }[] = [
-  { mode: "paint", label: "Paint", glyph: "▪", hint: "Drag to paint road tiles" },
   { mode: "line", label: "Line", glyph: "╱", hint: "Tap a start, then an end" },
   { mode: "curve", label: "Curve", glyph: "⌒", hint: "Tap start, a bend point, then the end" },
 ];
@@ -152,7 +151,7 @@ export class Hud {
   private roadTypeBtns = new Map<RoadType, HTMLElement>();
   private roadModeBtns = new Map<RoadMode, HTMLElement>();
   private roadType: RoadType = 1;
-  private roadMode: RoadMode = "paint";
+  private roadMode: RoadMode = "line";
   private svc = new Map<UtilityKey, { fill: HTMLElement; val: HTMLElement }>();
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private ind = new Map<string, { fill: HTMLElement; val: HTMLElement }>();
@@ -310,7 +309,7 @@ export class Hud {
     });
     this.toolBtns.set("road", roads);
     bar.appendChild(roads);
-    this.setRoadChoice(1, "paint", false);
+    this.setRoadChoice(1, "line", false);
 
     const flyZones = el("div", "panel fly");
     for (const id of ZONE_TOOLS) flyZones.appendChild(this.toolButton(T[id]));
@@ -411,6 +410,9 @@ export class Hud {
   }
 
   setRoadChoice(type: RoadType, mode: RoadMode, notify = true): void {
+    // Painting tile by tile cannot make clean junctions; roads are drawn as lines or curves (old saves of the
+    // preference may still say "paint").
+    if (mode === "paint") mode = "line";
     this.roadType = type;
     this.roadMode = mode;
     this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === type));
