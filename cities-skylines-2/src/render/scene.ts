@@ -82,6 +82,7 @@ export class CityRenderer {
   private terrainGeo!: THREE.PlaneGeometry;
   private hemi!: THREE.HemisphereLight;
   private sun!: THREE.DirectionalLight;
+  private sunDir = new THREE.Vector3(-40, 70, 30);
   private rain!: THREE.LineSegments;
   private rainOn = false;
   private lastRebuildAt = 0;
@@ -167,6 +168,16 @@ export class CityRenderer {
     this.sun = new THREE.DirectionalLight("#fff4de", 1.8);
     this.sun.position.set(-40, 70, 30);
     this.scene.add(this.sun);
+    this.scene.add(this.sun.target);
+    // Soft sun shadows over the area around the camera target (see render()); the map size follows the quality level.
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.03;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
     this.buildRain();
 
     this.rig = new CameraRig(1, size);
@@ -736,7 +747,7 @@ export class CityRenderer {
         }
         for (let k = 0; k < n; k++) ind.push(vi, vi + 1 + k, vi + 1 + ((k + 1) % n));
       };
-      const nodes: { x: number; z: number; r: number; lift: number; kerb: number }[] = [];
+      const nodes: { x: number; z: number; r: number; lift: number; kerb: number; tee: boolean }[] = [];
       segs.forEach((seg, n) => {
         if (seg.color || seg.type === 3 || seg.pts.length < 2) return;
         const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
@@ -745,13 +756,17 @@ export class CityRenderer {
         for (const i of [0, last]) {
           const p = seg.pts[i];
           const r = halfW(seg.type);
+          // A stem ending on the side of another road (T-junction) only gets asphalt; a kerb ring would cut across that road.
+          const meetsEnd = segs.some((o, id) => id !== n && !o.color && o.pts.length > 1 &&
+            [o.pts[0], o.pts[o.pts.length - 1]].some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.9));
+          const tee = !meetsEnd && touches(p, n);
           const hit = nodes.find((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.9);
-          if (hit) { hit.r = Math.max(hit.r, r); hit.lift = Math.max(hit.lift, lift); hit.kerb = Math.max(hit.kerb, kerb); }
-          else nodes.push({ x: p.x, z: p.z, r, lift, kerb });
+          if (hit) { hit.r = Math.max(hit.r, r); hit.lift = Math.max(hit.lift, lift); hit.kerb = Math.max(hit.kerb, kerb); hit.tee = hit.tee && tee; }
+          else nodes.push({ x: p.x, z: p.z, r, lift, kerb, tee });
         }
       });
       for (const nd of nodes) {
-        fan(nd.x, nd.z, nd.r + nd.kerb, nd.lift + 0.012, "#c4c7cc");
+        if (!nd.tee) fan(nd.x, nd.z, nd.r + nd.kerb, nd.lift + 0.012, "#c4c7cc");
         fan(nd.x, nd.z, nd.r, nd.lift + 0.02, "#3b3f46");
       }
       {
@@ -898,7 +913,7 @@ export class CityRenderer {
     fog.near = raining ? 40 : 90;
     fog.far = raining ? 150 : 260;
     const a = (tod - 0.25) * Math.PI * 2;
-    this.sun.position.set(-Math.cos(a) * 60, Math.max(6, Math.sin(a) * 70 + 8), 30);
+    this.sunDir.set(-Math.cos(a) * 60, Math.max(6, Math.sin(a) * 70 + 8), 30);
     this.sun.intensity = (0.15 + 1.7 * day) * (raining ? 0.5 : 1);
     this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6);
     this.hemi.intensity = (0.4 + 0.95 * day) * (raining ? 0.8 : 1);
@@ -988,6 +1003,17 @@ export class CityRenderer {
     if (!hit) return null;
     if (!inBounds(this.world, Math.floor(hit.point.x), Math.floor(hit.point.z))) return null;
     return { x: hit.point.x, z: hit.point.z };
+  }
+
+  /** Instanced models cast and receive sun shadows; flat overlays and ribbons only receive. Re-run as meshes appear. */
+  private markShadows(): void {
+    const flat = new Set<THREE.Object3D>([this.zones, this.overlay, this.pipes, this.hover, this.water?.mesh as THREE.Object3D].filter(Boolean) as THREE.Object3D[]);
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || flat.has(o)) return;
+      if (o === this.terrain || o === this.roadMesh) { m.receiveShadow = true; m.castShadow = false; return; }
+      if ((o as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = true; m.receiveShadow = true; }
+    });
   }
 
   /** Show one service's coverage as a tinted layer; 0 hides it. */
@@ -1171,6 +1197,14 @@ export class CityRenderer {
   setQualityCap(cap: number): void {
     this.pixelCap = Math.min(window.devicePixelRatio || 1, cap);
     this.pixelRatio = Math.min(this.pixelRatio, this.pixelCap);
+    // shadows by tier: off on low, a 1k map on medium, 2k on high
+    const res = cap <= 1 ? 0 : cap < 2 ? 1024 : 2048;
+    this.sun.castShadow = res > 0;
+    if (res > 0 && this.sun.shadow.mapSize.x !== res) {
+      this.sun.shadow.mapSize.set(res, res);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
     this.resize();
   }
 
@@ -1208,6 +1242,16 @@ export class CityRenderer {
     this.updateVehicles();
     if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();
+    if (this.frame % 90 === 0) this.markShadows();
+    // the shadow frustum travels with the camera target and covers the visible ground at this zoom
+    const tg = this.rig.target, span = Math.min(60, 8 + this.rig.dist * 0.75);
+    this.sun.target.position.set(tg.x, 0, tg.z);
+    this.sun.position.set(tg.x + this.sunDir.x, this.sunDir.y, tg.z + this.sunDir.z);
+    const sc = this.sun.shadow.camera;
+    if (Math.abs(sc.right - span) > 0.5) {
+      sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 1; sc.far = 220;
+      sc.updateProjectionMatrix();
+    }
     this.renderer.render(this.scene, this.rig.camera);
   }
 }
