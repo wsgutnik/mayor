@@ -1,5 +1,5 @@
-import { CityState, CAPACITY } from "./sim";
-import { CATALOG, CatalogEntry, facilityEntry, pickZoneEntry, thumbnailOf, tileHash } from "./catalog";
+import { CityState, CAPACITY, syncLots } from "./sim";
+import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
 import { COVER, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, idx, inBounds } from "./world";
 
 /** What the inspector card shows about one tile. Plain data, so the UI needs no simulation knowledge. */
@@ -69,11 +69,16 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
     const lvl = w.level[i];
     const label = z === ZONE.RES ? ["Zona residencial", "Residential zone"] : z === ZONE.COM ? ["Zona comercial", "Commercial zone"] : ["Zona industrial", "Industrial zone"];
     if (!lvl) return { ...base, kind: "zone", name: label[0], nameEn: label[1] };
-    const entry = pickZoneEntry(z, lvl, tileHash(x + 17, y + 29));
+    // The look and headcount belong to the whole lot; fall back to the tile when it has none yet.
+    syncLots(s);
+    const lotId = w.lotAt[i];
+    const lot = lotId >= 0 ? w.lots.find((l) => l.id === lotId) : undefined;
+    const area = lot ? lot.w * lot.h : 1;
+    const entry = pickLotEntry(z, lvl, area, tileHash((lot ? lot.x : x) + 17, (lot ? lot.y : y) + 29)).entry;
     const kind = z === ZONE.RES ? "res" : z === ZONE.COM ? "com" : "ind";
     return {
       ...base, kind: "building", ...(entry ? fromEntry(entry) : { name: label[0], nameEn: label[1] }),
-      level: lvl, people: CAPACITY[kind][lvl], peopleKind: z === ZONE.RES ? "residents" : "jobs",
+      level: lvl, people: CAPACITY[kind][lvl] * area, peopleKind: z === ZONE.RES ? "residents" : "jobs",
     };
   }
   return base;

@@ -99,6 +99,27 @@ export interface RoadSegment {
 export type Biome = "plains" | "forest" | "river" | "coast" | "mountain" | "desert";
 export const BIOMES: Biome[] = ["plains", "forest", "river", "coast", "mountain", "desert"];
 
+/**
+ * One city lot: a road-fronting rectangle of equally-zoned tiles that grows a
+ * single building. `level` is mirrored onto every footprint tile in `level`,
+ * so tile arrays stay usable for infoviews, traffic and saves.
+ */
+export interface WorldLot {
+  id: number;
+  /** Anchor (minimum) corner tile and footprint in tiles. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Tile step from the lot toward its street; shared by every footprint tile's block. */
+  facing: { dx: -1 | 0 | 1; dy: -1 | 0 | 1 };
+  zone: ZoneType;
+  /** Building level, 0 = empty lot, 1..3. */
+  level: number;
+  /** Kerb depth of the lot's front row (0), or -1 when no street fronts it. */
+  depthFromRoad: number;
+}
+
 export interface World {
   biome: Biome;
   size: number;
@@ -117,6 +138,17 @@ export interface World {
   zone: Uint8Array;
   /** Building level per tile, 0 = no building, 1..3. */
   level: Uint8Array;
+  /** Persistent lots (M17); rebuilt from zoning when absent. Serialised. */
+  lots: WorldLot[];
+  nextLotId: number;
+  /** Lot id per tile, -1 when the tile belongs to no lot. Derived, not saved. */
+  lotAt: Int32Array;
+  /** Bumped on road edits (frontage cache key). Derived, not saved. */
+  roadRevision: number;
+  /** Bumped on zone/facility edits (block cache key). Derived, not saved. */
+  zoneRevision: number;
+  /** Set by tools; the next sync rebuilds `lots` from the tile arrays. */
+  lotsDirty: boolean;
   /** Facility type per tile (FAC.*). */
   facility: Uint8Array;
   /** Bitmask of COVER.* services reaching each tile. */
@@ -224,6 +256,12 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     nextTransitId: 1,
     zone: new Uint8Array(size * size),
     level: new Uint8Array(size * size),
+    lots: [],
+    nextLotId: 1,
+    lotAt: new Int32Array(size * size).fill(-1),
+    roadRevision: 1,
+    zoneRevision: 1,
+    lotsDirty: true,
     facility: new Uint8Array(size * size),
     cover: new Uint16Array(size * size),
     landValue: new Uint8Array(size * size),

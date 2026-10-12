@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
+import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, syncLots, ToolId } from "./sim/sim";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
 import { Inspector } from "./ui/inspector";
@@ -336,6 +336,7 @@ function frame(now: number) {
     seenFires = state.fires;
   }
   hud.update(state);
+  syncLots(state); // lots stay fresh for the renderer even while paused
   renderer.render();
   requestAnimationFrame(frame);
 }

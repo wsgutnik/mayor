@@ -1,7 +1,7 @@
 import {
   CityState, newCity, refreshDerived,
 } from "./sim";
-import { BIOMES, Biome, generateWorld, RoadSegment, Stop, TransitLine } from "./world";
+import { BIOMES, Biome, generateWorld, RoadSegment, Stop, TransitLine, WorldLot } from "./world";
 
 export const SAVE_VERSION = 1;
 
@@ -29,6 +29,9 @@ interface SaveFile {
   lines: TransitLine[];
   nextSegmentId: number;
   nextTransitId: number;
+  /** Absent in pre-lot saves, whose lots are rebuilt from zoning on load. */
+  lots?: WorldLot[];
+  nextLotId?: number;
   /** dx/dy absent in older saves: the entry was always on the left edge. */
   entry: { x: number; y: number; dx?: number; dy?: number };
 }
@@ -73,6 +76,8 @@ export function serialize(s: CityState): string {
     lines: w.lines,
     nextSegmentId: w.nextSegmentId,
     nextTransitId: w.nextTransitId,
+    lots: w.lots,
+    nextLotId: w.nextLotId,
     entry: w.entry,
   };
   return JSON.stringify(file);
@@ -105,6 +110,17 @@ function validateStructure(f: SaveFile, n: number): void {
   for (const l of f.lines) {
     if (!l || !Array.isArray(l.stops) || !l.stops.every((id) => stopIds.has(id))) bad();
     if (!finite(l.vehicles) || l.vehicles < 0 || l.vehicles > 64) bad();
+  }
+  if (f.lots !== undefined) {
+    if (!Array.isArray(f.lots) || f.lots.length > n * n || !finite(f.nextLotId)) bad();
+    for (const l of f.lots) {
+      if (!l || !Number.isInteger(l.id) || l.id < 1) bad();
+      for (const k of ["x", "y", "w", "h"] as const) if (!Number.isInteger(l[k])) bad();
+      if (l.x < 0 || l.y < 0 || l.w < 1 || l.h < 1 || l.w > 4 || l.h > 4 || l.x + l.w > n || l.y + l.h > n) bad();
+      if (!l.facing || ![-1, 0, 1].includes(l.facing.dx) || ![-1, 0, 1].includes(l.facing.dy)) bad();
+      if (![1, 2, 3].includes(l.zone) || ![0, 1, 2, 3].includes(l.level)) bad();
+      if (l.depthFromRoad !== -1 && (l.depthFromRoad < 0 || l.depthFromRoad > 3)) bad();
+    }
   }
 }
 
@@ -141,6 +157,18 @@ export function deserialize(json: string): CityState {
   w.lines = f.lines;
   w.nextSegmentId = f.nextSegmentId;
   w.nextTransitId = f.nextTransitId;
+  if (f.lots !== undefined) {
+    // Lots ride along with the save; the tile mirror still self-heals them in refreshDerived.
+    w.lots = f.lots;
+    w.nextLotId = f.nextLotId!;
+    w.lotAt.fill(-1);
+    for (const l of w.lots) {
+      for (let y = l.y; y < l.y + l.h; y++) {
+        for (let x = l.x; x < l.x + l.w; x++) w.lotAt[y * n + x] = l.id;
+      }
+    }
+    w.lotsDirty = false;
+  }
   w.entry = { x: f.entry.x, y: f.entry.y, dx: f.entry.dx ?? 1, dy: f.entry.dy ?? 0 };
   s.day = f.day;
   s.money = f.money;

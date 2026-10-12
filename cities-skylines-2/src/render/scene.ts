@@ -6,7 +6,9 @@ import {
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
-import { zoneEntries, tileHash, facilityEntry } from "../sim/catalog";
+import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
+import { getFrontage } from "../sim/blocks";
+import { depthShade, lotCentre, lotKerb, lotModelCells, lotYaw } from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
@@ -18,6 +20,9 @@ const ZONE_TILE = {
   [ZONE.COM]: new THREE.Color("#4a8fe0"),
   [ZONE.IND]: new THREE.Color("#e0b43a"),
 } as const;
+/** Street kerb strips and the shared plot under multi-tile buildings. */
+const KERB_TINT = new THREE.Color("#dfe3e8");
+const PLOT_TINT = new THREE.Color("#c9c2b4");
 
 /** 0 = off, a COVER bit, or LAND_VALUE_LAYER. */
 export type OverlayLayer = number;
@@ -122,6 +127,7 @@ export class CityRenderer {
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
+  private kerbs!: THREE.InstancedMesh;
   private pipes!: THREE.InstancedMesh;
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
@@ -263,6 +269,7 @@ export class CityRenderer {
       return m;
     };
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.kerbs = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.pipes = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.pipes.renderOrder = 0;
     const mkModel = (geo: THREE.BufferGeometry, capacity: number) => {
@@ -505,7 +512,7 @@ export class CityRenderer {
     const w = this.world;
     this.updateTerrain();
     this.rebuildRoads();
-    let nz = 0, nl = 0;
+    let nz = 0, nl = 0, nk = 0;
     const smoke: SmokeSource[] = [];
     const treeCounts = new Map<THREE.InstancedMesh, number>();
     const counts = new Map<THREE.InstancedMesh, number>();
@@ -549,21 +556,59 @@ export class CityRenderer {
               d.rotation.set(0, 0, 0);
             }
           }
-        } else if (w.zone[i]) {
-          const z = w.zone[i] as 1 | 2 | 3;
-          d.position.set(x + 0.5, h + 0.04 - 0.5, y + 0.5);
-          d.scale.set(0.97, 1.0, 0.97);
+        } // zoned tiles draw per lot below (pads for empty lots, one building per built lot)
+      }
+    }
+    // Lots: empty lots read as depth-shaded pads with a street kerb; built
+    // lots hold one composed building on a shared plot, facing the street.
+    const frontage = getFrontage(w);
+    for (const lot of w.lots) {
+      const z = lot.zone as 1 | 2 | 3;
+      const area = lot.w * lot.h;
+      const c = lotCentre(lot);
+      let hLot = 0;
+      for (let y = lot.y; y < lot.y + lot.h; y++) {
+        for (let x = lot.x; x < lot.x + lot.w; x++) hLot += tileHeight(w, x, y);
+      }
+      hLot /= area;
+      const kerb = lotKerb(lot);
+      if (kerb && nk < this.kerbs.instanceMatrix.count) {
+        d.position.set(kerb.x, heightAt(w, kerb.x, kerb.z) + 0.06, kerb.z);
+        d.scale.set(Math.max(0.08, kerb.w - 0.04), 0.14, Math.max(0.08, kerb.d - 0.02));
+        d.updateMatrix();
+        this.kerbs.setMatrixAt(nk, d.matrix);
+        this.kerbs.setColorAt(nk++, KERB_TINT);
+      }
+      if (lot.level === 0) {
+        for (let y = lot.y; y < lot.y + lot.h; y++) {
+          for (let x = lot.x; x < lot.x + lot.w; x++) {
+            const i = idx(w, x, y);
+            d.position.set(x + 0.5, tileHeight(w, x, y) + 0.03, y + 0.5);
+            d.scale.set(0.96, 0.06, 0.96);
+            d.updateMatrix();
+            this.zones.setMatrixAt(nz, d.matrix);
+            this.zones.setColorAt(nz++, tint.copy(ZONE_TILE[z]).multiplyScalar(depthShade(frontage.distance[i])));
+          }
+        }
+      } else {
+        if (area > 1 && nz < this.zones.instanceMatrix.count) {
+          d.position.set(c.x, hLot + 0.02, c.z);
+          d.scale.set(lot.w - 0.08, 0.08, lot.h - 0.08);
           d.updateMatrix();
           this.zones.setMatrixAt(nz, d.matrix);
-          this.zones.setColorAt(nz++, ZONE_TILE[z]);
-          const l = w.level[i];
-          if (l) {
-            const r = hash(x, y);
-            if (z === 3 && l >= 2) smoke.push({ x: x + 0.72, y: h + (l === 3 ? 0.95 : 0.7), z: y + 0.3, strength: l === 3 ? 0.8 : 0.5 });
-            const variants = zoneEntries(z, l).length;
-            const mesh = this.bMeshes.get(`${z}-${l}-${Math.min(variants - 1, Math.floor(tileHash(x + 17, y + 29) * variants))}`);
-            const shade = 0.9 + r * 0.2;
-            if (mesh) this.placeModel(mesh, counts, x, y, h, 0.92 + r * 0.2, tint.setScalar(shade));
+          this.zones.setColorAt(nz++, PLOT_TINT);
+        }
+        const r = hash(lot.x, lot.y);
+        if (z === 3 && lot.level >= 2) {
+          smoke.push({ x: c.x + 0.22, y: hLot + (lot.level === 3 ? 0.95 : 0.7), z: c.z - 0.2, strength: lot.level === 3 ? 0.8 : 0.5 });
+        }
+        const look = pickLotEntry(z, lot.level, area, tileHash(lot.x + 17, lot.y + 29));
+        const mesh = this.bMeshes.get(`${z}-${look.level}-${look.index}`);
+        if (mesh) {
+          tint.setScalar(0.9 + r * 0.2);
+          const yaw = lotYaw(lot);
+          for (const cell of lotModelCells(lot)) {
+            this.placeLotCell(mesh, counts, cell.x, cell.z, yaw, 0.92 + r * 0.2, tint);
           }
         }
       }
@@ -571,6 +616,9 @@ export class CityRenderer {
     this.zones.count = nz;
     this.zones.instanceMatrix.needsUpdate = true;
     if (this.zones.instanceColor) this.zones.instanceColor.needsUpdate = true;
+    this.kerbs.count = nk;
+    this.kerbs.instanceMatrix.needsUpdate = true;
+    if (this.kerbs.instanceColor) this.kerbs.instanceColor.needsUpdate = true;
     // Street lamps on the verge of every fourth street and avenue tile, arm turned over the road.
     for (let y = 0; y < w.size && nl < this.lampMesh.instanceMatrix.count; y++) {
       for (let x = 0; x < w.size; x++) {
@@ -627,6 +675,21 @@ export class CityRenderer {
     const d = this.dummy;
     d.position.set(x + 0.5, h + 0.04, y + 0.5);
     d.rotation.set(0, this.facing(x, y), 0);
+    d.scale.set(1, scaleY, 1);
+    d.updateMatrix();
+    mesh.setMatrixAt(n, d.matrix);
+    mesh.setColorAt(n, tint);
+    counts.set(mesh, n + 1);
+    d.rotation.set(0, 0, 0);
+  }
+
+  /** One composed cell of a lot's building: explicit ground spot and street-facing yaw. */
+  private placeLotCell(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, fx: number, fz: number, yaw: number, scaleY: number, tint: THREE.Color): void {
+    const n = counts.get(mesh) ?? 0;
+    if (n >= mesh.instanceMatrix.count) return;
+    const d = this.dummy;
+    d.position.set(fx, heightAt(this.world, fx, fz) + 0.04, fz);
+    d.rotation.set(0, yaw, 0);
     d.scale.set(1, scaleY, 1);
     d.updateMatrix();
     mesh.setMatrixAt(n, d.matrix);
@@ -862,7 +925,7 @@ export class CityRenderer {
 
   /** Instanced models cast and receive sun shadows; flat overlays and ribbons only receive. Re-run as meshes appear. */
   private markShadows(): void {
-    const flat = new Set<THREE.Object3D>([this.zones, this.overlay, this.pipes, this.hover, this.water?.mesh as THREE.Object3D].filter(Boolean) as THREE.Object3D[]);
+    const flat = new Set<THREE.Object3D>([this.zones, this.kerbs, this.overlay, this.pipes, this.hover, this.water?.mesh as THREE.Object3D].filter(Boolean) as THREE.Object3D[]);
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || flat.has(o)) return;
@@ -898,6 +961,7 @@ export class CityRenderer {
     for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);
     for (const m of this.fMeshes.values()) fade(m.material, on ? 0.45 : 1);
     this.zones.visible = !on;
+    this.kerbs.visible = !on;
     this.pipes.visible = on;
     if (!on) this.pipes.count = 0;
   }

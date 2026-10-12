@@ -100,6 +100,27 @@ export function pickZoneEntry(zone: number, level: number, hash01: number): Cata
   return list.length ? list[Math.min(list.length - 1, Math.floor(hash01 * list.length))] : undefined;
 }
 
+/** The resolved look of a lot's building: the entry and where it sits in its pool. */
+export interface LotLook {
+  entry: CatalogEntry | undefined;
+  /** Effective level (a large lot borrows the next tier's looks). */
+  level: number;
+  /** Index into zoneEntries(zone, level). */
+  index: number;
+}
+
+/**
+ * Stable pick of the look for a whole lot. Larger lots prefer higher-level
+ * entries: any multi-tile lot borrows the next tier up (a 2x2 level-1 block
+ * already looks like level 2), so big footprints never wear the smallest hut.
+ */
+export function pickLotEntry(zone: number, level: number, area: number, hash01: number): LotLook {
+  const eff = Math.min(3, Math.max(1, level + (area > 1 ? 1 : 0)));
+  const list = zoneEntries(zone, eff);
+  const index = list.length ? Math.min(list.length - 1, Math.floor(hash01 * list.length)) : 0;
+  return { entry: list[index], level: eff, index };
+}
+
 /** Deterministic 0..1 hash of a tile, shared by the renderer and the UI so both pick the same building. */
 export function tileHash(x: number, y: number): number {
   let h = (x * 374761393 + y * 668265263) | 0;

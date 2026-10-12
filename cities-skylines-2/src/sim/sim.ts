@@ -2,11 +2,15 @@ import { makeRng } from "./rng";
 import { isRaining } from "./weather";
 import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
-  ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, generateWorld, idx, inBounds,
-  isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile,
+  ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
+  isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
 } from "./world";
 import { addSegment, rebuildNodes, removeSegment } from "./roads";
+import {
+  BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
+} from "./blocks";
+export { ZONE_DEPTH } from "./blocks";
 
 export type FacilityTool =
   | "power" | "water" | "sewage" | "landfill"
@@ -225,11 +229,143 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
   rebuildRoadRaster(w);
   s.money -= plan.cost;
   s.monthExpenses += plan.cost;
+  dirtyRoads(w);
   w.revision++;
   return { ok: true };
 }
 
 export { ROAD_NAME };
+
+// ------------------------------------------------------------ lots (M17)
+
+/** Mark lots stale after a road edit (frontage and blocks both change). */
+function dirtyRoads(w: World): void {
+  w.roadRevision++;
+  w.zoneRevision++;
+  w.lotsDirty = true;
+}
+
+/** Mark lots stale after a zone or facility edit (grouping changes, frontage stands). */
+function dirtyZones(w: World): void {
+  w.zoneRevision++;
+  w.lotsDirty = true;
+}
+
+/**
+ * Rebuild persistent lots from the tile arrays: planned road-fronting lots
+ * first, then 1x1 lots for every other zoned tile so no zone is ever lot-less.
+ * Levels come from the tile mirror, so rebuilding never loses buildings.
+ */
+export function refreshLots(s: CityState): void {
+  const w = s.world;
+  // Tools bump the road/zone revisions on every structural edit, so the cached
+  // blocks are fresh here (and zone/level pokes still land correct lots: the
+  // planner reads the live tile arrays and the fallback covers every zone).
+  const blocks = getBlocks(w);
+  const planned = planLots(w, blocks, makeRng((s.rngState ^ 0x9e3779b9) >>> 0));
+  const lots: WorldLot[] = [];
+  w.lotAt.fill(-1);
+  w.nextLotId = 1;
+  for (const p of planned) {
+    const id = w.nextLotId++;
+    lots.push({
+      id, x: p.x, y: p.y, w: p.w, h: p.h,
+      facing: { dx: p.facing.dx, dy: p.facing.dy },
+      zone: p.zone, level: w.level[idx(w, p.x, p.y)], depthFromRoad: 0,
+    });
+    for (let y = p.y; y < p.y + p.h; y++) {
+      for (let x = p.x; x < p.x + p.w; x++) w.lotAt[idx(w, x, y)] = id;
+    }
+  }
+  extendLots(w, blocks, lots);
+  // Fallback: zoned tiles the planner left out (rear rows cut off by a
+  // facility, plots past kerb depth, pre-lot saves) still get a 1x1 lot.
+  for (let y = 0; y < w.size; y++) {
+    for (let x = 0; x < w.size; x++) {
+      const i = idx(w, x, y);
+      if (!w.zone[i] || w.lotAt[i] >= 0 || w.road[i] || w.facility[i] || !isLand(w, x, y)) continue;
+      const id = w.nextLotId++;
+      const road = blocks.frontage.road[i];
+      lots.push({
+        id, x, y, w: 1, h: 1,
+        facing: road >= 0
+          ? { dx: blocks.frontage.dx[i] as -1 | 0 | 1, dy: blocks.frontage.dy[i] as -1 | 0 | 1 }
+          : { dx: 0, dy: 1 },
+        zone: w.zone[i] as ZoneType, level: w.level[i],
+        depthFromRoad: road >= 0 ? blocks.frontage.distance[i] : -1,
+      });
+      w.lotAt[i] = id;
+    }
+  }
+  w.lots = lots;
+  w.lotsDirty = false;
+}
+
+/**
+ * Grow planned lots backward over orphaned rear tiles. A front lot that took a
+ * shallow shape would otherwise strand the depth rows behind it, and those
+ * rows could never front the street. A row joins only when every tile matches
+ * the lot's zone, level and block, so lots stay rectangular and face one way.
+ */
+function extendLots(w: World, blocks: BlockInfo, lots: WorldLot[]): void {
+  for (const lot of lots) {
+    const block = blocks.blockId[idx(w, lot.x, lot.y)];
+    for (;;) {
+      const { dx, dy } = lot.facing;
+      // back-edge row, one step behind the lot (away from the street)
+      const row: number[] = [];
+      if (dy !== 0) {
+        const y = dy > 0 ? lot.y - 1 : lot.y + lot.h;
+        for (let x = lot.x; x < lot.x + lot.w; x++) row.push(y * w.size + x);
+      } else {
+        const x = dx > 0 ? lot.x - 1 : lot.x + lot.w;
+        for (let y = lot.y; y < lot.y + lot.h; y++) row.push(y * w.size + x);
+      }
+      const ok = row.every((i) => {
+        const x = i % w.size, y = (i / w.size) | 0;
+        return (
+          x >= 0 && y >= 0 && x < w.size && y < w.size && w.lotAt[i] < 0 && !w.road[i] && !w.facility[i] &&
+          w.zone[i] === lot.zone && w.level[i] === lot.level && blocks.blockId[i] === block && isLand(w, x, y)
+        );
+      });
+      if (!ok) break;
+      for (const i of row) w.lotAt[i] = lot.id;
+      if (dy !== 0) {
+        if (dy > 0) lot.y -= 1;
+        lot.h += 1;
+      } else {
+        if (dx > 0) lot.x -= 1;
+        lot.w += 1;
+      }
+    }
+  }
+}
+
+/** True when tiles were edited behind the lots' back (tests and old saves poke tiles directly). */
+function lotsOutOfSync(w: World): boolean {
+  for (const lot of w.lots) {
+    const i = idx(w, lot.x, lot.y);
+    if (w.lotAt[i] !== lot.id || w.zone[i] !== lot.zone || w.level[i] !== lot.level) return true;
+  }
+  for (let i = 0; i < w.zone.length; i++) {
+    if (!w.zone[i] || w.road[i] || w.facility[i] || w.lotAt[i] >= 0) continue;
+    if (isLand(w, i % w.size, (i / w.size) | 0)) return true;
+  }
+  return false;
+}
+
+/** Rebuild lots when stale; cheap to call every frame and every step. */
+export function syncLots(s: CityState): void {
+  if (s.world.lotsDirty || lotsOutOfSync(s.world)) refreshLots(s);
+}
+
+/** Set a lot's level and mirror it onto every footprint tile. */
+function setLotLevel(w: World, lot: WorldLot, level: number): void {
+  lot.level = level;
+  for (let y = lot.y; y < lot.y + lot.h; y++) {
+    for (let x = lot.x; x < lot.x + lot.w; x++) w.level[idx(w, x, y)] = level;
+  }
+}
 
 function facilityUpkeep(w: World): number {
   let total = 0;
@@ -277,6 +413,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       w.coverageDirty = true;
     }
     if (w.facility[i]) w.coverageDirty = true;
+    if (w.road[i]) dirtyRoads(w);
+    else if (w.zone[i] || w.facility[i]) dirtyZones(w);
     w.zone[i] = 0;
     w.level[i] = 0;
     w.facility[i] = 0;
@@ -302,6 +440,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     w.facility[i] = type;
     if (type === FAC.METRO) registerMetroStation(w, i);
     w.coverageDirty = true;
+    dirtyZones(w);
     updateCoverage(w);
     s.money -= cost;
     s.monthExpenses += cost;
@@ -319,26 +458,17 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (w.road[i]) return { ok: false, reason: "Tile is a road" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
     if (w.zone[i] === z) return { ok: true };
-    // Zoning hugs the street grid: lots are at most ZONE_DEPTH tiles deep from a road, like blocks in Cities: Skylines.
-    if (!nearRoad(w, x, y, ZONE_DEPTH)) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
+    // Zoning hugs the street grid: a tile needs street frontage within ZONE_DEPTH, like blocks in Cities: Skylines.
+    if (getFrontage(w).road[i] < 0) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
     flattenTile(w, x, y);
     w.zone[i] = z;
     w.level[i] = 0;
+    dirtyZones(w);
   }
   s.money -= cost;
   s.monthExpenses += cost;
   w.revision++;
   return { ok: true };
-}
-
-/** How far from a road, in tiles, a zone may be painted. */
-export const ZONE_DEPTH = 4;
-function nearRoad(w: World, x: number, y: number, r: number): boolean {
-  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-    const nx = x + dx, ny = y + dy;
-    if (inBounds(w, nx, ny) && w.road[idx(w, nx, ny)]) return true;
-  }
-  return false;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -430,6 +560,7 @@ export function refreshDerived(s: CityState): void {
   rebuildRoadRaster(w);
   updateConnectivity(w);
   updateCoverage(w);
+  syncLots(s);
   updateLandValue(w);
   recount(s);
   w.revision++;
@@ -446,30 +577,37 @@ export function step(s: CityState): void {
   const demandOf = [0, s.demand.r, s.demand.c, s.demand.i];
   let changed = false;
 
-  for (let y = 0; y < w.size; y++) {
-    for (let x = 0; x < w.size; x++) {
-      const i = idx(w, x, y);
-      const z = w.zone[i];
-      if (!z) continue;
-      const d = demandOf[z];
-      const lvl = w.level[i];
-      const c = w.cover[i];
-      const hasBasics = (c & COVER.POWER) !== 0 && (c & COVER.WATER) !== 0;
-      const served = isServed(w, x, y) && hasBasics;
-      if (lvl === 0) {
-        if (served && d > 0 && rng() < 0.05 * d) { w.level[i] = 1; changed = true; }
-      } else if (!served) {
-        if (rng() < 0.05) { w.level[i] = 0; changed = true; }
-      } else if (!(c & COVER.FIRE) && rng() < FIRE_CHANCE) {
-        w.level[i] = 0; s.fires++; changed = true;
-      } else {
-        // Level 2 needs sewage; level 3 needs garbage collection and schools.
-        const canUp = lvl === 1
-          ? (c & COVER.SEWAGE) !== 0
-          : (c & COVER.GARBAGE) !== 0 && (c & COVER.EDU) !== 0;
-        if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) { w.level[i] = lvl + 1; changed = true; }
-        else if (d < -0.3 && rng() < 0.01) { w.level[i] = lvl - 1; changed = true; }
+  // Growth decides once per ready lot; the level is mirrored onto the whole footprint.
+  syncLots(s);
+  const ready = new Set(lotsReadyToBuild(w, getBlocks(w), w.lots));
+  for (const lot of w.lots) {
+    const d = demandOf[lot.zone];
+    const lvl = lot.level;
+    // A building needs its services on every tile of its footprint.
+    let power = true, water = true, sewage = true, garbage = true, edu = true, fire = true;
+    for (let y = lot.y; y < lot.y + lot.h; y++) {
+      for (let x = lot.x; x < lot.x + lot.w; x++) {
+        const c = w.cover[idx(w, x, y)];
+        power &&= (c & COVER.POWER) !== 0;
+        water &&= (c & COVER.WATER) !== 0;
+        sewage &&= (c & COVER.SEWAGE) !== 0;
+        garbage &&= (c & COVER.GARBAGE) !== 0;
+        edu &&= (c & COVER.EDU) !== 0;
+        fire &&= (c & COVER.FIRE) !== 0;
       }
+    }
+    const served = ready.has(lot) && power && water;
+    if (lvl === 0) {
+      if (served && d > 0 && rng() < 0.05 * d) { setLotLevel(w, lot, 1); changed = true; }
+    } else if (!served) {
+      if (rng() < 0.05) { setLotLevel(w, lot, 0); changed = true; }
+    } else if (!fire && rng() < FIRE_CHANCE) {
+      setLotLevel(w, lot, 0); s.fires++; changed = true;
+    } else {
+      // Level 2 needs sewage; level 3 needs garbage collection and schools.
+      const canUp = lvl === 1 ? sewage : garbage && edu;
+      if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) { setLotLevel(w, lot, lvl + 1); changed = true; }
+      else if (d < -0.3 && rng() < 0.01) { setLotLevel(w, lot, lvl - 1); changed = true; }
     }
   }
   if (changed) w.revision++;

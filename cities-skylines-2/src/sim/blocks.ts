@@ -86,8 +86,8 @@ export function findFrontage(w: World): FrontageMap {
 }
 
 /** Group zoned cells by connected road component and the side of that component they face. */
-export function computeBlocks(w: World): BlockInfo {
-  const frontage = findFrontage(w), n = w.size * w.size;
+export function computeBlocks(w: World, frontage: FrontageMap = findFrontage(w)): BlockInfo {
+  const n = w.size * w.size;
   const roadComponent = new Int32Array(n); roadComponent.fill(-1);
   const queue = new Int32Array(n);
   let components = 0;
@@ -177,6 +177,32 @@ export function planLots(w: World, blocks: BlockInfo, rng: () => number): Lot[] 
     }
   }
   return lots;
+}
+
+const frontageCache = new WeakMap<World, { roadRevision: number; frontage: FrontageMap }>();
+const blockCache = new WeakMap<World, { roadRevision: number; zoneRevision: number; blocks: BlockInfo }>();
+
+/** Street frontage, cached by road revision; zone painting never invalidates it. */
+export function getFrontage(w: World): FrontageMap {
+  const hit = frontageCache.get(w);
+  if (hit && hit.roadRevision === w.roadRevision) return hit.frontage;
+  const frontage = findFrontage(w);
+  frontageCache.set(w, { roadRevision: w.roadRevision, frontage });
+  return frontage;
+}
+
+/** Zone blocks, cached by road/zone revision; tools bump those on structural edits. */
+export function getBlocks(w: World): BlockInfo {
+  const hit = blockCache.get(w);
+  if (hit && hit.roadRevision === w.roadRevision && hit.zoneRevision === w.zoneRevision) return hit.blocks;
+  return refreshBlockCache(w);
+}
+
+/** Recompute blocks unconditionally and re-prime the cache (frontage keeps its own revision). */
+export function refreshBlockCache(w: World): BlockInfo {
+  const blocks = computeBlocks(w, getFrontage(w));
+  blockCache.set(w, { roadRevision: w.roadRevision, zoneRevision: w.zoneRevision, blocks });
+  return blocks;
 }
 
 /** Return lots whose complete front edge is at depth zero and touches connected, non-highway road. */
