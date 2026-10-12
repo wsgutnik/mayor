@@ -313,6 +313,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (w.road[i]) return { ok: false, reason: "Tile is a road" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
     if (w.zone[i] === z) return { ok: true };
+    // Zoning hugs the street grid: lots are at most ZONE_DEPTH tiles deep from a road, like blocks in Cities: Skylines.
+    if (!nearRoad(w, x, y, ZONE_DEPTH)) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
     flattenTile(w, x, y);
     w.zone[i] = z;
     w.level[i] = 0;
@@ -321,6 +323,16 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   s.monthExpenses += cost;
   w.revision++;
   return { ok: true };
+}
+
+/** How far from a road, in tiles, a zone may be painted. */
+export const ZONE_DEPTH = 4;
+function nearRoad(w: World, x: number, y: number, r: number): boolean {
+  for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const nx = x + dx, ny = y + dy;
+    if (inBounds(w, nx, ny) && w.road[idx(w, nx, ny)]) return true;
+  }
+  return false;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
