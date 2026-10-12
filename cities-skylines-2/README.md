@@ -1,4 +1,4 @@
-# Skyline
+# Mayor
 
 Clone jogável de city builder inspirado em Cities: Skylines II. Mac, Windows e iPad (PWA).
 Plano e marcos: [PLAN.md](PLAN.md).

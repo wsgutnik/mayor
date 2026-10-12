@@ -1,4 +1,4 @@
-# Plano — clone de Cities: Skylines II (Mac, Windows, iPad)
+# Mayor — plano (city builder inspirado em Cities: Skylines II; Mac, Windows, iPad)
 
 Referência visual: `screenshots/` (local, fora do git). Fontes em `SOURCES.md`.
 
@@ -54,3 +54,9 @@ quando `world.revision` muda, UI nunca altera o mundo direto — usa `applyTool`
 - `npm test`: regras da sim (conectividade, crescimento, economia, determinismo).
 - `npm run build`: tipos + bundle.
 - Browser: screenshots do jogo comparadas com `screenshots/` para o visual de UI.
+
+## Ritual a cada etapa
+
+Ao fechar um marco: editar o objeto `DATA` em `docs/mayor-status.html` (status dos marcos,
+checks, log, screenshot em `docs/img/`) e republicar o mesmo arquivo no Artifact
+https://claude.ai/artifact/VdToX8pcS7bZcKx1m65Abu (passando `files` com as imagens).

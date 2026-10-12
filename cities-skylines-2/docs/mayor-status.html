@@ -1,0 +1,219 @@
+<title>Mayor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;800;900&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: single column status page. Hero logo card, then a milestone track
+     (real sequence, so numbered), a "playable now" shot, run/verify, changelog. */
+  :root {
+    --bg: #f2f6fb;
+    --surface: #ffffff;
+    --surface-2: #e8eff8;
+    --fg: #0c1a2e;
+    --muted: #55677f;
+    --line: #d3dfee;
+    --accent: #1c6fe6;
+    --accent-ink: #ffffff;
+    --good: #14804a;
+    --warn: #a15c00;
+    --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #08121f; --surface: #0f1d30; --surface-2: #14263d; --fg: #e6eef9;
+      --muted: #93a6c0; --line: #213652; --accent: #4d9bff; --accent-ink: #04101f;
+      --good: #4fd08b; --warn: #f0b24a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #08121f; --surface: #0f1d30; --surface-2: #14263d; --fg: #e6eef9;
+    --muted: #93a6c0; --line: #213652; --accent: #4d9bff; --accent-ink: #04101f;
+    --good: #4fd08b; --warn: #f0b24a; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--font-body);
+    font-size: 15px; line-height: 1.55; padding-inline: 16px; padding-block: 24px 64px;
+  }
+  .wrap { max-width: 880px; margin-inline: auto; display: flex; flex-direction: column; gap: 40px; }
+  h1, h2, h3 { font-family: var(--font-display); line-height: 1.1; margin: 0; text-wrap: balance; }
+  h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+  h3 { font-size: 16px; font-weight: 800; }
+  p { margin: 0; }
+  .mono { font-family: var(--font-mono); }
+  .label { font: 500 11px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+  .hero { background: #fff; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); }
+  .hero img { display: block; width: 100%; height: auto; }
+  .now { display: grid; grid-template-columns: 1fr auto; gap: 8px 24px; align-items: end; }
+  .now h1 { font-size: clamp(26px, 5vw, 36px); font-weight: 900; letter-spacing: -0.02em; }
+  .now p { color: var(--muted); max-width: 60ch; margin-top: 8px; }
+  .stamp { text-align: right; min-width: 0; }
+  .stamp b { display: block; font: 500 14px var(--font-mono); margin-top: 6px; }
+  @media (max-width: 560px) { .now { grid-template-columns: 1fr; } .stamp { text-align: left; } }
+
+  .progress { display: flex; align-items: center; gap: 12px; }
+  .bar { flex: 1; height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+
+  .track { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .ms { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 4px 14px; align-items: start;
+        background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .ms .id { font: 500 13px var(--font-mono); color: var(--muted); padding-top: 2px; }
+  .ms .name { font-weight: 600; }
+  .ms .desc { color: var(--muted); font-size: 14px; grid-column: 2 / 3; }
+  .pill { font: 500 11px var(--font-mono); letter-spacing: .04em; padding: 4px 9px; border-radius: 99px;
+          background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+  .ms.done { border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+  .ms.done .pill { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .ms.active { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .ms.active .pill { background: var(--accent); color: var(--accent-ink); }
+  .ms.active .id { color: var(--accent); }
+
+  .shot { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .shot img { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); display: block; }
+  .shot figcaption { color: var(--muted); font-size: 13px; }
+
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  pre { margin: 0; padding: 12px; border-radius: 8px; background: var(--surface-2); font: 13px/1.5 var(--font-mono); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font: 500 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .scroll { overflow-x: auto; }
+  .checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .checks li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; }
+  .checks li::before { content: "✓"; color: var(--good); font-weight: 700; }
+  .checks li.no::before { content: "–"; color: var(--warn); }
+
+  .log { display: flex; flex-direction: column; gap: 0; border-left: 2px solid var(--line); margin-left: 5px; }
+  .entry { position: relative; padding: 0 0 22px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .entry::before { content: ""; position: absolute; left: -7px; top: 5px; width: 12px; height: 12px; border-radius: 50%;
+                   background: var(--bg); border: 2px solid var(--accent); }
+  .entry ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .entry li + li { margin-top: 3px; }
+  a { color: var(--accent); }
+</style>
+
+<main class="wrap">
+  <div class="hero"><img src="img/mayor-logo.jpg" alt="Logotipo Mayor: letras em 3D prateadas e azuis diante de arranha-céus e uma ponte" width="1000" height="750"></div>
+
+  <header class="now">
+    <div>
+      <span class="label">Estado atual</span>
+      <h1 id="headline"></h1>
+      <p id="summary"></p>
+    </div>
+    <div class="stamp"><span class="label">Atualizado</span><b id="updated"></b></div>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2>Marcos</h2>
+    <div class="progress"><div class="bar"><i id="barfill"></i></div><span class="mono" id="barlabel"></span></div>
+    <ol class="track" id="track"></ol>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2>Jogável agora</h2>
+    <figure class="shot">
+      <img id="shotimg" alt="Captura do Mayor com estrada, zonas residenciais e comerciais e os primeiros prédios">
+      <figcaption id="shotcap"></figcaption>
+    </figure>
+  </section>
+
+  <section class="cols">
+    <div class="box">
+      <h3>Rodar</h3>
+      <pre>cd cities-skylines-2
+npm install
+npm run dev</pre>
+      <p style="color:var(--muted);font-size:14px">Abre em <span class="mono">localhost:5173</span>. No iPad, use o IP do computador na mesma rede e adicione à tela de início.</p>
+    </div>
+    <div class="box">
+      <h3>Verificação</h3>
+      <ul class="checks" id="checks"></ul>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>Controles</h2>
+    <div class="box scroll">
+      <table>
+        <thead><tr><th>Ação</th><th>Mouse e teclado</th><th>Toque (iPad)</th></tr></thead>
+        <tbody>
+          <tr><td>Usar ferramenta</td><td>Botão esquerdo, arrastar pinta</td><td>Um dedo</td></tr>
+          <tr><td>Mover câmera</td><td>Botão direito, WASD ou setas</td><td>Ferramenta Mover, ou dois dedos</td></tr>
+          <tr><td>Girar</td><td>Botão do meio, Q e E</td><td>Torcer com dois dedos</td></tr>
+          <tr><td>Zoom</td><td>Roda</td><td>Pinça</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2>Histórico</h2>
+    <div class="log" id="log"></div>
+  </section>
+</main>
+
+<script>
+  /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
+  const DATA = {
+    updated: "2026-10-11",
+    headline: "M1 concluído. M2 em seguida.",
+    summary: "Núcleo jogável: terreno, estradas, zonas residencial, comercial e industrial, crescimento por demanda e orçamento. Roda no navegador; Mac, Windows e iPad saem do mesmo código.",
+    screenshot: { src: "img/m1-gameplay.jpg", caption: "M1: estrada ligada à entrada da cidade, zonas R e C pintadas e os primeiros prédios surgindo. 10 segundos a 4x." },
+    milestones: [
+      { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
+      { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "active" },
+      { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "todo" },
+      { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "todo" },
+      { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "todo" },
+      { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "todo" },
+      { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "todo" },
+      { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "todo" }
+    ],
+    checks: [
+      { ok: true, text: "14 testes da simulação e da pintura de linha passando" },
+      { ok: true, text: "Checagem de tipos e build de produção sem erros" },
+      { ok: true, text: "Jogado no navegador: estrada, zonas, prédios, população e demanda" },
+      { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8)" }
+    ],
+    log: [
+      { date: "2026-10-11", title: "M1 · Núcleo jogável", items: [
+        "Terreno procedural com água e faixa de terra garantida na entrada",
+        "Estradas, zonas R/C/I e bulldoze pintados por arrasto, com custo e aviso de dinheiro ou água",
+        "Crescimento só em zona servida por estrada ligada à entrada; abandono se a estrada for cortada",
+        "Demanda RCI, impostos ajustáveis, receita e manutenção mensais",
+        "Correção: arrasto gerava estradas ligadas só pelo canto, agora a linha é conectada por lado",
+        "Nome do projeto definido: Mayor"
+      ] }
+    ]
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const LABEL = { done: "Concluído", active: "Em andamento", todo: "Pendente" };
+  const fmtDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+
+  $("headline").textContent = DATA.headline;
+  $("summary").textContent = DATA.summary;
+  $("updated").textContent = fmtDate(DATA.updated);
+  $("shotimg").src = DATA.screenshot.src;
+  $("shotcap").textContent = DATA.screenshot.caption;
+
+  const done = DATA.milestones.filter((m) => m.status === "done").length;
+  $("barfill").style.width = (done / DATA.milestones.length) * 100 + "%";
+  $("barlabel").textContent = done + " de " + DATA.milestones.length;
+
+  $("track").innerHTML = DATA.milestones.map((m) =>
+    `<li class="ms ${m.status}"><span class="id">${m.id}</span><span class="name">${m.name}</span>` +
+    `<span class="pill">${LABEL[m.status]}</span><span class="desc">${m.desc}</span></li>`).join("");
+
+  $("checks").innerHTML = DATA.checks.map((c) => `<li class="${c.ok ? "" : "no"}"><span>${c.text}</span></li>`).join("");
+
+  $("log").innerHTML = DATA.log.map((e) =>
+    `<article class="entry"><span class="label">${fmtDate(e.date)}</span><h3>${e.title}</h3>` +
+    `<ul>${e.items.map((i) => `<li>${i}</li>`).join("")}</ul></article>`).join("");
+</script>
