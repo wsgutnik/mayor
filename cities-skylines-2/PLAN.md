@@ -41,6 +41,7 @@ linguagem visual da UI. Não é paridade de features.
 | M12 | ✅ Mapas oficiais | Heightmaps do Map Kit carregados no jogo, seletor no menu |
 | M13 | ✅ Kit de prédios | Catálogo de 40 prédios, modelos por entrada, sete instalações, inspetor |
 | M14 | ✅ Blender, natureza e água | Pipeline Blender para GLB, árvores, veículos, barcos, água com correnteza |
+| M15 | ✅ Detalhe | Texturas, AO, faixas de pedestres, nuvens, fumaça, prédios principais redesenhados |
 
 ## Arquitetura
 

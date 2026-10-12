@@ -26,6 +26,10 @@ npm run build   # tipos + bundle em dist/
   prédios do kit, nove espécies de plantas, sete veículos, três barcos, poste e banco. O jogo carrega os GLB com instancing e acende
   faróis e janelas à noite. Água com profundidade, ondulação, espuma e correnteza (campo de fluxo derivado do relevo), barcos à deriva.
 
+- M15: Detalhe. Texturas compartilhadas (tijolo, telha, concreto, asfalto, grama) com oclusão ambiente nos vértices, meio-fio e faixas
+  nas ruas, faixas de pedestres e linhas de retenção nos cruzamentos, nuvens e fumaça de chaminé, e doze prédios do kit redesenhados
+  (varandas, degraus, cercas, carros estacionados, silos, torre de mangueiras).
+
 ## Controles
 
 | | Mouse | Toque |

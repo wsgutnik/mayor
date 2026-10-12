@@ -671,6 +671,65 @@ export class CityRenderer {
         strip(samples, 0.012, lift + 0.011, "#e8e4c8", -hw * 0.5, true);
       }
     });
+    // Zebra crossings and stop lines on every street/avenue arm that meets a junction (3+ road ends in one spot).
+    if (!tint) {
+      // Arms: every street/avenue end that touches another road segment (end-to-end or T-junction).
+      const near = new Map<string, Set<number>>();
+      segs.forEach((seg, n) => {
+        if (seg.color || seg.pts.length < 2) return;
+        for (const q of curvePoints(seg.pts, 0.5)) {
+          const key = `${Math.round(q.x)},${Math.round(q.z)}`;
+          const set = near.get(key) ?? new Set<number>();
+          set.add(n);
+          near.set(key, set);
+        }
+      });
+      const touches = (p: Pt, self: number): boolean => {
+        for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+          const set = near.get(`${Math.round(p.x) + ox},${Math.round(p.z) + oz}`);
+          if (set) for (const id of set) if (id !== self) return true;
+        }
+        return false;
+      };
+      const arms: { p: Pt; dx: number; dz: number; type: RoadType; lift: number }[] = [];
+      segs.forEach((seg, n) => {
+        if (seg.color || seg.type === 3 || seg.pts.length < 2) return;
+        const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
+        const last = seg.pts.length - 1;
+        for (const [i, j] of [[0, 1], [last, last - 1]] as const) {
+          const p = seg.pts[i], q = seg.pts[j];
+          if (!touches(p, n)) continue;
+          const l = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+          arms.push({ p, dx: (q.x - p.x) / l, dz: (q.z - p.z) / l, type: seg.type, lift });
+        }
+      });
+      const quad = (cx: number, cz: number, ax: number, az: number, hl: number, hw: number, lift: number, color: string) => {
+        // ax,az = unit direction along the quad's length
+        const bx = -az, bz = ax;
+        c.set(color);
+        const vi = pos.length / 3;
+        for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+          const x = cx + ax * hl * u + bx * hw * v, z = cz + az * hl * u + bz * hw * v;
+          pos.push(x, this.groundY(x, z) + lift, z);
+          col.push(c.r, c.g, c.b);
+          uvs.push(x / 0.6, z / 0.6);
+        }
+        ind.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+      };
+      {
+        for (const a of arms) {
+          const hw = ROAD_DRAW_WIDTH[a.type] / 2 - (a.type === 1 ? 0.07 : 0.09);
+          const d = 0.8;                                     // distance of the crossing from the junction centre
+          const cx = a.p.x + a.dx * d, cz = a.p.z + a.dz * d;
+          const stripes = Math.max(3, Math.round(hw * 5));
+          for (let k = 0; k < stripes; k++) {
+            const t = ((k + 0.5) / stripes) * 2 - 1;        // across the road
+            quad(cx - a.dz * hw * t * 0.9, cz + a.dx * hw * t * 0.9, a.dx, a.dz, 0.1, hw * 0.9 / stripes * 0.55, a.lift + 0.014, "#f1f1ea");
+          }
+          quad(a.p.x + a.dx * (d + 0.14), a.p.z + a.dz * (d + 0.14), -a.dz, a.dx, hw * 0.92, 0.012, a.lift + 0.014, "#f1f1ea");
+        }
+      }
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
