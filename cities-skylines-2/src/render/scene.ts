@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { CityState } from "../sim/sim";
 import {
-  ZONE, FAC, COVER, LAND_VALUE_LAYER, FacilityKind, idx, tileHeight, isLand, World,
+  ZONE, FAC, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, FacilityKind, idx, tileHeight, isLand, World,
   RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt,
 } from "../sim/world";
 import { CameraRig } from "./camera";
+import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 
 const BUILD_H = {
   [ZONE.RES]: [0, 0.55, 1.0, 1.7],
@@ -71,6 +72,9 @@ export class CityRenderer {
   private facilities!: THREE.InstancedMesh;
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
+  private vehicleMesh!: THREE.InstancedMesh;
+  private traffic: TrafficState | null = null;
+  private frame = 0;
   private overlaySeen = -1;
   private overlayLvSeen = -1;
   private hover: THREE.Mesh;
@@ -121,6 +125,8 @@ export class CityRenderer {
     this.scene.add(this.previewMesh);
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.buildings = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.vehicleMesh.count = 0;
     this.facilities = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
 
@@ -280,6 +286,46 @@ export class CityRenderer {
     this.roadMesh.geometry = this.buildRoadGeometry(this.world.segments as RoadSegment[]);
   }
 
+  /** Traffic whose vehicles are drawn and whose loads colour the traffic infoview. */
+  setTraffic(t: TrafficState): void {
+    this.traffic = t;
+  }
+
+  private updateVehicles(): void {
+    const t = this.traffic;
+    const m = this.vehicleMesh;
+    if (!t) return;
+    const d = this.dummy;
+    const col = new THREE.Color();
+    const CAR = ["#e8eef5", "#d0453a", "#3a6fd0", "#2c2f36", "#e0b43a", "#58a86a"];
+    let n = 0;
+    for (const v of t.vehicles) {
+      if (n >= m.instanceMatrix.count) break;
+      const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
+      if (i < 0) continue;
+      const f = v.progress - i;
+      const ax = v.pts[i * 2], az = v.pts[i * 2 + 1], bx = v.pts[i * 2 + 2], bz = v.pts[i * 2 + 3];
+      let hx = bx - ax, hz = bz - az;
+      const l = Math.hypot(hx, hz) || 1;
+      hx /= l; hz /= l;
+      const lane = v.kind === 1 ? 0.12 : 0.1;
+      const x = ax + (bx - ax) * f - hz * lane;
+      const z = az + (bz - az) * f + hx * lane;
+      d.position.set(x, heightAt(this.world, x, z) + 0.17, z);
+      d.rotation.set(0, -Math.atan2(hz, hx), 0);
+      if (v.kind === 1) d.scale.set(0.58, 0.24, 0.26); else d.scale.set(0.42, 0.17, 0.22);
+      d.updateMatrix();
+      m.setMatrixAt(n, d.matrix);
+      col.set(v.kind === 1 ? "#f08a3c" : CAR[v.id % CAR.length]);
+      m.setColorAt(n, col);
+      n++;
+    }
+    m.count = n;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    d.rotation.set(0, 0, 0);
+  }
+
   /** Ghost of a road being drawn; null clears it. */
   setRoadPreview(seg: { type: RoadType; pts: Pt[] } | null, valid = true): void {
     this.previewMesh.visible = !!seg;
@@ -318,6 +364,7 @@ export class CityRenderer {
     const layer = this.overlayLayer;
     if (!layer) { m.count = 0; return; }
     const isValue = layer === LAND_VALUE_LAYER;
+    const isTraffic = layer === TRAFFIC_LAYER;
     const flat = new THREE.Color(OVERLAY_COLOR[layer] ?? "#ffffff");
     const col = new THREE.Color();
     const d = this.dummy;
@@ -325,13 +372,21 @@ export class CityRenderer {
     for (let y = 0; y < w.size; y++) {
       for (let x = 0; x < w.size; x++) {
         const i = idx(w, x, y);
-        if (!isLand(w, x, y)) continue;
-        if (!isValue && !(w.cover[i] & layer)) continue;
+        if (isTraffic) {
+          if (!w.road[i]) continue;
+        } else {
+          if (!isLand(w, x, y)) continue;
+          if (!isValue && !(w.cover[i] & layer)) continue;
+        }
         d.position.set(x + 0.5, tileHeight(w, x, y) + 0.12, y + 0.5);
         d.scale.set(0.98, 0.02, 0.98);
         d.updateMatrix();
         m.setMatrixAt(n, d.matrix);
-        if (isValue) col.setHSL((w.landValue[i] / 100) * 0.33, 0.8, 0.5); // red (low) to green (high)
+        if (isTraffic) {
+          const load = this.traffic ? this.traffic.load[i] : 0;
+          const ratio = Math.min(1.5, load / ROAD_CAPACITY[w.road[i]]);
+          col.setHSL(0.33 * (1 - Math.min(1, ratio)), 0.9, 0.5); // green (free) to red (jammed)
+        } else if (isValue) col.setHSL((w.landValue[i] / 100) * 0.33, 0.8, 0.5); // red (low) to green (high)
         else col.copy(flat);
         m.setColorAt(n, col);
         n++;
@@ -385,6 +440,9 @@ export class CityRenderer {
       this.seenRevision = this.world.revision;
       this.rebuild();
     }
+    this.frame++;
+    this.updateVehicles();
+    if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();
     this.renderer.render(this.scene, this.rig.camera);
   }

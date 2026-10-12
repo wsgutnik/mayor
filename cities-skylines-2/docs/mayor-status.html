@@ -162,26 +162,35 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M4 concluído. M5 em seguida.",
-    summary: "As estradas deixaram de ser tiles pintados: agora são segmentos retos ou curvos de Bézier, em três classes (rua, avenida, rodovia). Por baixo a simulação segue em grade, então tudo que existia continua funcionando.",
-    screenshot: { src: "img/m4-roads.jpg", caption: "M4: rodovia em linha reta saindo da entrada, com faixa central, sobre terreno nivelado sob a via. Avenidas curvas funcionam do mesmo jeito." },
+    headline: "M5 concluído. M6 em seguida.",
+    summary: "A cidade agora tem trânsito: carros levam moradores ao trabalho e caminhões levam produtos da indústria ao comércio, escolhendo a rota mais rápida considerando o congestionamento. Vias lotadas atrasam todo mundo e derrubam a felicidade.",
+    screenshot: { src: "img/m5-traffic.jpg", caption: "M5: 109 veículos circulando; o infoview de tráfego pinta cada via de verde (livre) a vermelho (lotada)." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
       { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "done" },
       { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "done" },
-      { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "active" },
-      { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "todo" },
+      { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "done" },
+      { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "active" },
       { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "todo" },
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "todo" }
     ],
     checks: [
-      { ok: true, text: "33 testes da simulação e da pintura de linha passando" },
+      { ok: true, text: "43 testes passando, incluindo pathfinding e um teste de desempenho do tráfego (menos de 5 ms por tick com 260 veículos)" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
-      { ok: true, text: "Jogado no navegador: avenida curva, rodovia reta, preview e snapping na entrada" },
-      { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8)" }
+      { ok: true, text: "Jogado no navegador: 109 veículos, infoview de tráfego e 2,6 ms por quadro de renderização" },
+      { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8); quadros por segundo reais só medidos no navegador do Mac" }
     ],
     log: [
+      { date: "2026-10-12", title: "M5 · Agentes e tráfego", items: [
+        "Dois tipos de veículo: carros de moradores (casa para emprego) e caminhões (indústria para comércio)",
+        "Rota por A* com custo de tempo por classe de via, inflado pela ocupação atual: o tráfego desvia de vias lotadas",
+        "Velocidade e capacidade por classe: rua 3 tiles/s e 4 veículos, avenida 4,5 e 10, rodovia 7 e 20",
+        "Veículos seguem a curva suavizada das vias e andam por faixa; cidade limita-se a 260 veículos simultâneos",
+        "Congestionamento medido e suavizado reduz a felicidade; painel Services mostra veículos em circulação",
+        "Infoview de tráfego colore cada via por ocupação; veículos somem ao demolir a via que usavam",
+        "Medido: 2,6 ms por quadro de renderização com 45 veículos; tick de tráfego abaixo de 5 ms com 260"
+      ] },
       { date: "2026-10-12", title: "M4 · Estradas livres", items: [
         "Segmentos de estrada retos e curvos (Bézier quadrática), desenhados como fitas suaves sobre o terreno",
         "Três classes: rua (1 tile), avenida (2, canteiro verde) e rodovia (3, divisória); custo e manutenção por classe",

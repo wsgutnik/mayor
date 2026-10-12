@@ -31,7 +31,7 @@ linguagem visual da UI. Não é paridade de features.
 | M2 | ✅ Serviços | Energia, água, esgoto, coleta de lixo; cobertura por raio; overlays de infoview |
 | M3 | ✅ Serviços cívicos | Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo |
 | M4 | ✅ Estradas livres | Curvas/Bézier, tipos de via, interseções, cruzamentos, terreno cortado |
-| M5 | Agentes | Cidadãos/veículos com pathfinding (A*/flow), tráfego, congestionamento |
+| M5 | ✅ Agentes | Cidadãos/veículos com pathfinding (A*/flow), tráfego, congestionamento |
 | M6 | Transporte público | Ônibus, metrô, linhas e paradas |
 | M7 | Persistência e meta | Salvar/carregar, mapas, conquistas leves, ciclo dia/noite, clima |
 | M8 | Empacotamento | PWA offline, Tauri Mac/Win, ícones, perf no iPad |

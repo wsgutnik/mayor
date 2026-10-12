@@ -82,6 +82,10 @@ export interface CityState {
   landValue: number;
   /** Buildings lost to fire since the game began. */
   fires: number;
+  /** Share of vehicles crawling (0..1), smoothed; written by tickTraffic. */
+  congestion: number;
+  /** Vehicles currently driving; written by tickTraffic. */
+  vehicles: number;
   lastMonth: MonthReport;
   monthIncome: number;
   monthExpenses: number;
@@ -111,6 +115,8 @@ export function newCity(seed = 1337, size = 96): CityState {
     coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0 },
     landValue: 0,
     fires: 0,
+    congestion: 0,
+    vehicles: 0,
     lastMonth: { income: 0, expenses: 0 },
     monthIncome: 0,
     monthExpenses: 0,
@@ -330,7 +336,7 @@ function recount(s: CityState): void {
     : 0;
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
-      - missingSewage * 20 - missingGarbage * 15 - civicPenalty + s.coverage.park * 10,
+      - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10,
     0, 100,
   );
 

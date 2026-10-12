@@ -1,5 +1,5 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
-import { COVER, LAND_VALUE_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
+import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -39,6 +39,7 @@ const LAYERS: { layer: OverlayLayer; label: string; icon: string; color: string 
   { layer: COVER.EDU, label: "Education", icon: "✎", color: "#f59a4a" },
   { layer: COVER.PARK, label: "Parks", icon: "❀", color: "#48b85a" },
   { layer: LAND_VALUE_LAYER, label: "Land value", icon: "▦", color: "#7fd35c" },
+  { layer: TRAFFIC_LAYER, label: "Traffic", icon: "⇆", color: "#e5584f" },
 ];
 
 export const toolColor = (t: ToolId) => (T[t] ? T[t].color : "#ffffff");
@@ -112,6 +113,8 @@ export class Hud {
   private civicBtn!: HTMLElement;
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private lvEl!: HTMLElement;
+  private trafficFill!: HTMLElement;
+  private trafficVal!: HTMLElement;
   private flyView!: HTMLElement;
   private viewBtn!: HTMLElement;
   private layerBtns: HTMLElement[] = [];
@@ -178,6 +181,10 @@ export class Hud {
       this.civ.set(r.key, { fill: row.querySelector("i")!, val: row.querySelector(".svc-v")! });
       p.appendChild(row);
     }
+    const tr = el("div", "svc", `<span class="svc-l">Traffic</span><div class="svc-bar"><i style="background:#e5584f"></i></div><span class="svc-v">0 cars</span>`);
+    this.trafficFill = tr.querySelector("i")!;
+    this.trafficVal = tr.querySelector(".svc-v")!;
+    p.appendChild(tr);
     const lv = el("div", "svc-head lv", `<span>Land value</span><b data-k="lv">0</b>`);
     this.lvEl = lv.querySelector('[data-k="lv"]')!;
     p.appendChild(lv);
@@ -378,6 +385,9 @@ export class Hud {
       ref.val.textContent = `${Math.round(v * 100)}%`;
     }
     this.lvEl.textContent = String(Math.round(s.landValue));
+    this.trafficFill.style.width = `${Math.min(1, s.congestion) * 100}%`;
+    this.trafficVal.textContent = `${s.vehicles} cars`;
+    this.trafficVal.classList.toggle("neg", s.congestion > 0.4);
     const inc = this.budget.querySelector('[data-k="inc"]')!;
     const exp = this.budget.querySelector('[data-k="exp"]')!;
     inc.textContent = money(s.lastMonth.income);

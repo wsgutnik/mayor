@@ -19,6 +19,8 @@ export const COVER = {
 
 /** Pseudo-layer for the land value infoview (not a coverage bit). */
 export const LAND_VALUE_LAYER = 1024;
+/** Pseudo-layer colouring road tiles by how full they are. */
+export const TRAFFIC_LAYER = 2048;
 
 interface FacilityInfo {
   name: string; cost: number; upkeep: number; radius: number;

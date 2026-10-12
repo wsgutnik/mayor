@@ -30,4 +30,7 @@ npm run build   # tipos + bundle em dist/
 - M4: estradas livres. Toque ou clique inicio e fim (Linha) ou inicio, curva e fim (Curva); Pintar continua disponível.
   Rua, avenida e rodovia (a rodovia liga mas não serve lotes); snapping em estradas existentes.
   A simulação continua em grade: cada via é rasterizada em tiles, então zonas, cobertura e conectividade seguem iguais.
-- Próximo: M5 (agentes: cidadãos e veículos com pathfinding e tráfego).
+- M5: tráfego. Carros de moradores (casa para emprego) e caminhões (indústria para comércio) percorrem a rede
+  com A* sensível a congestionamento; cada classe de via tem velocidade e capacidade; infoview de tráfego;
+  congestionamento reduz felicidade.
+- Próximo: M6 (transporte público: ônibus, metrô, linhas e paradas).

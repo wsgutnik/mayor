@@ -1,5 +1,6 @@
 import "./ui/style.css";
 import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
+import { newTraffic, tickTraffic } from "./sim/traffic";
 import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, toolColor } from "./ui/hud";
@@ -12,6 +13,8 @@ view.className = "view";
 app.appendChild(view);
 
 const renderer = new CityRenderer(view, state);
+const traffic = newTraffic(state.world.size);
+renderer.setTraffic(traffic);
 let tool: ToolId = "road";
 let speed = 1;
 let roadType: RoadType = 1;
@@ -159,6 +162,7 @@ function frame(now: number) {
     acc += dt * speed;
     while (acc >= DAY_MS) { step(state); acc -= DAY_MS; }
   }
+  tickTraffic(state, traffic, (dt / 1000) * speed);
   if (state.fires !== seenFires) {
     hud.showToast("Fire! A building burned down. Build a fire station.");
     seenFires = state.fires;
@@ -170,4 +174,4 @@ function frame(now: number) {
 requestAnimationFrame(frame);
 
 // Debug/test hook.
-(window as unknown as { __city: unknown }).__city = { state, renderer, tileHeight };
+(window as unknown as { __city: unknown }).__city = { state, renderer, traffic, tileHeight };
