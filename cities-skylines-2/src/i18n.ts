@@ -104,6 +104,8 @@ const PT: Record<string, string> = {
   "Official maps": "Mapas oficiais", "Random terrain": "Terreno aleatório",
   "Beginner": "Iniciante", "Medium": "Médio", "Advanced": "Avançado",
   "Play": "Jogar", "Size": "Tamanho", "tiles": "trechos",
+  // inspector card
+  "Residents": "Moradores", "Level": "Nível", "Upkeep": "Manutenção", "Radius": "Raio", "Close": "Fechar",
 };
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];

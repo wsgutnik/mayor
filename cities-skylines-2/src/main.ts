@@ -3,6 +3,8 @@ import "./ui/touch.css";
 import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
+import { Inspector } from "./ui/inspector";
+import { describeTile } from "./sim/inspect";
 import { AUTOSAVE, exportFile, importFile, loadFrom, saveTo, slotInfo } from "./storage";
 import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
@@ -41,7 +43,7 @@ function makeHud(): Hud {
   return new Hud(app, {
   onTool: (t) => {
     tool = t;
-    if (t === "pan") renderer.setHover(null);
+    if (t === "pan") renderer.setHover(null); else inspector.hide();
     if (t !== "road") cancelDraft();
     refreshHint();
   },
@@ -106,6 +108,8 @@ async function startMap(id: string): Promise<void> {
     hud.showToast(tr("Could not load the map"));
   }
 }
+
+const inspector = new Inspector(app, { onClose: () => renderer.setHover(null) });
 
 const menu = new Menu(app, {
   info: (slot) => slotInfo(slot),
@@ -220,7 +224,17 @@ function updatePreview(): void {
     : `${name}: ${trReason(plan.reason!)}`);
 }
 
+/** Move tool: a tap shows what stands on the tile. */
+function inspectAt(cx: number, cy: number): void {
+  const t = renderer.pick(cx, cy);
+  const info = t ? describeTile(state, t.x, t.y) : null;
+  if (!info || info.kind === "empty") { inspector.hide(); renderer.setHover(null); return; }
+  inspector.show(info);
+  renderer.setHover(t, "#ffd84a");
+}
+
 function onTap(cx: number, cy: number): void {
+  if (tool === "pan") { inspectAt(cx, cy); return; }
   if (!placing()) return;
   if (lineTool()) { onLineTap(cx, cy); return; }
   const raw = renderer.pickPoint(cx, cy);
@@ -287,7 +301,9 @@ bindInput(renderer, {
 
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (menu.isOpen) menu.close(); else cancelDraft();
+    if (menu.isOpen) menu.close();
+    else if (inspector.isOpen) { inspector.hide(); renderer.setHover(null); }
+    else cancelDraft();
   }
 });
 
