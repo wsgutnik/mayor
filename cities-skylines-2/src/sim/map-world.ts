@@ -14,7 +14,11 @@ export function worldFromMap(data: MapData, biome: Biome = "plains"): World {
   const w = generateWorld(size, 1, biome);
   w.heights.set(unpackHeights(data.heightsB64, size));
   const e = data.entry;
-  if (e.x < 0 || e.y < 0 || e.x >= size || e.y >= size) throw new Error("Map entry is outside the map");
+  if (Math.abs(e.dx) + Math.abs(e.dy) !== 1) throw new Error("Map entry has an invalid direction");
+  for (let k = 0; k < 3; k++) {
+    const x = e.x + e.dx * k, y = e.y + e.dy * k;
+    if (x < 0 || y < 0 || x >= size || y >= size) throw new Error("Map entry is outside the map");
+  }
   w.entry = { x: e.x, y: e.y, dx: e.dx, dy: e.dy };
   const tiles = entryRoadTiles(w);
   levelTiles(w, tiles);

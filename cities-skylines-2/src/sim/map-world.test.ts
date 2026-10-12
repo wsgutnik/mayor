@@ -40,6 +40,11 @@ describe("worldFromMap", () => {
     const bad = { ...island(), entry: { x: 99, y: 0, dx: 1 as const, dy: 0 as const } };
     expect(() => worldFromMap(bad)).toThrow(/outside/);
     expect(() => worldFromMap({ ...island(), size: 5 })).toThrow(/invalid size/);
+    // heading off the map, or not a cardinal direction
+    const off = { ...island(), entry: { x: 0, y: 5, dx: -1 as const, dy: 0 as const } };
+    expect(() => worldFromMap(off)).toThrow(/outside/);
+    const diag = { ...island(), entry: { x: 5, y: 5, dx: 1 as const, dy: 1 as const } };
+    expect(() => worldFromMap(diag)).toThrow(/invalid direction/);
   });
 
   it("protects the entry tiles from the bulldozer, whichever edge they are on", () => {

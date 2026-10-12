@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyTool, newCity, placeRoad, step, CityState } from "./sim";
 import { createLine, setLineVehicles, removeLine, stopAt, transitUpkeep, updateTransit, VEHICLE_COST } from "./transit";
 import { newTraffic, tickTraffic } from "./traffic";
-import { ROAD, cidx, idx, updateConnectivity, updateCoverage, COVER } from "./world";
+import { ROAD, FAC, cidx, idx, updateConnectivity, updateCoverage, COVER } from "./world";
 
 function flat(s: CityState) {
   const ey = s.world.entry.y;
@@ -123,6 +123,10 @@ describe("ridership and effects", () => {
 
   it("bus stops raise coverage and happiness", () => {
     const { s, ey } = town();
+    // Basic utilities everywhere, so the baseline happiness is well above zero.
+    for (const [x, f] of [[10, FAC.POWER], [11, FAC.WATER], [12, FAC.SEWAGE], [13, FAC.LANDFILL], [14, FAC.POLICE], [15, FAC.CLINIC]] as const) {
+      s.world.facility[idx(s.world, x, ey + 4)] = f;
+    }
     updateCoverage(s.world);
     step(s);
     const base = s.happiness;
@@ -191,5 +195,40 @@ describe("vehicles on lines", () => {
     removeLine(s, s.world.lines[0].id);
     tickTraffic(s, t, 0.01);
     expect(t.transit).toHaveLength(0);
+  });
+});
+
+describe("review fixes", () => {
+  it("bulldozing a road segment removes every bus stop that was on it", () => {
+    const { s, ey } = town();
+    applyTool(s, "busstop", 8, ey);
+    applyTool(s, "busstop", 22, ey);
+    expect(s.world.stops).toHaveLength(2);
+    applyTool(s, "bulldoze", 15, ey); // a third tile of the same segment
+    expect(s.world.stops).toHaveLength(0);
+    expect(s.world.lines).toHaveLength(0);
+  });
+
+  it("a bus line whose road was cut stops earning", () => {
+    const { s, ey } = town();
+    // two roads joined by a link we can remove
+    expect(placeRoad(s, ROAD.STREET, [{ x: 12.5, z: ey - 0.5 }, { x: 12.5, z: ey - 7.5 }]).ok).toBe(true);
+    expect(placeRoad(s, ROAD.STREET, [{ x: 12.5, z: ey - 7.5 }, { x: 28.5, z: ey - 7.5 }]).ok).toBe(true);
+    applyTool(s, "busstop", 8, ey);
+    applyTool(s, "busstop", 24, ey - 8);
+    const ids = s.world.stops.map((x) => x.id);
+    expect(createLine(s, "bus", ids).ok).toBe(true);
+    updateTransit(s);
+    expect(s.transit.riders).toBeGreaterThan(0);
+    applyTool(s, "bulldoze", 12, ey - 4); // cut the connector (a segment of its own)
+    updateTransit(s);
+    expect(s.transit.riders).toBe(0);
+  });
+
+  it("rejects a line made of one stop listed twice", () => {
+    const { s, ey } = town();
+    applyTool(s, "busstop", 8, ey);
+    const id = s.world.stops[0].id;
+    expect(createLine(s, "bus", [id, id]).ok).toBe(false);
   });
 });

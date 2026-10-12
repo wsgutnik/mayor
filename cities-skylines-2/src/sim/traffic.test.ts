@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTool, newCity, placeRoad, step, CityState } from "./sim";
 import { findPath, newTraffic, tickTraffic, ROAD_CAPACITY, ROAD_SPEED } from "./traffic";
-import { ROAD, cidx, idx, updateConnectivity } from "./world";
+import { ROAD, FAC, cidx, idx, updateConnectivity } from "./world";
 
 /** Dry, flat ground around the entry so layouts do not depend on the seed. */
 function flat(s: CityState) {
@@ -113,6 +113,11 @@ describe("traffic simulation", () => {
 
   it("congestion lowers happiness", () => {
     const { s } = town();
+    // Enough utilities for the whole town, so the baseline is not already pinned at zero.
+    const ey = s.world.entry.y;
+    const kinds = [FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.LANDFILL];
+    for (let k = 0; k < 24; k++) s.world.facility[idx(s.world, 3 + k, ey + 5)] = kinds[k % 4];
+    s.world.coverageDirty = true;
     step(s);
     const calm = s.happiness;
     s.congestion = 1;

@@ -109,3 +109,22 @@ describe("weather", () => {
     expect(RAIN_SPEED_FACTOR).toBeLessThan(1);
   });
 });
+
+describe("save validation (review fixes)", () => {
+  const good = () => JSON.parse(serialize(builtCity()));
+  it("turns structural damage into a SaveError, never a raw TypeError", () => {
+    expect(() => deserialize(JSON.stringify({ ...good(), segments: null }))).toThrow(SaveError);
+    expect(() => deserialize(JSON.stringify({ ...good(), stops: [{ id: 1, kind: "bus", tile: 99999999 }] }))).toThrow(SaveError);
+    expect(() => deserialize(JSON.stringify({ ...good(), lines: [{ stops: [42], vehicles: 1 }] }))).toThrow(SaveError);
+    expect(() => deserialize(JSON.stringify({ ...good(), money: "lots" }))).toThrow(SaveError);
+    expect(() => deserialize(JSON.stringify({ ...good(), entry: null }))).toThrow(SaveError);
+  });
+
+  it("rejects out-of-range facility and level values", () => {
+    const f = good();
+    const raw = atob(f.facility).split("").map((c) => c.charCodeAt(0));
+    raw[0] = 200;
+    f.facility = btoa(String.fromCharCode(...raw));
+    expect(() => deserialize(JSON.stringify(f))).toThrow(SaveError);
+  });
+});

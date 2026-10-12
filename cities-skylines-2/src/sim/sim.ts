@@ -88,6 +88,8 @@ export interface CityState {
   landValue: number;
   /** Buildings lost to fire since the game began. */
   fires: number;
+  /** World revision the land values were last computed for (not saved). */
+  lvSeenRevision: number;
   /** Rain slows road traffic; derived from the day and seed. */
   raining: boolean;
   /** Daily passengers, fare income and share of commuters on transit. */
@@ -125,6 +127,7 @@ export function newCity(seed = 1337, size = 96, biome: Biome = "plains"): CitySt
     coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 },
     landValue: 0,
     fires: 0,
+    lvSeenRevision: -1,
     raining: false,
     transit: { riders: 0, income: 0, share: 0 },
     congestion: 0,
@@ -251,6 +254,11 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       // Bulldozing a road removes the whole segment it belongs to.
       w.segments = w.segments.filter((seg) => seg.fixed || !seg.tiles.includes(i));
       rebuildRoadRaster(w);
+      // Every bus stop that lost its road goes with it, not only the one under the cursor.
+      for (const stop of [...w.stops]) {
+        if (stop.kind === "bus" && !w.road[stop.tile]) removeStopAt(w, stop.tile);
+      }
+      w.coverageDirty = true;
     }
     if (w.facility[i]) w.coverageDirty = true;
     w.zone[i] = 0;
@@ -311,7 +319,7 @@ function recount(s: CityState): void {
   const w = s.world;
   let res = 0, com = 0, ind = 0;
   const util = emptyUtilities();
-  let built = 0, noSewage = 0, noGarbage = 0;
+  let built = 0, noSewage = 0, noGarbage = 0, noPower = 0, noWater = 0;
   const civicCovered: Record<CivicKey, number> = { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 };
   let lvSum = 0;
 
@@ -334,8 +342,10 @@ function recount(s: CityState): void {
     const u = USAGE[kind][l];
     const c = w.cover[i];
     built++;
-    if (c & COVER.POWER) util.power.demand += u;
-    if (c & COVER.WATER) util.water.demand += u;
+    util.power.demand += u;
+    util.water.demand += u;
+    if (!(c & COVER.POWER)) noPower++;
+    if (!(c & COVER.WATER)) noWater++;
     if (c & COVER.SEWAGE) util.sewage.demand += u; else noSewage++;
     if (c & COVER.GARBAGE) util.garbage.demand += u; else noGarbage++;
     for (const k of CIVIC_KEYS) if (c & CIVIC_BIT[k]) civicCovered[k]++;
@@ -349,6 +359,8 @@ function recount(s: CityState): void {
   // Shortage: demand beyond supply hurts happiness in proportion to the shortfall.
   const short = (k: UtilityKey) =>
     util[k].demand > 0 ? Math.max(0, 1 - util[k].supply / util[k].demand) : 0;
+  const missingPower = built ? noPower / built : 0;
+  const missingWater = built ? noWater / built : 0;
   const missingSewage = built ? noSewage / built : 0;
   const missingGarbage = built ? noGarbage / built : 0;
   const hasBuildings = built > 0;
@@ -357,7 +369,7 @@ function recount(s: CityState): void {
     : 0;
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
-      - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10 + s.coverage.transit * 5,
+      - missingPower * 25 - missingWater * 25 - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10 + s.coverage.transit * 5,
     0, 100,
   );
 
@@ -397,7 +409,7 @@ export function step(s: CityState): void {
   if (w.connectivityDirty) updateConnectivity(w);
   if (w.coverageDirty) updateCoverage(w);
   s.raining = isRaining(s.day, s.rngState);
-  if (s.day % 5 === 0) updateLandValue(w);
+  if (s.day % 5 === 0 || s.lvSeenRevision !== w.revision) { updateLandValue(w); s.lvSeenRevision = w.revision; }
   const rng = makeRng(s.rngState ^ (s.day * 2654435761));
   const demandOf = [0, s.demand.r, s.demand.c, s.demand.i];
   let changed = false;

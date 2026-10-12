@@ -1,6 +1,6 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
-import { ROAD, World, ZONE, idx, inBounds, TransitKind } from "./world";
+import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity } from "./world";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
 
@@ -112,23 +112,34 @@ function crossCost(cls: number, load: number): number {
   return (1 / ROAD_SPEED[cls]) * (1 + load / ROAD_CAPACITY[cls]);
 }
 
+const scratch = { n: 0, g: new Float32Array(0), prev: new Int32Array(0), stamp: new Uint32Array(0), gen: 0 };
+
 /** Fastest route over road tiles given current loads, or null when unreachable. */
 export function findPath(w: World, load: Uint16Array, from: number, to: number): number[] | null {
   if (!w.road[from] || !w.road[to]) return null;
   if (from === to) return [from];
   const n = w.size * w.size;
-  const g = new Float32Array(n).fill(Infinity);
-  const prev = new Int32Array(n).fill(-1);
+  if (scratch.n !== n) {
+    scratch.n = n;
+    scratch.g = new Float32Array(n);
+    scratch.prev = new Int32Array(n);
+    scratch.stamp = new Uint32Array(n);
+    scratch.gen = 0;
+  }
+  // Generation stamps stand in for refilling the arrays on every search.
+  const gen = ++scratch.gen;
+  const { g, prev, stamp } = scratch;
+  const G = (i: number) => (stamp[i] === gen ? g[i] : Infinity);
   const heap = new MinHeap();
   const minCost = 1 / ROAD_SPEED[ROAD.HIGHWAY];
   const tx = to % w.size, ty = (to / w.size) | 0;
-  g[from] = 0;
+  stamp[from] = gen; g[from] = 0; prev[from] = -1;
   heap.push(0, from);
   while (heap.size) {
     const cur = heap.pop();
     if (cur === to) break;
     const cx = cur % w.size, cy = (cur / w.size) | 0;
-    const gc = g[cur];
+    const gc = G(cur);
     for (const [dx, dy] of NEIGHBOURS) {
       const nx = cx + dx, ny = cy + dy;
       if (!inBounds(w, nx, ny)) continue;
@@ -136,14 +147,15 @@ export function findPath(w: World, load: Uint16Array, from: number, to: number):
       const cls = w.road[j];
       if (!cls) continue;
       const ng = gc + crossCost(cls, load[j]);
-      if (ng < g[j]) {
+      if (ng < G(j)) {
+        stamp[j] = gen;
         g[j] = ng;
         prev[j] = cur;
         heap.push(ng + (Math.abs(nx - tx) + Math.abs(ny - ty)) * minCost, j);
       }
     }
   }
-  if (prev[to] === -1) return null;
+  if (stamp[to] !== gen) return null;
   const out: number[] = [];
   for (let c = to; c !== -1; c = prev[c]) out.push(c);
   return out.reverse();
@@ -292,6 +304,8 @@ function moveTransit(w: World, t: TrafficState, dt: number, weather: number): vo
 /** Advance traffic by `dt` seconds of game time and publish stats onto the city state. */
 export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   const w = s.world;
+  // Roads change while paused; spawn points must not read a stale connectivity map.
+  if (w.connectivityDirty) updateConnectivity(w);
   if (t.listRevision !== w.revision) refreshLists(w, t);
   if (t.transitRevision !== w.revision) syncTransit(w, t);
   if (dt <= 0) return;

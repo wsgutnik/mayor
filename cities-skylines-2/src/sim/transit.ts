@@ -80,7 +80,7 @@ function legReachable(s: CityState, kind: TransitKind, a: Stop, b: Stop): boolea
 
 export function createLine(s: CityState, kind: TransitKind, stopIds: number[]): ToolResult {
   const w = s.world;
-  if (stopIds.length < 2) return { ok: false, reason: "A line needs at least two stops" };
+  if (new Set(stopIds).size < 2) return { ok: false, reason: "A line needs at least two stops" };
   const stops = stopIds.map((id) => w.stops.find((x) => x.id === id));
   if (stops.some((x) => !x)) return { ok: false, reason: "Unknown stop" };
   if (stops.some((x) => x!.kind !== kind)) return { ok: false, reason: `Use only ${NAME[kind].toLowerCase()} stops` };
@@ -153,10 +153,28 @@ function catchment(w: World, line: TransitLine) {
  * Daily ridership: people need a stop near both home and work on the same line.
  * Riders are limited by vehicle capacity, pay a fare, and take cars off the road.
  */
+const reachCache = new WeakMap<TransitLine, { revision: number; ok: boolean }>();
+
+/** Whether every leg of a bus line still has a road route; re-checked only when the world changes. */
+function lineIsServiceable(s: CityState, line: TransitLine): boolean {
+  if (line.kind === "metro") return true;
+  const hit = reachCache.get(line);
+  if (hit && hit.revision === s.world.revision) return hit.ok;
+  const stops = line.stops.map((id) => s.world.stops.find((x) => x.id === id));
+  let ok = stops.every(Boolean);
+  for (let i = 0; ok && i < stops.length; i++) {
+    const a = stops[i]!, b = stops[(i + 1) % stops.length]!;
+    if (a.id !== b.id && !legReachable(s, "bus", a, b)) ok = false;
+  }
+  reachCache.set(line, { revision: s.world.revision, ok });
+  return ok;
+}
+
 export function updateTransit(s: CityState): void {
   const w = s.world;
   let riders = 0, income = 0;
   for (const line of w.lines) {
+    if (!lineIsServiceable(s, line)) continue;
     const { homes, jobs } = catchment(w, line);
     const residentShare = s.capacity.res > 0 ? s.population / s.capacity.res : 0;
     const commuters = Math.min(homes * residentShare * 0.65, jobs);

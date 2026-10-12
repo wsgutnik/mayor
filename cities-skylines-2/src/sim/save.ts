@@ -80,6 +80,34 @@ export function serialize(s: CityState): string {
 
 export class SaveError extends Error {}
 
+/** Everything a hand-edited or truncated save could break must fail here as a SaveError. */
+function validateStructure(f: SaveFile, n: number): void {
+  const bad = () => { throw new SaveError("The save file is damaged"); };
+  const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+  const tile = (t: unknown) => Number.isInteger(t) && (t as number) >= 0 && (t as number) < n * n;
+  for (const k of ["day", "money", "taxRate", "population", "happiness", "fires", "monthIncome", "monthExpenses", "nextSegmentId", "nextTransitId"] as const) {
+    if (!finite(f[k])) bad();
+  }
+  if (!f.entry || !finite(f.entry.x) || !finite(f.entry.y)) bad();
+  if (!f.lastMonth || !finite(f.lastMonth.income) || !finite(f.lastMonth.expenses)) bad();
+  if (!Array.isArray(f.segments) || !Array.isArray(f.stops) || !Array.isArray(f.lines)) bad();
+  for (const seg of f.segments) {
+    if (!seg || ![1, 2, 3].includes(seg.type) || !Array.isArray(seg.tiles) || !Array.isArray(seg.pts)) bad();
+    if (seg.pts.length < 2 || seg.pts.length > 3 || seg.tiles.length > n * n) bad();
+    if (!seg.tiles.every(tile)) bad();
+    if (!seg.pts.every((p) => p && finite(p.x) && finite(p.z))) bad();
+  }
+  const stopIds = new Set<number>();
+  for (const st of f.stops) {
+    if (!st || !tile(st.tile) || (st.kind !== "bus" && st.kind !== "metro") || !finite(st.id)) bad();
+    stopIds.add(st.id);
+  }
+  for (const l of f.lines) {
+    if (!l || !Array.isArray(l.stops) || !l.stops.every((id) => stopIds.has(id))) bad();
+    if (!finite(l.vehicles) || l.vehicles < 0 || l.vehicles > 64) bad();
+  }
+}
+
 export function deserialize(json: string): CityState {
   let f: SaveFile;
   try {
@@ -90,6 +118,7 @@ export function deserialize(json: string): CityState {
   if (!f || typeof f !== "object" || f.v !== SAVE_VERSION) throw new SaveError("This save is from a different version");
   const n = f.size;
   if (!Number.isInteger(n) || n < 8 || n > 512) throw new SaveError("The save file is damaged");
+  validateStructure(f, n);
   const biome: Biome = f.biome && BIOMES.includes(f.biome) ? f.biome : "plains";
   const s = newCity(f.seed, n, biome);
   const w = s.world;
@@ -104,6 +133,9 @@ export function deserialize(json: string): CityState {
   w.zone.set(bytes(f.zone, n * n));
   w.level.set(bytes(f.level, n * n));
   w.facility.set(bytes(f.facility, n * n));
+  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 3) || w.facility.some((v) => v > 10)) {
+    throw new SaveError("The save file is damaged");
+  }
   w.segments = f.segments;
   w.stops = f.stops;
   w.lines = f.lines;
