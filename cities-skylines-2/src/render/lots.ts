@@ -38,7 +38,8 @@ export function lotModelCells(lot: Footprint): { x: number; z: number }[] {
 export function lotKerb(lot: Footprint & Pick<WorldLot, "facing" | "depthFromRoad">): {
   x: number; z: number; w: number; d: number;
 } | null {
-  if (lot.depthFromRoad < 0) return null;
+  // Only a lot whose front edge sits on the road gets a kerb strip; deeper lots would show a floating bar.
+  if (lot.depthFromRoad !== 0) return null;
   const { dx, dy } = lot.facing;
   if (dy !== 0) return { x: lot.x + lot.w / 2, z: dy > 0 ? lot.y + lot.h : lot.y, w: lot.w, d: 0.12 };
   if (dx !== 0) return { x: dx > 0 ? lot.x + lot.w : lot.x, z: lot.y + lot.h / 2, w: 0.12, d: lot.h };

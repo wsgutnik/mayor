@@ -31,6 +31,8 @@ describe("lot layout", () => {
     expect(lotKerb({ x: 4, y: 8, w: 1, h: 2, facing: { dx: -1, dy: 0 }, depthFromRoad: 0 }))
       .toEqual({ x: 4, z: 9, w: 0.12, d: 2 });
     expect(lotKerb({ x: 4, y: 8, w: 1, h: 1, facing: { dx: 0, dy: 1 }, depthFromRoad: -1 })).toBeNull();
+    // a lot two tiles back from the road has no kerb of its own
+    expect(lotKerb({ x: 4, y: 8, w: 1, h: 1, facing: { dx: 0, dy: 1 }, depthFromRoad: 2 })).toBeNull();
   });
 
   it("shades pads darker toward the back of the block", () => {

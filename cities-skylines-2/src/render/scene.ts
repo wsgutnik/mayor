@@ -1035,9 +1035,12 @@ export class CityRenderer {
     this.renderer.toneMappingExposure = 0.85 + day * 0.2 - dusk * 0.05;
     const a = (tod - 0.25) * Math.PI * 2;
     this.sunDir.set(-Math.cos(a) * 60, Math.max(6, Math.sin(a) * 70 + 8), 30);
-    this.sun.intensity = (0.15 + 1.7 * day) * (raining ? 0.5 : 1);
-    this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6);
-    this.hemi.intensity = (0.4 + 0.95 * day) * (raining ? 0.8 : 1);
+    // Night keeps a readable moonlit floor (cool, soft) instead of near black; the underground view is always lit.
+    const night = 1 - day;
+    const under = this.overlayLayer === UNDERGROUND_LAYER;
+    this.sun.intensity = under ? 1.1 : (0.15 + 1.7 * day + 0.32 * night) * (raining ? 0.55 : 1);
+    this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6).lerp(new THREE.Color("#9db8ff"), night * 0.7);
+    this.hemi.intensity = under ? 1.2 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
     this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
     this.nightGlow = this.winMat.emissiveIntensity;
     for (const g of this.glowMats) g.emissiveIntensity = this.nightGlow;
