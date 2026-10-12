@@ -42,6 +42,14 @@ linguagem visual da UI. Não é paridade de features.
 | M13 | ✅ Kit de prédios | Catálogo de 40 prédios, modelos por entrada, sete instalações, inspetor |
 | M14 | ✅ Blender, natureza e água | Pipeline Blender para GLB, árvores, veículos, barcos, água com correnteza |
 | M15 | ✅ Detalhe | Texturas, AO, faixas de pedestres, nuvens, fumaça, prédios principais redesenhados |
+| M16 | ✅ Rede viária com nós | Grafo de nós, esquinas, zebras, dados de semáforo; estradas por Linha e Curva |
+| M17 | ✅ Quadras e lotes | Lotes persistidos voltados para a rua, um prédio por lote, zonas até 4 lotes da estrada |
+| M18 | ✅ Redes e subsolo | Água, esgoto e energia por fluxo nas ruas, vista Subsolo, avisos |
+| M19 | ✅ Água | Margem contínua, normais, reflexo, espuma, níveis de qualidade |
+| M20 | em produção | Texturas HD, níveis de qualidade, LOD (sombras e tone mapping já feitos) |
+| M21 | em produção | Mão única, rotatória, semáforos e props de calçada |
+| M22 | pendente | Pedestres, polimento, validação em Windows e iPad |
+| M23 | ✅ Pontes e túneis | Elevação por segmento, vãos sobre água e colinas, tabuleiro, pilares, portais |
 
 ## Arquitetura
 
