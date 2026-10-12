@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M13 concluído. Falta validar Windows e iPad.",
-    summary: "O Kit de Prédios Básicos virou catálogo no jogo: 40 prédios com nome e categoria, um modelo 3D por prédio, sete instalações novas e um cartão de inspeção com a miniatura do kit ao tocar em qualquer prédio.",
-    screenshot: { src: "img/m13-inspector.jpg", caption: "M13: tocar num prédio com a ferramenta Mover abre o cartão do kit: nome, categoria S4, serviços atendidos, manutenção e raio." },
+    headline: "M14 concluído. Falta validar Windows e iPad.",
+    summary: "O mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
+    screenshot: { src: "img/m14-blender.jpg", caption: "M14: ruas com calçada e faixa, casas de telhado azul, apartamentos, torres de vidro, fábricas e instalações do kit, com árvores de várias espécies e a costa ao fundo." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -178,10 +178,11 @@ npm run dev</pre>
       { id: "M10", name: "Kit visual", desc: "Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas.", status: "done" },
       { id: "M11", name: "Modelos 3D", desc: "Casas, torres, galpões e instalações procedurais; janelas acesas à noite; prédios voltados para a rua.", status: "done" },
       { id: "M12", name: "Mapas oficiais", desc: "Heightmaps do Map Kit no jogo, conversor, seletor no menu, mapas de qualquer tamanho.", status: "done" },
-      { id: "M13", name: "Kit de prédios", desc: "Catálogo de 40 prédios, modelos por entrada, sete instalações e inspetor com miniaturas.", status: "done" }
+      { id: "M13", name: "Kit de prédios", desc: "Catálogo de 40 prédios, modelos por entrada, sete instalações e inspetor com miniaturas.", status: "done" },
+      { id: "M14", name: "Blender, natureza e água", desc: "Modelos do kit em GLB, plantas, veículos, barcos, postes, vias detalhadas e água com correnteza.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "118 testes passando: catálogo, inspeção, modelos por entrada, instalações novas e correções de toque" },
+      { ok: true, text: "122 testes passando, incluindo leitura de todos os GLB, limites do tile e orçamento de triângulos" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
       { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar (ainda com o ícone antigo)" },
@@ -189,6 +190,16 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M14 · Blender, natureza e água", items: [
+        "Pipeline em Blender 5.2 por script (blender/): biblioteca de modelagem, exportação em GLB e prévia isométrica comparada com a arte do kit",
+        "37 prédios e instalações do kit em GLB (Codex: 2–19, Muse: 21–30 e 34–39, eu: 1, 20 e 40), de 150 a 410 triângulos, com janelas, lajes e sebes",
+        "Plantas: carvalho, pinheiro, álamo, cerejeira, outono, palmeira, arbusto, arbusto com flores e pedra, por espécie conforme o terreno",
+        "Veículos: sedã, hatch, SUV, van, caminhão, ônibus e trem; faróis e lanternas acendem à noite; ônibus e trem usam a cor da linha",
+        "Três barcos à deriva pelas águas abertas e postes de luz nas ruas, que acendem à noite",
+        "Água em shader: cor por profundidade, ondulação em duas fases, brilho do sol, espuma na margem e correnteza derivada do relevo",
+        "Vias com meio-fio e calçada, faixas tracejadas, canteiro nas avenidas e linhas nas rodovias",
+        "Testes leem todos os GLB: dentro do tile, no orçamento de triângulos e com os materiais que acendem à noite"
+      ] },
       { date: "2026-10-12", title: "M13 · Kit de Prédios Básicos", items: [
         "Catálogo com os 40 prédios do kit: número, nome em português e inglês, categoria, uso e miniatura recortada de cada página",
         "Cada prédio zoneado usa o modelo da sua entrada (Codex); 37 modelos novos de prédios e instalações, no máximo 128 triângulos",

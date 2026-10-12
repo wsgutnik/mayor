@@ -600,10 +600,14 @@ export class CityRenderer {
     const col: number[] = [];
     const ind: number[] = [];
     const c = new THREE.Color();
-    const strip = (samples: Pt[], halfW: number, lift: number, color: string) => {
+    const strip = (samples: Pt[], halfW: number, lift: number, color: string, offset = 0, dashed = false) => {
       if (tint) c.copy(tint); else c.set(color);
-      const base = pos.length / 3;
+      let prevOn = false;
       for (let i = 0; i < samples.length; i++) {
+        // dashes: two samples on, two off (about one tile each at 0.5 spacing)
+        const on = !dashed || i % 4 < 2;
+        if (!on) { prevOn = false; continue; }
+        const first = !prevOn;
         const a = samples[Math.max(0, i - 1)], b = samples[Math.min(samples.length - 1, i + 1)];
         let tx = b.x - a.x, tz = b.z - a.z;
         const l = Math.hypot(tx, tz) || 1;
@@ -611,23 +615,37 @@ export class CityRenderer {
         const nx = -tz, nz = tx;
         const p = samples[i];
         const y = this.groundY(p.x, p.z) + lift;
-        pos.push(p.x + nx * halfW, y, p.z + nz * halfW, p.x - nx * halfW, y, p.z - nz * halfW);
+        const ox = nx * offset, oz = nz * offset;
+        const vi = pos.length / 3;
+        pos.push(p.x + ox + nx * halfW, y, p.z + oz + nz * halfW, p.x + ox - nx * halfW, y, p.z + oz - nz * halfW);
         col.push(c.r, c.g, c.b, c.r, c.g, c.b);
-        if (i > 0) {
-          const k = base + (i - 1) * 2;
-          ind.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-        }
+        if (!first) ind.push(vi - 2, vi - 1, vi, vi - 1, vi + 1, vi);
+        prevOn = true;
       }
     };
     segs.forEach((seg, n) => {
       const samples = curvePoints(seg.pts, 0.5);
       const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
       if (seg.color) { strip(samples, (seg.width ?? 0.3) / 2, lift, seg.color); return; }
-      const hw = ROAD_DRAW_WIDTH[seg.type] / 2;
-      strip(samples, hw, lift, seg.type === 3 ? "#4a4f57" : "#3b3f46");
-      if (seg.type === 1) strip(samples, 0.04, lift + 0.01, "#6b717b");
-      else if (seg.type === 2) strip(samples, 0.16, lift + 0.01, "#5f8a4a");
-      else strip(samples, 0.14, lift + 0.01, "#b8bec6");
+      const total = ROAD_DRAW_WIDTH[seg.type];
+      if (seg.type === 3) {
+        strip(samples, total / 2, lift, "#4a4f57");
+        strip(samples, 0.14, lift + 0.01, "#b8bec6");
+        strip(samples, 0.012, lift + 0.012, "#e8e4c8", total * 0.25, true);
+        strip(samples, 0.012, lift + 0.012, "#e8e4c8", -total * 0.25, true);
+        return;
+      }
+      // Asphalt with a kerb and pavement on each side; the drawn width includes both pavements.
+      const kerb = seg.type === 1 ? 0.07 : 0.09;
+      const hw = total / 2 - kerb;
+      strip(samples, hw, lift, "#3b3f46");
+      for (const side of [-1, 1]) strip(samples, kerb / 2, lift + 0.006, "#c4c7cc", side * (hw + kerb / 2));
+      if (seg.type === 1) strip(samples, 0.012, lift + 0.01, "#d8d4b0", 0, true);
+      else {
+        strip(samples, 0.16, lift + 0.01, "#5f8a4a");
+        strip(samples, 0.012, lift + 0.011, "#e8e4c8", hw * 0.5, true);
+        strip(samples, 0.012, lift + 0.011, "#e8e4c8", -hw * 0.5, true);
+      }
     });
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
