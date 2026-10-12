@@ -18,7 +18,7 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
 
-Testes: 266 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 265 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
