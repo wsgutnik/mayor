@@ -1,0 +1,9 @@
+{
+  "name": "Skyline",
+  "short_name": "Skyline",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#121a28",
+  "theme_color": "#121a28",
+  "start_url": "/"
+}

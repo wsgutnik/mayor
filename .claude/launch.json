@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "skyline-dev", "runtimeExecutable": "npm", "runtimeArgs": ["--prefix", "cities-skylines-2", "run", "dev", "--", "--port", "5173"], "port": 5173 }
+  ]
+}
