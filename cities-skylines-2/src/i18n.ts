@@ -58,13 +58,14 @@ const PT: Record<string, string> = {
   "Save file": "Arquivo de save", "Keep a copy or move it to another device": "Guarde uma cópia ou leve para outro aparelho",
   "Export": "Exportar", "Import": "Importar", "Back to the city": "Voltar à cidade",
   "Terrain": "Terreno", "Plains": "Planície", "Forest": "Floresta", "River": "Rio", "Coast": "Litoral", "Mountain": "Montanha", "Desert": "Deserto",
+  "Could not load the map": "Não foi possível carregar o mapa",
   "Preferences": "Preferências", "Pop {n}": "Pop. {n}",
   // preferences
   "General": "Geral", "Graphics": "Gráficos", "Gameplay": "Jogabilidade", "Controls": "Controles",
   "Use tool": "Usar ferramenta", "Move camera": "Mover câmera", "Rotate": "Girar", "Zoom": "Zoom",
   "Left button / one finger": "Botão esquerdo / um dedo", "Right button, WASD / two fingers": "Botão direito, WASD / dois dedos",
   "Middle button, Q E / twist": "Botão do meio, Q E / torcer", "Wheel / pinch": "Roda / pinça", "Apply": "Aplicar", "Language": "Idioma", "Graphics quality": "Qualidade gráfica",
-  "Low": "Baixa", "Medium": "Média", "High": "Alta", "Show tips": "Mostrar dicas",
+  "Low": "Baixa", "High": "Alta", "Low quality": "Baixa", "Medium quality": "Média", "High quality": "Alta", "Show tips": "Mostrar dicas",
   "Save automatically": "Salvar automaticamente", "Dynamic day/night": "Modo dia/noite dinâmico",
   "Restore defaults": "Restaurar padrões", "OK": "OK", "Resolution": "Resolução", "Auto": "Auto",
   // toasts
@@ -89,6 +90,9 @@ const PT: Record<string, string> = {
   "This save is from a different version": "Este save é de outra versão",
   "That file is too large to be a Mayor save": "Arquivo grande demais para ser um save do Mayor",
   "Tap a bus stop": "Toque em um ponto de ônibus", "Tap a metro station": "Toque em uma estação de metrô",
+  "Official maps": "Mapas oficiais", "Random terrain": "Terreno aleatório",
+  "Beginner": "Iniciante", "Medium": "Médio", "Advanced": "Avançado",
+  "Play": "Jogar", "Size": "Tamanho", "tiles": "trechos",
 };
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];

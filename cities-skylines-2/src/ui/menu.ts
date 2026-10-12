@@ -1,7 +1,31 @@
 import { SlotInfo } from "../storage";
 import { Prefs, Quality, defaultPrefs } from "../prefs";
-import { Lang, tr } from "../i18n";
+import { Lang, getLang, tr } from "../i18n";
 import { BIOMES, Biome } from "../sim/world";
+import type { MapIndex, MapListing } from "../sim/maps";
+import { difficultyKey, localizedDescription, localizedName, sortMapsByDifficulty } from "./maps-list";
+
+/** Official maps from /maps/index.json, fetched lazily on first menu open. */
+let cachedMaps: MapListing[] | null = null;
+let mapsFailed = false;
+let mapsInflight: Promise<void> | null = null;
+
+function loadMaps(): Promise<void> {
+  if (cachedMaps || mapsFailed) return Promise.resolve();
+  if (mapsInflight) return mapsInflight;
+  mapsInflight = fetch("/maps/index.json")
+    .then((r) => {
+      if (!r.ok) throw new Error(`maps index ${r.status}`);
+      return r.json() as Promise<MapIndex>;
+    })
+    .then((idx) => { cachedMaps = sortMapsByDifficulty(idx.maps ?? []); })
+    .catch(() => { mapsFailed = true; })
+    .finally(() => { mapsInflight = null; });
+  return mapsInflight;
+}
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const BIOME_LABEL: Record<Biome, string> = {
   plains: "Plains", forest: "Forest", river: "River", coast: "Coast", mountain: "Mountain", desert: "Desert",
@@ -11,6 +35,7 @@ export interface MenuHooks {
   onSave(slot: number): void;
   onLoad(slot: string): void;
   onNew(seed: number, biome: Biome): void;
+  onNewMap(id: string): void;
   onExport(): void;
   onImport(file: File): void;
   info(slot: string): SlotInfo | null;
@@ -25,6 +50,7 @@ export class Menu {
   private root: HTMLElement;
   private view: "main" | "prefs" = "main";
   private biome: Biome = "plains";
+  private selectedMap: string | null = null;
   private draft: Prefs | null = null;
   private prefTab: "general" | "graphics" | "gameplay" | "controls" = "general";
 
@@ -47,6 +73,8 @@ export class Menu {
     this.draft = null;
     this.render();
     this.root.hidden = false;
+    // Lazy official maps: fill the section in once the index arrives.
+    void loadMaps().then(() => { if (this.isOpen && this.view === "main") this.render(); });
   }
 
   /** Re-render in place (language changed). */
@@ -81,8 +109,10 @@ export class Menu {
       rows.push(`<div class="menu-row"><div><b>${tr("Slot {n}", { n })}</b><small>${i ? meta(i) : tr("Empty")}</small></div>
         <span><button data-save="${n}">${tr("Save")}</button><button data-load="${n}" ${i ? "" : "disabled"}>${tr("Load")}</button></span></div>`);
     }
-    rows.push(`<div class="menu-block"><div class="menu-row new"><div><b>${tr("New city")}</b><small>${tr("Terrain")} · ${tr("Map seed")}</small></div>
+    rows.push(`<div class="menu-block"><div class="menu-row new"><div><b>${tr("New city")}</b><small>${tr("Map seed")}</small></div>
       <span><input id="menu-seed" inputmode="numeric" value="${Math.floor(Math.random() * 99999)}"><button data-new>${tr("Generate")}</button></span></div>
+      ${this.mapsSection()}
+      <div class="maps-title">${tr("Random terrain")}</div>
       <div class="terrain-pick">${BIOMES.map((b) => `<button data-biome="${b}" class="${b === this.biome ? "on" : ""}">
         <img src="/ui/kit/tile-${b}.png" alt=""><span>${tr(BIOME_LABEL[b])}</span></button>`).join("")}</div></div>`);
     rows.push(`<div class="menu-row"><div><b>${tr("Save file")}</b><small>${tr("Keep a copy or move it to another device")}</small></div>
@@ -114,7 +144,36 @@ export class Menu {
         this.biome = b.dataset.biome as Biome;
         body.querySelectorAll("[data-biome]").forEach((x) => x.classList.toggle("on", x === b));
       }));
+    body.querySelectorAll<HTMLButtonElement>("[data-map]").forEach((b) =>
+      b.addEventListener("click", () => {
+        this.selectedMap = b.dataset.map!;
+        body.querySelectorAll("[data-map]").forEach((x) => x.classList.toggle("on", x === b));
+        const play = body.querySelector<HTMLButtonElement>("[data-play-map]");
+        if (play) play.disabled = false;
+      }));
+    body.querySelector("[data-play-map]")?.addEventListener("click", () => {
+      if (this.selectedMap) { this.hooks.onNewMap(this.selectedMap); this.close(); }
+    });
     body.querySelector("[data-prefs]")!.addEventListener("click", () => { this.view = "prefs"; this.render(); });
+  }
+
+  /** Official maps section; empty when the index hasn't loaded (or failed), so the menu hides it. */
+  private mapsSection(): string {
+    if (!cachedMaps || cachedMaps.length === 0) return "";
+    const lang = getLang();
+    const cards = cachedMaps.map((m) => `
+      <button class="map-card${m.id === this.selectedMap ? " on" : ""}" data-map="${escapeHtml(m.id)}">
+        <img src="${escapeHtml(m.preview)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/ui/kit/tile-plains.png'">
+        <span class="map-info">
+          <span class="map-name">${escapeHtml(localizedName(m, lang))}
+            <i class="diff diff-${m.difficulty}">${tr(difficultyKey(m.difficulty))}</i></span>
+          <span class="map-desc">${escapeHtml(localizedDescription(m, lang))}</span>
+          <span class="map-size">${tr("Size")}: ${m.size} × ${m.size}</span>
+        </span>
+      </button>`).join("");
+    return `<div class="maps-title">${tr("Official maps")}</div>
+      <div class="maps-list">${cards}</div>
+      <button class="map-play" data-play-map${this.selectedMap ? "" : " disabled"}>${tr("Play")}</button>`;
   }
 
   /** Preferences in the layout of the brand kit: tabs on the left, Restore / Apply / OK at the bottom. */
@@ -131,7 +190,7 @@ export class Menu {
     const panes: Record<string, string> = {
       general: `<div class="menu-row"><b>${tr("Language")}</b>${sel("pf-lang", [["pt", "Português (Brasil)"], ["en", "English"]], draft.lang)}</div>
         ${chk("pf-tips", tr("Show tips"), draft.tips)}`,
-      graphics: `<div class="menu-row"><b>${tr("Graphics quality")}</b>${sel("pf-quality", [["low", tr("Low")], ["medium", tr("Medium")], ["high", tr("High")]], draft.quality)}</div>
+      graphics: `<div class="menu-row"><b>${tr("Graphics quality")}</b>${sel("pf-quality", [["low", tr("Low quality")], ["medium", tr("Medium quality")], ["high", tr("High quality")]], draft.quality)}</div>
         ${chk("pf-daynight", tr("Dynamic day/night"), draft.dayNight)}`,
       gameplay: `${chk("pf-auto", tr("Save automatically"), draft.autosave)}${chk("pf-tips2", tr("Show tips"), draft.tips)}`,
       controls: `<table class="keys">

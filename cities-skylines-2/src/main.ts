@@ -8,7 +8,9 @@ import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, toolColor } from "./ui/hud";
 import { Pt, ROAD_NAME, RoadType, tileHeight } from "./sim/world";
-import { setLang, tr, trReason } from "./i18n";
+import { setLang, tr, trReason, getLang } from "./i18n";
+import { MapData, MapIndex } from "./sim/maps";
+import { newCityFromMap } from "./sim/map-world";
 import { Prefs, QUALITY_PIXEL_CAP, loadPrefs, savePrefs } from "./prefs";
 
 let prefs: Prefs = loadPrefs();
@@ -88,6 +90,22 @@ function useCity(next: CityState): void {
   lastMonthSaved = Math.floor(state.day / 30);
 }
 
+/** Fetch an official map and start a city on it. */
+async function startMap(id: string): Promise<void> {
+  try {
+    const index = (await (await fetch("/maps/index.json")).json()) as MapIndex;
+    const listing = index.maps.find((m) => m.id === id);
+    if (!listing) throw new Error("unknown map");
+    const res = await fetch(listing.data);
+    if (!res.ok) throw new Error("map data missing");
+    const data = (await res.json()) as MapData;
+    useCity(newCityFromMap(data, listing.terrain));
+    hud.showToast(getLang() === "pt" ? listing.name : listing.nameEn);
+  } catch {
+    hud.showToast(tr("Could not load the map"));
+  }
+}
+
 const menu = new Menu(app, {
   info: (slot) => slotInfo(slot),
   onSave: (n) => {
@@ -99,6 +117,7 @@ const menu = new Menu(app, {
     if (r.ok) { useCity(r.state); hud.showToast(tr("City loaded")); } else hud.showToast(trReason(r.reason));
   },
   onNew: (seed, biome) => { useCity(newCity(seed, 96, biome)); hud.showToast(tr("New city, seed {n}", { n: seed })); },
+  onNewMap: (id) => { void startMap(id); },
   getPrefs: () => prefs,
   onPrefs: (p) => {
     const langChanged = p.lang !== prefs.lang;
