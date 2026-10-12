@@ -6,7 +6,8 @@ import {
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
-import { zoneEntries, tileHash } from "../sim/catalog";
+import { zoneEntries, tileHash, facilityEntry } from "../sim/catalog";
+import { loadGlb, LoadedModel } from "./glb-models";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 
 const ZONE_TILE = {
@@ -92,6 +93,11 @@ export class CityRenderer {
   private bMeshes = new Map<string, THREE.InstancedMesh>();
   private fMeshes = new Map<number, THREE.InstancedMesh>();
   private sized: THREE.Object3D[] = [];
+  /** Kit models from Blender (public/models/NN.glb), loaded once and shared across map swaps. */
+  private glb = new Map<number, LoadedModel | null>();
+  private glbPending = new Set<number>();
+  private glowMats = new Set<THREE.MeshStandardMaterial>();
+  private nightGlow = 0;
   private models!: ReturnType<typeof buildModels>;
 
   constructor(private container: HTMLElement, state: CityState) {
@@ -195,10 +201,52 @@ export class CityRenderer {
     );
     water.position.set(size / 2, -0.02, size / 2);
     own(water);
+    this.applyGlbModels();
+  }
+
+  /** Swap procedural models for the Blender ones as they arrive; instance data is untouched. */
+  private applyGlbModels(): void {
+    const wanted = new Map<number, THREE.InstancedMesh[]>();
+    const want = (n: number | undefined, mesh: THREE.InstancedMesh | undefined) => {
+      if (n === undefined || !mesh) return;
+      (wanted.get(n) ?? wanted.set(n, []).get(n)!).push(mesh);
+    };
+    for (const [key, mesh] of this.bMeshes) {
+      const [z, l, i] = key.split("-").map(Number);
+      want(zoneEntries(z, l)[i]?.n, mesh);
+    }
+    for (const [kind, mesh] of this.fMeshes) want(facilityEntry(kind as never)?.n, mesh);
+    for (const [n, meshes] of wanted) {
+      const apply = (model: LoadedModel) => {
+        for (const m of meshes) {
+          if (!this.sized.includes(m)) continue; // the world was swapped meanwhile
+          m.geometry = model.geometry;
+          m.material = model.materials;
+        }
+        for (const g of model.glow) {
+          this.glowMats.add(g);
+          g.emissiveIntensity = this.nightGlow;
+        }
+      };
+      if (this.glb.has(n)) {
+        const hit = this.glb.get(n);
+        if (hit) apply(hit);
+      } else if (!this.glbPending.has(n)) {
+        this.glbPending.add(n);
+        const url = `/models/${String(n).padStart(2, "0")}.glb`;
+        loadGlb(url).then((model) => {
+          this.glb.set(n, model);
+          this.glbPending.delete(n);
+          // Re-run so whichever world is current gets the model, even after a map swap.
+          if (model) this.applyGlbModels();
+        });
+      }
+    }
   }
 
   private disposeWorldResources(): void {
     const models = new Set<THREE.BufferGeometry>([...this.models.buildings.values(), ...this.models.facilities.values()]);
+    for (const m of this.glb.values()) if (m) models.add(m.geometry);
     for (const o of this.sized) {
       this.scene.remove(o);
       const m = o as THREE.Mesh;
@@ -507,6 +555,8 @@ export class CityRenderer {
     this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6);
     this.hemi.intensity = (0.4 + 0.95 * day) * (raining ? 0.8 : 1);
     this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
+    this.nightGlow = this.winMat.emissiveIntensity;
+    for (const g of this.glowMats) g.emissiveIntensity = this.nightGlow;
     this.rainOn = raining;
     this.rain.visible = raining;
   }
