@@ -66,7 +66,7 @@ export const CATALOG: CatalogEntry[] = [
   e(30, "Quartel dos Bombeiros", "Fire Station", "S3", "safety", "resposta a incêndios", "fire response", { facility: FAC.FIRE }),
 
   e(31, "Estação de Ônibus", "Bus Station", "T2", "transport", "integração local", "local integration"),
-  e(32, "Estação de Trem", "Train Station", "T3", "transport", "mobilidade regional", "regional mobility"),
+  e(32, "Estação de Trem", "Train Station", "T3", "transport", "mobilidade regional", "regional mobility", { facility: FAC.METRO }),
   e(33, "Terminal de Carga", "Cargo Terminal", "T3", "transport", "logística urbana", "urban logistics"),
   e(34, "Estação de Tratamento de Água", "Water Treatment Plant", "U3", "utility", "abastecimento", "water supply", { facility: FAC.WATER }),
   e(35, "Subestação Elétrica", "Electrical Substation", "U2", "utility", "distribuição de energia", "power distribution", { facility: FAC.SUBSTATION }),
