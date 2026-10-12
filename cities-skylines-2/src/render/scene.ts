@@ -89,6 +89,8 @@ export class CityRenderer {
   private plainMat!: THREE.MeshLambertMaterial;
   private bMeshes = new Map<string, THREE.InstancedMesh>();
   private fMeshes = new Map<number, THREE.InstancedMesh>();
+  private sized: THREE.Object3D[] = [];
+  private models!: ReturnType<typeof buildModels>;
 
   constructor(private container: HTMLElement, state: CityState) {
     this.world = state.world;
@@ -109,18 +111,9 @@ export class CityRenderer {
     this.buildRain();
 
     this.rig = new CameraRig(1, size);
-    this.rig.target.set(8, 0, this.world.entry.y + 0.5);
+    this.focusEntry();
 
-    this.buildTerrain();
-    const cap = size * size;
-    const box = new THREE.BoxGeometry(1, 1, 1);
-    const mk = (mat: THREE.Material) => {
-      const m = new THREE.InstancedMesh(box, mat, cap);
-      m.count = 0;
-      m.frustumCulled = false;
-      this.scene.add(m);
-      return m;
-    };
+    // Size-independent parts: ribbons, previews, shared models and window materials.
     this.roadMesh = new THREE.Mesh(
       new THREE.BufferGeometry(),
       new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
@@ -140,38 +133,13 @@ export class CityRenderer {
     this.previewMesh.frustumCulled = false;
     this.previewMesh.visible = false;
     this.scene.add(this.previewMesh);
-    this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     const tex = makeWindowTextures();
     this.winMat = new THREE.MeshLambertMaterial({
       map: tex.map, vertexColors: true, emissive: new THREE.Color("#ffd98a"), emissiveMap: tex.glow, emissiveIntensity: 0,
     });
     this.plainMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-    const models = buildModels();
-    const mkModel = (geo: THREE.BufferGeometry, capacity: number) => {
-      const m = new THREE.InstancedMesh(geo, [this.winMat, this.plainMat], capacity);
-      m.count = 0;
-      m.frustumCulled = false;
-      this.scene.add(m);
-      return m;
-    };
-    for (const [k, g] of models.buildings) this.bMeshes.set(k, mkModel(g, Math.ceil(cap / 2)));
-    for (const [k, g] of models.facilities) this.fMeshes.set(k, mkModel(g, Math.ceil(cap / 4)));
-    this.trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.17, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: "#ffffff" }), cap);
-    this.trees.count = 0;
-    this.trees.frustumCulled = false;
-    this.scene.add(this.trees);
-    this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
-    this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
-    this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
-    this.vehicleMesh.count = 0;
-    this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
-
-    const water = new THREE.Mesh(
-      new THREE.PlaneGeometry(size * 3, size * 3).rotateX(-Math.PI / 2),
-      new THREE.MeshLambertMaterial({ color: "#3c78b4", transparent: true, opacity: 0.88 }),
-    );
-    water.position.set(size / 2, -0.02, size / 2);
-    this.scene.add(water);
+    this.models = buildModels();
+    this.buildWorldResources();
 
     this.hover = new THREE.Mesh(
       new THREE.BoxGeometry(1.02, 0.12, 1.02),
@@ -182,6 +150,62 @@ export class CityRenderer {
 
     this.resize();
     window.addEventListener("resize", () => this.resize());
+  }
+
+  /** Everything whose size depends on the map: terrain, instance buffers, water. Rebuilt when the map size changes. */
+  private buildWorldResources(): void {
+    const size = this.world.size;
+    const cap = size * size;
+    const own = (o: THREE.Object3D) => { this.sized.push(o); this.scene.add(o); return o; };
+    this.buildTerrain();
+    own(this.terrain);
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const mk = (mat: THREE.Material) => {
+      const m = new THREE.InstancedMesh(box, mat, cap);
+      m.count = 0;
+      m.frustumCulled = false;
+      own(m);
+      return m;
+    };
+    this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    const mkModel = (geo: THREE.BufferGeometry, capacity: number) => {
+      const m = new THREE.InstancedMesh(geo, [this.winMat, this.plainMat], capacity);
+      m.count = 0;
+      m.frustumCulled = false;
+      own(m);
+      return m;
+    };
+    this.bMeshes.clear();
+    this.fMeshes.clear();
+    for (const [k, g] of this.models.buildings) this.bMeshes.set(k, mkModel(g, Math.ceil(cap / 2)));
+    for (const [k, g] of this.models.facilities) this.fMeshes.set(k, mkModel(g, Math.ceil(cap / 4)));
+    this.trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.17, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: "#ffffff" }), cap);
+    this.trees.count = 0;
+    this.trees.frustumCulled = false;
+    own(this.trees);
+    this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
+    this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(size * 3, size * 3).rotateX(-Math.PI / 2),
+      new THREE.MeshLambertMaterial({ color: "#3c78b4", transparent: true, opacity: 0.88 }),
+    );
+    water.position.set(size / 2, -0.02, size / 2);
+    own(water);
+  }
+
+  private disposeWorldResources(): void {
+    const models = new Set<THREE.BufferGeometry>([...this.models.buildings.values(), ...this.models.facilities.values()]);
+    for (const o of this.sized) {
+      this.scene.remove(o);
+      const m = o as THREE.Mesh;
+      if (m.geometry && !models.has(m.geometry as THREE.BufferGeometry)) m.geometry.dispose();
+      const mat = m.material;
+      // Window/plain materials are shared with the model meshes and live as long as the renderer.
+      if (mat && !Array.isArray(mat)) mat.dispose();
+    }
+    this.sized = [];
   }
 
   private buildTerrain(): void {
@@ -197,7 +221,6 @@ export class CityRenderer {
       this.terrainGeo,
       new THREE.MeshLambertMaterial({ vertexColors: true }),
     );
-    this.scene.add(this.terrain);
   }
 
   private updateTerrain(): void {
@@ -244,7 +267,7 @@ export class CityRenderer {
         } else if (!w.zone[i]) {
           // Open ground: scatter trees by terrain preset, never on water or the entry strip.
           const r = hash(x * 7 + 3, y * 13 + 5);
-          if (r < look.trees && isLand(w, x, y) && h > 0.2 && h < look.rockAt + 1.5 && !(x < 7 && Math.abs(y - w.entry.y) < 3)) {
+          if (r < look.trees && isLand(w, x, y) && h > 0.2 && h < look.rockAt + 1.5 && Math.hypot(x - w.entry.x, y - w.entry.y) > 5) {
             const j1 = hash(x + 101, y + 211), j2 = hash(x + 307, y + 53);
             const sc = 0.8 + j1 * 0.9;
             d.position.set(x + 0.2 + j1 * 0.6, h, y + 0.2 + j2 * 0.6);
@@ -436,9 +459,23 @@ export class CityRenderer {
     this.scene.add(this.rain);
   }
 
-  /** Swap in another world of the same size (load / new city). */
+  /** Point the camera at the road entry so a new city opens on something to build from. */
+  private focusEntry(): void {
+    const e = this.world.entry;
+    this.rig.target.set(e.x + 0.5 + e.dx * 7, 0, e.y + 0.5 + e.dy * 7);
+    this.rig.apply();
+  }
+
+  /** Swap in another world; rebuilds size-dependent buffers when the map size differs. (load / new city). */
   setWorld(world: World): void {
+    if (world.size !== this.world.size) {
+      this.disposeWorldResources();
+      this.world = world;
+      this.buildWorldResources();
+      this.rig.setBounds(world.size);
+    }
     this.world = world;
+    this.focusEntry();
     this.seenRevision = -1;
     this.overlaySeen = -1;
     this.overlayLvSeen = -1;

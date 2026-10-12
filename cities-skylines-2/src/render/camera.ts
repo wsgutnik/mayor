@@ -59,6 +59,11 @@ export class CameraRig {
     this.apply();
   }
 
+  setBounds(mapSize: number): void {
+    this.bounds = mapSize;
+    this.apply();
+  }
+
   resize(aspect: number): void {
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();

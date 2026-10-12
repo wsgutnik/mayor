@@ -3,7 +3,7 @@ import { isRaining } from "./weather";
 import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, generateWorld, idx, inBounds,
-  isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile,
+  isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
 } from "./world";
 
@@ -232,7 +232,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   const i = idx(w, x, y);
   if (tool === "busstop") return placeBusStop(s, x, y);
   const cost = COST[tool];
-  const isEntry = x <= 2 && y === w.entry.y;
+  const isEntry = isEntryTile(w, x, y);
 
   if (tool === "bulldoze") {
     if (isEntry) return { ok: false, reason: "Cannot remove the highway entry" };

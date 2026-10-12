@@ -29,7 +29,8 @@ interface SaveFile {
   lines: TransitLine[];
   nextSegmentId: number;
   nextTransitId: number;
-  entry: { x: number; y: number };
+  /** dx/dy absent in older saves: the entry was always on the left edge. */
+  entry: { x: number; y: number; dx?: number; dy?: number };
 }
 
 function toB64(bytes: Uint8Array): string {
@@ -108,7 +109,7 @@ export function deserialize(json: string): CityState {
   w.lines = f.lines;
   w.nextSegmentId = f.nextSegmentId;
   w.nextTransitId = f.nextTransitId;
-  w.entry = f.entry;
+  w.entry = { x: f.entry.x, y: f.entry.y, dx: f.entry.dx ?? 1, dy: f.entry.dy ?? 0 };
   s.day = f.day;
   s.money = f.money;
   s.taxRate = f.taxRate;

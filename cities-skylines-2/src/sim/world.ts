@@ -109,7 +109,8 @@ export interface World {
   coverageDirty: boolean;
   /** 1 where a road tile is connected to the map entry. */
   connected: Uint8Array;
-  entry: { x: number; y: number };
+  /** First of three pre-built road tiles on a map edge; (dx, dy) points inward. */
+  entry: { x: number; y: number; dx: number; dy: number };
   /** Bumped on any change; renderers rebuild when it moves. */
   revision: number;
   connectivityDirty: boolean;
@@ -208,7 +209,7 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     lvRevision: 1,
     coverageDirty: true,
     connected: new Uint8Array(size * size),
-    entry: { x: 0, y: Math.floor(size / 2) },
+    entry: { x: 0, y: Math.floor(size / 2), dx: 1, dy: 0 },
     revision: 1,
     connectivityDirty: true,
   };
@@ -217,13 +218,25 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
   for (let y = ey - 1; y <= ey + 2; y++) {
     for (let x = 0; x <= 5; x++) heights[y * s + x] = 0.35;
   }
-  const entryTiles = [0, 1, 2].map((x) => idx(world, x, ey));
+  const entryTiles = entryRoadTiles(world);
   world.segments.push({
     id: world.nextSegmentId++, type: 1, fixed: true, tiles: entryTiles,
     pts: [{ x: 0.5, z: ey + 0.5 }, { x: 2.5, z: ey + 0.5 }],
   });
   rebuildRoadRaster(world);
   return world;
+}
+
+/** The three road tiles of the entry, starting on the map edge. */
+export function entryRoadTiles(w: World): number[] {
+  const { x, y, dx, dy } = w.entry;
+  return [0, 1, 2].map((k) => idx(w, x + dx * k, y + dy * k));
+}
+
+export function isEntryTile(w: World, x: number, y: number): boolean {
+  const { x: ex, y: ey, dx, dy } = w.entry;
+  for (let k = 0; k < 3; k++) if (x === ex + dx * k && y === ey + dy * k) return true;
+  return false;
 }
 
 /** Recompute which road tiles are reachable from the entry (4-neighbour BFS). */
