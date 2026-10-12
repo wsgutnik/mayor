@@ -1,0 +1,2457 @@
+{
+  "project": "MAYOR",
+  "version": "0.1.0",
+  "author": "Original procedural meshes created for MAYOR",
+  "coordinateSystem": "glTF Y-up; Blender importer converts to Blender Z-up",
+  "units": "metres",
+  "pieceCount": 40,
+  "license": "Original generated pack: usable in MAYOR; no third-party game assets included",
+  "assets": [
+    {
+      "id": "street_2lane",
+      "name": "Rua local 2 faixas",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_2lane.glb",
+      "sizeBytes": 23416,
+      "triangles": 1640,
+      "boundsYup": [
+        [
+          -4.85,
+          -0.1,
+          -10.0
+        ],
+        [
+          4.85,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.5,
+        "laneWidthM": 3.2,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "5045061a7fc35508afb39668933f4508b173ff5efbe50a82a3b7269033718b55"
+    },
+    {
+      "id": "street_curve90",
+      "name": "Rua curva 90°",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_curve90.glb",
+      "sizeBytes": 34768,
+      "triangles": 2600,
+      "boundsYup": [
+        [
+          -0.119,
+          -0.1,
+          -20.849
+        ],
+        [
+          20.849,
+          0.205,
+          0.119
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -16.0
+          ],
+          "forwardVectorYup": [
+            0.785,
+            0.0,
+            0.019
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            16.0,
+            0.0,
+            0.0
+          ],
+          "forwardVectorYup": [
+            0.019,
+            0.0,
+            0.785
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.5,
+        "laneWidthM": 3.2,
+        "lengthM": 25.13,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "2944cb3b669911cd9a3f95b504ee4ae2a1bc9301f06008447df3445d06130ff0"
+    },
+    {
+      "id": "street_sbend",
+      "name": "Rua em S",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_sbend.glb",
+      "sizeBytes": 32868,
+      "triangles": 2440,
+      "boundsYup": [
+        [
+          -4.748,
+          -0.1,
+          -15.139
+        ],
+        [
+          13.748,
+          0.205,
+          15.139
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.029,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            9.0,
+            0.0,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.029,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.4,
+        "laneWidthM": 3.2,
+        "lengthM": 31.56,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "b137d1f09d30802b98feb21d4227b8b831159ae1396c4ad7aa97c5d99e1d36c6"
+    },
+    {
+      "id": "street_slope",
+      "name": "Rua em aclive",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_slope.glb",
+      "sizeBytes": 23380,
+      "triangles": 1640,
+      "boundsYup": [
+        [
+          -4.75,
+          -0.1,
+          -10.0
+        ],
+        [
+          4.75,
+          4.705,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.033,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            4.5,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.033,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.4,
+        "laneWidthM": 3.2,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "ba3e8828e305af7d52f21790b89dc4cc316b5a436ed0809bb66f8f13f5d36f52"
+    },
+    {
+      "id": "street_crosswalk",
+      "name": "Rua com faixa de pedestres",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_crosswalk.glb",
+      "sizeBytes": 29444,
+      "triangles": 1724,
+      "boundsYup": [
+        [
+          -4.85,
+          -0.1,
+          -10.0
+        ],
+        [
+          4.85,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.5,
+        "laneWidthM": 3.2,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "1e26b2ca0401b85eb9990aa9b7a24ac3e57f2e9fd36c9c15db635338df7049e6"
+    },
+    {
+      "id": "street_trees",
+      "name": "Rua arborizada",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_trees.glb",
+      "sizeBytes": 38764,
+      "triangles": 2312,
+      "boundsYup": [
+        [
+          -6.7,
+          -0.1,
+          -10.0
+        ],
+        [
+          6.7,
+          3.8,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.8,
+        "laneWidthM": 3.2,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": "tree"
+      },
+      "sha256": "7c185c56dfc7bce8f999ac6095310af16d090c4ed4ec34fd06efa7bc7867828c"
+    },
+    {
+      "id": "street_gravel",
+      "name": "Estrada de cascalho",
+      "category": "rural",
+      "description": "",
+      "file": "glb/street_gravel.glb",
+      "sizeBytes": 22084,
+      "triangles": 1476,
+      "boundsYup": [
+        [
+          -3.55,
+          -0.1,
+          -10.0
+        ],
+        [
+          3.55,
+          0.13,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.2,
+        "sidewalkM": 0,
+        "laneWidthM": 3.1,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": "gravel"
+      },
+      "sha256": "664a6dad3e8f4fcd9d2f6b5a1af24ba01f1adfdba8fbc98e569f0b3c1fff3f69"
+    },
+    {
+      "id": "street_oneway",
+      "name": "Rua mão única",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_oneway.glb",
+      "sizeBytes": 27228,
+      "triangles": 1456,
+      "boundsYup": [
+        [
+          -4.65,
+          -0.1,
+          -10.0
+        ],
+        [
+          4.65,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.3,
+        "laneWidthM": 3.2,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "a381a46b5718351e6b54de29404bea68d0663b07cb9876f6c23ac6ec4e0c1104"
+    },
+    {
+      "id": "street_pedestrian",
+      "name": "Via de pedestres",
+      "category": "pedestrian",
+      "description": "",
+      "file": "glb/street_pedestrian.glb",
+      "sizeBytes": 29188,
+      "triangles": 1620,
+      "boundsYup": [
+        [
+          -4.45,
+          -0.1,
+          -10.0
+        ],
+        [
+          5.65,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 2
+      },
+      "modes": [
+        "pedestrian",
+        "service"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 5.6,
+        "sidewalkM": 1.5,
+        "laneWidthM": 2.8,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": "gravel"
+      },
+      "sha256": "c2055be5b474cebc26a642e8bee1246884a5e0818e3a560d5fc5263b00573a7a"
+    },
+    {
+      "id": "street_bike",
+      "name": "Rua ciclável segregada",
+      "category": "local",
+      "description": "",
+      "file": "glb/street_bike.glb",
+      "sizeBytes": 26644,
+      "triangles": 1968,
+      "boundsYup": [
+        [
+          -5.25,
+          -0.1,
+          -10.0
+        ],
+        [
+          5.25,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "bicycle",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 7.0,
+        "sidewalkM": 1.6,
+        "laneWidthM": 3.5,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": "bike"
+      },
+      "sha256": "1c3a4c6e419880a6d231e509547ec8678f1314961f7db9adbf9af31ae9d09769"
+    },
+    {
+      "id": "street_bus",
+      "name": "Corredor de ônibus",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/street_bus.glb",
+      "sizeBytes": 32384,
+      "triangles": 1948,
+      "boundsYup": [
+        [
+          -7.05,
+          -0.1,
+          -10.0
+        ],
+        [
+          7.05,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 2
+      },
+      "modes": [
+        "car",
+        "bus",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 10.2,
+        "sidewalkM": 1.8,
+        "laneWidthM": 3.4,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": "bus"
+      },
+      "sha256": "fb5e1a4118a853c5679efdaa41d6fe4774ebdba1a81468a688a5045fb02c09f8"
+    },
+    {
+      "id": "street_tram",
+      "name": "Avenida com bonde",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/street_tram.glb",
+      "sizeBytes": 40568,
+      "triangles": 2300,
+      "boundsYup": [
+        [
+          -6.25,
+          -0.1,
+          -10.0
+        ],
+        [
+          6.25,
+          0.25,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "tram",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 8.2,
+        "sidewalkM": 2.0,
+        "laneWidthM": 3.3,
+        "lengthM": 20.0,
+        "medianM": 1.6,
+        "detail": "tram"
+      },
+      "sha256": "697c8902603a11c943d22dcfebd9db844380504d137fe0a48f9230cbcc7149ea"
+    },
+    {
+      "id": "avenue_4lane",
+      "name": "Avenida 4 faixas",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/avenue_4lane.glb",
+      "sizeBytes": 33508,
+      "triangles": 1928,
+      "boundsYup": [
+        [
+          -8.85,
+          -0.1,
+          -10.0
+        ],
+        [
+          8.85,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 13.0,
+        "sidewalkM": 2.2,
+        "laneWidthM": 3.25,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "4f7b10853f5f8a91f0bb232be71b50f319cbd8d742bfa4a0420f8a724c23a5b4"
+    },
+    {
+      "id": "avenue_curve90",
+      "name": "Avenida curva 90°",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/avenue_curve90.glb",
+      "sizeBytes": 50176,
+      "triangles": 3032,
+      "boundsYup": [
+        [
+          -0.217,
+          -0.1,
+          -28.847
+        ],
+        [
+          28.847,
+          0.205,
+          0.217
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -20.0
+          ],
+          "forwardVectorYup": [
+            0.981,
+            0.0,
+            0.024
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            20.0,
+            0.0,
+            0.0
+          ],
+          "forwardVectorYup": [
+            0.024,
+            0.0,
+            0.981
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 13.0,
+        "sidewalkM": 2.2,
+        "laneWidthM": 3.25,
+        "lengthM": 31.41,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "5af3d54ab0532725a9d82b2e05a2aaff5367c0807529a360db09e190e78840b6"
+    },
+    {
+      "id": "avenue_6lane",
+      "name": "Avenida 6 faixas",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/avenue_6lane.glb",
+      "sizeBytes": 48820,
+      "triangles": 2380,
+      "boundsYup": [
+        [
+          -13.0,
+          -0.1,
+          -10.0
+        ],
+        [
+          13.0,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 3,
+        "backward": 3
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 21.3,
+        "sidewalkM": 2.2,
+        "laneWidthM": 3.25,
+        "lengthM": 20.0,
+        "medianM": 1.8,
+        "detail": null
+      },
+      "sha256": "f8fc96e78029d734905b8fd6af464b5ea0ad6b64aa581a9ae94f922632164a8c"
+    },
+    {
+      "id": "avenue_asym_3_1",
+      "name": "Avenida assimétrica 3+1",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/avenue_asym_3_1.glb",
+      "sizeBytes": 33544,
+      "triangles": 1928,
+      "boundsYup": [
+        [
+          -8.45,
+          -0.1,
+          -10.0
+        ],
+        [
+          8.45,
+          0.205,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 3,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 13.0,
+        "sidewalkM": 1.8,
+        "laneWidthM": 3.25,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null
+      },
+      "sha256": "14db2ef9717e7596adfc7dcc9238bb9fd06ca80e6ccf0dc0b3103f555b581a45"
+    },
+    {
+      "id": "avenue_green",
+      "name": "Avenida com canteiro verde",
+      "category": "arterial",
+      "description": "",
+      "file": "glb/avenue_green.glb",
+      "sizeBytes": 58184,
+      "triangles": 2764,
+      "boundsYup": [
+        [
+          -11.3,
+          -0.1,
+          -10.0
+        ],
+        [
+          11.3,
+          3.8,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 15.0,
+        "sidewalkM": 2.1,
+        "laneWidthM": 3.25,
+        "lengthM": 20.0,
+        "medianM": 2.0,
+        "detail": "tree"
+      },
+      "sha256": "91669d672b91c598f8e162a2d7390a3ba6bf2de02703800511c1d0e60b8990c2"
+    },
+    {
+      "id": "highway_4lane",
+      "name": "Rodovia dividida 2+2",
+      "category": "highway",
+      "description": "",
+      "file": "glb/highway_4lane.glb",
+      "sizeBytes": 38368,
+      "triangles": 2236,
+      "boundsYup": [
+        [
+          -8.84,
+          -0.1,
+          -15.0
+        ],
+        [
+          8.84,
+          0.28,
+          15.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 16.6,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 30.0,
+        "medianM": 2.2,
+        "detail": "highway"
+      },
+      "sha256": "9e6fe18759a9eff2496c2d1782ce219a8f429fcf71e2eea67d5010c81cc98604"
+    },
+    {
+      "id": "highway_curve90",
+      "name": "Rodovia curva 90°",
+      "category": "highway",
+      "description": "",
+      "file": "glb/highway_curve90.glb",
+      "sizeBytes": 55924,
+      "triangles": 3436,
+      "boundsYup": [
+        [
+          -0.217,
+          -0.1,
+          -34.837
+        ],
+        [
+          34.837,
+          0.28,
+          0.217
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -26.0
+          ],
+          "forwardVectorYup": [
+            1.276,
+            0.0,
+            0.031
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            26.0,
+            0.0,
+            0.0
+          ],
+          "forwardVectorYup": [
+            0.031,
+            0.0,
+            1.276
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 16.6,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 40.84,
+        "medianM": 2.2,
+        "detail": "highway"
+      },
+      "sha256": "4999475a2b2bb229f7a10be37975f1bdb0205fd48490db0bc9e9ca28e7417325"
+    },
+    {
+      "id": "highway_6lane",
+      "name": "Rodovia dividida 3+3",
+      "category": "highway",
+      "description": "",
+      "file": "glb/highway_6lane.glb",
+      "sizeBytes": 47492,
+      "triangles": 2668,
+      "boundsYup": [
+        [
+          -12.49,
+          -0.1,
+          -15.0
+        ],
+        [
+          12.49,
+          0.28,
+          15.0
+        ]
+      ],
+      "lanes": {
+        "forward": 3,
+        "backward": 3
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 23.9,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 30.0,
+        "medianM": 2.3,
+        "detail": "highway"
+      },
+      "sha256": "13be70f91b9041adb99035729ecb3c7171e68727d27bd98518950824435b3b54"
+    },
+    {
+      "id": "highway_asym_3_2",
+      "name": "Rodovia assimétrica 3+2",
+      "category": "highway",
+      "description": "",
+      "file": "glb/highway_asym_3_2.glb",
+      "sizeBytes": 42988,
+      "triangles": 2452,
+      "boundsYup": [
+        [
+          -10.69,
+          -0.1,
+          -15.0
+        ],
+        [
+          10.69,
+          0.28,
+          15.0
+        ]
+      ],
+      "lanes": {
+        "forward": 3,
+        "backward": 2
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 20.3,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 30.0,
+        "medianM": 2.3,
+        "detail": "highway"
+      },
+      "sha256": "615544460c625c0a9fdd5fca57e21249ab0a56e40a28bad119352b998c355513"
+    },
+    {
+      "id": "bridge_street",
+      "name": "Ponte viária baixa",
+      "category": "bridge",
+      "description": "",
+      "file": "glb/bridge_street.glb",
+      "sizeBytes": 27716,
+      "triangles": 1980,
+      "boundsYup": [
+        [
+          -4.45,
+          -0.25,
+          -12.0
+        ],
+        [
+          4.45,
+          4.9,
+          12.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            4.5,
+            -12.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.2
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            4.5,
+            12.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.2
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.1,
+        "laneWidthM": 3.2,
+        "lengthM": 24.0,
+        "medianM": 0,
+        "detail": "bridge"
+      },
+      "sha256": "1b3c226f412e842663e568a6deb7fe8035e44c118c2016113c713756b4a50ec9"
+    },
+    {
+      "id": "bridge_ramp",
+      "name": "Rampa de ponte 0–4.5m",
+      "category": "bridge",
+      "description": "",
+      "file": "glb/bridge_ramp.glb",
+      "sizeBytes": 27700,
+      "triangles": 1980,
+      "boundsYup": [
+        [
+          -4.45,
+          -0.25,
+          -12.0
+        ],
+        [
+          4.45,
+          4.9,
+          12.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.033,
+            1.2
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            4.5,
+            12.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.033,
+            1.2
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.1,
+        "laneWidthM": 3.2,
+        "lengthM": 24.0,
+        "medianM": 0,
+        "detail": "bridge"
+      },
+      "sha256": "a466c83a843d5b59f71d448f1d30d0d6723b241e6db4b39072dced12db024a37"
+    },
+    {
+      "id": "bridge_highway",
+      "name": "Ponte de rodovia",
+      "category": "bridge",
+      "description": "",
+      "file": "glb/bridge_highway.glb",
+      "sizeBytes": 42692,
+      "triangles": 2248,
+      "boundsYup": [
+        [
+          -8.915,
+          -0.25,
+          -15.0
+        ],
+        [
+          8.915,
+          7.4,
+          15.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            7.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            7.0,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 16.6,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 30.0,
+        "medianM": 2.2,
+        "detail": "bridge"
+      },
+      "sha256": "ad1ead5f569b2a5aedb547ce2d1fa751db91605d08f5f0db747388cb0defb8eb"
+    },
+    {
+      "id": "highway_ramp",
+      "name": "Rampa de rodovia 0–4.5m",
+      "category": "bridge",
+      "description": "",
+      "file": "glb/highway_ramp.glb",
+      "sizeBytes": 42680,
+      "triangles": 2248,
+      "boundsYup": [
+        [
+          -8.915,
+          -0.25,
+          -15.0
+        ],
+        [
+          8.915,
+          4.9,
+          15.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.033,
+            1.5
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            4.5,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.033,
+            1.5
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 16.6,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 30.0,
+        "medianM": 2.2,
+        "detail": "bridge"
+      },
+      "sha256": "48a6d941d6aa678cf84a6fd5fa094b98b29eeb70b2f02fad90deb1bcdcf637cc"
+    },
+    {
+      "id": "junction_t",
+      "name": "Interseção em T",
+      "category": "junction",
+      "description": "",
+      "file": "glb/junction_t.glb",
+      "sizeBytes": 28284,
+      "triangles": 1460,
+      "boundsYup": [
+        [
+          -10.0,
+          -0.115,
+          -10.45
+        ],
+        [
+          10.45,
+          3.95,
+          10.45
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "role": "N",
+          "posYup": [
+            0,
+            0,
+            10.0
+          ],
+          "direction": "N"
+        },
+        {
+          "role": "S",
+          "posYup": [
+            0,
+            0,
+            -10.0
+          ],
+          "direction": "S"
+        },
+        {
+          "role": "E",
+          "posYup": [
+            10.0,
+            0,
+            0
+          ],
+          "direction": "E"
+        }
+      ],
+      "params": {
+        "intersection": "t",
+        "roadWidthM": 6.8,
+        "sizeM": 20
+      },
+      "sha256": "15c5bbf6b08a114ce23ee997982572f15b5cb59a33ea7adef2755d4f50eea60b"
+    },
+    {
+      "id": "junction_cross",
+      "name": "Cruzamento 4 vias",
+      "category": "junction",
+      "description": "",
+      "file": "glb/junction_cross.glb",
+      "sizeBytes": 30256,
+      "triangles": 1544,
+      "boundsYup": [
+        [
+          -10.45,
+          -0.115,
+          -10.45
+        ],
+        [
+          10.45,
+          3.95,
+          10.45
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "role": "N",
+          "posYup": [
+            0,
+            0,
+            10.0
+          ],
+          "direction": "N"
+        },
+        {
+          "role": "S",
+          "posYup": [
+            0,
+            0,
+            -10.0
+          ],
+          "direction": "S"
+        },
+        {
+          "role": "E",
+          "posYup": [
+            10.0,
+            0,
+            0
+          ],
+          "direction": "E"
+        },
+        {
+          "role": "W",
+          "posYup": [
+            -10.0,
+            0,
+            0
+          ],
+          "direction": "W"
+        }
+      ],
+      "params": {
+        "intersection": "cross",
+        "roadWidthM": 6.8,
+        "sizeM": 20
+      },
+      "sha256": "a33761652055d8679ec831493b95a6ee1f85f0c6b71437575f6abc439858cf15"
+    },
+    {
+      "id": "avenue_junction_t",
+      "name": "Avenida interseção T",
+      "category": "junction",
+      "description": "",
+      "file": "glb/avenue_junction_t.glb",
+      "sizeBytes": 28364,
+      "triangles": 1460,
+      "boundsYup": [
+        [
+          -14.0,
+          -0.115,
+          -14.45
+        ],
+        [
+          14.45,
+          3.95,
+          14.45
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "role": "N",
+          "posYup": [
+            0,
+            0,
+            14.0
+          ],
+          "direction": "N"
+        },
+        {
+          "role": "S",
+          "posYup": [
+            0,
+            0,
+            -14.0
+          ],
+          "direction": "S"
+        },
+        {
+          "role": "E",
+          "posYup": [
+            14.0,
+            0,
+            0
+          ],
+          "direction": "E"
+        }
+      ],
+      "params": {
+        "intersection": "t",
+        "roadWidthM": 13.4,
+        "sizeM": 28
+      },
+      "sha256": "82fcd076bd755d7fa16f36c06264bf726bf705eaabf103741da006427eb817e5"
+    },
+    {
+      "id": "avenue_junction_cross",
+      "name": "Avenida cruzamento 4 vias",
+      "category": "junction",
+      "description": "",
+      "file": "glb/avenue_junction_cross.glb",
+      "sizeBytes": 30336,
+      "triangles": 1544,
+      "boundsYup": [
+        [
+          -14.45,
+          -0.115,
+          -14.45
+        ],
+        [
+          14.45,
+          3.95,
+          14.45
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "role": "N",
+          "posYup": [
+            0,
+            0,
+            14.0
+          ],
+          "direction": "N"
+        },
+        {
+          "role": "S",
+          "posYup": [
+            0,
+            0,
+            -14.0
+          ],
+          "direction": "S"
+        },
+        {
+          "role": "E",
+          "posYup": [
+            14.0,
+            0,
+            0
+          ],
+          "direction": "E"
+        },
+        {
+          "role": "W",
+          "posYup": [
+            -14.0,
+            0,
+            0
+          ],
+          "direction": "W"
+        }
+      ],
+      "params": {
+        "intersection": "cross",
+        "roadWidthM": 13.4,
+        "sizeM": 28
+      },
+      "sha256": "cbf0d075051e55cf2c2ab634250535ac96cd18da86b19e6eaf59d0e6b5e55d61"
+    },
+    {
+      "id": "roundabout_small",
+      "name": "Rotatória local",
+      "category": "junction",
+      "description": "",
+      "file": "glb/roundabout_small.glb",
+      "sizeBytes": 72756,
+      "triangles": 3372,
+      "boundsYup": [
+        [
+          -21.0,
+          -0.065,
+          -21.0
+        ],
+        [
+          21.0,
+          1.48,
+          21.0
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "role": "N",
+          "posYup": [
+            0.0,
+            0,
+            20.5
+          ],
+          "direction": "N"
+        },
+        {
+          "role": "E",
+          "posYup": [
+            20.5,
+            0,
+            0.0
+          ],
+          "direction": "E"
+        },
+        {
+          "role": "S",
+          "posYup": [
+            0.0,
+            0,
+            -20.5
+          ],
+          "direction": "S"
+        },
+        {
+          "role": "W",
+          "posYup": [
+            -20.5,
+            0,
+            -0.0
+          ],
+          "direction": "W"
+        }
+      ],
+      "params": {
+        "radiusM": 10.5,
+        "laneCount": 2,
+        "roundabout": true
+      },
+      "sha256": "0d449cb277a78c7281bc1136ba373fdeecdc91df24d80b002e2dfc15ed400c7f"
+    },
+    {
+      "id": "roundabout_large",
+      "name": "Rotatória arterial",
+      "category": "junction",
+      "description": "",
+      "file": "glb/roundabout_large.glb",
+      "sizeBytes": 72764,
+      "triangles": 3372,
+      "boundsYup": [
+        [
+          -28.5,
+          -0.065,
+          -28.5
+        ],
+        [
+          28.5,
+          1.48,
+          28.5
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "car",
+        "pedestrian"
+      ],
+      "connections": [
+        {
+          "role": "N",
+          "posYup": [
+            0.0,
+            0,
+            28.0
+          ],
+          "direction": "N"
+        },
+        {
+          "role": "E",
+          "posYup": [
+            28.0,
+            0,
+            0.0
+          ],
+          "direction": "E"
+        },
+        {
+          "role": "S",
+          "posYup": [
+            0.0,
+            0,
+            -28.0
+          ],
+          "direction": "S"
+        },
+        {
+          "role": "W",
+          "posYup": [
+            -28.0,
+            0,
+            -0.0
+          ],
+          "direction": "W"
+        }
+      ],
+      "params": {
+        "radiusM": 18,
+        "laneCount": 2,
+        "roundabout": true
+      },
+      "sha256": "02a605e5029f749284b78bb378892b2547fa2ecfe8566cb33b74b2ee75026405"
+    },
+    {
+      "id": "street_culdesac",
+      "name": "Cul-de-sac / rua sem saída",
+      "category": "junction",
+      "description": "",
+      "file": "glb/street_culdesac.glb",
+      "sizeBytes": 37396,
+      "triangles": 2024,
+      "boundsYup": [
+        [
+          -6.6,
+          -0.1,
+          -8.0
+        ],
+        [
+          6.6,
+          0.25,
+          17.6
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -8.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            0.8
+          ],
+          "role": "start"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.4,
+        "laneWidthM": 3.2,
+        "lengthM": 16.0,
+        "medianM": 0,
+        "detail": null,
+        "endCap": "round"
+      },
+      "sha256": "b4f727f01d961de163d18fe36014ddad7132cc1b2d3330b9958ebbdb2b85263c"
+    },
+    {
+      "id": "tunnel_portal",
+      "name": "Portal de túnel rodoviário",
+      "category": "tunnel",
+      "description": "",
+      "file": "glb/tunnel_portal.glb",
+      "sizeBytes": 29300,
+      "triangles": 1688,
+      "boundsYup": [
+        [
+          -4.625,
+          -0.1,
+          -10.0
+        ],
+        [
+          4.625,
+          5.06,
+          10.0
+        ]
+      ],
+      "lanes": {
+        "forward": 1,
+        "backward": 1
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            10.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "role": "end"
+        }
+      ],
+      "params": {
+        "roadWidthM": 6.4,
+        "sidewalkM": 1.0,
+        "laneWidthM": 3.2,
+        "lengthM": 20.0,
+        "medianM": 0,
+        "detail": null,
+        "requiresTerrainCut": true
+      },
+      "sha256": "f2d4e6514ce293c976e3e70a12598d75ee388fd43863edc9540283c2ccc3f274"
+    },
+    {
+      "id": "highway_merge",
+      "name": "Entroncamento / faixa de incorporação",
+      "category": "highway",
+      "description": "",
+      "file": "glb/highway_merge.glb",
+      "sizeBytes": 49480,
+      "triangles": 2680,
+      "boundsYup": [
+        [
+          -8.84,
+          -0.1,
+          -15.118
+        ],
+        [
+          19.946,
+          0.28,
+          15.0
+        ]
+      ],
+      "lanes": {
+        "forward": 2,
+        "backward": 2
+      },
+      "modes": [
+        "car"
+      ],
+      "connections": [
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            -15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "start"
+        },
+        {
+          "posYup": [
+            0.0,
+            0.0,
+            15.0
+          ],
+          "forwardVectorYup": [
+            0.0,
+            0.0,
+            1.5
+          ],
+          "role": "end"
+        },
+        {
+          "role": "onramp",
+          "posYup": [
+            18,
+            0,
+            -15
+          ],
+          "direction": "towards_merge"
+        }
+      ],
+      "params": {
+        "roadWidthM": 16.6,
+        "sidewalkM": 0,
+        "laneWidthM": 3.6,
+        "lengthM": 30.0,
+        "medianM": 2.2,
+        "detail": "highway",
+        "junction": "merge_visual_only"
+      },
+      "sha256": "f490d5ad4755f93764c89b0dd80e0b547a585f66eac8b5c94809ec196d43b78f"
+    },
+    {
+      "id": "prop_traffic_light",
+      "name": "Semáforo",
+      "category": "prop",
+      "description": "",
+      "file": "glb/prop_traffic_light.glb",
+      "sizeBytes": 7872,
+      "triangles": 284,
+      "boundsYup": [
+        [
+          -0.275,
+          0.0,
+          -0.19
+        ],
+        [
+          0.275,
+          3.95,
+          0.32
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "decorative"
+      ],
+      "connections": [],
+      "params": {},
+      "sha256": "786300adca7915fbe3a802c03f7f3d0173d7cb9a8a72216227b8d4c9ac098878"
+    },
+    {
+      "id": "prop_streetlamp",
+      "name": "Poste de iluminação",
+      "category": "prop",
+      "description": "",
+      "file": "glb/prop_streetlamp.glb",
+      "sizeBytes": 3684,
+      "triangles": 64,
+      "boundsYup": [
+        [
+          -0.14,
+          0.0,
+          -0.24
+        ],
+        [
+          1.86,
+          6.4,
+          0.24
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "decorative"
+      ],
+      "connections": [],
+      "params": {},
+      "sha256": "72a1df3fe48fc2c066150eb37ceedce3523bd7fcb1aba0063398dfcc18a74500"
+    },
+    {
+      "id": "prop_bollard",
+      "name": "Balizador",
+      "category": "prop",
+      "description": "",
+      "file": "glb/prop_bollard.glb",
+      "sizeBytes": 3108,
+      "triangles": 96,
+      "boundsYup": [
+        [
+          -0.165,
+          0.0,
+          -0.165
+        ],
+        [
+          0.165,
+          1.0,
+          0.165
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "decorative"
+      ],
+      "connections": [],
+      "params": {},
+      "sha256": "11e97ae11d1adbab6c483ee12f3855036e3e8c744bb4dcccc6ca8cfeec7162f7"
+    },
+    {
+      "id": "prop_bus_stop",
+      "name": "Abrigo de ônibus",
+      "category": "prop",
+      "description": "",
+      "file": "glb/prop_bus_stop.glb",
+      "sizeBytes": 4120,
+      "triangles": 60,
+      "boundsYup": [
+        [
+          -2.1,
+          0.0,
+          -0.7
+        ],
+        [
+          2.1,
+          2.53,
+          0.7
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "decorative"
+      ],
+      "connections": [],
+      "params": {},
+      "sha256": "49acb06b7933a21011aa43cae4f4ecf802c598c2bbacee2b75bd4922c5eb30d8"
+    },
+    {
+      "id": "prop_wayfinding",
+      "name": "Placa rodoviária",
+      "category": "prop",
+      "description": "",
+      "file": "glb/prop_wayfinding.glb",
+      "sizeBytes": 4008,
+      "triangles": 80,
+      "boundsYup": [
+        [
+          -0.65,
+          0.0,
+          -0.078
+        ],
+        [
+          0.65,
+          3.025,
+          0.2
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "decorative"
+      ],
+      "connections": [],
+      "params": {},
+      "sha256": "77f66a5351c0e1131b3b4534f57e77cb0a1280357067c08dc62d385ce715fde6"
+    },
+    {
+      "id": "prop_guardrail",
+      "name": "Guarda-corpo modular",
+      "category": "prop",
+      "description": "",
+      "file": "glb/prop_guardrail.glb",
+      "sizeBytes": 2824,
+      "triangles": 48,
+      "boundsYup": [
+        [
+          -0.1,
+          0.0,
+          -5.0
+        ],
+        [
+          0.1,
+          1.08,
+          5.0
+        ]
+      ],
+      "lanes": {
+        "forward": 0,
+        "backward": 0
+      },
+      "modes": [
+        "decorative"
+      ],
+      "connections": [],
+      "params": {},
+      "sha256": "aa69f299913546bde60a33bd1a19b556497df4d2103fe9366c74b6b66e7b2172"
+    }
+  ]
+}

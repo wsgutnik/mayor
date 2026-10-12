@@ -6,3 +6,4 @@
 | `polyhaven-asphalt_02/` | Poly Haven, asphalt_02, 1k diffuse / normal (GL) / roughness — https://polyhaven.com/a/asphalt_02 | CC0 |
 
 Source files only: the game does not load them directly. `blender/` scripts retint and budget them into `public/models/props/` and `public/textures/`.
+| `mayor-road-kit/` | "MAYOR Road Kit" v0.1.0 (user-provided, generated for this project; "usable in MAYOR") — props, tunnel portal, bridge pieces only | project-internal |
