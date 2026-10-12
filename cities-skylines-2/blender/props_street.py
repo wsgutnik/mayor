@@ -191,8 +191,8 @@ def newsstand(m):
     m.box(0, 0.02, 0.205, 0.30, 0.20, 0.015, "roof_slate", roof="roof_slate")
     m._quad([(-0.14, -0.075, 0.15), (0.14, -0.075, 0.15),
              (0.14, -0.075, 0.205), (-0.14, -0.075, 0.205)], "sign_red")  # awning
-    for i, (x, mat) in enumerate(((-0.08, "paper"), (-0.03, "sign_red"), (0.02, "sign_blue"),
-                                  (0.07, "flower_yellow"), (0.11, "paper"))):
+    for i, (x, mat) in enumerate(((-0.08, "white"), (-0.03, "sign_red"), (0.02, "sign_blue"),
+                                  (0.07, "flower_yellow"), (0.11, "white"))):
         m._quad([(x - 0.02, -0.0815, 0.115), (x + 0.02, -0.0815, 0.115),
                  (x + 0.02, -0.0815, 0.15), (x - 0.02, -0.0815, 0.15)], mat)  # magazines
     m.box(-0.09, 0.02, 0.115, 0.05, 0.08, 0.03, "flower_red")    # goods crate
