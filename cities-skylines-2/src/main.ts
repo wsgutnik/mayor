@@ -1,5 +1,5 @@
 import "./ui/style.css";
-import { applyTool, CityState, newCity, step, ToolId } from "./sim/sim";
+import { applyTool, CityState, isFacilityTool, newCity, step, ToolId } from "./sim/sim";
 import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, toolColor } from "./ui/hud";
@@ -18,6 +18,7 @@ const hud = new Hud(app, {
   onTool: (t) => { tool = t; if (t === "pan") renderer.setHover(null); },
   onSpeed: (s) => { speed = s; hud.setSpeed(s); },
   onTax: (r) => { state.taxRate = r; },
+  onOverlay: (layer) => renderer.setOverlay(layer),
 });
 hud.setTool(tool);
 hud.setSpeed(speed);
@@ -25,7 +26,9 @@ hud.setSpeed(speed);
 let lastToast = "";
 bindInput(renderer, {
   paintsWithPrimary: () => tool !== "pan",
-  paint: (tile) => {
+  paint: (tile, first) => {
+    // Facilities are expensive: place one per click, never along a drag.
+    if (isFacilityTool(tool) && !first) return;
     const res = applyTool(state, tool, tile.x, tile.y);
     if (!res.ok && res.reason !== lastToast) { hud.showToast(res.reason); lastToast = res.reason; }
     if (res.ok) lastToast = "";

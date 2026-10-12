@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CityState } from "../sim/sim";
-import { ZONE, idx, tileHeight, World } from "../sim/world";
+import { ZONE, FAC, COVER, idx, tileHeight, isLand, World } from "../sim/world";
 import { CameraRig } from "./camera";
 
 const BUILD_H = {
@@ -21,6 +21,23 @@ const BUILD_COLOR = {
   [ZONE.IND]: new THREE.Color("#d8c690"),
 } as const;
 
+/** Facility look: [height, footprint, color]. */
+const FACILITY_LOOK = {
+  [FAC.POWER]: [1.9, 0.7, new THREE.Color("#f2c230")],
+  [FAC.WATER]: [1.0, 0.7, new THREE.Color("#39b6e8")],
+  [FAC.SEWAGE]: [0.6, 0.8, new THREE.Color("#8a6a4a")],
+  [FAC.LANDFILL]: [0.45, 0.9, new THREE.Color("#7d848c")],
+} as const;
+
+export type OverlayLayer = 0 | typeof COVER.POWER | typeof COVER.WATER | typeof COVER.SEWAGE | typeof COVER.GARBAGE;
+
+export const OVERLAY_COLOR: Record<Exclude<OverlayLayer, 0>, string> = {
+  [COVER.POWER]: "#f2c230",
+  [COVER.WATER]: "#2ea8e8",
+  [COVER.SEWAGE]: "#a07848",
+  [COVER.GARBAGE]: "#9aa3ad",
+};
+
 const hash = (x: number, y: number) => {
   let h = (x * 374761393 + y * 668265263) | 0;
   h = (h ^ (h >>> 13)) * 1274126177;
@@ -36,6 +53,10 @@ export class CityRenderer {
   private roads!: THREE.InstancedMesh;
   private zones!: THREE.InstancedMesh;
   private buildings!: THREE.InstancedMesh;
+  private facilities!: THREE.InstancedMesh;
+  private overlay!: THREE.InstancedMesh;
+  private overlayLayer: OverlayLayer = 0;
+  private overlaySeen = -1;
   private hover: THREE.Mesh;
   private raycaster = new THREE.Raycaster();
   private seenRevision = -1;
@@ -72,6 +93,8 @@ export class CityRenderer {
     this.roads = mk(new THREE.MeshLambertMaterial({ color: "#3b3f46" }));
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.buildings = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.facilities = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
 
     const water = new THREE.Mesh(
       new THREE.PlaneGeometry(size * 3, size * 3).rotateX(-Math.PI / 2),
@@ -130,14 +153,21 @@ export class CityRenderer {
   private rebuild(): void {
     const w = this.world;
     this.updateTerrain();
-    let nr = 0, nz = 0, nb = 0;
+    let nr = 0, nz = 0, nb = 0, nf = 0;
     const d = this.dummy;
     const color = new THREE.Color();
     for (let y = 0; y < w.size; y++) {
       for (let x = 0; x < w.size; x++) {
         const i = idx(w, x, y);
         const h = tileHeight(w, x, y);
-        if (w.road[i]) {
+        if (w.facility[i]) {
+          const [fh, fw, fc] = FACILITY_LOOK[w.facility[i] as 1 | 2 | 3 | 4];
+          d.position.set(x + 0.5, h + 0.04 + fh / 2, y + 0.5);
+          d.scale.set(fw, fh, fw);
+          d.updateMatrix();
+          this.facilities.setMatrixAt(nf, d.matrix);
+          this.facilities.setColorAt(nf++, fc);
+        } else if (w.road[i]) {
           // Pad extends below the surface so sloped neighbours never poke through.
           d.position.set(x + 0.5, h + 0.06 - 0.5, y + 0.5);
           d.scale.set(1, 1.0, 1);
@@ -164,11 +194,38 @@ export class CityRenderer {
         }
       }
     }
-    for (const [m, n] of [[this.roads, nr], [this.zones, nz], [this.buildings, nb]] as const) {
+    for (const [m, n] of [[this.roads, nr], [this.zones, nz], [this.buildings, nb], [this.facilities, nf]] as const) {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+  }
+
+  /** Show one service's coverage as a tinted layer; 0 hides it. */
+  setOverlay(layer: OverlayLayer): void {
+    this.overlayLayer = layer;
+    this.overlaySeen = -1;
+  }
+
+  private rebuildOverlay(): void {
+    const w = this.world;
+    const m = this.overlay;
+    this.overlaySeen = w.revision;
+    if (!this.overlayLayer) { m.count = 0; return; }
+    (m.material as THREE.MeshBasicMaterial).color.set(OVERLAY_COLOR[this.overlayLayer]);
+    const d = this.dummy;
+    let n = 0;
+    for (let y = 0; y < w.size; y++) {
+      for (let x = 0; x < w.size; x++) {
+        if (!(w.cover[idx(w, x, y)] & this.overlayLayer) || !isLand(w, x, y)) continue;
+        d.position.set(x + 0.5, tileHeight(w, x, y) + 0.12, y + 0.5);
+        d.scale.set(0.98, 0.02, 0.98);
+        d.updateMatrix();
+        m.setMatrixAt(n++, d.matrix);
+      }
+    }
+    m.count = n;
+    m.instanceMatrix.needsUpdate = true;
   }
 
   /** Tile under a client-space pointer, or null if it hits nothing. */
@@ -214,6 +271,7 @@ export class CityRenderer {
       this.seenRevision = this.world.revision;
       this.rebuild();
     }
+    if (this.overlaySeen !== this.world.revision) this.rebuildOverlay();
     this.renderer.render(this.scene, this.rig.camera);
   }
 }

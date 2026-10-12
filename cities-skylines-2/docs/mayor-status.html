@@ -161,14 +161,14 @@ npm run dev</pre>
 <script>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
-    updated: "2026-10-11",
-    headline: "M1 concluído. M2 em seguida.",
-    summary: "Núcleo jogável: terreno, estradas, zonas residencial, comercial e industrial, crescimento por demanda e orçamento. Roda no navegador; Mac, Windows e iPad saem do mesmo código.",
-    screenshot: { src: "img/m1-gameplay.jpg", caption: "M1: estrada ligada à entrada da cidade, zonas R e C pintadas e os primeiros prédios surgindo. 10 segundos a 4x." },
+    updated: "2026-10-12",
+    headline: "M2 concluído. M3 em seguida.",
+    summary: "Além do núcleo (terreno, estradas, zonas, economia), a cidade agora precisa de energia, água, esgoto e coleta de lixo. Cada instalação cobre um raio, e o infoview mostra onde falta serviço.",
+    screenshot: { src: "img/m2-infoview.jpg", caption: "M2: usina, bomba d'água, esgoto e aterro colocados; o infoview de energia tinge a área coberta (raio 14) e o painel Services mostra uso e capacidade." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
-      { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "active" },
-      { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "todo" },
+      { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
+      { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "active" },
       { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "todo" },
       { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "todo" },
       { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "todo" },
@@ -176,12 +176,20 @@ npm run dev</pre>
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "todo" }
     ],
     checks: [
-      { ok: true, text: "14 testes da simulação e da pintura de linha passando" },
+      { ok: true, text: "21 testes da simulação e da pintura de linha passando" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
-      { ok: true, text: "Jogado no navegador: estrada, zonas, prédios, população e demanda" },
+      { ok: true, text: "Jogado no navegador: estrada, zonas, quatro instalações, infoview de energia e painel de serviços" },
       { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8)" }
     ],
     log: [
+      { date: "2026-10-12", title: "M2 · Serviços básicos", items: [
+        "Quatro instalações: usina (raio 14), bomba d'água e saída de esgoto (raio 10, a até 3 tiles da água) e aterro (raio 12)",
+        "Prédios novos exigem energia e água; nível 2 exige esgoto e nível 3 exige coleta de lixo",
+        "Capacidade finita por tipo: demanda acima da oferta derruba a felicidade e o ritmo de ocupação",
+        "Infoview por serviço (energia, água, esgoto, lixo) e painel Services com uso e capacidade",
+        "Manutenção mensal das instalações entra no orçamento; instalações são colocadas um clique por vez para evitar gasto acidental",
+        "Barra de ferramentas ganhou os submenus Utilities e Infoview"
+      ] },
       { date: "2026-10-11", title: "M1 · Núcleo jogável", items: [
         "Terreno procedural com água e faixa de terra garantida na entrada",
         "Estradas, zonas R/C/I e bulldoze pintados por arrasto, com custo e aviso de dinheiro ou água",

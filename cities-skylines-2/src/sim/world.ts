@@ -3,6 +3,20 @@ import { makeRng } from "./rng";
 export const ZONE = { NONE: 0, RES: 1, COM: 2, IND: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
 
+/** Utility facility kinds stored per tile. */
+export const FAC = { NONE: 0, POWER: 1, WATER: 2, SEWAGE: 3, LANDFILL: 4 } as const;
+export type FacilityType = (typeof FAC)[keyof typeof FAC];
+
+/** Bits in World.cover. */
+export const COVER = { POWER: 1, WATER: 2, SEWAGE: 4, GARBAGE: 8 } as const;
+
+export const FACILITY_INFO = {
+  [FAC.POWER]: { name: "Power plant", cost: 800, upkeep: 60, radius: 14, capacity: 120, bit: COVER.POWER, nearWater: false },
+  [FAC.WATER]: { name: "Water pump", cost: 500, upkeep: 40, radius: 10, capacity: 90, bit: COVER.WATER, nearWater: true },
+  [FAC.SEWAGE]: { name: "Sewage outlet", cost: 400, upkeep: 40, radius: 10, capacity: 90, bit: COVER.SEWAGE, nearWater: true },
+  [FAC.LANDFILL]: { name: "Landfill", cost: 300, upkeep: 30, radius: 12, capacity: 80, bit: COVER.GARBAGE, nearWater: false },
+} as const;
+
 export interface World {
   size: number;
   /** (size+1)^2 corner heights; water level is 0. */
@@ -11,6 +25,11 @@ export interface World {
   zone: Uint8Array;
   /** Building level per tile, 0 = no building, 1..3. */
   level: Uint8Array;
+  /** Facility type per tile (FAC.*). */
+  facility: Uint8Array;
+  /** Bitmask of COVER.* services reaching each tile. */
+  cover: Uint8Array;
+  coverageDirty: boolean;
   /** 1 where a road tile is connected to the map entry. */
   connected: Uint8Array;
   entry: { x: number; y: number };
@@ -77,6 +96,9 @@ export function generateWorld(size: number, seed: number): World {
     road: new Uint8Array(size * size),
     zone: new Uint8Array(size * size),
     level: new Uint8Array(size * size),
+    facility: new Uint8Array(size * size),
+    cover: new Uint8Array(size * size),
+    coverageDirty: true,
     connected: new Uint8Array(size * size),
     entry: { x: 0, y: Math.floor(size / 2) },
     revision: 1,
@@ -131,4 +153,36 @@ export function flattenTile(w: World, x: number, y: number): void {
   w.heights[y * s + x + 1] = h;
   w.heights[(y + 1) * s + x] = h;
   w.heights[(y + 1) * s + x + 1] = h;
+}
+
+/** True if any tile within `r` (Chebyshev) of x,y is not land. */
+export function nearWater(w: World, x: number, y: number, r: number): boolean {
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (inBounds(w, nx, ny) && !isLand(w, nx, ny)) return true;
+    }
+  }
+  return false;
+}
+
+/** Recompute which services reach each tile (Euclidean radius around each facility). */
+export function updateCoverage(w: World): void {
+  w.cover.fill(0);
+  w.coverageDirty = false;
+  for (let y = 0; y < w.size; y++) {
+    for (let x = 0; x < w.size; x++) {
+      const f = w.facility[idx(w, x, y)] as FacilityType;
+      if (!f) continue;
+      const info = FACILITY_INFO[f as 1 | 2 | 3 | 4];
+      const r = info.radius;
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (dx * dx + dy * dy > r * r) continue;
+          const nx = x + dx, ny = y + dy;
+          if (inBounds(w, nx, ny)) w.cover[idx(w, nx, ny)] |= info.bit;
+        }
+      }
+    }
+  }
 }

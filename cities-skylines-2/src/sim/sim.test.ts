@@ -1,10 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { applyTool, newCity, step, countRoads } from "./sim";
-import { ZONE, idx, isLand } from "./world";
+import { ZONE, COVER, idx, isLand, cidx, updateCoverage } from "./world";
+
+type City = ReturnType<typeof newCity>;
+
+/** Dig a one-tile pond at (x,y) so shoreline-only facilities can be placed near it. */
+function carvePond(s: City, x: number, y: number) {
+  for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]])
+    s.world.heights[cidx(s.world, x + dx, y + dy)] = -1;
+}
+
+/** Power + water + sewage + landfill all covering the strip east of the entry. */
+function addUtilities(s: City) {
+  const ey = s.world.entry.y;
+  // Make the neighbourhood dry and flat regardless of seed, then dig a pond south of it.
+  for (let y = ey - 6; y <= ey + 5; y++)
+    for (let x = 0; x <= 14; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+  carvePond(s, 6, ey + 6);
+  expect(applyTool(s, "power", 5, ey + 2).ok).toBe(true);
+  expect(applyTool(s, "water", 6, ey + 4).ok).toBe(true);
+  expect(applyTool(s, "sewage", 7, ey + 4).ok).toBe(true);
+  expect(applyTool(s, "landfill", 8, ey + 2).ok).toBe(true);
+}
 
 /** Build a straight road east from the entry and zone both sides. */
-function buildStrip(s: ReturnType<typeof newCity>, len = 8) {
+function buildStrip(s: City, len = 8) {
   const ey = s.world.entry.y;
+  addUtilities(s);
   for (let x = 3; x < 3 + len; x++) applyTool(s, "road", x, ey);
   for (let x = 3; x < 3 + len; x++) {
     applyTool(s, "res", x, ey - 1);
@@ -86,6 +108,15 @@ describe("growth", () => {
     expect(stillBuilt).toBe(0);
   });
 
+  it("does not develop without power and water", () => {
+    const s = newCity(7);
+    const ey = s.world.entry.y;
+    for (let x = 3; x < 11; x++) applyTool(s, "road", x, ey);
+    for (let x = 3; x < 11; x++) applyTool(s, "res", x, ey - 1);
+    for (let d = 0; d < 300; d++) step(s);
+    expect(s.world.level.reduce((n, l) => n + l, 0)).toBe(0);
+  });
+
   it("is deterministic for a given seed", () => {
     const a = newCity(99), b = newCity(99);
     buildStrip(a); buildStrip(b);
@@ -112,5 +143,70 @@ describe("economy", () => {
     lo.taxRate = 0.05; hi.taxRate = 0.2;
     step(lo); step(hi);
     expect(hi.demand.r).toBeLessThan(lo.demand.r);
+  });
+});
+
+describe("utilities", () => {
+  it("water pump and sewage outlet need nearby water", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    const r = applyTool(s, "water", 5, ey + 2);
+    expect(r.ok).toBe(false);
+    carvePond(s, 5, ey + 5);
+    expect(applyTool(s, "water", 5, ey + 3).ok).toBe(true);
+  });
+
+  it("refuses facilities on roads, zones and other facilities", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    applyTool(s, "road", 4, ey);
+    applyTool(s, "res", 4, ey - 1);
+    expect(applyTool(s, "power", 4, ey).ok).toBe(false);
+    expect(applyTool(s, "power", 4, ey - 1).ok).toBe(false);
+    expect(applyTool(s, "power", 4, ey + 2).ok).toBe(true);
+    expect(applyTool(s, "landfill", 4, ey + 2).ok).toBe(false);
+  });
+
+  it("covers tiles within the radius and not beyond", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    applyTool(s, "power", 5, ey + 2);
+    updateCoverage(s.world);
+    expect(s.world.cover[idx(s.world, 5, ey - 5)] & COVER.POWER).toBeTruthy();
+    expect(s.world.cover[idx(s.world, 5 + 15, ey + 2)] & COVER.POWER).toBeFalsy();
+  });
+
+  it("bulldozing a facility removes its coverage", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    applyTool(s, "power", 5, ey + 2);
+    updateCoverage(s.world);
+    expect(s.world.cover[idx(s.world, 5, ey)] & COVER.POWER).toBeTruthy();
+    applyTool(s, "bulldoze", 5, ey + 2);
+    step(s);
+    expect(s.world.cover[idx(s.world, 5, ey)] & COVER.POWER).toBeFalsy();
+  });
+
+  it("reports shortage and lowers happiness when demand exceeds supply", () => {
+    const s = newCity(7);
+    buildStrip(s, 8);
+    // Heavy industrial zone around the strip overwhelms one 120-unit plant.
+    const ey = s.world.entry.y;
+    for (let x = 3; x < 11; x++) for (const dy of [-2, -3, -4]) applyTool(s, "ind", x, ey + dy);
+    for (let x = 3; x < 11; x++) applyTool(s, "road", x, ey - 2 + 0 * x);
+    s.world.level.fill(3);
+    for (let i = 0; i < s.world.zone.length; i++) if (!s.world.zone[i]) s.world.level[i] = 0;
+    step(s);
+    expect(s.utilities.power.demand).toBeGreaterThan(s.utilities.power.supply);
+    expect(s.happiness).toBeLessThan(100);
+  });
+
+  it("charges facility upkeep monthly", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    applyTool(s, "power", 5, ey + 2);
+    s.monthExpenses = 0;
+    for (let d = 0; d < 30; d++) step(s);
+    expect(s.lastMonth.expenses).toBeCloseTo(60);
   });
 });

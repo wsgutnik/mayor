@@ -4,7 +4,8 @@ type Tile = { x: number; y: number };
 
 export interface InputHooks {
   /** Called for every tile the active tool should touch while painting. */
-  paint(tile: Tile): void;
+  /** `first` is true for the tile where the stroke began (one-shot tools use only that). */
+  paint(tile: Tile, first: boolean): void;
   /** True when the current tool paints; false means one-finger drag pans. */
   paintsWithPrimary(): boolean;
   hover(tile: Tile | null): void;
@@ -56,7 +57,8 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   const paintAt = (cx: number, cy: number) => {
     const t = r.pick(cx, cy);
     if (!t) return;
-    for (const tile of last ? lineTiles(last, t) : [t]) hooks.paint(tile);
+    const first = last === null;
+    for (const tile of last ? lineTiles(last, t) : [t]) hooks.paint(tile, first);
     last = t;
   };
 

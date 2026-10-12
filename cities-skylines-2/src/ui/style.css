@@ -80,3 +80,26 @@ body {
   .demand { top: calc(64px + var(--safe-top)); }
   .tool { min-width: 62px; }
 }
+
+/* M2: services panel and flyouts */
+.services {
+  position: absolute; left: 10px; top: calc(140px + var(--safe-top)); width: 190px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.svc-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.svc-head b { font-size: 15px; color: var(--text); font-variant-numeric: tabular-nums; }
+.svc-head b.neg, .svc-v.neg { color: var(--bad); }
+.svc { display: grid; grid-template-columns: 52px 1fr auto; gap: 8px; align-items: center; font-size: 12px; }
+.svc-l { color: var(--muted); }
+.svc-bar { height: 6px; border-radius: 4px; background: rgba(255,255,255,.1); overflow: hidden; }
+.svc-bar i { display: block; height: 100%; width: 0; border-radius: 4px; }
+.svc-v { font-variant-numeric: tabular-nums; font-size: 11px; min-width: 52px; text-align: right; }
+.fly {
+  position: absolute; left: 50%; bottom: calc(96px + var(--safe-bottom)); transform: translateX(-50%);
+  display: none; gap: 4px; padding: 6px;
+}
+.fly.open { display: flex; }
+.hint { bottom: calc(196px + var(--safe-bottom)); }
+@media (max-width: 640px) {
+  .services { top: calc(190px + var(--safe-top)); width: 170px; }
+}

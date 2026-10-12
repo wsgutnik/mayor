@@ -21,5 +21,7 @@ npm run build   # tipos + bundle em dist/
 
 ## Status
 
-M1 (núcleo jogável): terreno, estradas, zonas R/C/I, bulldoze, crescimento por demanda,
-impostos e orçamento. Próximo: M2 (energia, água, esgoto).
+- M1: terreno, estradas, zonas R/C/I, bulldoze, crescimento por demanda, impostos e orçamento.
+- M2: usina, bomba d'água, esgoto e aterro com cobertura por raio, infoviews e painel de serviços.
+  Prédios novos precisam de energia e água; nível 2 pede esgoto, nível 3 pede coleta de lixo.
+- Próximo: M3 (polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo).
