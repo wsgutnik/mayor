@@ -1,5 +1,7 @@
 # Mayor
 
+![Mayor](public/ui/brand-banner.png)
+
 Clone jogável de city builder inspirado em Cities: Skylines II. Mac, Windows e iPad (PWA).
 Plano e marcos: [PLAN.md](PLAN.md).
 
@@ -41,4 +43,8 @@ npm run build   # tipos + bundle em dist/
 - M8: empacotamento. PWA com service worker (offline), ícones e manifest; app de Mac com Tauri (`npm run desktop:build`,
   `.app` de 10 MB e `.dmg` de 3 MB); exportar e importar saves por arquivo; resolução adaptativa e reconstrução da cena
   limitada a uma vez a cada 80 ms para aliviar GPUs mais fracas. Instruções para iPad e Windows em [docs/INSTALL.md](docs/INSTALL.md).
-- Próximo: M9 (identidade visual: logo com coroa, ícones, preferências e HUD novos).
+- M9: identidade visual a partir da folha de marca. Banner e ícone do app, ícones do HUD recortados da folha,
+  barra de ferramentas reagrupada (Estradas, Zonas, Serviços, Transporte, Demolir, Mapas, Economia),
+  painel de indicadores (Popularidade, Orçamento, Meio ambiente, Tráfego), preferências (idioma pt-BR/en,
+  qualidade gráfica, dicas, autosave, dia/noite) e interface traduzida.
+- Pendente: reconstruir o app de Mac com o ícone novo (`npm run desktop:build`).

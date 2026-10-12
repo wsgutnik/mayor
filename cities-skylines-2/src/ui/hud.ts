@@ -1,66 +1,74 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
 import { MAX_LINE_VEHICLES } from "../sim/transit";
-import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
+import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, RoadType, ROAD_COST } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
+import { lineName, monthName, tr } from "../i18n";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export type RoadMode = "paint" | "line" | "curve";
 
-interface ToolDef { id: ToolId; label: string; icon: string; hint: string; color: string }
+/** Art from the brand sheet (public/ui) or a plain glyph. */
+interface Icon { img?: string; glyph?: string; color?: string }
+
+interface ToolDef { id: ToolId; label: string; hint: string; color: string; icon: Icon }
 
 const T: Record<string, ToolDef> = {
-  pan: { id: "pan", label: "Move", icon: "✋", hint: "Drag to move the camera", color: "#ffffff" },
-  road: { id: "road", label: "Road", icon: "═", hint: "Paint roads", color: "#9aa3b2" },
-  res: { id: "res", label: "Residential", icon: "⌂", hint: "Zone residential", color: "#4fbf6a" },
-  com: { id: "com", label: "Commercial", icon: "▣", hint: "Zone commercial", color: "#4a8fe0" },
-  ind: { id: "ind", label: "Industrial", icon: "⚙", hint: "Zone industrial", color: "#e0b43a" },
-  power: { id: "power", label: "Power plant", icon: "⚡", hint: "Place a power plant (radius 14)", color: "#f2c230" },
-  water: { id: "water", label: "Water pump", icon: "💧", hint: "Place a water pump near water (radius 10)", color: "#39b6e8" },
-  sewage: { id: "sewage", label: "Sewage", icon: "≋", hint: "Place a sewage outlet near water (radius 10)", color: "#a07848" },
-  landfill: { id: "landfill", label: "Landfill", icon: "♻", hint: "Place a landfill (radius 12)", color: "#9aa3ad" },
-  police: { id: "police", label: "Police", icon: "★", hint: "Police station: crime cover (radius 12)", color: "#3d6ee8" },
-  fire: { id: "fire", label: "Fire", icon: "▲", hint: "Fire station: stops fires (radius 12)", color: "#ee5a4c" },
-  clinic: { id: "clinic", label: "Clinic", icon: "✚", hint: "Clinic: health cover (radius 12)", color: "#f2f6fb" },
-  school: { id: "school", label: "School", icon: "✎", hint: "School: education, needed for level 3 (radius 14)", color: "#f59a4a" },
-  park: { id: "park", label: "Park", icon: "❀", hint: "Park: land value and happiness (radius 8)", color: "#48b85a" },
-  busstop: { id: "busstop", label: "Bus stop", icon: "◴", hint: "Place a bus stop on a street or avenue", color: "#3d8bff" },
-  metro: { id: "metro", label: "Metro", icon: "Ⓜ", hint: "Metro station: any free land tile (radius 9)", color: "#9b7bff" },
-  busline: { id: "busline", label: "Bus line", icon: "➰", hint: "Tap bus stops in order, then Create line", color: "#3d8bff" },
-  metroline: { id: "metroline", label: "Metro line", icon: "➿", hint: "Tap metro stations in order, then Create line", color: "#9b7bff" },
-  bulldoze: { id: "bulldoze", label: "Bulldoze", icon: "✕", hint: "Remove roads, zones and facilities", color: "#e5584f" },
+  pan: { id: "pan", label: "Move", hint: "Drag to move the camera", color: "#ffffff", icon: { glyph: "✋" } },
+  road: { id: "road", label: "Roads", hint: "Paint roads", color: "#9aa3b2", icon: { img: "ico-construir" } },
+  res: { id: "res", label: "Residential", hint: "Zone residential", color: "#4fbf6a", icon: { img: "zone-residencial" } },
+  com: { id: "com", label: "Commercial", hint: "Zone commercial", color: "#4a8fe0", icon: { img: "zone-comercial" } },
+  ind: { id: "ind", label: "Industrial", hint: "Zone industrial", color: "#e0b43a", icon: { img: "zone-industrial" } },
+  power: { id: "power", label: "Power plant", hint: "Place a power plant (radius 14)", color: "#f2c230", icon: { img: "ico-servicos" } },
+  water: { id: "water", label: "Water pump", hint: "Place a water pump near water (radius 10)", color: "#39b6e8", icon: { glyph: "💧" } },
+  sewage: { id: "sewage", label: "Sewage", hint: "Place a sewage outlet near water (radius 10)", color: "#a07848", icon: { glyph: "≋", color: "#a07848" } },
+  landfill: { id: "landfill", label: "Landfill", hint: "Place a landfill (radius 12)", color: "#9aa3ad", icon: { img: "ico-recursos" } },
+  police: { id: "police", label: "Police", hint: "Police station: crime cover (radius 12)", color: "#3d6ee8", icon: { glyph: "★", color: "#3d6ee8" } },
+  fire: { id: "fire", label: "Fire", hint: "Fire station: stops fires (radius 12)", color: "#ee5a4c", icon: { glyph: "▲", color: "#ee5a4c" } },
+  clinic: { id: "clinic", label: "Clinic", hint: "Clinic: health cover (radius 12)", color: "#f2f6fb", icon: { glyph: "✚", color: "#f2f6fb" } },
+  school: { id: "school", label: "School", hint: "School: education, needed for level 3 (radius 14)", color: "#f59a4a", icon: { glyph: "✎", color: "#f59a4a" } },
+  park: { id: "park", label: "Park", hint: "Park: land value and happiness (radius 8)", color: "#48b85a", icon: { glyph: "❀", color: "#48b85a" } },
+  busstop: { id: "busstop", label: "Bus stop", hint: "Place a bus stop on a street or avenue", color: "#3d8bff", icon: { img: "ico-transporte" } },
+  metro: { id: "metro", label: "Metro station", hint: "Metro station: any free land tile (radius 9)", color: "#9b7bff", icon: { glyph: "Ⓜ", color: "#9b7bff" } },
+  busline: { id: "busline", label: "Bus line", hint: "Tap bus stops in order, then Create line", color: "#3d8bff", icon: { glyph: "➰", color: "#3d8bff" } },
+  metroline: { id: "metroline", label: "Metro line", hint: "Tap metro stations in order, then Create line", color: "#9b7bff", icon: { glyph: "➿", color: "#9b7bff" } },
+  bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "ico-demolicao" } },
 };
 
-const UTILITY_TOOLS = ["power", "water", "sewage", "landfill"];
-const CIVIC_TOOLS = ["police", "fire", "clinic", "school", "park"];
+const ZONE_TOOLS = ["res", "com", "ind"];
+const SERVICE_TOOLS = ["power", "water", "sewage", "landfill", "police", "fire", "clinic", "school", "park"];
 const TRANSIT_TOOLS = ["busstop", "metro", "busline", "metroline"];
 
-const LAYERS: { layer: OverlayLayer; label: string; icon: string; color: string }[] = [
-  { layer: 0, label: "Off", icon: "○", color: "#ffffff" },
-  { layer: COVER.POWER, label: "Power", icon: "⚡", color: "#f2c230" },
-  { layer: COVER.WATER, label: "Water", icon: "💧", color: "#39b6e8" },
-  { layer: COVER.SEWAGE, label: "Sewage", icon: "≋", color: "#a07848" },
-  { layer: COVER.GARBAGE, label: "Garbage", icon: "♻", color: "#9aa3ad" },
-  { layer: COVER.POLICE, label: "Police", icon: "★", color: "#3d6ee8" },
-  { layer: COVER.FIRE, label: "Fire", icon: "▲", color: "#ee5a4c" },
-  { layer: COVER.HEALTH, label: "Health", icon: "✚", color: "#f2f6fb" },
-  { layer: COVER.EDU, label: "Education", icon: "✎", color: "#f59a4a" },
-  { layer: COVER.PARK, label: "Parks", icon: "❀", color: "#48b85a" },
-  { layer: COVER.TRANSIT, label: "Transit", icon: "◴", color: "#9b7bff" },
-  { layer: LAND_VALUE_LAYER, label: "Land value", icon: "▦", color: "#7fd35c" },
-  { layer: TRAFFIC_LAYER, label: "Traffic", icon: "⇆", color: "#e5584f" },
+const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }[] = [
+  { mode: "paint", label: "Paint", glyph: "▪", hint: "Drag to paint road tiles" },
+  { mode: "line", label: "Line", glyph: "╱", hint: "Tap a start, then an end" },
+  { mode: "curve", label: "Curve", glyph: "⌒", hint: "Tap start, a bend point, then the end" },
+];
+
+const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string }[] = [
+  { layer: 0, label: "Off", glyph: "○", color: "#ffffff" },
+  { layer: COVER.POWER, label: "Power", glyph: "⚡", color: "#f2c230" },
+  { layer: COVER.WATER, label: "Water", glyph: "💧", color: "#39b6e8" },
+  { layer: COVER.SEWAGE, label: "Sewage", glyph: "≋", color: "#a07848" },
+  { layer: COVER.GARBAGE, label: "Garbage", glyph: "♻", color: "#9aa3ad" },
+  { layer: COVER.POLICE, label: "Police", glyph: "★", color: "#3d6ee8" },
+  { layer: COVER.FIRE, label: "Fire", glyph: "▲", color: "#ee5a4c" },
+  { layer: COVER.HEALTH, label: "Health", glyph: "✚", color: "#f2f6fb" },
+  { layer: COVER.EDU, label: "Education", glyph: "✎", color: "#f59a4a" },
+  { layer: COVER.PARK, label: "Parks", glyph: "❀", color: "#48b85a" },
+  { layer: COVER.TRANSIT, label: "Transit", glyph: "◴", color: "#9b7bff" },
+  { layer: LAND_VALUE_LAYER, label: "Land value", glyph: "▦", color: "#7fd35c" },
+  { layer: TRAFFIC_LAYER, label: "Traffic", glyph: "⇆", color: "#e5584f" },
 ];
 
 export const toolColor = (t: ToolId) => (T[t] ? T[t].color : "#ffffff");
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 const money = (n: number) => (n < 0 ? "-$" : "$") + fmt(Math.abs(n));
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
-export type RoadMode = "paint" | "line" | "curve";
-
-const ROAD_MODES: { mode: RoadMode; label: string; icon: string; hint: string }[] = [
-  { mode: "paint", label: "Paint", icon: "▪", hint: "Drag to paint road tiles" },
-  { mode: "line", label: "Line", icon: "╱", hint: "Tap a start, then an end" },
-  { mode: "curve", label: "Curve", icon: "⌒", hint: "Tap start, a bend point, then the end" },
-];
+const iconHtml = (i: Icon) =>
+  i.img
+    ? `<img class="ic-img" src="/ui/${i.img}.png" alt="" draggable="false">`
+    : `<span class="ic" style="${i.color ? `color:${i.color}` : ""}">${i.glyph ?? ""}</span>`;
 
 export interface HudHooks {
   onMenu(): void;
@@ -98,6 +106,13 @@ const CIVIC_ROWS: { key: CivicKey; label: string; color: string }[] = [
   { key: "transit", label: "Transit", color: "#9b7bff" },
 ];
 
+const INDICATORS = [
+  { key: "pop", label: "Popularity", icon: "hud-popularidade", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "bud", label: "Budget", icon: "hud-orcamento", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "env", label: "Environment", icon: "hud-ambiente", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "trf", label: "Traffic", icon: "hud-trafego", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+] as const;
+
 export class Hud {
   private root: HTMLElement;
   private moneyEl!: HTMLElement;
@@ -105,64 +120,65 @@ export class Hud {
   private popEl!: HTMLElement;
   private dateEl!: HTMLElement;
   private jobsEl!: HTMLElement;
+  private skyEl!: HTMLElement;
   private bars!: { r: HTMLElement; c: HTMLElement; i: HTMLElement };
   private toolBtns = new Map<ToolId, HTMLElement>();
-  private groupBtn!: HTMLElement;
+  private groupBtns = new Map<string, HTMLElement>();
+  private flyouts = new Map<string, HTMLElement>();
   private speedBtns: HTMLElement[] = [];
   private toast!: HTMLElement;
   private toastTimer = 0;
   private budget!: HTMLElement;
-  private taxLabel!: HTMLElement;
   private hint!: HTMLElement;
-  private flyUtil!: HTMLElement;
-  private flyRoad!: HTMLElement;
-  private roadTypeBtns = new Map<RoadType, HTMLElement>();
-  private roadModeBtns = new Map<RoadMode, HTMLElement>();
   private finishBtn!: HTMLElement;
-  private roadType: RoadType = 1;
-  private roadMode: RoadMode = "paint";
-  private flyCivic!: HTMLElement;
-  private civicBtn!: HTMLElement;
-  private flyTransit!: HTMLElement;
-  private transitBtn!: HTMLElement;
   private createBtn!: HTMLElement;
   private linesPanel!: HTMLElement;
   private linesSig = "";
-  private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
-  private lvEl!: HTMLElement;
-  private skyEl!: HTMLElement;
-  private trafficFill!: HTMLElement;
-  private trafficVal!: HTMLElement;
-  private flyView!: HTMLElement;
   private viewBtn!: HTMLElement;
   private layerBtns: HTMLElement[] = [];
+  private roadTypeBtns = new Map<RoadType, HTMLElement>();
+  private roadModeBtns = new Map<RoadMode, HTMLElement>();
+  private roadType: RoadType = 1;
+  private roadMode: RoadMode = "paint";
   private svc = new Map<UtilityKey, { fill: HTMLElement; val: HTMLElement }>();
-  private happyEl!: HTMLElement;
+  private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
+  private ind = new Map<string, { fill: HTMLElement; val: HTMLElement }>();
+  private lvEl!: HTMLElement;
+  private trafficFill!: HTMLElement;
+  private trafficVal!: HTMLElement;
+  private tips = true;
+  private currentTool: ToolId = "road";
 
   constructor(parent: HTMLElement, private hooks: HudHooks) {
     this.root = el("div", "hud");
     parent.appendChild(this.root);
     this.buildTop();
-    this.buildDemand();
-    this.buildServices();
+    this.buildLeft();
     this.buildBottom();
     this.buildBudget();
     this.toast = el("div", "toast");
     this.root.appendChild(this.toast);
   }
 
+  destroy(): void {
+    this.root.remove();
+  }
+
+  // ------------------------------------------------------------------ build
+
   private buildTop(): void {
     const top = el("div", "panel topbar");
     top.innerHTML = `
-      <div class="stat"><span class="lbl">Population</span><b data-k="pop">0</b></div>
-      <div class="stat"><span class="lbl">Jobs</span><b data-k="jobs">0</b></div>
-      <div class="stat date"><span class="lbl">Date <span data-k="sky"></span></span><b data-k="date"></b></div>
-      <div class="stat"><span class="lbl">Balance</span><b data-k="money"></b><small data-k="delta"></small></div>`;
+      <div class="stat"><span class="lbl">${tr("Population")}</span><b data-k="pop">0</b></div>
+      <div class="stat"><span class="lbl">${tr("Jobs")}</span><b data-k="jobs">0</b></div>
+      <div class="stat date"><span class="lbl">${tr("Date")} <span data-k="sky"></span></span><b data-k="date"></b></div>
+      <div class="stat"><span class="lbl">${tr("Balance")}</span><b data-k="money"></b><small data-k="delta"></small></div>`;
     this.popEl = top.querySelector('[data-k="pop"]')!;
     this.jobsEl = top.querySelector('[data-k="jobs"]')!;
     this.dateEl = top.querySelector('[data-k="date"]')!;
     this.moneyEl = top.querySelector('[data-k="money"]')!;
     this.deltaEl = top.querySelector('[data-k="delta"]')!;
+    this.skyEl = top.querySelector('[data-k="sky"]')!;
 
     const speed = el("div", "speed");
     [["⏸", 0], ["▶", 1], ["▶▶", 2], ["▶▶▶", 4]].forEach(([label, v]) => {
@@ -171,53 +187,59 @@ export class Hud {
       speed.appendChild(b);
       this.speedBtns.push(b);
     });
-    top.appendChild(speed);
-    const menu = el("button", "speed-btn menu-btn", "☰");
-    menu.title = "Menu: save, load, new city";
+    const menu = el("button", "speed-btn menu-btn", `<img class="ic-img sm" src="/ui/ico-config.png" alt="">`);
+    menu.title = tr("Menu: save, load, new city");
     menu.addEventListener("click", () => this.hooks.onMenu());
     speed.appendChild(menu);
-    this.skyEl = top.querySelector('[data-k="sky"]')!;
+    top.appendChild(speed);
     this.root.appendChild(top);
   }
 
-  private buildDemand(): void {
-    const p = el("div", "panel demand");
-    p.innerHTML = `
+  private buildLeft(): void {
+    const col = el("div", "left-col");
+
+    const rci = el("div", "panel demand");
+    rci.innerHTML = `
       <div class="bar r"><i></i></div><div class="bar c"><i></i></div><div class="bar i"><i></i></div>
       <div class="legend"><span>R</span><span>C</span><span>I</span></div>`;
-    const [r, c, i] = Array.from(p.querySelectorAll<HTMLElement>(".bar i"));
+    const [r, c, i] = Array.from(rci.querySelectorAll<HTMLElement>(".bar i"));
     this.bars = { r, c, i };
-    this.root.appendChild(p);
-  }
+    col.appendChild(rci);
 
-  private buildServices(): void {
+    const ind = el("div", "panel indicators");
+    for (const d of INDICATORS) {
+      const row = el("div", "ind",
+        `<img class="ic-img xs" src="/ui/${d.icon}.png" alt=""><span class="ind-l">${tr(d.label)}</span>` +
+        `<div class="ind-bar"><i></i></div><span class="ind-v">–</span>`);
+      this.ind.set(d.key, { fill: row.querySelector("i")!, val: row.querySelector(".ind-v")! });
+      ind.appendChild(row);
+    }
+    col.appendChild(ind);
+
     const p = el("div", "panel services");
-    p.innerHTML = `<div class="svc-head"><span>Services</span><b data-k="happy">100</b></div>`;
-    this.happyEl = p.querySelector('[data-k="happy"]')!;
-    for (const r of SERVICE_ROWS) {
-      const row = el("div", "svc", `<span class="svc-l">${r.label}</span><div class="svc-bar"><i style="background:${r.color}"></i></div><span class="svc-v">–</span>`);
-      this.svc.set(r.key, { fill: row.querySelector("i")!, val: row.querySelector(".svc-v")! });
-      p.appendChild(row);
-    }
-    for (const r of CIVIC_ROWS) {
-      const row = el("div", "svc", `<span class="svc-l">${r.label}</span><div class="svc-bar"><i style="background:${r.color}"></i></div><span class="svc-v">0%</span>`);
-      this.civ.set(r.key, { fill: row.querySelector("i")!, val: row.querySelector(".svc-v")! });
-      p.appendChild(row);
-    }
-    const tr = el("div", "svc", `<span class="svc-l">Traffic</span><div class="svc-bar"><i style="background:#e5584f"></i></div><span class="svc-v">0 cars</span>`);
-    this.trafficFill = tr.querySelector("i")!;
-    this.trafficVal = tr.querySelector(".svc-v")!;
-    p.appendChild(tr);
-    const lv = el("div", "svc-head lv", `<span>Land value</span><b data-k="lv">0</b>`);
+    const head = el("div", "svc-head toggle", `<span>${tr("Services")} ▾</span><b></b>`);
+    head.addEventListener("click", () => p.classList.toggle("collapsed"));
+    p.appendChild(head);
+    for (const r2 of SERVICE_ROWS) p.appendChild(this.svcRow(r2.label, r2.color, "none", (f, v) => this.svc.set(r2.key, { fill: f, val: v })));
+    for (const r2 of CIVIC_ROWS) p.appendChild(this.svcRow(r2.label, r2.color, "0%", (f, v) => this.civ.set(r2.key, { fill: f, val: v })));
+    p.appendChild(this.svcRow("Traffic", "#e5584f", `0 ${tr("cars")}`, (f, v) => { this.trafficFill = f; this.trafficVal = v; }));
+    const lv = el("div", "svc-head lv", `<span>${tr("Land value")}</span><b data-k="lv">0</b>`);
     this.lvEl = lv.querySelector('[data-k="lv"]')!;
     p.appendChild(lv);
-    this.root.appendChild(p);
+    col.appendChild(p);
+    this.root.appendChild(col);
   }
 
-  private toolButton(t: ToolDef): HTMLElement {
-    const cost = t.id === "pan" ? "" : `<small>$${COST[t.id as Exclude<ToolId, "pan">]}</small>`;
-    const b = el("button", "tool", `<span class="ic" style="color:${t.color}">${t.icon}</span><span>${t.label}</span>${cost}`);
-    b.title = t.hint;
+  private svcRow(label: string, color: string, initial: string, bind: (fill: HTMLElement, val: HTMLElement) => void): HTMLElement {
+    const row = el("div", "svc", `<span class="svc-l">${tr(label)}</span><div class="svc-bar"><i style="background:${color}"></i></div><span class="svc-v">${initial}</span>`);
+    bind(row.querySelector("i")!, row.querySelector(".svc-v")!);
+    return row;
+  }
+
+  private toolButton(t: ToolDef, big = false): HTMLElement {
+    const cost = t.id === "pan" || t.id === "busline" || t.id === "metroline" ? "" : `<small>$${COST[t.id as Exclude<ToolId, "pan">]}</small>`;
+    const b = el("button", "tool", `${iconHtml(t.icon)}<span>${tr(t.label)}</span>${big ? "" : cost}`);
+    b.title = tr(t.hint);
     b.addEventListener("click", () => {
       this.hooks.onTool(t.id);
       this.setTool(t.id);
@@ -227,76 +249,66 @@ export class Hud {
     return b;
   }
 
+  /** A toolbar category button that opens a flyout. */
+  private group(name: string, label: string, icon: Icon, fly: HTMLElement, onOpen?: () => void): HTMLElement {
+    const b = el("button", "tool", `${iconHtml(icon)}<span>${tr(label)}</span><small>▴</small>`);
+    b.addEventListener("click", () => {
+      this.toggleFly(name);
+      onOpen?.();
+    });
+    this.groupBtns.set(name, b);
+    this.flyouts.set(name, fly);
+    this.root.appendChild(fly);
+    return b;
+  }
+
   private buildBottom(): void {
     const bar = el("div", "panel toolbar");
     bar.appendChild(this.toolButton(T.pan));
-    const roads = el("button", "tool", `<span class="ic" style="color:#9aa3b2">═</span><span>Roads</span><small>▴</small>`);
-    roads.title = "Roads: streets, avenues and highways";
-    roads.addEventListener("click", () => {
-      this.toggleFly(this.flyRoad);
+
+    // Roads: class and drawing mode
+    const flyRoad = el("div", "panel fly");
+    for (const t of [1, 2, 3] as RoadType[]) {
+      const name = t === 1 ? "Street" : t === 2 ? "Avenue" : "Highway";
+      const b = el("button", "tool", `<span class="ic">${t === 1 ? "─" : t === 2 ? "═" : "≡"}</span><span>${tr(name)}</span><small>$${ROAD_COST[t]}/${tr("tile")}</small>`);
+      b.addEventListener("click", () => { this.setRoadChoice(t, this.roadMode); this.hooks.onTool("road"); this.setTool("road"); });
+      this.roadTypeBtns.set(t, b);
+      flyRoad.appendChild(b);
+    }
+    flyRoad.appendChild(el("span", "sep"));
+    for (const m of ROAD_MODES) {
+      const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(m.label)}</span>`);
+      b.title = tr(m.hint);
+      b.addEventListener("click", () => { this.setRoadChoice(this.roadType, m.mode); this.hooks.onTool("road"); this.setTool("road"); });
+      this.roadModeBtns.set(m.mode, b);
+      flyRoad.appendChild(b);
+    }
+    const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
       this.hooks.onTool("road");
       this.setTool("road");
       this.hooks.onRoad(this.roadType, this.roadMode);
     });
     this.toolBtns.set("road", roads);
     bar.appendChild(roads);
-    for (const id of ["res", "com", "ind"]) bar.appendChild(this.toolButton(T[id]));
-
-    this.groupBtn = el("button", "tool", `<span class="ic" style="color:#f2c230">⚡</span><span>Utilities</span><small>▴</small>`);
-    this.groupBtn.addEventListener("click", () => this.toggleFly(this.flyUtil));
-    bar.appendChild(this.groupBtn);
-
-    this.civicBtn = el("button", "tool", `<span class="ic" style="color:#3d6ee8">★</span><span>Civic</span><small>▴</small>`);
-    this.civicBtn.addEventListener("click", () => this.toggleFly(this.flyCivic));
-    bar.appendChild(this.civicBtn);
-
-    this.transitBtn = el("button", "tool", `<span class="ic" style="color:#9b7bff">◴</span><span>Transit</span><small>▴</small>`);
-    this.transitBtn.addEventListener("click", () => this.toggleFly(this.flyTransit));
-    bar.appendChild(this.transitBtn);
-
-    bar.appendChild(this.toolButton(T.bulldoze));
-
-    this.viewBtn = el("button", "tool", `<span class="ic">◉</span><span>Infoview</span><small>▴</small>`);
-    this.viewBtn.addEventListener("click", () => this.toggleFly(this.flyView));
-    bar.appendChild(this.viewBtn);
-
-    const eco = el("button", "tool", `<span class="ic">$</span><span>Economy</span>`);
-    eco.addEventListener("click", () => this.budget.classList.toggle("open"));
-    bar.appendChild(eco);
-    this.root.appendChild(bar);
-
-    this.flyUtil = el("div", "panel fly");
-    for (const id of UTILITY_TOOLS) this.flyUtil.appendChild(this.toolButton(T[id]));
-    this.flyRoad = el("div", "panel fly");
-    for (const t of [1, 2, 3] as RoadType[]) {
-      const b = el("button", "tool", `<span class="ic">${t === 1 ? "─" : t === 2 ? "═" : "≡"}</span><span>${ROAD_NAME[t]}</span><small>$${ROAD_COST[t]}/tile</small>`);
-      b.addEventListener("click", () => { this.setRoadChoice(t, this.roadMode); this.hooks.onTool("road"); this.setTool("road"); });
-      this.roadTypeBtns.set(t, b);
-      this.flyRoad.appendChild(b);
-    }
-    this.flyRoad.appendChild(el("span", "sep"));
-    for (const m of ROAD_MODES) {
-      const b = el("button", "tool", `<span class="ic">${m.icon}</span><span>${m.label}</span>`);
-      b.title = m.hint;
-      b.addEventListener("click", () => { this.setRoadChoice(this.roadType, m.mode); this.hooks.onTool("road"); this.setTool("road"); });
-      this.roadModeBtns.set(m.mode, b);
-      this.flyRoad.appendChild(b);
-    }
-    this.root.appendChild(this.flyRoad);
     this.setRoadChoice(1, "paint", false);
 
-    this.finishBtn = el("button", "finish", "Finish road");
-    this.finishBtn.addEventListener("click", () => this.hooks.onFinishRoad());
-    this.finishBtn.hidden = true;
-    this.root.appendChild(this.finishBtn);
+    const flyZones = el("div", "panel fly");
+    for (const id of ZONE_TOOLS) flyZones.appendChild(this.toolButton(T[id]));
+    bar.appendChild(this.group("zones", "Zones", { img: "ico-zonas" }, flyZones));
 
-    this.flyCivic = el("div", "panel fly");
-    for (const id of CIVIC_TOOLS) this.flyCivic.appendChild(this.toolButton(T[id]));
-    this.flyTransit = el("div", "panel fly");
-    for (const id of TRANSIT_TOOLS) this.flyTransit.appendChild(this.toolButton(T[id]));
-    this.flyView = el("div", "panel fly wrap");
+    const flyServices = el("div", "panel fly wrap");
+    for (const id of SERVICE_TOOLS) flyServices.appendChild(this.toolButton(T[id]));
+    bar.appendChild(this.group("services", "Services", { img: "ico-servicos" }, flyServices));
+
+    const flyTransit = el("div", "panel fly");
+    for (const id of TRANSIT_TOOLS) flyTransit.appendChild(this.toolButton(T[id]));
+    bar.appendChild(this.group("transit", "Transit", { img: "ico-transporte" }, flyTransit));
+
+    bar.appendChild(this.toolButton(T.bulldoze, true));
+
+    const flyView = el("div", "panel fly wrap");
     for (const l of LAYERS) {
-      const b = el("button", "tool", `<span class="ic" style="color:${l.color}">${l.icon}</span><span>${l.label}</span>`);
+      const b = el("button", "tool", `<span class="ic" style="color:${l.color}">${l.glyph}</span><span>${tr(l.label)}</span>`);
       b.addEventListener("click", () => {
         this.hooks.onOverlay(l.layer);
         this.layerBtns.forEach((x) => x.classList.toggle("active", x === b));
@@ -304,24 +316,79 @@ export class Hud {
         this.closeFlyouts();
       });
       this.layerBtns.push(b);
-      this.flyView.appendChild(b);
+      flyView.appendChild(b);
     }
     this.layerBtns[0].classList.add("active");
-    this.root.appendChild(this.flyUtil);
-    this.root.appendChild(this.flyCivic);
-    this.root.appendChild(this.flyTransit);
+    this.viewBtn = this.group("view", "Infoview", { img: "ico-mapas" }, flyView);
+    bar.appendChild(this.viewBtn);
 
-    this.createBtn = el("button", "finish create", "Create line");
+    const eco = el("button", "tool", `<img class="ic-img" src="/ui/ico-economia.png" alt=""><span>${tr("Economy")}</span>`);
+    eco.addEventListener("click", () => this.budget.classList.toggle("open"));
+    bar.appendChild(eco);
+    this.root.appendChild(bar);
+
+    this.finishBtn = el("button", "finish", tr("Finish road"));
+    this.finishBtn.addEventListener("click", () => this.hooks.onFinishRoad());
+    this.finishBtn.hidden = true;
+    this.root.appendChild(this.finishBtn);
+
+    this.createBtn = el("button", "finish create", tr("Create line"));
     this.createBtn.addEventListener("click", () => this.hooks.onCreateLine());
     this.createBtn.hidden = true;
     this.root.appendChild(this.createBtn);
 
     this.linesPanel = el("div", "panel lines");
     this.root.appendChild(this.linesPanel);
-    this.root.appendChild(this.flyView);
 
     this.hint = el("div", "hint", "");
     this.root.appendChild(this.hint);
+  }
+
+  private buildBudget(): void {
+    this.budget = el("div", "panel budget");
+    this.budget.innerHTML = `
+      <h3>${tr("Economy")}</h3>
+      <div class="row"><span>${tr("Income (last month)")}</span><b data-k="inc">$0</b></div>
+      <div class="row"><span>${tr("Expenses (last month)")}</span><b data-k="exp">$0</b></div>
+      <label class="row"><span>${tr("Tax rate")} <b data-k="tax">10%</b></span>
+        <input type="range" min="2" max="25" value="10"></label>`;
+    const slider = this.budget.querySelector("input")!;
+    const label = this.budget.querySelector('[data-k="tax"]')!;
+    slider.addEventListener("input", () => {
+      const v = Number(slider.value);
+      label.textContent = `${v}%`;
+      this.hooks.onTax(v / 100);
+    });
+    this.root.appendChild(this.budget);
+  }
+
+  // ------------------------------------------------------------------ state
+
+  /** Restore the controls after the HUD was rebuilt (language change). */
+  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; tips: boolean }): void {
+    this.setRoadChoice(opts.roadType, opts.roadMode, false);
+    this.setTool(opts.tool);
+    this.setSpeed(opts.speed);
+    this.setTips(opts.tips);
+    const slider = this.budget.querySelector("input")!;
+    slider.value = String(Math.round(opts.taxRate * 100));
+    this.budget.querySelector('[data-k="tax"]')!.textContent = `${slider.value}%`;
+  }
+
+  setTips(on: boolean): void {
+    this.tips = on;
+    this.hint.hidden = !on;
+  }
+
+  private toggleFly(name: string): void {
+    const f = this.flyouts.get(name)!;
+    const open = f.classList.contains("open");
+    this.closeFlyouts();
+    if (!open) f.classList.add("open");
+  }
+
+  private closeFlyouts(): void {
+    this.flyouts.forEach((f) => f.classList.remove("open"));
   }
 
   setRoadChoice(type: RoadType, mode: RoadMode, notify = true): void {
@@ -330,6 +397,21 @@ export class Hud {
     this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === type));
     this.roadModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
     if (notify) this.hooks.onRoad(type, mode);
+  }
+
+  setTool(t: ToolId): void {
+    this.currentTool = t;
+    this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === t));
+    const group = (names: string[], key: string) => this.groupBtns.get(key)?.classList.toggle("active", names.includes(t));
+    group(ZONE_TOOLS, "zones");
+    group(SERVICE_TOOLS, "services");
+    group(TRANSIT_TOOLS, "transit");
+    if (T[t]) this.hint.textContent = tr(T[t].hint);
+  }
+
+  setSpeed(s: number): void {
+    const order = [0, 1, 2, 4];
+    this.speedBtns.forEach((b, i) => b.classList.toggle("active", order[i] === s));
   }
 
   setSky(tod: number, raining: boolean): void {
@@ -343,15 +425,22 @@ export class Hud {
 
   showFinish(on: boolean, label = "Finish road"): void {
     this.finishBtn.hidden = !on;
-    this.finishBtn.textContent = label;
+    this.finishBtn.textContent = tr(label);
   }
 
   showCreateLine(on: boolean): void {
     this.createBtn.hidden = !on;
   }
 
-  /** Rebuild the lines list when lines, vehicles or ridership change. */
-  updateLines(s: CityState): void {
+  showToast(msg: string): void {
+    this.toast.textContent = msg;
+    this.toast.classList.add("show");
+    clearTimeout(this.toastTimer);
+    this.toastTimer = window.setTimeout(() => this.toast.classList.remove("show"), 1800);
+  }
+
+  /** Rebuild the lines list when lines or vehicle counts change. */
+  private updateLines(s: CityState): void {
     const sig = s.world.lines.map((l) => `${l.id}:${l.vehicles}:${l.stops.length}`).join("|");
     if (sig === this.linesSig) return;
     this.linesSig = sig;
@@ -359,7 +448,7 @@ export class Hud {
     this.linesPanel.innerHTML = "";
     for (const l of s.world.lines) {
       const row = el("div", "line-row",
-        `<i style="background:${l.color}"></i><span class="ln">${l.name}</span><span class="lm">${l.stops.length} stops</span>` +
+        `<i style="background:${l.color}"></i><span class="ln">${lineName(l.name)}</span><span class="lm">${l.stops.length} ${tr("stops")}</span>` +
         `<button data-d="-1">−</button><b>${l.vehicles}</b><button data-d="1">+</button><button data-x>✕</button>`);
       row.querySelector<HTMLButtonElement>('[data-d="-1"]')!.addEventListener("click", () => this.hooks.onLineVehicles(l.id, -1));
       const plus = row.querySelector<HTMLButtonElement>('[data-d="1"]')!;
@@ -370,67 +459,15 @@ export class Hud {
     }
   }
 
-  private toggleFly(which: HTMLElement): void {
-    const open = which.classList.contains("open");
-    this.closeFlyouts();
-    if (!open) which.classList.add("open");
-  }
-
-  private closeFlyouts(): void {
-    this.flyUtil.classList.remove("open");
-    this.flyRoad.classList.remove("open");
-    this.flyCivic.classList.remove("open");
-    this.flyTransit.classList.remove("open");
-    this.flyView.classList.remove("open");
-  }
-
-  private buildBudget(): void {
-    this.budget = el("div", "panel budget");
-    this.budget.innerHTML = `
-      <h3>Economy</h3>
-      <div class="row"><span>Income (last month)</span><b data-k="inc">$0</b></div>
-      <div class="row"><span>Expenses (last month)</span><b data-k="exp">$0</b></div>
-      <label class="row"><span>Tax rate <b data-k="tax">10%</b></span>
-        <input type="range" min="2" max="25" value="10"></label>`;
-    const slider = this.budget.querySelector("input")!;
-    this.taxLabel = this.budget.querySelector('[data-k="tax"]')!;
-    slider.addEventListener("input", () => {
-      const v = Number(slider.value);
-      this.taxLabel.textContent = `${v}%`;
-      this.hooks.onTax(v / 100);
-    });
-    this.root.appendChild(this.budget);
-  }
-
-  setTool(t: ToolId): void {
-    this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === t));
-    this.groupBtn.classList.toggle("active", UTILITY_TOOLS.includes(t));
-    this.civicBtn.classList.toggle("active", CIVIC_TOOLS.includes(t));
-    this.transitBtn.classList.toggle("active", TRANSIT_TOOLS.includes(t));
-    this.hint.textContent = T[t].hint;
-  }
-
-  setSpeed(s: number): void {
-    const order = [0, 1, 2, 4];
-    this.speedBtns.forEach((b, i) => b.classList.toggle("active", order[i] === s));
-  }
-
-  showToast(msg: string): void {
-    this.toast.textContent = msg;
-    this.toast.classList.add("show");
-    clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => this.toast.classList.remove("show"), 1800);
-  }
-
   update(s: CityState): void {
     const d = dateOf(s.day);
-    this.dateEl.textContent = `${MONTHS[d.month]} ${d.day}, ${d.year}`;
+    this.dateEl.textContent = `${d.day} ${monthName(d.month)} ${d.year}`;
     this.popEl.textContent = fmt(s.population);
     this.jobsEl.textContent = `${fmt(s.employed)} / ${fmt(s.capacity.com + s.capacity.ind)}`;
     this.moneyEl.textContent = money(s.money);
     this.moneyEl.classList.toggle("neg", s.money < 0);
     const net = s.lastMonth.income - s.lastMonth.expenses;
-    this.deltaEl.textContent = s.day >= DAYS_PER_MONTH ? `${net >= 0 ? "+" : ""}${money(net)}/mo` : "";
+    this.deltaEl.textContent = s.day >= DAYS_PER_MONTH ? `${net >= 0 ? "+" : ""}${money(net)}/${tr("mo")}` : "";
     this.deltaEl.classList.toggle("neg", net < 0);
     for (const k of ["r", "c", "i"] as const) {
       const v = s.demand[k];
@@ -439,14 +476,29 @@ export class Hud {
       bar.style.bottom = v >= 0 ? "50%" : `${50 - Math.abs(v) * 50}%`;
       bar.classList.toggle("neg", v < 0);
     }
-    this.happyEl.textContent = String(Math.round(s.happiness));
-    this.happyEl.classList.toggle("neg", s.happiness < 60);
+
+    // Indicators: each 0..1, higher is better.
+    const flow = s.lastMonth.income + s.lastMonth.expenses;
+    const util = (k: UtilityKey) => (s.utilities[k].demand > 0 ? clamp01(s.utilities[k].supply / s.utilities[k].demand) : 1);
+    const values = {
+      pop: clamp01(s.happiness / 100),
+      bud: flow > 0 ? clamp01(0.5 + net / (flow * 1.2)) : 0.5,
+      env: clamp01(0.4 * util("sewage") + 0.4 * util("garbage") + 0.2 * Math.min(1, s.coverage.park * 2)),
+      trf: clamp01(1 - s.congestion),
+    };
+    for (const [key, v] of Object.entries(values)) {
+      const ref = this.ind.get(key)!;
+      ref.fill.style.width = `${v * 100}%`;
+      ref.fill.style.background = v > 0.66 ? "#5fd08a" : v > 0.33 ? "#f0b43a" : "#e5584f";
+      ref.val.textContent = `${Math.round(v * 100)}`;
+    }
+
     for (const [key, ref] of this.svc) {
       const u = s.utilities[key];
       const ratio = u.supply === 0 ? (u.demand > 0 ? 1 : 0) : Math.min(1, u.demand / u.supply);
       ref.fill.style.width = `${ratio * 100}%`;
       const over = u.demand > u.supply;
-      ref.val.textContent = u.supply === 0 ? "none" : `${fmt(u.demand)}/${fmt(u.supply)}`;
+      ref.val.textContent = u.supply === 0 ? tr("none") : `${fmt(u.demand)}/${fmt(u.supply)}`;
       ref.val.classList.toggle("neg", over);
     }
     for (const [key, ref] of this.civ) {
@@ -455,13 +507,16 @@ export class Hud {
       ref.val.textContent = `${Math.round(v * 100)}%`;
     }
     this.lvEl.textContent = String(Math.round(s.landValue));
-    this.updateLines(s);
     this.trafficFill.style.width = `${Math.min(1, s.congestion) * 100}%`;
-    this.trafficVal.textContent = `${s.vehicles} cars`;
+    this.trafficVal.textContent = `${s.vehicles} ${tr("cars")}`;
     this.trafficVal.classList.toggle("neg", s.congestion > 0.4);
+    this.updateLines(s);
     const inc = this.budget.querySelector('[data-k="inc"]')!;
     const exp = this.budget.querySelector('[data-k="exp"]')!;
     inc.textContent = money(s.lastMonth.income);
     exp.textContent = money(s.lastMonth.expenses);
   }
+
+  get tool(): ToolId { return this.currentTool; }
+  get tipsOn(): boolean { return this.tips; }
 }

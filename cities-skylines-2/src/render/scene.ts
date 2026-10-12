@@ -623,6 +623,13 @@ export class CityRenderer {
     this.lastFrameAt = now;
   }
 
+  /** Highest pixel ratio the quality setting allows (also bounded by the display). */
+  setQualityCap(cap: number): void {
+    this.pixelCap = Math.min(window.devicePixelRatio || 1, cap);
+    this.pixelRatio = Math.min(this.pixelRatio, this.pixelCap);
+    this.resize();
+  }
+
   get currentPixelRatio(): number {
     return this.pixelRatio;
   }

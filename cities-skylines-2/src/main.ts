@@ -8,7 +8,11 @@ import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, toolColor } from "./ui/hud";
 import { Pt, ROAD_NAME, RoadType, tileHeight } from "./sim/world";
+import { setLang, tr, trReason } from "./i18n";
+import { Prefs, QUALITY_PIXEL_CAP, loadPrefs, savePrefs } from "./prefs";
 
+let prefs: Prefs = loadPrefs();
+setLang(prefs.lang);
 let state: CityState = newCity(1337);
 const app = document.getElementById("app")!;
 const view = document.createElement("div");
@@ -18,6 +22,7 @@ app.appendChild(view);
 const renderer = new CityRenderer(view, state);
 let traffic: TrafficState = newTraffic(state.world.size);
 renderer.setTraffic(traffic);
+renderer.setQualityCap(QUALITY_PIXEL_CAP[prefs.quality]);
 let tool: ToolId = "road";
 let speed = 1;
 let roadType: RoadType = 1;
@@ -29,7 +34,8 @@ let draft: Pt[] = [];
 let lineDraft: number[] = [];
 let cursor: Pt | null = null;
 
-const hud = new Hud(app, {
+function makeHud(): Hud {
+  return new Hud(app, {
   onTool: (t) => {
     tool = t;
     if (t === "pan") renderer.setHover(null);
@@ -45,18 +51,31 @@ const hud = new Hud(app, {
   onCreateLine: () => {
     const kind = tool === "metroline" ? "metro" : "bus";
     const res = createLine(state, kind, lineDraft);
-    if (res.ok) { hud.showToast("Line created"); cancelDraft(); } else hud.showToast(res.reason);
+    if (res.ok) { hud.showToast(tr("Line created")); cancelDraft(); } else hud.showToast(trReason(res.reason));
   },
   onLineVehicles: (id, delta) => {
     const line = state.world.lines.find((l) => l.id === id);
     if (!line) return;
     const res = setLineVehicles(state, id, line.vehicles + delta);
-    if (!res.ok) hud.showToast(res.reason);
+    if (!res.ok) hud.showToast(trReason(res.reason));
   },
   onRemoveLine: (id) => removeLine(state, id),
-});
+  });
+}
+let hud = makeHud();
 hud.setTool(tool);
 hud.setSpeed(speed);
+hud.setTips(prefs.tips);
+
+/** Rebuild the HUD in the current language, keeping what the player had selected. */
+function rebuildHud(): void {
+  hud.destroy();
+  hud = makeHud();
+  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, tips: prefs.tips });
+  cancelDraft();
+  menu.raise();
+  menu.refresh();
+}
 
 /** Replace the running city (load or new game); everything player-facing resets with it. */
 function useCity(next: CityState): void {
@@ -73,17 +92,27 @@ const menu = new Menu(app, {
   info: (slot) => slotInfo(slot),
   onSave: (n) => {
     const r = saveTo(String(n), state);
-    hud.showToast(r.ok ? `Saved to slot ${n}` : r.reason);
+    hud.showToast(r.ok ? tr("Saved to slot {n}", { n }) : trReason(r.reason));
   },
   onLoad: (slot) => {
     const r = loadFrom(slot);
-    if (r.ok) { useCity(r.state); hud.showToast("City loaded"); } else hud.showToast(r.reason);
+    if (r.ok) { useCity(r.state); hud.showToast(tr("City loaded")); } else hud.showToast(trReason(r.reason));
   },
-  onNew: (seed) => { useCity(newCity(seed)); hud.showToast(`New city, seed ${seed}`); },
-  onExport: () => { exportFile(state); hud.showToast("Save file downloaded"); },
+  onNew: (seed) => { useCity(newCity(seed)); hud.showToast(tr("New city, seed {n}", { n: seed })); },
+  getPrefs: () => prefs,
+  onPrefs: (p) => {
+    const langChanged = p.lang !== prefs.lang;
+    prefs = p;
+    savePrefs(p);
+    setLang(p.lang);
+    renderer.setQualityCap(QUALITY_PIXEL_CAP[p.quality]);
+    hud.setTips(p.tips);
+    if (langChanged) rebuildHud();
+  },
+  onExport: () => { exportFile(state); hud.showToast(tr("Save file downloaded")); },
   onImport: async (file) => {
     const r = await importFile(file);
-    if (r.ok) { useCity(r.state); hud.showToast("City imported"); } else hud.showToast(r.reason);
+    if (r.ok) { useCity(r.state); hud.showToast(tr("City imported")); } else hud.showToast(trReason(r.reason));
   },
 });
 
@@ -91,7 +120,7 @@ const menu = new Menu(app, {
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => { navigator.serviceWorker.register("/sw.js").catch(() => {}); });
 }
-if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast("Autosave found: open the menu to continue"), 800);
+if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast(tr("Autosave found: open the menu to continue")), 800);
 
 const lineTool = () => tool === "busline" || tool === "metroline";
 const placing = () => (tool === "road" && roadMode !== "paint") || lineTool();
@@ -121,7 +150,7 @@ function onLineTap(cx: number, cy: number): void {
     const st = stopAt(w, y * w.size + x);
     if (st && st.kind === kind) { found = st; break; }
   }
-  if (!found) { hud.showToast(`Tap a ${kind} ${kind === "bus" ? "stop" : "station"}`); return; }
+  if (!found) { hud.showToast(tr(kind === "bus" ? "Tap a bus stop" : "Tap a metro station")); return; }
   if (lineDraft[lineDraft.length - 1] === found.id) return;
   lineDraft.push(found.id);
   renderer.setStopMarks(lineDraft.map((id) => w.stops.find((s) => s.id === id)!.tile),
@@ -134,16 +163,16 @@ function onLineTap(cx: number, cy: number): void {
 function refreshHint(): void {
   if (!placing()) return;
   if (lineTool()) {
-    const what = tool === "metroline" ? "metro station" : "bus stop";
+    const what = tr(tool === "metroline" ? "metro station" : "bus stop");
     hud.setHint(lineDraft.length < 2
-      ? `Tap ${what}s in the order the line should run (${lineDraft.length} picked)`
-      : `${lineDraft.length} stops. Tap more, or Create line (the route loops)`);
+      ? tr("Tap {what}s in the order the line should run ({n} picked)", { what, n: lineDraft.length })
+      : tr("{n} stops. Tap more, or Create line (the route loops)", { n: lineDraft.length }));
     return;
   }
-  const name = ROAD_NAME[roadType];
-  if (draft.length === 0) hud.setHint(`${name}: tap a start point (or an existing road to connect)`);
-  else if (roadMode === "curve" && draft.length === 1) hud.setHint(`${name}: tap the bend point`);
-  else hud.setHint(`${name}: tap the end point`);
+  const name = tr(ROAD_NAME[roadType]);
+  if (draft.length === 0) hud.setHint(tr("{name}: tap a start point (or an existing road to connect)", { name }));
+  else if (roadMode === "curve" && draft.length === 1) hud.setHint(tr("{name}: tap the bend point", { name }));
+  else hud.setHint(tr("{name}: tap the end point", { name }));
 }
 
 /** Snap to the centre of an existing road tile so new roads connect cleanly. */
@@ -165,10 +194,10 @@ function updatePreview(): void {
   // Before the bend point is set in curve mode, show the straight guide.
   const plan = planRoad(state, roadType, seg.pts);
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok);
-  const name = ROAD_NAME[roadType];
+  const name = tr(ROAD_NAME[roadType]);
   hud.setHint(plan.ok
-    ? `${name}: ${plan.newTiles} tiles, $${plan.cost}`
-    : `${name}: ${plan.reason}`);
+    ? tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost })
+    : `${name}: ${trReason(plan.reason!)}`);
 }
 
 function onTap(cx: number, cy: number): void {
@@ -200,7 +229,7 @@ function onTap(cx: number, cy: number): void {
     renderer.setRoadPreview(null);
     refreshHint();
   } else {
-    hud.showToast(res.reason);
+    hud.showToast(trReason(res.reason));
     updatePreview();
   }
 }
@@ -213,7 +242,7 @@ bindInput(renderer, {
     // Facilities are expensive: place one per click, never along a drag.
     if (isFacilityTool(tool) && !first) return;
     const res = applyTool(state, tool, tile.x, tile.y, roadType);
-    if (!res.ok && res.reason !== lastToast) { hud.showToast(res.reason); lastToast = res.reason; }
+    if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
     if (res.ok) lastToast = "";
   },
   hover: (cx, cy) => {
@@ -258,16 +287,16 @@ function frame(now: number) {
     while (acc >= DAY_MS) { step(state); acc -= DAY_MS; }
   }
   tickTraffic(state, traffic, (dt / 1000) * speed);
-  tod = (tod + ((dt / 1000) * speed) / 90) % 1;
+  tod = prefs.dayNight ? (tod + ((dt / 1000) * speed) / 90) % 1 : 0.45;
   renderer.setAtmosphere(tod, state.raining);
   hud.setSky(tod, state.raining);
   const month = Math.floor(state.day / 30);
   if (month !== lastMonthSaved) {
     lastMonthSaved = month;
-    saveTo(AUTOSAVE, state);
+    if (prefs.autosave) saveTo(AUTOSAVE, state);
   }
   if (state.fires !== seenFires) {
-    hud.showToast("Fire! A building burned down. Build a fire station.");
+    hud.showToast(tr("Fire! A building burned down. Build a fire station."));
     seenFires = state.fires;
   }
   hud.update(state);

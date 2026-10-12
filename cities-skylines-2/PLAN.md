@@ -35,7 +35,7 @@ linguagem visual da UI. Não é paridade de features.
 | M6 | ✅ Transporte público | Ônibus, metrô, linhas e paradas |
 | M7 | ✅ Persistência e meta | Salvar/carregar, mapas, conquistas leves, ciclo dia/noite, clima |
 | M8 | ✅ Empacotamento (Mac verificado; Windows e iPad por verificar) | PWA offline, Tauri Mac/Win, ícones, perf no iPad |
-| M9 | Identidade visual | Logo com coroa, ícones do HUD, painel de preferências (idioma, qualidade, autosave), indicadores |
+| M9 | ✅ Identidade visual | Logo com coroa, ícones do HUD, painel de preferências (idioma, qualidade, autosave), indicadores |
 
 ## Arquitetura
 

@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M8 concluído no Mac. M9 em seguida.",
-    summary: "O jogo agora vira app de Mac (Tauri), PWA instalável e offline para iPad, exporta e importa saves por arquivo e ajusta a resolução sozinho em GPUs mais lentas. Windows e iPad real ainda precisam ser testados em máquina própria.",
-    screenshot: { src: "img/m7-menu.jpg", caption: "M7: menu com logo, autosave, três slots e nova cidade por seed; ao fundo, a cidade à noite sob chuva." },
+    headline: "M9 concluído. Falta validar Windows e iPad.",
+    summary: "A interface passou a usar a identidade da folha de marca: banner e ícone com coroa, ícones do HUD, barra de ferramentas reagrupada, indicadores e preferências com idioma, qualidade e dicas. Tudo traduzido para português do Brasil.",
+    screenshot: { src: "img/m9-brand.jpg", caption: "M9: painel de preferências sobre a cidade, com o banner da marca, indicadores no canto superior esquerdo e a barra reagrupada, tudo em português." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -174,17 +174,26 @@ npm run dev</pre>
       { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "done" },
       { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "done" },
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "done" },
-      { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "active" }
+      { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "68 testes passando, incluindo a lógica do service worker com fakes de cache e rede" },
+      { ok: true, text: "72 testes passando, incluindo tradução e substituição de variáveis" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
-      { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar" },
+      { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar (ainda com o ícone antigo)" },
       { ok: false, text: "Service worker não pôde ser registrado no navegador embutido daqui; só a lógica foi testada, com fakes" },
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M9 · Identidade visual", items: [
+        "Banner da marca no menu; ícone do app, do PWA e do Tauri refeitos a partir do ícone da folha",
+        "Ícones de Construir, Zonas, Serviços, Transporte, Demolição, Mapas, Economia e Configurações recortados da folha",
+        "Barra de ferramentas reagrupada de 11 para 8 botões: zonas num submenu, serviços e utilidades juntos",
+        "Painel de indicadores: Popularidade, Orçamento, Meio ambiente e Tráfego, com cores de alerta",
+        "Preferências: idioma (português do Brasil ou inglês), qualidade gráfica, dicas, autosave e ciclo dia/noite",
+        "Interface inteira traduzida, inclusive avisos da simulação; o idioma troca sem perder a cidade",
+        "Qualidade gráfica define o teto de resolução; a resolução adaptativa continua abaixo dele"
+      ] },
       { date: "2026-10-12", title: "M8 · Empacotamento", items: [
         "App de Mac com Tauri 2: Mayor.app de 10 MB e dmg de 3 MB; abre e fica estável por 6 s",
         "PWA: manifest com ícones normal e maskable, apple-touch-icon e service worker (shell pré-cacheado, navegação com rede primeiro)",
