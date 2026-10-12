@@ -58,6 +58,14 @@ describe("save and load", () => {
     expect(() => deserialize(JSON.stringify({ ...good, size: 1 }))).toThrow(/damaged/);
   });
 
+  it("keeps the terrain preset, and old saves without one load as plains", () => {
+    const s = newCity(5, 96, "mountain");
+    expect(deserialize(serialize(s)).world.biome).toBe("mountain");
+    const old = JSON.parse(serialize(newCity(5)));
+    delete old.biome;
+    expect(deserialize(JSON.stringify(old)).world.biome).toBe("plains");
+  });
+
   it("stays small enough for localStorage", () => {
     expect(serialize(builtCity()).length).toBeLessThan(400_000);
   });

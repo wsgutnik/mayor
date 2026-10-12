@@ -171,3 +171,25 @@ body {
   .left-col { top: calc(64px + var(--safe-top)); width: 180px; }
   .ind { grid-template-columns: 18px 78px 1fr 22px; }
 }
+
+/* M10: kit icons, terrain picker */
+.menu-block { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.menu-block .menu-row { background: transparent; padding: 0; }
+.terrain-pick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.menu .terrain-pick button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; font-size: 11px; border: 1px solid transparent; }
+.menu .terrain-pick button.on { border-color: var(--accent); background: rgba(92,184,255,.18); }
+.terrain-pick img { width: 100%; max-width: 56px; height: auto; }
+@media (max-width: 520px) { .terrain-pick { grid-template-columns: repeat(3, 1fr); } }
+
+.prefs { display: grid; grid-template-columns: 150px 1fr; gap: 10px; min-height: 190px; }
+.prefs nav { display: flex; flex-direction: column; gap: 4px; }
+.menu .prefs nav button { display: flex; align-items: center; gap: 8px; text-align: left; background: transparent; padding: 9px 10px; }
+.menu .prefs nav button.on { background: rgba(92,184,255,.22); box-shadow: inset 2px 0 0 var(--accent); }
+.prefs nav img { width: 20px; height: 20px; }
+.prefs-pane { display: flex; flex-direction: column; gap: 6px; }
+.prefs-foot { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; margin-top: 4px; }
+.keys { width: 100%; border-collapse: collapse; font-size: 13px; }
+.keys td { padding: 8px 6px; border-bottom: 1px solid var(--panel-border); }
+.keys td:last-child { color: var(--muted); text-align: right; }
+.menu-row.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+@media (max-width: 520px) { .prefs { grid-template-columns: 1fr; } .prefs nav { flex-direction: row; flex-wrap: wrap; } }

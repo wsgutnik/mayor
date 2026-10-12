@@ -1,13 +1,15 @@
 import {
   CityState, newCity, refreshDerived,
 } from "./sim";
-import { generateWorld, RoadSegment, Stop, TransitLine } from "./world";
+import { BIOMES, Biome, generateWorld, RoadSegment, Stop, TransitLine } from "./world";
 
 export const SAVE_VERSION = 1;
 
 interface SaveFile {
   v: number;
   seed: number;
+  /** Terrain preset; absent in older saves, which were all plains. */
+  biome?: Biome;
   size: number;
   day: number;
   money: number;
@@ -50,6 +52,7 @@ export function serialize(s: CityState): string {
   const file: SaveFile = {
     v: SAVE_VERSION,
     seed: s.rngState,
+    biome: w.biome,
     size: w.size,
     day: s.day,
     money: s.money,
@@ -86,7 +89,8 @@ export function deserialize(json: string): CityState {
   if (!f || typeof f !== "object" || f.v !== SAVE_VERSION) throw new SaveError("This save is from a different version");
   const n = f.size;
   if (!Number.isInteger(n) || n < 8 || n > 512) throw new SaveError("The save file is damaged");
-  const s = newCity(f.seed, n);
+  const biome: Biome = f.biome && BIOMES.includes(f.biome) ? f.biome : "plains";
+  const s = newCity(f.seed, n, biome);
   const w = s.world;
   const heights = fromB64(f.heights);
   const bytes = (b64: string, len: number) => {

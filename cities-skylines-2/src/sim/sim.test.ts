@@ -402,3 +402,46 @@ describe("free-form roads", () => {
     expect(s.lastMonth.expenses).toBeCloseTo(7 * 3); // 7 street tiles beyond the entry
   });
 });
+
+import { generateWorld, BIOMES, tileHeight as tileH } from "./world";
+
+describe("terrain presets", () => {
+  const stats = (b: (typeof BIOMES)[number]) => {
+    const w = generateWorld(96, 1337, b);
+    let water = 0, max = -1e9;
+    for (let y = 0; y < w.size; y++) for (let x = 0; x < w.size; x++) {
+      if (!isLand(w, x, y)) water++;
+      max = Math.max(max, tileH(w, x, y));
+    }
+    return { w, water: water / (w.size * w.size), max };
+  };
+
+  it("every preset keeps a dry flat landing strip at the entry", () => {
+    for (const b of BIOMES) {
+      const { w } = stats(b);
+      for (let x = 0; x <= 4; x++) expect(isLand(w, x, w.entry.y)).toBe(true);
+      expect(w.road[idx(w, 0, w.entry.y)]).toBeGreaterThan(0);
+    }
+  });
+
+  it("presets differ the way their names say", () => {
+    const plains = stats("plains"), river = stats("river"), coast = stats("coast");
+    const mountain = stats("mountain"), desert = stats("desert");
+    expect(mountain.max).toBeGreaterThan(plains.max * 1.5);
+    expect(coast.water).toBeGreaterThan(plains.water);
+    expect(desert.water).toBeLessThan(plains.water);
+    // the river is a band across the north: lots of water in the top third, little in the bottom
+    let top = 0, bottom = 0;
+    for (let x = 0; x < river.w.size; x++) {
+      for (let y = 0; y < 32; y++) if (!isLand(river.w, x, y)) top++;
+      for (let y = 64; y < 96; y++) if (!isLand(river.w, x, y)) bottom++;
+    }
+    expect(top).toBeGreaterThan(bottom);
+  });
+
+  it("is deterministic and stored in saves", () => {
+    const a = generateWorld(96, 7, "mountain"), b = generateWorld(96, 7, "mountain");
+    expect(Array.from(a.heights)).toEqual(Array.from(b.heights));
+    expect(a.biome).toBe("mountain");
+  });
+});

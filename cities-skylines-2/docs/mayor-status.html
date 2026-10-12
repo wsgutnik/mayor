@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M9 concluído. Falta validar Windows e iPad.",
-    summary: "A interface passou a usar a identidade da folha de marca: banner e ícone com coroa, ícones do HUD, barra de ferramentas reagrupada, indicadores e preferências com idioma, qualidade e dicas. Tudo traduzido para português do Brasil.",
-    screenshot: { src: "img/m9-brand.jpg", caption: "M9: painel de preferências sobre a cidade, com o banner da marca, indicadores no canto superior esquerdo e a barra reagrupada, tudo em português." },
+    headline: "M10 concluído. Falta validar Windows e iPad.",
+    summary: "O kit visual do PDF entrou no jogo: ícones coloridos na interface, tiles isométricos nas zonas, seis terrenos selecionáveis com árvores e cores próprias, preferências em abas e o ícone do app em alta resolução.",
+    screenshot: { src: "img/m10-kit.jpg", caption: "M10: menu com o seletor de terreno do kit (Planície, Floresta, Rio, Litoral, Montanha, Deserto) sobre uma cidade em terreno de floresta." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -174,10 +174,11 @@ npm run dev</pre>
       { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "done" },
       { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "done" },
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "done" },
-      { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "done" }
+      { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "done" },
+      { id: "M10", name: "Kit visual", desc: "Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "72 testes passando, incluindo tradução e substituição de variáveis" },
+      { ok: true, text: "76 testes passando, incluindo presets de terreno, entrada seca em todos e save com terreno" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
       { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar (ainda com o ícone antigo)" },
@@ -185,6 +186,15 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M10 · Kit visual do PDF", items: [
+        "36 ícones coloridos do kit na barra de ferramentas, nos submenus, nos mapas e nos indicadores",
+        "Tiles isométricos do kit como ícones de zona residencial, comercial e industrial",
+        "Seis terrenos selecionáveis ao criar a cidade, com forma, cor e densidade de árvores próprias: planície, floresta, rio, litoral, montanha e deserto",
+        "Árvores espalhadas pelo terreno livre; somem sob estradas e construções",
+        "Preferências no layout do kit: abas Geral, Gráficos, Jogabilidade e Controles, com Restaurar padrões e Aplicar",
+        "Ícone do app, do PWA e do Tauri a partir do ícone de 1024 px do kit",
+        "Saves guardam o terreno; saves antigos carregam como planície"
+      ] },
       { date: "2026-10-12", title: "M9 · Identidade visual", items: [
         "Banner da marca no menu; ícone do app, do PWA e do Tauri refeitos a partir do ícone da folha",
         "Ícones de Construir, Zonas, Serviços, Transporte, Demolição, Mapas, Economia e Configurações recortados da folha",

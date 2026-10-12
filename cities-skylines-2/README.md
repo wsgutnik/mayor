@@ -47,4 +47,6 @@ npm run build   # tipos + bundle em dist/
   barra de ferramentas reagrupada (Estradas, Zonas, Serviços, Transporte, Demolir, Mapas, Economia),
   painel de indicadores (Popularidade, Orçamento, Meio ambiente, Tráfego), preferências (idioma pt-BR/en,
   qualidade gráfica, dicas, autosave, dia/noite) e interface traduzida.
-- Pendente: reconstruir o app de Mac com o ícone novo (`npm run desktop:build`).
+- M10: kit visual (PDF). Ícones coloridos do kit na barra, no HUD e nos mapas; tiles isométricos nas zonas;
+  seletor de terreno ao criar cidade (Planície, Floresta, Rio, Litoral, Montanha, Deserto) com árvores e cores próprias;
+  preferências em abas (Geral, Gráficos, Jogabilidade, Controles) com Restaurar padrões e Aplicar; ícone do app em alta resolução.

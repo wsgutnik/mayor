@@ -13,24 +13,24 @@ interface ToolDef { id: ToolId; label: string; hint: string; color: string; icon
 
 const T: Record<string, ToolDef> = {
   pan: { id: "pan", label: "Move", hint: "Drag to move the camera", color: "#ffffff", icon: { glyph: "✋" } },
-  road: { id: "road", label: "Roads", hint: "Paint roads", color: "#9aa3b2", icon: { img: "ico-construir" } },
-  res: { id: "res", label: "Residential", hint: "Zone residential", color: "#4fbf6a", icon: { img: "zone-residencial" } },
-  com: { id: "com", label: "Commercial", hint: "Zone commercial", color: "#4a8fe0", icon: { img: "zone-comercial" } },
-  ind: { id: "ind", label: "Industrial", hint: "Zone industrial", color: "#e0b43a", icon: { img: "zone-industrial" } },
-  power: { id: "power", label: "Power plant", hint: "Place a power plant (radius 14)", color: "#f2c230", icon: { img: "ico-servicos" } },
-  water: { id: "water", label: "Water pump", hint: "Place a water pump near water (radius 10)", color: "#39b6e8", icon: { glyph: "💧" } },
+  road: { id: "road", label: "Roads", hint: "Paint roads", color: "#9aa3b2", icon: { img: "kit/ico-estrada" } },
+  res: { id: "res", label: "Residential", hint: "Zone residential", color: "#4fbf6a", icon: { img: "kit/tile-residential" } },
+  com: { id: "com", label: "Commercial", hint: "Zone commercial", color: "#4a8fe0", icon: { img: "kit/tile-commercial" } },
+  ind: { id: "ind", label: "Industrial", hint: "Zone industrial", color: "#e0b43a", icon: { img: "kit/tile-industrial" } },
+  power: { id: "power", label: "Power plant", hint: "Place a power plant (radius 14)", color: "#f2c230", icon: { img: "kit/ico-energia" } },
+  water: { id: "water", label: "Water pump", hint: "Place a water pump near water (radius 10)", color: "#39b6e8", icon: { img: "kit/ico-agua" } },
   sewage: { id: "sewage", label: "Sewage", hint: "Place a sewage outlet near water (radius 10)", color: "#a07848", icon: { glyph: "≋", color: "#a07848" } },
-  landfill: { id: "landfill", label: "Landfill", hint: "Place a landfill (radius 12)", color: "#9aa3ad", icon: { img: "ico-recursos" } },
-  police: { id: "police", label: "Police", hint: "Police station: crime cover (radius 12)", color: "#3d6ee8", icon: { glyph: "★", color: "#3d6ee8" } },
-  fire: { id: "fire", label: "Fire", hint: "Fire station: stops fires (radius 12)", color: "#ee5a4c", icon: { glyph: "▲", color: "#ee5a4c" } },
-  clinic: { id: "clinic", label: "Clinic", hint: "Clinic: health cover (radius 12)", color: "#f2f6fb", icon: { glyph: "✚", color: "#f2f6fb" } },
-  school: { id: "school", label: "School", hint: "School: education, needed for level 3 (radius 14)", color: "#f59a4a", icon: { glyph: "✎", color: "#f59a4a" } },
-  park: { id: "park", label: "Park", hint: "Park: land value and happiness (radius 8)", color: "#48b85a", icon: { glyph: "❀", color: "#48b85a" } },
-  busstop: { id: "busstop", label: "Bus stop", hint: "Place a bus stop on a street or avenue", color: "#3d8bff", icon: { img: "ico-transporte" } },
-  metro: { id: "metro", label: "Metro station", hint: "Metro station: any free land tile (radius 9)", color: "#9b7bff", icon: { glyph: "Ⓜ", color: "#9b7bff" } },
+  landfill: { id: "landfill", label: "Landfill", hint: "Place a landfill (radius 12)", color: "#9aa3ad", icon: { img: "kit/ico-reciclar" } },
+  police: { id: "police", label: "Police", hint: "Police station: crime cover (radius 12)", color: "#3d6ee8", icon: { img: "kit/ico-escudo" } },
+  fire: { id: "fire", label: "Fire", hint: "Fire station: stops fires (radius 12)", color: "#ee5a4c", icon: { img: "kit/ico-extintor" } },
+  clinic: { id: "clinic", label: "Clinic", hint: "Clinic: health cover (radius 12)", color: "#f2f6fb", icon: { img: "kit/ico-maleta" } },
+  school: { id: "school", label: "School", hint: "School: education, needed for level 3 (radius 14)", color: "#f59a4a", icon: { img: "kit/ico-formatura" } },
+  park: { id: "park", label: "Park", hint: "Park: land value and happiness (radius 8)", color: "#48b85a", icon: { img: "kit/ico-arvore" } },
+  busstop: { id: "busstop", label: "Bus stop", hint: "Place a bus stop on a street or avenue", color: "#3d8bff", icon: { img: "kit/ico-onibus" } },
+  metro: { id: "metro", label: "Metro station", hint: "Metro station: any free land tile (radius 9)", color: "#9b7bff", icon: { img: "kit/ico-trem" } },
   busline: { id: "busline", label: "Bus line", hint: "Tap bus stops in order, then Create line", color: "#3d8bff", icon: { glyph: "➰", color: "#3d8bff" } },
   metroline: { id: "metroline", label: "Metro line", hint: "Tap metro stations in order, then Create line", color: "#9b7bff", icon: { glyph: "➿", color: "#9b7bff" } },
-  bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "ico-demolicao" } },
+  bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "kit/ico-lixeira" } },
 };
 
 const ZONE_TOOLS = ["res", "com", "ind"];
@@ -43,20 +43,20 @@ const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }
   { mode: "curve", label: "Curve", glyph: "⌒", hint: "Tap start, a bend point, then the end" },
 ];
 
-const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string }[] = [
+const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string; img?: string }[] = [
   { layer: 0, label: "Off", glyph: "○", color: "#ffffff" },
-  { layer: COVER.POWER, label: "Power", glyph: "⚡", color: "#f2c230" },
-  { layer: COVER.WATER, label: "Water", glyph: "💧", color: "#39b6e8" },
+  { layer: COVER.POWER, label: "Power", glyph: "⚡", color: "#f2c230", img: "kit/ico-energia" },
+  { layer: COVER.WATER, label: "Water", glyph: "💧", color: "#39b6e8", img: "kit/ico-agua" },
   { layer: COVER.SEWAGE, label: "Sewage", glyph: "≋", color: "#a07848" },
-  { layer: COVER.GARBAGE, label: "Garbage", glyph: "♻", color: "#9aa3ad" },
-  { layer: COVER.POLICE, label: "Police", glyph: "★", color: "#3d6ee8" },
-  { layer: COVER.FIRE, label: "Fire", glyph: "▲", color: "#ee5a4c" },
-  { layer: COVER.HEALTH, label: "Health", glyph: "✚", color: "#f2f6fb" },
-  { layer: COVER.EDU, label: "Education", glyph: "✎", color: "#f59a4a" },
-  { layer: COVER.PARK, label: "Parks", glyph: "❀", color: "#48b85a" },
-  { layer: COVER.TRANSIT, label: "Transit", glyph: "◴", color: "#9b7bff" },
-  { layer: LAND_VALUE_LAYER, label: "Land value", glyph: "▦", color: "#7fd35c" },
-  { layer: TRAFFIC_LAYER, label: "Traffic", glyph: "⇆", color: "#e5584f" },
+  { layer: COVER.GARBAGE, label: "Garbage", glyph: "♻", color: "#9aa3ad", img: "kit/ico-reciclar" },
+  { layer: COVER.POLICE, label: "Police", glyph: "★", color: "#3d6ee8", img: "kit/ico-escudo" },
+  { layer: COVER.FIRE, label: "Fire", glyph: "▲", color: "#ee5a4c", img: "kit/ico-extintor" },
+  { layer: COVER.HEALTH, label: "Health", glyph: "✚", color: "#f2f6fb", img: "kit/ico-maleta" },
+  { layer: COVER.EDU, label: "Education", glyph: "✎", color: "#f59a4a", img: "kit/ico-formatura" },
+  { layer: COVER.PARK, label: "Parks", glyph: "❀", color: "#48b85a", img: "kit/ico-arvore" },
+  { layer: COVER.TRANSIT, label: "Transit", glyph: "◴", color: "#9b7bff", img: "kit/ico-onibus" },
+  { layer: LAND_VALUE_LAYER, label: "Land value", glyph: "▦", color: "#7fd35c", img: "kit/ico-grafico" },
+  { layer: TRAFFIC_LAYER, label: "Traffic", glyph: "⇆", color: "#e5584f", img: "kit/ico-estrada" },
 ];
 
 export const toolColor = (t: ToolId) => (T[t] ? T[t].color : "#ffffff");
@@ -107,10 +107,10 @@ const CIVIC_ROWS: { key: CivicKey; label: string; color: string }[] = [
 ];
 
 const INDICATORS = [
-  { key: "pop", label: "Popularity", icon: "hud-popularidade", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
-  { key: "bud", label: "Budget", icon: "hud-orcamento", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
-  { key: "env", label: "Environment", icon: "hud-ambiente", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
-  { key: "trf", label: "Traffic", icon: "hud-trafego", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "pop", label: "Popularity", icon: "kit/ico-pessoas", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "bud", label: "Budget", icon: "kit/ico-dinheiro", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "env", label: "Environment", icon: "kit/ico-ambiente", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
+  { key: "trf", label: "Traffic", icon: "kit/ico-estrada", colors: ["#e5584f", "#f0b43a", "#5fd08a"] },
 ] as const;
 
 export class Hud {
@@ -187,7 +187,7 @@ export class Hud {
       speed.appendChild(b);
       this.speedBtns.push(b);
     });
-    const menu = el("button", "speed-btn menu-btn", `<img class="ic-img sm" src="/ui/ico-config.png" alt="">`);
+    const menu = el("button", "speed-btn menu-btn", `<img class="ic-img sm" src="/ui/kit/ico-engrenagem.png" alt="">`);
     menu.title = tr("Menu: save, load, new city");
     menu.addEventListener("click", () => this.hooks.onMenu());
     speed.appendChild(menu);
@@ -294,21 +294,21 @@ export class Hud {
 
     const flyZones = el("div", "panel fly");
     for (const id of ZONE_TOOLS) flyZones.appendChild(this.toolButton(T[id]));
-    bar.appendChild(this.group("zones", "Zones", { img: "ico-zonas" }, flyZones));
+    bar.appendChild(this.group("zones", "Zones", { img: "kit/ico-zonas" }, flyZones));
 
     const flyServices = el("div", "panel fly wrap");
     for (const id of SERVICE_TOOLS) flyServices.appendChild(this.toolButton(T[id]));
-    bar.appendChild(this.group("services", "Services", { img: "ico-servicos" }, flyServices));
+    bar.appendChild(this.group("services", "Services", { img: "kit/ico-governo" }, flyServices));
 
     const flyTransit = el("div", "panel fly");
     for (const id of TRANSIT_TOOLS) flyTransit.appendChild(this.toolButton(T[id]));
-    bar.appendChild(this.group("transit", "Transit", { img: "ico-transporte" }, flyTransit));
+    bar.appendChild(this.group("transit", "Transit", { img: "kit/ico-onibus" }, flyTransit));
 
     bar.appendChild(this.toolButton(T.bulldoze, true));
 
     const flyView = el("div", "panel fly wrap");
     for (const l of LAYERS) {
-      const b = el("button", "tool", `<span class="ic" style="color:${l.color}">${l.glyph}</span><span>${tr(l.label)}</span>`);
+      const b = el("button", "tool", `${iconHtml(l.img ? { img: l.img } : { glyph: l.glyph, color: l.color })}<span>${tr(l.label)}</span>`);
       b.addEventListener("click", () => {
         this.hooks.onOverlay(l.layer);
         this.layerBtns.forEach((x) => x.classList.toggle("active", x === b));
@@ -319,10 +319,10 @@ export class Hud {
       flyView.appendChild(b);
     }
     this.layerBtns[0].classList.add("active");
-    this.viewBtn = this.group("view", "Infoview", { img: "ico-mapas" }, flyView);
+    this.viewBtn = this.group("view", "Infoview", { img: "kit/ico-busca" }, flyView);
     bar.appendChild(this.viewBtn);
 
-    const eco = el("button", "tool", `<img class="ic-img" src="/ui/ico-economia.png" alt=""><span>${tr("Economy")}</span>`);
+    const eco = el("button", "tool", `<img class="ic-img" src="/ui/kit/ico-dinheiro.png" alt=""><span>${tr("Economy")}</span>`);
     eco.addEventListener("click", () => this.budget.classList.toggle("open"));
     bar.appendChild(eco);
     this.root.appendChild(bar);

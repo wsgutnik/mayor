@@ -2,7 +2,7 @@ import { makeRng } from "./rng";
 import { isRaining } from "./weather";
 import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
-  ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, generateWorld, idx, inBounds,
+  ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, generateWorld, idx, inBounds,
   isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
 } from "./world";
@@ -109,9 +109,9 @@ const emptyUtilities = (): Record<UtilityKey, UtilityStat> => ({
   garbage: { supply: 0, demand: 0 },
 });
 
-export function newCity(seed = 1337, size = 96): CityState {
+export function newCity(seed = 1337, size = 96, biome: Biome = "plains"): CityState {
   return {
-    world: generateWorld(size, seed),
+    world: generateWorld(size, seed, biome),
     day: 0,
     money: 50000,
     taxRate: 0.1,

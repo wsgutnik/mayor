@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CityState } from "../sim/sim";
 import {
   ZONE, FAC, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, FacilityKind, idx, tileHeight, isLand, World,
-  RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt,
+  RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt, Biome,
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
@@ -55,6 +55,16 @@ export const OVERLAY_COLOR: Record<number, string> = {
   [COVER.TRANSIT]: "#9b7bff",
 };
 
+/** Ground colours and tree density per terrain preset. */
+const BIOME_LOOK: Record<Biome, { sand: string; grass: string; rock: string; rockAt: number; snowAt: number; trees: number; leaf: string[] }> = {
+  plains: { sand: "#d6c690", grass: "#6f9b4e", rock: "#8b8678", rockAt: 2.4, snowAt: 99, trees: 0.035, leaf: ["#3f7a3a", "#4f8a43", "#5a9a4a"] },
+  forest: { sand: "#cdbf8a", grass: "#527f3e", rock: "#7d7a6c", rockAt: 2.8, snowAt: 99, trees: 0.4, leaf: ["#2f6a34", "#3a7a3c", "#285c2c", "#4a8a3a"] },
+  river: { sand: "#d6c690", grass: "#74a352", rock: "#8b8678", rockAt: 2.6, snowAt: 99, trees: 0.07, leaf: ["#3f7a3a", "#4f8a43"] },
+  coast: { sand: "#e2d3a0", grass: "#79a856", rock: "#8b8678", rockAt: 2.6, snowAt: 99, trees: 0.05, leaf: ["#3f7a3a", "#5a9a4a"] },
+  mountain: { sand: "#bdb59a", grass: "#628554", rock: "#85817a", rockAt: 3.2, snowAt: 7.2, trees: 0.12, leaf: ["#2f6a34", "#285c2c"] },
+  desert: { sand: "#dcc084", grass: "#d2b57a", rock: "#a9946a", rockAt: 3.0, snowAt: 99, trees: 0.012, leaf: ["#6f8f4a", "#7d9a52"] },
+};
+
 /** Minimum time between full scene rebuilds. */
 const REBUILD_GAP_MS = 80;
 
@@ -84,6 +94,7 @@ export class CityRenderer {
   private roadMesh!: THREE.Mesh;
   private metroMesh!: THREE.Mesh;
   private stopMesh!: THREE.InstancedMesh;
+  private trees!: THREE.InstancedMesh;
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
@@ -156,6 +167,10 @@ export class CityRenderer {
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.buildingMat = new THREE.MeshLambertMaterial({ color: "#ffffff", emissive: new THREE.Color("#ffd9a0"), emissiveIntensity: 0 });
     this.buildings = mk(this.buildingMat);
+    this.trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.17, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: "#ffffff" }), cap);
+    this.trees.count = 0;
+    this.trees.frustumCulled = false;
+    this.scene.add(this.trees);
     this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
@@ -202,13 +217,15 @@ export class CityRenderer {
     const pos = this.terrainGeo.attributes.position as THREE.BufferAttribute;
     const col = this.terrainGeo.attributes.color as THREE.BufferAttribute;
     const c = new THREE.Color();
+    const look = BIOME_LOOK[this.world.biome];
     for (let i = 0; i < s * s; i++) {
       const h = this.world.heights[i];
       pos.setY(i, h);
       const j = (hash(i % s, (i / s) | 0) - 0.5) * 0.04;
-      if (h < 0.3) c.set("#d6c690");
-      else if (h < 2.4) c.set("#6f9b4e").offsetHSL(0, 0, j - h * 0.015);
-      else c.set("#8b8678").offsetHSL(0, 0, j);
+      if (h < 0.3) c.set(look.sand);
+      else if (h < look.rockAt) c.set(look.grass).offsetHSL(0, 0, j - h * 0.015);
+      else if (h < look.snowAt) c.set(look.rock).offsetHSL(0, 0, j);
+      else c.set("#eef2f6");
       col.setXYZ(i, c.r, c.g, c.b);
     }
     pos.needsUpdate = true;
@@ -221,7 +238,9 @@ export class CityRenderer {
     const w = this.world;
     this.updateTerrain();
     this.rebuildRoads();
-    let nz = 0, nb = 0, nf = 0;
+    let nz = 0, nb = 0, nf = 0, nt = 0;
+    const look = BIOME_LOOK[w.biome];
+    const leaf = look.leaf.map((c) => new THREE.Color(c));
     const d = this.dummy;
     const color = new THREE.Color();
     for (let y = 0; y < w.size; y++) {
@@ -237,6 +256,18 @@ export class CityRenderer {
           this.facilities.setColorAt(nf++, fc);
         } else if (w.road[i]) {
           // Drawn as ribbons (see buildRoadGeometry).
+        } else if (!w.zone[i]) {
+          // Open ground: scatter trees by terrain preset, never on water or the entry strip.
+          const r = hash(x * 7 + 3, y * 13 + 5);
+          if (r < look.trees && isLand(w, x, y) && h > 0.2 && h < look.rockAt + 1.5 && !(x < 7 && Math.abs(y - w.entry.y) < 3)) {
+            const j1 = hash(x + 101, y + 211), j2 = hash(x + 307, y + 53);
+            const sc = 0.8 + j1 * 0.9;
+            d.position.set(x + 0.2 + j1 * 0.6, h, y + 0.2 + j2 * 0.6);
+            d.scale.set(sc, sc * (0.9 + j2 * 0.5), sc);
+            d.updateMatrix();
+            this.trees.setMatrixAt(nt, d.matrix);
+            this.trees.setColorAt(nt++, leaf[Math.floor(j2 * leaf.length) % leaf.length]);
+          }
         } else if (w.zone[i]) {
           const z = w.zone[i] as 1 | 2 | 3;
           d.position.set(x + 0.5, h + 0.04 - 0.5, y + 0.5);
@@ -258,6 +289,9 @@ export class CityRenderer {
         }
       }
     }
+    this.trees.count = nt;
+    this.trees.instanceMatrix.needsUpdate = true;
+    if (this.trees.instanceColor) this.trees.instanceColor.needsUpdate = true;
     for (const [m, n] of [[this.zones, nz], [this.buildings, nb], [this.facilities, nf]] as const) {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;

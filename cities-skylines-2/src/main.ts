@@ -98,7 +98,7 @@ const menu = new Menu(app, {
     const r = loadFrom(slot);
     if (r.ok) { useCity(r.state); hud.showToast(tr("City loaded")); } else hud.showToast(trReason(r.reason));
   },
-  onNew: (seed) => { useCity(newCity(seed)); hud.showToast(tr("New city, seed {n}", { n: seed })); },
+  onNew: (seed, biome) => { useCity(newCity(seed, 96, biome)); hud.showToast(tr("New city, seed {n}", { n: seed })); },
   getPrefs: () => prefs,
   onPrefs: (p) => {
     const langChanged = p.lang !== prefs.lang;

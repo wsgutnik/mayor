@@ -80,7 +80,11 @@ export interface RoadSegment {
   fixed?: boolean;
 }
 
+export type Biome = "plains" | "forest" | "river" | "coast" | "mountain" | "desert";
+export const BIOMES: Biome[] = ["plains", "forest", "river", "coast", "mountain", "desert"];
+
 export interface World {
+  biome: Biome;
   size: number;
   /** (size+1)^2 corner heights; water level is 0. */
   heights: Float32Array;
@@ -150,20 +154,44 @@ export function isLand(w: World, x: number, y: number): boolean {
   );
 }
 
-export function generateWorld(size: number, seed: number): World {
+/** Height range and shaping per terrain preset. `scale` multiplies the noise, `bias` sets the sea level. */
+const BIOME_SHAPE: Record<Biome, { scale: number; bias: number }> = {
+  plains: { scale: 7, bias: 0.4 },
+  forest: { scale: 7, bias: 0.4 },
+  river: { scale: 6, bias: 0.4 },
+  coast: { scale: 7, bias: 0.4 },
+  mountain: { scale: 14, bias: 0.44 },
+  desert: { scale: 5, bias: 0.34 },
+};
+
+export function generateWorld(size: number, seed: number, biome: Biome = "plains"): World {
   const rng = makeRng(seed);
   const n1 = valueNoise(size + 1, 32, rng);
   const n2 = valueNoise(size + 1, 16, rng);
   const n3 = valueNoise(size + 1, 8, rng);
   const s = size + 1;
   const heights = new Float32Array(s * s);
+  const { scale, bias } = BIOME_SHAPE[biome];
+  const phase = (seed % 97) / 15;
+  const smooth = (t: number) => { const c = Math.max(0, Math.min(1, t)); return c * c * (3 - 2 * c); };
   for (let y = 0; y < s; y++) {
     for (let x = 0; x < s; x++) {
       const n = n1(x, y) * 0.6 + n2(x, y) * 0.28 + n3(x, y) * 0.12;
-      heights[y * s + x] = (n - 0.4) * 7;
+      let h = (n - bias) * scale;
+      if (biome === "river") {
+        // a meandering river across the north side, clear of the entry strip
+        const path = size * 0.27 + Math.sin(x * 0.085 + phase) * size * 0.08 + Math.sin(x * 0.21 + phase * 2) * 1.6;
+        const d = Math.abs(y - path);
+        h = Math.min(h, (d - 3.4) * 0.9 - 0.1);
+      } else if (biome === "coast") {
+        // open sea along the far (east) edge
+        h -= smooth((x - size * 0.6) / (size * 0.22)) * 8;
+      }
+      heights[y * s + x] = h;
     }
   }
   const world: World = {
+    biome,
     size,
     heights,
     road: new Uint8Array(size * size),
