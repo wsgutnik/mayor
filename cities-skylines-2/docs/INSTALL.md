@@ -33,3 +33,7 @@ npm run desktop:build
 ```
 
 Pré-requisitos: Node 22, Rust (stable) e o WebView2 (já vem no Windows 11). Gera `.msi` e `.exe` em `src-tauri/target/release/bundle/`.
+
+## Mac (dmg pronto)
+
+O instalador mais recente fica nas Releases do repositório privado: https://github.com/wsgutnik/mayor/releases (arquivo `Mayor-*-aarch64.dmg`, Apple Silicon). Abra o dmg, arraste Mayor para Aplicativos e, na primeira abertura, use clique direito > Abrir (o app não é assinado). Gerado localmente com `npm run package`.
