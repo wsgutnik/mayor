@@ -210,3 +210,84 @@ describe("utilities", () => {
     expect(s.lastMonth.expenses).toBeCloseTo(60);
   });
 });
+
+describe("civic services", () => {
+  /** Level-3 buildings along a strip, with all utilities, so only civic cover varies. */
+  function builtStrip(seed = 11) {
+    const s = newCity(seed);
+    buildStrip(s, 8);
+    s.world.level.fill(0);
+    for (let i = 0; i < s.world.zone.length; i++) if (s.world.zone[i]) s.world.level[i] = 3;
+    return s;
+  }
+
+  it("places civic buildings anywhere on land, one per tile", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    for (const t of ["police", "fire", "clinic", "school", "park"] as const) {
+      expect(applyTool(s, t, 4 + ["police", "fire", "clinic", "school", "park"].indexOf(t), ey + 3).ok).toBe(true);
+    }
+    expect(applyTool(s, "park", 4, ey + 3).ok).toBe(false);
+  });
+
+  it("burns down uncovered buildings over time, and a fire station prevents it", () => {
+    const bare = builtStrip();
+    for (let d = 0; d < 4000; d++) { step(bare); }
+    expect(bare.fires).toBeGreaterThan(0);
+
+    const guarded = builtStrip();
+    const ey = guarded.world.entry.y;
+    expect(applyTool(guarded, "fire", 10, ey + 3).ok).toBe(true);
+    for (let d = 0; d < 4000; d++) { step(guarded); }
+    expect(guarded.fires).toBe(0);
+  });
+
+  it("missing police and health lower happiness; parks raise it", () => {
+    const s = builtStrip();
+    step(s);
+    const base = s.happiness;
+    const ey = s.world.entry.y;
+    expect(applyTool(s, "police", 10, ey + 3).ok).toBe(true);
+    expect(applyTool(s, "clinic", 11, ey + 3).ok).toBe(true);
+    step(s);
+    expect(s.happiness).toBeGreaterThan(base);
+    expect(s.coverage.police).toBeGreaterThan(0.9);
+    expect(s.coverage.health).toBeGreaterThan(0.9);
+  });
+
+  it("parks and services raise land value; industry lowers it", () => {
+    const s = builtStrip();
+    step(s);
+    const ey = s.world.entry.y;
+    const probe = idx(s.world, 5, ey - 1);
+    const before = s.world.landValue[probe];
+    expect(applyTool(s, "park", 10, ey + 3).ok).toBe(true);
+    s.day = 5; // land value refreshes every 5 days
+    step(s);
+    expect(s.world.landValue[probe]).toBeGreaterThan(before);
+
+    const t = newCity(11);
+    buildStrip(t, 8);
+    applyTool(t, "ind", 5, ey - 3);
+    t.world.level[idx(t.world, 5, ey - 3)] = 1;
+    step(t);
+    const clean = newCity(11);
+    buildStrip(clean, 8);
+    step(clean);
+    expect(t.world.landValue[probe]).toBeLessThan(clean.world.landValue[probe]);
+  });
+
+  it("level 3 needs a school", () => {
+    const s = newCity(5);
+    buildStrip(s, 6);
+    const ey = s.world.entry.y;
+    for (let d = 0; d < 2500; d++) step(s);
+    const maxNoSchool = Math.max(...Array.from(s.world.level));
+    expect(maxNoSchool).toBeLessThan(3);
+    expect(applyTool(s, "school", 10, ey + 3).ok).toBe(true);
+    expect(applyTool(s, "fire", 11, ey + 3).ok).toBe(true);
+    s.taxRate = 0.03; // cheap taxes keep demand high enough to level up
+    for (let d = 0; d < 6000; d++) step(s);
+    expect(Math.max(...Array.from(s.world.level))).toBe(3);
+  });
+});

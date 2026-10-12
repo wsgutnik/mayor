@@ -3,19 +3,40 @@ import { makeRng } from "./rng";
 export const ZONE = { NONE: 0, RES: 1, COM: 2, IND: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
 
-/** Utility facility kinds stored per tile. */
-export const FAC = { NONE: 0, POWER: 1, WATER: 2, SEWAGE: 3, LANDFILL: 4 } as const;
+/** Facility kinds stored per tile: utilities (1-4) and civic services (5-9). */
+export const FAC = {
+  NONE: 0, POWER: 1, WATER: 2, SEWAGE: 3, LANDFILL: 4,
+  POLICE: 5, FIRE: 6, CLINIC: 7, SCHOOL: 8, PARK: 9,
+} as const;
 export type FacilityType = (typeof FAC)[keyof typeof FAC];
+export type FacilityKind = Exclude<FacilityType, 0>;
 
 /** Bits in World.cover. */
-export const COVER = { POWER: 1, WATER: 2, SEWAGE: 4, GARBAGE: 8 } as const;
+export const COVER = {
+  POWER: 1, WATER: 2, SEWAGE: 4, GARBAGE: 8,
+  POLICE: 16, FIRE: 32, HEALTH: 64, EDU: 128, PARK: 256,
+} as const;
 
-export const FACILITY_INFO = {
+/** Pseudo-layer for the land value infoview (not a coverage bit). */
+export const LAND_VALUE_LAYER = 1024;
+
+interface FacilityInfo {
+  name: string; cost: number; upkeep: number; radius: number;
+  /** Units supplied; 0 for civic services, which cover without a capacity limit. */
+  capacity: number; bit: number; nearWater: boolean;
+}
+
+export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.POWER]: { name: "Power plant", cost: 800, upkeep: 60, radius: 14, capacity: 120, bit: COVER.POWER, nearWater: false },
   [FAC.WATER]: { name: "Water pump", cost: 500, upkeep: 40, radius: 10, capacity: 90, bit: COVER.WATER, nearWater: true },
   [FAC.SEWAGE]: { name: "Sewage outlet", cost: 400, upkeep: 40, radius: 10, capacity: 90, bit: COVER.SEWAGE, nearWater: true },
   [FAC.LANDFILL]: { name: "Landfill", cost: 300, upkeep: 30, radius: 12, capacity: 80, bit: COVER.GARBAGE, nearWater: false },
-} as const;
+  [FAC.POLICE]: { name: "Police station", cost: 600, upkeep: 50, radius: 12, capacity: 0, bit: COVER.POLICE, nearWater: false },
+  [FAC.FIRE]: { name: "Fire station", cost: 600, upkeep: 50, radius: 12, capacity: 0, bit: COVER.FIRE, nearWater: false },
+  [FAC.CLINIC]: { name: "Clinic", cost: 700, upkeep: 60, radius: 12, capacity: 0, bit: COVER.HEALTH, nearWater: false },
+  [FAC.SCHOOL]: { name: "School", cost: 900, upkeep: 70, radius: 14, capacity: 0, bit: COVER.EDU, nearWater: false },
+  [FAC.PARK]: { name: "Park", cost: 150, upkeep: 10, radius: 8, capacity: 0, bit: COVER.PARK, nearWater: false },
+};
 
 export interface World {
   size: number;
@@ -28,7 +49,11 @@ export interface World {
   /** Facility type per tile (FAC.*). */
   facility: Uint8Array;
   /** Bitmask of COVER.* services reaching each tile. */
-  cover: Uint8Array;
+  cover: Uint16Array;
+  /** 0..100 per tile, derived from services, parks and nearby industry. */
+  landValue: Uint8Array;
+  /** Bumped when any land value changes (overlay refresh). */
+  lvRevision: number;
   coverageDirty: boolean;
   /** 1 where a road tile is connected to the map entry. */
   connected: Uint8Array;
@@ -97,7 +122,9 @@ export function generateWorld(size: number, seed: number): World {
     zone: new Uint8Array(size * size),
     level: new Uint8Array(size * size),
     facility: new Uint8Array(size * size),
-    cover: new Uint8Array(size * size),
+    cover: new Uint16Array(size * size),
+    landValue: new Uint8Array(size * size),
+    lvRevision: 1,
     coverageDirty: true,
     connected: new Uint8Array(size * size),
     entry: { x: 0, y: Math.floor(size / 2) },
@@ -174,7 +201,7 @@ export function updateCoverage(w: World): void {
     for (let x = 0; x < w.size; x++) {
       const f = w.facility[idx(w, x, y)] as FacilityType;
       if (!f) continue;
-      const info = FACILITY_INFO[f as 1 | 2 | 3 | 4];
+      const info = FACILITY_INFO[f as FacilityKind];
       const r = info.radius;
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
@@ -185,4 +212,41 @@ export function updateCoverage(w: World): void {
       }
     }
   }
+}
+
+/**
+ * Land value per tile. Services and parks raise it, nearby industry lowers it.
+ * Returns true when any value changed.
+ */
+export function updateLandValue(w: World): boolean {
+  const BONUS: [number, number][] = [
+    [COVER.PARK, 18], [COVER.HEALTH, 8], [COVER.EDU, 8], [COVER.POLICE, 6], [COVER.FIRE, 6],
+    [COVER.SEWAGE, 5], [COVER.GARBAGE, 4], [COVER.POWER, 4], [COVER.WATER, 4],
+  ];
+  let changed = false;
+  for (let y = 0; y < w.size; y++) {
+    for (let x = 0; x < w.size; x++) {
+      const i = idx(w, x, y);
+      let v = 25;
+      const c = w.cover[i];
+      for (const [bit, add] of BONUS) if (c & bit) v += add;
+      if (isServed(w, x, y)) v += 6;
+      if (w.zone[i] !== ZONE.IND) {
+        let ind = 0;
+        for (let dy = -3; dy <= 3; dy++) {
+          for (let dx = -3; dx <= 3; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (!inBounds(w, nx, ny)) continue;
+            const j = idx(w, nx, ny);
+            if (w.zone[j] === ZONE.IND && w.level[j] > 0) ind++;
+          }
+        }
+        v -= Math.min(30, ind * 5);
+      }
+      v = Math.max(0, Math.min(100, v));
+      if (w.landValue[i] !== v) { w.landValue[i] = v; changed = true; }
+    }
+  }
+  if (changed) w.lvRevision++;
+  return changed;
 }

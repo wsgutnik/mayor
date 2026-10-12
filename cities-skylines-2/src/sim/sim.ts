@@ -1,14 +1,17 @@
 import { makeRng } from "./rng";
 import {
-  ZONE, FAC, COVER, FACILITY_INFO, FacilityType, World, generateWorld, idx, inBounds,
-  isLand, isServed, nearWater, updateConnectivity, updateCoverage, flattenTile,
+  ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, generateWorld, idx, inBounds,
+  isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile,
 } from "./world";
 
-export type FacilityTool = "power" | "water" | "sewage" | "landfill";
+export type FacilityTool =
+  | "power" | "water" | "sewage" | "landfill"
+  | "police" | "fire" | "clinic" | "school" | "park";
 export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | FacilityTool;
 
-const FACILITY_OF_TOOL: Record<FacilityTool, Exclude<FacilityType, 0>> = {
+const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   power: FAC.POWER, water: FAC.WATER, sewage: FAC.SEWAGE, landfill: FAC.LANDFILL,
+  police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK,
 };
 export const isFacilityTool = (t: ToolId): t is FacilityTool => t in FACILITY_OF_TOOL;
 
@@ -18,6 +21,11 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
   water: FACILITY_INFO[FAC.WATER].cost,
   sewage: FACILITY_INFO[FAC.SEWAGE].cost,
   landfill: FACILITY_INFO[FAC.LANDFILL].cost,
+  police: FACILITY_INFO[FAC.POLICE].cost,
+  fire: FACILITY_INFO[FAC.FIRE].cost,
+  clinic: FACILITY_INFO[FAC.CLINIC].cost,
+  school: FACILITY_INFO[FAC.SCHOOL].cost,
+  park: FACILITY_INFO[FAC.PARK].cost,
 };
 
 /** Residents, commercial jobs, industrial jobs per building level (index = level). */
@@ -37,11 +45,21 @@ export const USAGE = {
 export const DAYS_PER_MONTH = 30;
 export const MONTHS_PER_YEAR = 12;
 const ROAD_UPKEEP_PER_MONTH = 3;
+/** Minimum zone demand for a building to level up. A balanced city settles near 0.2-0.3. */
+const UPGRADE_DEMAND = 0.2;
+/** Daily chance that a building outside fire-station cover burns down. */
+const FIRE_CHANCE = 0.0002;
 
 export interface Demand { r: number; c: number; i: number }
 export interface MonthReport { income: number; expenses: number }
 export interface UtilityStat { supply: number; demand: number }
 export type UtilityKey = "power" | "water" | "sewage" | "garbage";
+export type CivicKey = "police" | "fire" | "health" | "edu" | "park";
+
+const CIVIC_BIT: Record<CivicKey, number> = {
+  police: COVER.POLICE, fire: COVER.FIRE, health: COVER.HEALTH, edu: COVER.EDU, park: COVER.PARK,
+};
+export const CIVIC_KEYS = Object.keys(CIVIC_BIT) as CivicKey[];
 
 export interface CityState {
   world: World;
@@ -54,8 +72,14 @@ export interface CityState {
   unemployed: number;
   demand: Demand;
   utilities: Record<UtilityKey, UtilityStat>;
-  /** 0..100; falls with missing sewage/garbage cover and utility shortages. */
+  /** 0..100; falls with missing services and shortages, rises with parks. */
   happiness: number;
+  /** Fraction (0..1) of buildings reached by each civic service. */
+  coverage: Record<CivicKey, number>;
+  /** Average land value (0..100) over built tiles. */
+  landValue: number;
+  /** Buildings lost to fire since the game began. */
+  fires: number;
   lastMonth: MonthReport;
   monthIncome: number;
   monthExpenses: number;
@@ -82,6 +106,9 @@ export function newCity(seed = 1337, size = 96): CityState {
     demand: { r: 0.5, c: 0.2, i: 0.2 },
     utilities: emptyUtilities(),
     happiness: 100,
+    coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0 },
+    landValue: 0,
+    fires: 0,
     lastMonth: { income: 0, expenses: 0 },
     monthIncome: 0,
     monthExpenses: 0,
@@ -112,7 +139,7 @@ function facilityUpkeep(w: World): number {
   let total = 0;
   for (let i = 0; i < w.facility.length; i++) {
     const f = w.facility[i];
-    if (f) total += FACILITY_INFO[f as 1 | 2 | 3 | 4].upkeep;
+    if (f) total += FACILITY_INFO[f as FacilityKind].upkeep;
   }
   return total;
 }
@@ -198,11 +225,13 @@ function recount(s: CityState): void {
   let res = 0, com = 0, ind = 0;
   const util = emptyUtilities();
   let built = 0, noSewage = 0, noGarbage = 0;
+  const civicCovered: Record<CivicKey, number> = { police: 0, fire: 0, health: 0, edu: 0, park: 0 };
+  let lvSum = 0;
 
   for (let i = 0; i < w.facility.length; i++) {
     const f = w.facility[i];
-    if (!f) continue;
-    const info = FACILITY_INFO[f as 1 | 2 | 3 | 4];
+    if (!f || f > FAC.LANDFILL) continue;
+    const info = FACILITY_INFO[f as FacilityKind];
     const key: UtilityKey = f === FAC.POWER ? "power" : f === FAC.WATER ? "water" : f === FAC.SEWAGE ? "sewage" : "garbage";
     util[key].supply += info.capacity;
   }
@@ -222,7 +251,11 @@ function recount(s: CityState): void {
     if (c & COVER.WATER) util.water.demand += u;
     if (c & COVER.SEWAGE) util.sewage.demand += u; else noSewage++;
     if (c & COVER.GARBAGE) util.garbage.demand += u; else noGarbage++;
+    for (const k of CIVIC_KEYS) if (c & CIVIC_BIT[k]) civicCovered[k]++;
+    lvSum += w.landValue[i];
   }
+  for (const k of CIVIC_KEYS) s.coverage[k] = built ? civicCovered[k] / built : 0;
+  s.landValue = built ? lvSum / built : 0;
   s.capacity = { res, com, ind };
   s.utilities = util;
 
@@ -231,9 +264,13 @@ function recount(s: CityState): void {
     util[k].demand > 0 ? Math.max(0, 1 - util[k].supply / util[k].demand) : 0;
   const missingSewage = built ? noSewage / built : 0;
   const missingGarbage = built ? noGarbage / built : 0;
+  const hasBuildings = built > 0;
+  const civicPenalty = hasBuildings
+    ? (1 - s.coverage.police) * 10 + (1 - s.coverage.health) * 10
+    : 0;
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
-      - missingSewage * 20 - missingGarbage * 15,
+      - missingSewage * 20 - missingGarbage * 15 - civicPenalty + s.coverage.park * 10,
     0, 100,
   );
 
@@ -261,6 +298,7 @@ export function step(s: CityState): void {
   const w = s.world;
   if (w.connectivityDirty) updateConnectivity(w);
   if (w.coverageDirty) updateCoverage(w);
+  if (s.day % 5 === 0) updateLandValue(w);
   const rng = makeRng(s.rngState ^ (s.day * 2654435761));
   const demandOf = [0, s.demand.r, s.demand.c, s.demand.i];
   let changed = false;
@@ -279,10 +317,14 @@ export function step(s: CityState): void {
         if (served && d > 0 && rng() < 0.05 * d) { w.level[i] = 1; changed = true; }
       } else if (!served) {
         if (rng() < 0.05) { w.level[i] = 0; changed = true; }
+      } else if (!(c & COVER.FIRE) && rng() < FIRE_CHANCE) {
+        w.level[i] = 0; s.fires++; changed = true;
       } else {
-        // Level 2 needs sewage, level 3 needs garbage collection.
-        const canUp = lvl === 1 ? (c & COVER.SEWAGE) !== 0 : (c & COVER.GARBAGE) !== 0;
-        if (d > 0.35 && lvl < 3 && canUp && rng() < 0.004) { w.level[i] = lvl + 1; changed = true; }
+        // Level 2 needs sewage; level 3 needs garbage collection and schools.
+        const canUp = lvl === 1
+          ? (c & COVER.SEWAGE) !== 0
+          : (c & COVER.GARBAGE) !== 0 && (c & COVER.EDU) !== 0;
+        if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) { w.level[i] = lvl + 1; changed = true; }
         else if (d < -0.3 && rng() < 0.01) { w.level[i] = lvl - 1; changed = true; }
       }
     }
@@ -292,7 +334,7 @@ export function step(s: CityState): void {
   recount(s);
 
   const jobs = s.capacity.com + s.capacity.ind;
-  const monthlyIncome = (s.population * 3 + Math.min(jobs, s.population * 0.65 + jobs * 0.2) * 4) * (s.taxRate / 0.1);
+  const monthlyIncome = (s.population * 3 + Math.min(jobs, s.population * 0.65 + jobs * 0.2) * 4) * (s.taxRate / 0.1) * (0.6 + 0.8 * (s.landValue / 100));
   const monthlyUpkeep = Math.max(0, countRoads(w) - 3) * ROAD_UPKEEP_PER_MONTH + facilityUpkeep(w);
   const inc = monthlyIncome / DAYS_PER_MONTH;
   const exp = monthlyUpkeep / DAYS_PER_MONTH;

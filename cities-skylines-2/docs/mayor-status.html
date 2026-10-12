@@ -162,26 +162,35 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M2 concluído. M3 em seguida.",
-    summary: "Além do núcleo (terreno, estradas, zonas, economia), a cidade agora precisa de energia, água, esgoto e coleta de lixo. Cada instalação cobre um raio, e o infoview mostra onde falta serviço.",
-    screenshot: { src: "img/m2-infoview.jpg", caption: "M2: usina, bomba d'água, esgoto e aterro colocados; o infoview de energia tinge a área coberta (raio 14) e o painel Services mostra uso e capacidade." },
+    headline: "M3 concluído. M4 em seguida.",
+    summary: "A cidade agora tem polícia, bombeiros, clínica, escola e parques. Sem bombeiros os prédios podem pegar fogo, escolas liberam o nível 3 e o valor do solo, visível num mapa de calor, define quanto a cidade arrecada.",
+    screenshot: { src: "img/m3-land-value.jpg", caption: "M3: infoview de valor do solo (laranja baixo, verde alto) com parques, escola, clínica, polícia e bombeiros; o painel Services mostra a cobertura de cada serviço." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
-      { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "active" },
-      { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "todo" },
+      { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "done" },
+      { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "active" },
       { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "todo" },
       { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "todo" },
       { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "todo" },
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "todo" }
     ],
     checks: [
-      { ok: true, text: "21 testes da simulação e da pintura de linha passando" },
+      { ok: true, text: "26 testes da simulação e da pintura de linha passando" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
-      { ok: true, text: "Jogado no navegador: estrada, zonas, quatro instalações, infoview de energia e painel de serviços" },
+      { ok: true, text: "Jogado no navegador: instalações cívicas, painel de cobertura e infoview de valor do solo" },
       { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8)" }
     ],
     log: [
+      { date: "2026-10-12", title: "M3 · Serviços cívicos", items: [
+        "Cinco instalações: polícia, bombeiros, clínica (raio 12), escola (raio 14) e parque (raio 8)",
+        "Incêndio: prédio fora de cobertura de bombeiros pode queimar (0,02% ao dia) e a cidade avisa",
+        "Escola é pré-requisito do nível 3, junto com a coleta de lixo",
+        "Felicidade passa a contar polícia, saúde e parques",
+        "Valor do solo por tile: serviços e parques somam, indústria vizinha subtrai; escala a arrecadação de impostos",
+        "Novos infoviews (polícia, fogo, saúde, educação, parques, valor do solo) e submenu Civic",
+        "Ajuste: limite de demanda para subir de nível caiu de 0,35 para 0,20; uma cidade equilibrada nunca chegava lá"
+      ] },
       { date: "2026-10-12", title: "M2 · Serviços básicos", items: [
         "Quatro instalações: usina (raio 14), bomba d'água e saída de esgoto (raio 10, a até 3 tiles da água) e aterro (raio 12)",
         "Prédios novos exigem energia e água; nível 2 exige esgoto e nível 3 exige coleta de lixo",

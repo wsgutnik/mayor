@@ -24,4 +24,6 @@ npm run build   # tipos + bundle em dist/
 - M1: terreno, estradas, zonas R/C/I, bulldoze, crescimento por demanda, impostos e orçamento.
 - M2: usina, bomba d'água, esgoto e aterro com cobertura por raio, infoviews e painel de serviços.
   Prédios novos precisam de energia e água; nível 2 pede esgoto, nível 3 pede coleta de lixo.
-- Próximo: M3 (polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo).
+- M3: polícia, bombeiros, clínica, escola e parque; incêndios, felicidade e mapa de valor do solo.
+  Sem estação de bombeiros um prédio pode pegar fogo; nível 3 exige escola; valor do solo escala a arrecadação.
+- Próximo: M4 (estradas livres: curvas, tipos de via, interseções).

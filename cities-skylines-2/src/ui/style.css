@@ -103,3 +103,9 @@ body {
 @media (max-width: 640px) {
   .services { top: calc(190px + var(--safe-top)); width: 170px; }
 }
+
+/* M3 */
+.svc-head.lv { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--panel-border); }
+.fly.wrap { flex-wrap: wrap; justify-content: center; max-width: min(620px, calc(100% - 16px)); }
+.services { width: 200px; }
+@media (max-width: 640px) { .services { top: calc(190px + var(--safe-top)); width: 180px; } }

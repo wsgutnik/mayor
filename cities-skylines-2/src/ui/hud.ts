@@ -1,5 +1,5 @@
-import { CityState, COST, ToolId, UtilityKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
-import { COVER } from "../sim/world";
+import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
+import { COVER, LAND_VALUE_LAYER } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -16,10 +16,16 @@ const T: Record<string, ToolDef> = {
   water: { id: "water", label: "Water pump", icon: "💧", hint: "Place a water pump near water (radius 10)", color: "#39b6e8" },
   sewage: { id: "sewage", label: "Sewage", icon: "≋", hint: "Place a sewage outlet near water (radius 10)", color: "#a07848" },
   landfill: { id: "landfill", label: "Landfill", icon: "♻", hint: "Place a landfill (radius 12)", color: "#9aa3ad" },
+  police: { id: "police", label: "Police", icon: "★", hint: "Police station: crime cover (radius 12)", color: "#3d6ee8" },
+  fire: { id: "fire", label: "Fire", icon: "▲", hint: "Fire station: stops fires (radius 12)", color: "#ee5a4c" },
+  clinic: { id: "clinic", label: "Clinic", icon: "✚", hint: "Clinic: health cover (radius 12)", color: "#f2f6fb" },
+  school: { id: "school", label: "School", icon: "✎", hint: "School: education, needed for level 3 (radius 14)", color: "#f59a4a" },
+  park: { id: "park", label: "Park", icon: "❀", hint: "Park: land value and happiness (radius 8)", color: "#48b85a" },
   bulldoze: { id: "bulldoze", label: "Bulldoze", icon: "✕", hint: "Remove roads, zones and facilities", color: "#e5584f" },
 };
 
 const UTILITY_TOOLS = ["power", "water", "sewage", "landfill"];
+const CIVIC_TOOLS = ["police", "fire", "clinic", "school", "park"];
 
 const LAYERS: { layer: OverlayLayer; label: string; icon: string; color: string }[] = [
   { layer: 0, label: "Off", icon: "○", color: "#ffffff" },
@@ -27,6 +33,12 @@ const LAYERS: { layer: OverlayLayer; label: string; icon: string; color: string 
   { layer: COVER.WATER, label: "Water", icon: "💧", color: "#39b6e8" },
   { layer: COVER.SEWAGE, label: "Sewage", icon: "≋", color: "#a07848" },
   { layer: COVER.GARBAGE, label: "Garbage", icon: "♻", color: "#9aa3ad" },
+  { layer: COVER.POLICE, label: "Police", icon: "★", color: "#3d6ee8" },
+  { layer: COVER.FIRE, label: "Fire", icon: "▲", color: "#ee5a4c" },
+  { layer: COVER.HEALTH, label: "Health", icon: "✚", color: "#f2f6fb" },
+  { layer: COVER.EDU, label: "Education", icon: "✎", color: "#f59a4a" },
+  { layer: COVER.PARK, label: "Parks", icon: "❀", color: "#48b85a" },
+  { layer: LAND_VALUE_LAYER, label: "Land value", icon: "▦", color: "#7fd35c" },
 ];
 
 export const toolColor = (t: ToolId) => (T[t] ? T[t].color : "#ffffff");
@@ -55,6 +67,14 @@ const SERVICE_ROWS: { key: UtilityKey; label: string; color: string }[] = [
   { key: "garbage", label: "Garbage", color: "#9aa3ad" },
 ];
 
+const CIVIC_ROWS: { key: CivicKey; label: string; color: string }[] = [
+  { key: "police", label: "Police", color: "#3d6ee8" },
+  { key: "fire", label: "Fire", color: "#ee5a4c" },
+  { key: "health", label: "Health", color: "#e8eef5" },
+  { key: "edu", label: "Education", color: "#f59a4a" },
+  { key: "park", label: "Parks", color: "#48b85a" },
+];
+
 export class Hud {
   private root: HTMLElement;
   private moneyEl!: HTMLElement;
@@ -72,6 +92,10 @@ export class Hud {
   private taxLabel!: HTMLElement;
   private hint!: HTMLElement;
   private flyUtil!: HTMLElement;
+  private flyCivic!: HTMLElement;
+  private civicBtn!: HTMLElement;
+  private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
+  private lvEl!: HTMLElement;
   private flyView!: HTMLElement;
   private viewBtn!: HTMLElement;
   private layerBtns: HTMLElement[] = [];
@@ -133,6 +157,14 @@ export class Hud {
       this.svc.set(r.key, { fill: row.querySelector("i")!, val: row.querySelector(".svc-v")! });
       p.appendChild(row);
     }
+    for (const r of CIVIC_ROWS) {
+      const row = el("div", "svc", `<span class="svc-l">${r.label}</span><div class="svc-bar"><i style="background:${r.color}"></i></div><span class="svc-v">0%</span>`);
+      this.civ.set(r.key, { fill: row.querySelector("i")!, val: row.querySelector(".svc-v")! });
+      p.appendChild(row);
+    }
+    const lv = el("div", "svc-head lv", `<span>Land value</span><b data-k="lv">0</b>`);
+    this.lvEl = lv.querySelector('[data-k="lv"]')!;
+    p.appendChild(lv);
     this.root.appendChild(p);
   }
 
@@ -157,6 +189,10 @@ export class Hud {
     this.groupBtn.addEventListener("click", () => this.toggleFly(this.flyUtil));
     bar.appendChild(this.groupBtn);
 
+    this.civicBtn = el("button", "tool", `<span class="ic" style="color:#3d6ee8">★</span><span>Civic</span><small>▴</small>`);
+    this.civicBtn.addEventListener("click", () => this.toggleFly(this.flyCivic));
+    bar.appendChild(this.civicBtn);
+
     bar.appendChild(this.toolButton(T.bulldoze));
 
     this.viewBtn = el("button", "tool", `<span class="ic">◉</span><span>Infoview</span><small>▴</small>`);
@@ -170,7 +206,9 @@ export class Hud {
 
     this.flyUtil = el("div", "panel fly");
     for (const id of UTILITY_TOOLS) this.flyUtil.appendChild(this.toolButton(T[id]));
-    this.flyView = el("div", "panel fly");
+    this.flyCivic = el("div", "panel fly");
+    for (const id of CIVIC_TOOLS) this.flyCivic.appendChild(this.toolButton(T[id]));
+    this.flyView = el("div", "panel fly wrap");
     for (const l of LAYERS) {
       const b = el("button", "tool", `<span class="ic" style="color:${l.color}">${l.icon}</span><span>${l.label}</span>`);
       b.addEventListener("click", () => {
@@ -184,6 +222,7 @@ export class Hud {
     }
     this.layerBtns[0].classList.add("active");
     this.root.appendChild(this.flyUtil);
+    this.root.appendChild(this.flyCivic);
     this.root.appendChild(this.flyView);
 
     this.hint = el("div", "hint", "");
@@ -198,6 +237,7 @@ export class Hud {
 
   private closeFlyouts(): void {
     this.flyUtil.classList.remove("open");
+    this.flyCivic.classList.remove("open");
     this.flyView.classList.remove("open");
   }
 
@@ -222,6 +262,7 @@ export class Hud {
   setTool(t: ToolId): void {
     this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === t));
     this.groupBtn.classList.toggle("active", UTILITY_TOOLS.includes(t));
+    this.civicBtn.classList.toggle("active", CIVIC_TOOLS.includes(t));
     this.hint.textContent = T[t].hint;
   }
 
@@ -264,6 +305,12 @@ export class Hud {
       ref.val.textContent = u.supply === 0 ? "none" : `${fmt(u.demand)}/${fmt(u.supply)}`;
       ref.val.classList.toggle("neg", over);
     }
+    for (const [key, ref] of this.civ) {
+      const v = s.coverage[key];
+      ref.fill.style.width = `${v * 100}%`;
+      ref.val.textContent = `${Math.round(v * 100)}%`;
+    }
+    this.lvEl.textContent = String(Math.round(s.landValue));
     const inc = this.budget.querySelector('[data-k="inc"]')!;
     const exp = this.budget.querySelector('[data-k="exp"]')!;
     inc.textContent = money(s.lastMonth.income);

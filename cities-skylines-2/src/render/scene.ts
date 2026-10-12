@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CityState } from "../sim/sim";
-import { ZONE, FAC, COVER, idx, tileHeight, isLand, World } from "../sim/world";
+import { ZONE, FAC, COVER, LAND_VALUE_LAYER, FacilityKind, idx, tileHeight, isLand, World } from "../sim/world";
 import { CameraRig } from "./camera";
 
 const BUILD_H = {
@@ -27,15 +27,26 @@ const FACILITY_LOOK = {
   [FAC.WATER]: [1.0, 0.7, new THREE.Color("#39b6e8")],
   [FAC.SEWAGE]: [0.6, 0.8, new THREE.Color("#8a6a4a")],
   [FAC.LANDFILL]: [0.45, 0.9, new THREE.Color("#7d848c")],
+  [FAC.POLICE]: [0.9, 0.8, new THREE.Color("#2f5fd0")],
+  [FAC.FIRE]: [0.9, 0.8, new THREE.Color("#e0453a")],
+  [FAC.CLINIC]: [0.8, 0.8, new THREE.Color("#e8eef5")],
+  [FAC.SCHOOL]: [0.8, 0.9, new THREE.Color("#f08a3c")],
+  [FAC.PARK]: [0.1, 0.96, new THREE.Color("#3fa34d")],
 } as const;
 
-export type OverlayLayer = 0 | typeof COVER.POWER | typeof COVER.WATER | typeof COVER.SEWAGE | typeof COVER.GARBAGE;
+/** 0 = off, a COVER bit, or LAND_VALUE_LAYER. */
+export type OverlayLayer = number;
 
-export const OVERLAY_COLOR: Record<Exclude<OverlayLayer, 0>, string> = {
+export const OVERLAY_COLOR: Record<number, string> = {
   [COVER.POWER]: "#f2c230",
   [COVER.WATER]: "#2ea8e8",
   [COVER.SEWAGE]: "#a07848",
   [COVER.GARBAGE]: "#9aa3ad",
+  [COVER.POLICE]: "#3d6ee8",
+  [COVER.FIRE]: "#ee5a4c",
+  [COVER.HEALTH]: "#f2f6fb",
+  [COVER.EDU]: "#f59a4a",
+  [COVER.PARK]: "#48b85a",
 };
 
 const hash = (x: number, y: number) => {
@@ -57,6 +68,7 @@ export class CityRenderer {
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
   private overlaySeen = -1;
+  private overlayLvSeen = -1;
   private hover: THREE.Mesh;
   private raycaster = new THREE.Raycaster();
   private seenRevision = -1;
@@ -161,7 +173,7 @@ export class CityRenderer {
         const i = idx(w, x, y);
         const h = tileHeight(w, x, y);
         if (w.facility[i]) {
-          const [fh, fw, fc] = FACILITY_LOOK[w.facility[i] as 1 | 2 | 3 | 4];
+          const [fh, fw, fc] = FACILITY_LOOK[w.facility[i] as FacilityKind];
           d.position.set(x + 0.5, h + 0.04 + fh / 2, y + 0.5);
           d.scale.set(fw, fh, fw);
           d.updateMatrix();
@@ -205,27 +217,39 @@ export class CityRenderer {
   setOverlay(layer: OverlayLayer): void {
     this.overlayLayer = layer;
     this.overlaySeen = -1;
+    this.overlayLvSeen = -1;
   }
 
   private rebuildOverlay(): void {
     const w = this.world;
     const m = this.overlay;
     this.overlaySeen = w.revision;
-    if (!this.overlayLayer) { m.count = 0; return; }
-    (m.material as THREE.MeshBasicMaterial).color.set(OVERLAY_COLOR[this.overlayLayer]);
+    this.overlayLvSeen = w.lvRevision;
+    const layer = this.overlayLayer;
+    if (!layer) { m.count = 0; return; }
+    const isValue = layer === LAND_VALUE_LAYER;
+    const flat = new THREE.Color(OVERLAY_COLOR[layer] ?? "#ffffff");
+    const col = new THREE.Color();
     const d = this.dummy;
     let n = 0;
     for (let y = 0; y < w.size; y++) {
       for (let x = 0; x < w.size; x++) {
-        if (!(w.cover[idx(w, x, y)] & this.overlayLayer) || !isLand(w, x, y)) continue;
+        const i = idx(w, x, y);
+        if (!isLand(w, x, y)) continue;
+        if (!isValue && !(w.cover[i] & layer)) continue;
         d.position.set(x + 0.5, tileHeight(w, x, y) + 0.12, y + 0.5);
         d.scale.set(0.98, 0.02, 0.98);
         d.updateMatrix();
-        m.setMatrixAt(n++, d.matrix);
+        m.setMatrixAt(n, d.matrix);
+        if (isValue) col.setHSL((w.landValue[i] / 100) * 0.33, 0.8, 0.5); // red (low) to green (high)
+        else col.copy(flat);
+        m.setColorAt(n, col);
+        n++;
       }
     }
     m.count = n;
     m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
   /** Tile under a client-space pointer, or null if it hits nothing. */
@@ -271,7 +295,7 @@ export class CityRenderer {
       this.seenRevision = this.world.revision;
       this.rebuild();
     }
-    if (this.overlaySeen !== this.world.revision) this.rebuildOverlay();
+    if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();
     this.renderer.render(this.scene, this.rig.camera);
   }
 }

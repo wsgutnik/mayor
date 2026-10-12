@@ -37,6 +37,7 @@ bindInput(renderer, {
 });
 
 // Fixed-step sim: 2 days/second at 1x.
+let seenFires = 0;
 let acc = 0;
 let prev = performance.now();
 const DAY_MS = 500;
@@ -46,6 +47,10 @@ function frame(now: number) {
   if (speed > 0) {
     acc += dt * speed;
     while (acc >= DAY_MS) { step(state); acc -= DAY_MS; }
+  }
+  if (state.fires !== seenFires) {
+    hud.showToast("Fire! A building burned down. Build a fire station.");
+    seenFires = state.fires;
   }
   hud.update(state);
   renderer.render();
