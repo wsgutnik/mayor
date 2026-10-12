@@ -15,6 +15,8 @@ export interface RoadNode {
 export const SNAP_RADIUS = 0.6;
 /** Paint-mode steps merge into a straight segment ending this close to its tip. */
 const EXTEND_RADIUS = 1.3;
+/** A painted tile this close to a road (4-neighbour adjacency plus slack) is linked to it. */
+const JOIN_RADIUS = 1.05;
 /** Two centrelines closer than this count as the same road (upgrade, not a duplicate). */
 const COINCIDE_TOL = 0.35;
 
@@ -291,6 +293,32 @@ function addPad(w: World, type: RoadType, p: Pt, fixedId: number): number[] {
     return [bestSeg.id];
   }
   const at = nearestNode(w, p.x, p.z, SNAP_RADIUS);
+  if (!at) {
+    // A tile painted beside an existing road (a bend, or a side street meeting the side of a road) joins it with a
+    // one-tile link, so the graph stays connected and the junction gets proper corners.
+    let join: RoadNode | null = nearestNode(w, p.x, p.z, JOIN_RADIUS);
+    if (!join) {
+      let sideSeg: RoadSegment | null = null;
+      let side = { x: 0, z: 0, t: 0, d: JOIN_RADIUS };
+      for (const seg of w.segments) {
+        if (roughLength(seg.pts) < 1e-6) continue;
+        const pr = projectOnSegment(seg, p);
+        if (pr.d <= side.d && pr.t > 0.03 && pr.t < 0.97) { sideSeg = seg; side = pr; }
+      }
+      if (sideSeg) join = splitSegment(w, sideSeg, side.x, side.z);
+    }
+    if (join) {
+      const nn = makeNode(w, p.x, p.z);
+      const link: RoadSegment = {
+        id: fixedId, type, pts: [{ x: join.x, z: join.z }, { ...p }], tiles: [], a: join.id, b: nn.id,
+      };
+      retile(w, link);
+      w.segments.push(link);
+      attach(w, join.id, link.id);
+      attach(w, nn.id, link.id);
+      return [link.id];
+    }
+  }
   const node = at ?? makeNode(w, p.x, p.z);
   const seg: RoadSegment = {
     id: fixedId, type, pts: [{ ...p }, { ...p }], tiles: [], a: node.id, b: node.id,

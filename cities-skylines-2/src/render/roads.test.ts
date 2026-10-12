@@ -94,33 +94,18 @@ describe("road network geometry", () => {
     expect(white(buildRoadNetworkGeometry(lone.world, gy))).toBe(0);
   });
 
-  it("keeps one lift per layer across the whole network", () => {
+  it("keeps every vertex on a small fixed set of lifts (no per-segment offsets)", () => {
     const s = junction();
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
     const g = buildRoadNetworkGeometry(s.world, gy);
     const pos = g.attributes.position.array as Float32Array;
     const lifts = new Set<string>();
-    for (let i = 0; i < pos.length / 3; i++) {
-      const y = pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2]);
-      // Bands are 0.002 apart, far above float32 noise: exact layer match.
-      const layer =
-        Math.abs(y - 0.06) < 5e-4 ? "asphalt" : Math.abs(y - 0.066) < 5e-4 ? "kerb" : "mark";
-      lifts.add(`${layer}:${y.toFixed(3)}`);
-    }
-    // Asphalt, kerb and markings each sit on exactly one lift (no per-segment offsets).
-    const byLayer = new Map<string, Set<string>>();
-    for (const key of lifts) {
-      const [layer, y] = key.split(":");
-      if (!byLayer.has(layer)) byLayer.set(layer, new Set());
-      byLayer.get(layer)!.add(y);
-    }
-    for (const [layer, ys] of byLayer) {
-      expect(ys.size).toBe(1); // flat ground: exactly one lift per layer
-      void layer;
-    }
-    expect(byLayer.has("asphalt")).toBe(true);
-    expect(byLayer.has("kerb")).toBe(true);
-    expect(lifts.size).toBe(3); // 0.06 asphalt, 0.066 kerb, 0.064 markings
+    for (let i = 0; i < pos.length / 3; i++) lifts.add((pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2])).toFixed(3));
+    // ribbons 0.060 / kerb 0.066 / marks 0.064, then the node patch on top: kerb 0.078, asphalt 0.080
+    const allowed = new Set(["0.060", "0.064", "0.066", "0.078", "0.080", "0.074"]);
+    for (const y of lifts) expect(allowed.has(y)).toBe(true);
+    expect(lifts.has("0.060")).toBe(true);
+    expect(lifts.has("0.066")).toBe(true);
   });
 
   it("builds preview strips without junctions", () => {
