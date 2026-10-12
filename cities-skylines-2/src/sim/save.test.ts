@@ -4,7 +4,7 @@ import { createLine, setLineVehicles } from "./transit";
 import { deserialize, serialize, SaveError } from "./save";
 import { isRaining, RAIN_SPEED_FACTOR } from "./weather";
 import { newTraffic, tickTraffic } from "./traffic";
-import { ROAD, cidx } from "./world";
+import { FAC, ROAD, cidx } from "./world";
 
 function builtCity(): CityState {
   const s = newCity(21);
@@ -64,6 +64,18 @@ describe("save and load", () => {
     const old = JSON.parse(serialize(newCity(5)));
     delete old.biome;
     expect(deserialize(JSON.stringify(old)).world.biome).toBe("plains");
+  });
+
+  it("loads every facility kind, including the late ones (hospital, city hall, substation)", () => {
+    const s = builtCity();
+    const w = s.world;
+    const ey = w.entry.y;
+    for (const [k, kind] of [[2, FAC.HOSPITAL], [4, FAC.MUSEUM], [6, FAC.CITYHALL], [8, FAC.SUBSTATION]] as const) {
+      w.facility[cidx(w, 10 + k, ey - 6)] = kind;
+    }
+    const back = deserialize(serialize(s));
+    expect(back.world.facility[cidx(back.world, 16, ey - 6)]).toBe(FAC.CITYHALL);
+    expect(back.world.facility[cidx(back.world, 18, ey - 6)]).toBe(FAC.SUBSTATION);
   });
 
   it("stays small enough for localStorage", () => {

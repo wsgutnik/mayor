@@ -1,7 +1,7 @@
 import {
   CityState, newCity, refreshDerived,
 } from "./sim";
-import { BIOMES, Biome, generateWorld, RoadSegment, Stop, TransitLine, WorldLot } from "./world";
+import { BIOMES, FAC, Biome, generateWorld, RoadSegment, Stop, TransitLine, WorldLot } from "./world";
 
 export const SAVE_VERSION = 1;
 
@@ -149,7 +149,7 @@ export function deserialize(json: string): CityState {
   w.zone.set(bytes(f.zone, n * n));
   w.level.set(bytes(f.level, n * n));
   w.facility.set(bytes(f.facility, n * n));
-  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 3) || w.facility.some((v) => v > 10)) {
+  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 3) || w.facility.some((v) => v > FAC.SUBSTATION)) {
     throw new SaveError("The save file is damaged");
   }
   w.segments = f.segments;
