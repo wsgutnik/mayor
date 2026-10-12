@@ -41,6 +41,10 @@ lotes validados só no tile âncora ao sincronizar.
 - A rede de utilidades usa um pool por rede ordenado por proximidade, não orçamento por instalação.
 - Sem pedestres, sem faixas direcionais por pista; tráfego ainda em grade de tiles.
 
+## Processo
+
+CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cada merge e `npm run package` para o app. O workflow do GitHub Actions foi removido.
+
 ## Próximos passos
 
 1. Entregas pendentes: M20 (texturas HD e LOD), M21 (sinalização), props Kenney, assets do `muse-world`.

@@ -11,7 +11,9 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
-    "maps": "node scripts/convert-maps.mjs"
+    "maps": "node scripts/convert-maps.mjs",
+    "ci": "tsc --noEmit && vitest run && vite build",
+    "package": "npm run ci && tauri build"
   },
   "dependencies": {
     "three": "^0.186.1"

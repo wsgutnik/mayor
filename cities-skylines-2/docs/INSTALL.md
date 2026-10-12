@@ -25,7 +25,7 @@ O app não é assinado nem notarizado: na primeira vez, abra com clique direito 
 
 ## Windows
 
-Precisa de uma máquina Windows (ou do workflow em `.github/workflows/mayor-desktop.yml`):
+Precisa de uma máquina Windows (o empacotamento é sempre local, sem GitHub Actions):
 
 ```bash
 npm ci
