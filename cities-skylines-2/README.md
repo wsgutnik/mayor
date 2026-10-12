@@ -42,7 +42,11 @@ npm run build   # tipos + bundle em dist/
 - M19: água com margem contínua pelo relevo, normais por onda, reflexo do céu, brilho do sol, espuma só na costa e três níveis de qualidade.
 - M23: pontes e túneis (`src/sim/elevation.ts`). O planejador marca vãos sobre água (até 12/20 tiles) e trechos em colina como ponte
   (custo 3×) ou túnel (4×); tabuleiro, pilares e portais no mesmo mesh; zonas e lotes ignoram tabuleiros, e o terreno acima de um túnel fica livre.
-- Em produção: M20 (texturas HD, níveis de qualidade e LOD) e M21 (mão única, rotatória, semáforos e props de calçada).
+- M20: render. Terreno com mistura de grama, areia, rocha e terra por altura e inclinação (texturas HD), asfalto, meio-fio e calçada
+  texturizados, sombras suaves do sol que seguem a câmera, tone mapping, LOD por distância e três níveis de qualidade (baixa, média, alta).
+- M21: vias e sinalização. Rua e avenida de mão única (setas), ferramenta de rotatória, semáforos com fases e tráfego que para no vermelho,
+  e props de calçada (postes, placas, hidrantes, lixeiras, pedestres, abrigos) por densidade de qualidade.
+- Kit de prédios completo: estação de ônibus, estação de trem (usada nas estações de metrô) e terminal de carga (31 a 33).
 
 Documentação do processo, pesquisa e plano: [docs/process/](docs/process/). Progresso detalhado: [PROGRESS.md](PROGRESS.md). Guia para agentes: [AGENTS.md](AGENTS.md).
 

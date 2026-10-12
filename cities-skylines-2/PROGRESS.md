@@ -12,12 +12,12 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | M17 Quadras e lotes | feito | lotes persistidos, um prédio por lote, lotes vazios desenhados |
 | M18 Redes e subsolo | feito | água, esgoto, energia por fluxo; vista Subsolo; avisos |
 | M19 Água | feito | margem contínua, normais, reflexo, espuma, níveis de qualidade |
-| M20 Render | em produção | sombras e tone mapping feitos; texturas HD, LOD e níveis de qualidade com Muse |
-| M21 Vias e sinalização | em produção | mão única, rotatória, semáforos e props com Muse |
+| M20 Render | feito | terreno em camadas, texturas HD, sombras, tone mapping, LOD, níveis de qualidade |
+| M21 Vias e sinalização | feito | mão única, rotatória, semáforos com fases, props de calçada |
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
 
-Testes: 225 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 263 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
@@ -45,9 +45,15 @@ lotes validados só no tile âncora ao sincronizar.
 
 CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cada merge e `npm run package` para o app. O workflow do GitHub Actions foi removido.
 
+## Pendências de assets
+
+- Kit de subsolo em GLB (tubos, bombas, válvulas) e peças de lote (jardim, estacionamento, praça, calçada de esquina): o `muse-world` não terminou; o jogo usa geometria procedural.
+- Props a partir do Kenney City Kit Roads (semáforos, postes, placas, barreiras): fontes em `third_party/`, conversão não feita.
+- Entradas 31 (estação de ônibus) e 33 (terminal de carga) têm modelo mas nenhuma função no jogo; 32 (estação de trem) é o modelo das estações de metrô.
+
 ## Próximos passos
 
-1. Entregas pendentes: M20 (texturas HD e LOD), M21 (sinalização), props Kenney, assets do `muse-world`.
+1. M24: separação de níveis (ponte ou túnel cruzando outra rua sem nó) e tráfego por pista.
 2. Desempenho do grafo e dos semáforos (achados abertos).
-3. M22: pedestres, polimento, validação em Windows e iPad.
+3. M22: pedestres em movimento, polimento, validação em Windows e iPad.
 4. Tráfego por pista (referência: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, fases C e E).

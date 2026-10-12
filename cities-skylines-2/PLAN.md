@@ -46,8 +46,8 @@ linguagem visual da UI. Não é paridade de features.
 | M17 | ✅ Quadras e lotes | Lotes persistidos voltados para a rua, um prédio por lote, zonas até 4 lotes da estrada |
 | M18 | ✅ Redes e subsolo | Água, esgoto e energia por fluxo nas ruas, vista Subsolo, avisos |
 | M19 | ✅ Água | Margem contínua, normais, reflexo, espuma, níveis de qualidade |
-| M20 | em produção | Texturas HD, níveis de qualidade, LOD (sombras e tone mapping já feitos) |
-| M21 | em produção | Mão única, rotatória, semáforos e props de calçada |
+| M20 | ✅ Render | Terreno em camadas, texturas HD, sombras, tone mapping, LOD, níveis de qualidade |
+| M21 | ✅ Vias e sinalização | Mão única, rotatória, semáforos com fases, props de calçada |
 | M22 | pendente | Pedestres, polimento, validação em Windows e iPad |
 | M23 | ✅ Pontes e túneis | Elevação por segmento, vãos sobre água e colinas, tabuleiro, pilares, portais |
 
