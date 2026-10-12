@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import {
-  Pt, RoadSegment, RoadType, ROAD_DRAW_WIDTH, World, curvePoints,
+  Pt, RoadSegment, RoadType, ROAD_DRAW_WIDTH, World, baseRoadType, curvePoints,
   makeDeckSampler, segElevation, DeckSampler,
 } from "../sim/world";
-import { NodeLayout, NodeLayoutArm, halfAsphalt, kerbWidth, nodeById, nodeLayout } from "../sim/roads";
+import { NodeLayout, NodeLayoutArm, halfAsphalt, kerbWidth, nodeArms, nodeById, nodeLayout } from "../sim/roads";
 
 /**
  * Junction road geometry: ribbons stop at the corner offsets and every node
@@ -33,6 +33,8 @@ export interface StripSeg {
   width?: number;
   color?: string;
   lift?: number;
+  /** 0 = two-way; otherwise chevron arrows point along (1) or against (-1) the point order. */
+  dirSign?: number;
 }
 
 class Geo {
@@ -143,7 +145,7 @@ export const NO_TRIM: RibbonOpts = {
  */
 function ribbon(
   g: Geo, pts: Pt[], type: RoadType, o: RibbonOpts,
-  groundY: (x: number, z: number) => number, tint?: THREE.Color,
+  groundY: (x: number, z: number) => number, tint?: THREE.Color, dirSign = 0,
 ): void {
   g.force = tint ? `#${tint.getHexString()}` : null;
   const samples = sampleCurve(pts);
@@ -223,8 +225,21 @@ function ribbon(
       prevOn = true;
     }
   };
-  if (type === 1) mark(0, 0.012, LINE, true);
-  else if (type === 2) {
+  const base = baseRoadType(type);
+  if (dirSign !== 0) {
+    // One-way: amber chevrons along the centreline point the way traffic flows.
+    if (base === 2) { mark(hw * 0.5, 0.012, AVE_LINE, true); mark(-hw * 0.5, 0.012, AVE_LINE, true); }
+    for (let s = aMin + 0.7; s < mEnd - 0.2; s += 1.8) {
+      const p = walk(s);
+      const tx = p.dx * dirSign, tz = p.dz * dirSign;
+      const nx = -tz, nz = tx;
+      const tip = g.vert(p.x + tx * 0.17, groundY(p.x + tx * 0.17, p.z + tz * 0.17) + MARK_LIFT + 0.002, p.z + tz * 0.17, "#f5c542");
+      const b1 = g.vert(p.x - tx * 0.1 + nx * 0.11, groundY(p.x - tx * 0.1 + nx * 0.11, p.z - tz * 0.1 + nz * 0.11) + MARK_LIFT + 0.002, p.z - tz * 0.1 + nz * 0.11, "#f5c542");
+      const b2 = g.vert(p.x - tx * 0.1 - nx * 0.11, groundY(p.x - tx * 0.1 - nx * 0.11, p.z - tz * 0.1 - nz * 0.11) + MARK_LIFT + 0.002, p.z - tz * 0.1 - nz * 0.11, "#f5c542");
+      g.tri(b1, tip, b2);
+    }
+  } else if (base === 1) mark(0, 0.012, LINE, true);
+  else if (base === 2) {
     // Median then the two carriageway dashes.
     strip(g, samples, aMin, mEnd, 0.16, MARK_LIFT, MEDIAN, groundY, false);
     mark(hw * 0.5, 0.012, AVE_LINE, true);
@@ -545,7 +560,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     // A deck ribbon rides the profile instead of the terrain; its ramps meet the ground at the ends.
     const gy = deck ? (x: number, z: number): number => deck.yAt(deck.sAt(x, z)) : groundY;
     // Ribbons run the full length to each node centre; the node patch below rounds the corners over them.
-    ribbon(g, seg.pts, seg.type, NO_TRIM, gy);
+    ribbon(g, seg.pts, seg.type, NO_TRIM, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0);
     if (deck) {
       parapets(g, seg.type, deck);
       pillars(g, deck, groundY);
@@ -571,6 +586,42 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     if (l.arms.length >= 3) {
       for (const arm of l.arms) {
         zebra(g, l, arm, groundY);
+      }
+    }
+  }
+  // Roundabout islands: kerb rim, grass disc, and a yield dash across each entry arm.
+  for (const rb of w.roundabouts) {
+    const SEG = 20;
+    const fan = (r: number, y: number, color: string): void => {
+      const c = g.vert(rb.x, groundY(rb.x, rb.z) + y, rb.z, color);
+      let prev = -1;
+      for (let k = 0; k <= SEG; k++) {
+        const a = (k / SEG) * Math.PI * 2;
+        const x = rb.x + Math.cos(a) * r, z = rb.z + Math.sin(a) * r;
+        const v = g.vert(x, groundY(x, z) + y, z, color);
+        if (prev >= 0) g.tri(c, prev, v);
+        prev = v;
+      }
+    };
+    fan(rb.r - 0.45, KERB_LIFT, KERB);
+    fan(rb.r - 0.53, KERB_LIFT + 0.002, "#6f9b4e");
+    for (const node of w.nodes) {
+      if (Math.abs(Math.hypot(node.x - rb.x, node.z - rb.z) - rb.r) > 0.05) continue;
+      for (const arm of nodeArms(w, node.id)) {
+        if (w.segments.find((s) => s.id === arm.segId)?.roundabout) continue;
+        const d = 0.85, hw2 = arm.halfWidth * 0.85;
+        const cx2 = node.x + arm.dx * d, cz2 = node.z + arm.dz * d;
+        const px = -arm.dz, pz = arm.dx;
+        for (const side of [-0.5, 0.5]) {
+          const sx = cx2 + px * hw2 * side * 1.4, sz = cz2 + pz * hw2 * side * 1.4;
+          g.quad(
+            sx + arm.dx * 0.05 + px * hw2 * 0.28, sz + arm.dz * 0.05 + pz * hw2 * 0.28,
+            sx - arm.dx * 0.05 + px * hw2 * 0.28, sz - arm.dz * 0.05 + pz * hw2 * 0.28,
+            sx - arm.dx * 0.05 - px * hw2 * 0.28, sz - arm.dz * 0.05 - pz * hw2 * 0.28,
+            sx + arm.dx * 0.05 - px * hw2 * 0.28, sz + arm.dz * 0.05 - pz * hw2 * 0.28,
+            MARK_LIFT, ZEBRA, groundY,
+          );
+        }
       }
     }
   }
@@ -607,7 +658,7 @@ export function buildStripGeometry(
       }
       return;
     }
-    ribbon(g, seg.pts, seg.type, NO_TRIM, groundY, tint);
+    ribbon(g, seg.pts, seg.type, NO_TRIM, groundY, tint, seg.dirSign ?? 0);
   });
   return g.build();
 }

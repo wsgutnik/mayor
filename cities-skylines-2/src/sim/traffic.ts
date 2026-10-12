@@ -6,8 +6,8 @@ import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
-export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7 };
-export const ROAD_CAPACITY: Record<number, number> = { [ROAD.STREET]: 4, [ROAD.AVENUE]: 10, [ROAD.HIGHWAY]: 20 };
+export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7, [ROAD.ONEWAY_STREET]: 3, [ROAD.ONEWAY_AVENUE]: 4.5 };
+export const ROAD_CAPACITY: Record<number, number> = { [ROAD.STREET]: 4, [ROAD.AVENUE]: 10, [ROAD.HIGHWAY]: 20, [ROAD.ONEWAY_STREET]: 4, [ROAD.ONEWAY_AVENUE]: 10 };
 
 const MAX_VEHICLES = 260;
 const MIN_SPEED_FACTOR = 0.15;
@@ -183,6 +183,10 @@ export function findPath(w: World, load: Uint16Array, from: number, to: number):
       const j = ny * w.size + nx;
       const cls = w.road[j];
       if (!cls) continue;
+      // One-way tiles may only be crossed with their travel direction (the
+      // dot threshold still allows turning onto/off a diagonal one-way).
+      if ((w.dirX[cur] || w.dirZ[cur]) && w.dirX[cur] * dx + w.dirZ[cur] * dy < -0.35) continue;
+      if ((w.dirX[j] || w.dirZ[j]) && w.dirX[j] * dx + w.dirZ[j] * dy < -0.35) continue;
       const ng = gc + crossCost(cls, load[j]);
       if (ng < G(j)) {
         stamp[j] = gen;

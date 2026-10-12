@@ -70,15 +70,20 @@ export interface TransitLine {
   name: string;
 }
 
-/** Road classes. The grid stores the class per tile (0 = none). */
-export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3 } as const;
-export type RoadType = 1 | 2 | 3;
+/** Road classes. The grid stores the class per tile (0 = none). Types 4/5 are the one-way variants of street/avenue. */
+export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3, ONEWAY_STREET: 4, ONEWAY_AVENUE: 5 } as const;
+export type RoadType = 1 | 2 | 3 | 4 | 5;
 /** Tiles of width a road occupies on the grid, and its drawn width in world units. */
-export const ROAD_TILE_WIDTH: Record<RoadType, number> = { 1: 1, 2: 2, 3: 3 };
-export const ROAD_DRAW_WIDTH: Record<RoadType, number> = { 1: 0.9, 2: 1.8, 3: 2.8 };
-export const ROAD_COST: Record<RoadType, number> = { 1: 20, 2: 45, 3: 90 };
-export const ROAD_UPKEEP: Record<RoadType, number> = { 1: 3, 2: 7, 3: 14 };
-export const ROAD_NAME: Record<RoadType, string> = { 1: "Street", 2: "Avenue", 3: "Highway" };
+export const ROAD_TILE_WIDTH: Record<RoadType, number> = { 1: 1, 2: 2, 3: 3, 4: 1, 5: 2 };
+export const ROAD_DRAW_WIDTH: Record<RoadType, number> = { 1: 0.9, 2: 1.8, 3: 2.8, 4: 0.9, 5: 1.8 };
+export const ROAD_COST: Record<RoadType, number> = { 1: 20, 2: 45, 3: 90, 4: 22, 5: 48 };
+export const ROAD_UPKEEP: Record<RoadType, number> = { 1: 3, 2: 7, 3: 14, 4: 3, 5: 7 };
+export const ROAD_NAME: Record<RoadType, string> = { 1: "Street", 2: "Avenue", 3: "Highway", 4: "One-way street", 5: "One-way avenue" };
+
+/** True for the one-way road classes (4/5). */
+export const isOneWayType = (t: RoadType): boolean => t === 4 || t === 5;
+/** The two-way class a road type draws and behaves like (one-way variants map to their base class). */
+export const baseRoadType = (t: RoadType): 1 | 2 | 3 => (t === 4 ? 1 : t === 5 ? 2 : t);
 
 /** A point on the ground plane; tile (x, y) covers [x, x+1) × [y, y+1). */
 export interface Pt { x: number; z: number }
@@ -100,7 +105,16 @@ export interface RoadSegment {
   /** The pre-built entry road cannot be removed. */
   fixed?: boolean;
   elevation?: Elevation;
+  /** One-way segment: traffic may only travel in the `dir` direction. Absent in old saves (two-way). */
+  oneWay?: boolean;
+  /** Travel direction for one-way segments: 1 = a→b, -1 = b→a. Defaults to 1 when `oneWay` is set. */
+  dir?: 1 | -1;
+  /** Part of a roundabout ring (one-way arc stamped by the roundabout tool). */
+  roundabout?: boolean;
 }
+
+/** A roundabout island stamped on a junction; the ring segments live in `segments`. */
+export interface Roundabout { x: number; z: number; r: number }
 
 export type Biome = "plains" | "forest" | "river" | "coast" | "mountain" | "desert";
 export const BIOMES: Biome[] = ["plains", "forest", "river", "coast", "mountain", "desert"];
@@ -142,6 +156,11 @@ export interface World {
   /** Junction graph: every segment end attaches to one of these. Rebuilt on load. */
   nodes: RoadNode[];
   nextNodeId: number;
+  /** Unit travel direction per tile for one-way roads (0,0 = two-way/none), derived in rebuildRoadRaster. */
+  dirX: Float32Array;
+  dirZ: Float32Array;
+  /** Roundabout islands stamped by the roundabout tool. */
+  roundabouts: Roundabout[];
   stops: Stop[];
   lines: TransitLine[];
   nextTransitId: number;
@@ -265,6 +284,9 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     nextSegmentId: 1,
     nodes: [],
     nextNodeId: 1,
+    dirX: new Float32Array(size * size),
+    dirZ: new Float32Array(size * size),
+    roundabouts: [],
     stops: [],
     lines: [],
     nextTransitId: 1,
@@ -516,6 +538,41 @@ export function rebuildRoadRaster(w: World): void {
   }
   for (const seg of w.segments) {
     if (segElevation(seg) === "bridge") stampDeck(w, seg);
+  }
+  // One-way travel direction per tile, sampled along each one-way segment's
+  // centreline in its travel direction (a→b, flipped when dir is -1).
+  w.dirX.fill(0);
+  w.dirZ.fill(0);
+  for (const seg of w.segments) {
+    if (!seg.oneWay) continue;
+    const sign = seg.dir === -1 ? -1 : 1;
+    const width = ROAD_TILE_WIDTH[seg.type];
+    const pts = curvePoints(seg.pts, 0.25);
+    for (let i = 1; i < pts.length; i++) {
+      const vx = (pts[i].x - pts[i - 1].x) * sign, vz = (pts[i].z - pts[i - 1].z) * sign;
+      const l = Math.hypot(vx, vz);
+      if (l < 1e-9) continue;
+      // Paint the direction over the segment's full raster width, not just
+      // the centreline row, or wide one-way avenues leak along their far lane.
+      for (const p of [pts[i - 1], pts[i]]) {
+        if (width === 1) {
+          const tx = Math.floor(p.x), ty = Math.floor(p.z);
+          if (!inBounds(w, tx, ty)) continue;
+          const t = ty * w.size + tx;
+          w.dirX[t] = vx / l;
+          w.dirZ[t] = vz / l;
+        } else {
+          const x0 = Math.floor(p.x - width / 2 + 0.5), y0 = Math.floor(p.z - width / 2 + 0.5);
+          for (let dy = 0; dy < width; dy++) for (let dx = 0; dx < width; dx++) {
+            const tx = x0 + dx, ty = y0 + dy;
+            if (!inBounds(w, tx, ty)) continue;
+            const t = ty * w.size + tx;
+            w.dirX[t] = vx / l;
+            w.dirZ[t] = vz / l;
+          }
+        }
+      }
+    }
   }
   w.connectivityDirty = true;
 }

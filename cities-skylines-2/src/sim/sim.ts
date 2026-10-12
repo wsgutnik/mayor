@@ -4,11 +4,11 @@ import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, update
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
   isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
-  ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
+  ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, isOneWayType, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
   Elevation,
 } from "./world";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan } from "./elevation";
-import { addSegment, rebuildNodes, removeSegment } from "./roads";
+import { addSegment, rebuildNodes, removeSegment, stampRoundabout, toggleOneWayAt } from "./roads";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
@@ -18,7 +18,7 @@ export type FacilityTool =
   | "power" | "water" | "sewage" | "landfill"
   | "police" | "fire" | "clinic" | "school" | "park" | "metro"
   | "hospital" | "highschool" | "library" | "community" | "museum" | "cityhall" | "substation";
-export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | FacilityTool;
+export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | "roundabout" | FacilityTool;
 
 const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   power: FAC.POWER, water: FAC.WATER, sewage: FAC.SEWAGE, landfill: FAC.LANDFILL,
@@ -50,6 +50,7 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
   busstop: 100,
   busline: 0,
   metroline: 0,
+  roundabout: 150,
 };
 
 /** Residents, commercial jobs, industrial jobs per building level (index = level). */
@@ -278,7 +279,14 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
 export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
   const plan = planRoad(s, type, pts);
   if (!plan.ok) return { ok: false, reason: plan.reason! };
-  if (plan.newTiles === 0) return { ok: true }; // already built at this class or better
+  if (plan.newTiles === 0) {
+    // Re-drawing a one-way road with the same tool flips its direction (free).
+    if (isOneWayType(type) && toggleOneWayAt(s.world, pts)) {
+      rebuildRoadRaster(s.world);
+      s.world.revision++;
+    }
+    return { ok: true }; // already built at this class or better
+  }
   const w = s.world;
   const pieces = plan.pieces ?? [{ pts, elevation: "ground" as Elevation, tiles: plan.tiles }];
   const groundTiles: number[] = [];
@@ -442,6 +450,34 @@ function setLotLevel(w: World, lot: WorldLot, level: number): void {
   }
 }
 
+/** Stamp a roundabout on the junction nearest tile (x, y); charges the flat tool cost. */
+export function placeRoundabout(s: CityState, x: number, y: number): ToolResult {
+  const w = s.world;
+  const cx = x + 0.5, cz = y + 0.5;
+  let nodeId = -1, bd = 1.6;
+  for (const n of w.nodes) {
+    const d = Math.hypot(n.x - cx, n.z - cz);
+    if (d < bd) { bd = d; nodeId = n.id; }
+  }
+  if (nodeId < 0) return { ok: false, reason: "Roundabouts need a junction with at least 3 arms" };
+  const node = w.nodes.find((n) => n.id === nodeId)!;
+  // The ring (radius 1.5) must sit on dry, unbuilt land around the junction.
+  for (let ty = Math.floor(node.z - 2); ty <= Math.floor(node.z + 2); ty++) {
+    for (let tx = Math.floor(node.x - 2); tx <= Math.floor(node.x + 2); tx++) {
+      if (!inBounds(w, tx, ty)) return { ok: false, reason: "No room for a roundabout here" };
+      if (Math.hypot(tx + 0.5 - node.x, ty + 0.5 - node.z) > 2.1) continue;
+      if (!isLand(w, tx, ty) || w.facility[idx(w, tx, ty)]) return { ok: false, reason: "No room for a roundabout here" };
+    }
+  }
+  if (s.money < COST.roundabout) return { ok: false, reason: "Not enough money" };
+  if (!stampRoundabout(w, nodeId)) return { ok: false, reason: "Roundabouts need a junction with at least 3 arms" };
+  rebuildRoadRaster(w);
+  s.money -= COST.roundabout;
+  s.monthExpenses += COST.roundabout;
+  w.revision++;
+  return { ok: true };
+}
+
 function facilityUpkeep(w: World): number {
   let total = 0;
   for (let i = 0; i < w.facility.length; i++) {
@@ -458,6 +494,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   if (!inBounds(w, x, y)) return { ok: false, reason: "Outside the map" };
   const i = idx(w, x, y);
   if (tool === "busstop") return placeBusStop(s, x, y);
+  if (tool === "roundabout") return placeRoundabout(s, x, y);
   const cost = COST[tool];
   const isEntry = isEntryTile(w, x, y);
 

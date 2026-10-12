@@ -1,5 +1,5 @@
 import {
-  Pt, RoadSegment, RoadType, World, curvePoints, rasterizeRoad, ROAD_DRAW_WIDTH,
+  Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints, isOneWayType, rasterizeRoad, ROAD_DRAW_WIDTH,
   Elevation, segElevation,
 } from "./world";
 
@@ -23,7 +23,8 @@ const COINCIDE_TOL = 0.35;
 
 /** Kerb width beside the asphalt, by road class (highways have no kerbs). */
 export function kerbWidth(type: RoadType): number {
-  return type === 1 ? 0.07 : type === 2 ? 0.09 : 0;
+  const b = baseRoadType(type);
+  return b === 1 ? 0.07 : b === 2 ? 0.09 : 0;
 }
 
 /** Half the asphalt width (drawn width minus kerbs). */
@@ -33,7 +34,7 @@ export function halfAsphalt(type: RoadType): number {
 
 /** Kerb fillet radius at corners: tighter for streets, wider for avenues and highways. */
 export function cornerRadius(type: RoadType): number {
-  return type === 1 ? 0.25 : 0.4;
+  return baseRoadType(type) === 1 ? 0.25 : 0.4;
 }
 
 export const segById = (w: World, id: number): RoadSegment | undefined =>
@@ -154,6 +155,8 @@ function splitSegment(w: World, seg: RoadSegment, x: number, z: number): RoadNod
     id: w.nextSegmentId++, type: seg.type, pts: right, tiles: [], a: n.id, b: seg.b,
     ...(seg.fixed ? { fixed: true } : {}),
     ...(seg.elevation !== undefined ? { elevation: seg.elevation } : {}),
+    ...(seg.oneWay ? { oneWay: true, dir: (seg.dir ?? 1) as 1 | -1 } : {}),
+    ...(seg.roundabout ? { roundabout: true } : {}),
   };
   seg.pts = left;
   seg.b = n.id;
@@ -324,6 +327,7 @@ function addPad(w: World, type: RoadType, p: Pt, fixedId: number): number[] {
   const node = at ?? makeNode(w, p.x, p.z);
   const seg: RoadSegment = {
     id: fixedId, type, pts: [{ ...p }, { ...p }], tiles: [], a: node.id, b: node.id,
+    ...(isOneWayType(type) ? { oneWay: true, dir: 1 as const } : {}),
   };
   retile(w, seg);
   w.segments.push(seg);
@@ -341,6 +345,8 @@ export interface AddSegmentOpts {
   fixed?: boolean;
   /** Vertical placement of every created piece (bridges/tunnels from the planner). */
   elevation?: Elevation;
+  /** Force one-way travel a→b even for a two-way class (roundabout rings use the one-way street class instead). */
+  oneWay?: boolean;
 }
 
 export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmentOpts): number[] {
@@ -359,8 +365,13 @@ export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmen
     // Paving over the same path upgrades the road instead of doubling it.
     for (const seg of w.segments) {
       const pair = (seg.a === na.id && seg.b === nb.id) || (seg.a === nb.id && seg.b === na.id);
-      if (pair && seg.type <= type && coincides(seg.pts, piece)) {
+      if (pair && ROAD_DRAW_WIDTH[type] >= ROAD_DRAW_WIDTH[seg.type] && coincides(seg.pts, piece)) {
         seg.type = type;
+        if (isOneWayType(type) && !seg.oneWay) {
+          // Direction follows the stroke just drawn (piece start is node na).
+          seg.oneWay = true;
+          seg.dir = seg.a === na.id ? 1 : -1;
+        }
         retile(w, seg);
         return seg.id;
       }
@@ -369,6 +380,7 @@ export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmen
       id: w.nextSegmentId++, type, pts: piece, tiles: [], a: na.id, b: nb.id,
       ...(opts?.fixed ? { fixed: true } : {}),
       ...(opts?.elevation !== undefined ? { elevation: opts.elevation } : {}),
+      ...(isOneWayType(type) || opts?.oneWay ? { oneWay: true, dir: 1 as const } : {}),
     };
     retile(w, seg);
     w.segments.push(seg);
@@ -442,6 +454,7 @@ function tryMergeNode(w: World, nodeId: number): void {
   if (!s1 || !s2) return;
   if (s1.type !== s2.type || s1.fixed || s2.fixed) return;
   if (segElevation(s1) !== segElevation(s2)) return;
+  if (s1.oneWay || s2.oneWay) return; // merging must never flip a one-way direction
   if (roughLength(s1.pts) < 1e-6 || roughLength(s2.pts) < 1e-6) return;
   const arms = nodeArms(w, nodeId);
   if (arms.length !== 2) return;
@@ -515,14 +528,16 @@ export interface RoadArm {
   kerb: number;
 }
 
-/** Tangent of a segment at one end, pointing away from that end's node. */
+/** Tangent of a segment at one end, pointing away from that end's node along the segment. */
 function endTangent(seg: RoadSegment, end: "a" | "b"): { dx: number; dz: number } {
   const pts = seg.pts;
   const tip = end === "a" ? pts[0] : pts[pts.length - 1];
   const inner = end === "a"
     ? pts.length === 3 ? pts[1] : pts[1]
     : pts.length === 3 ? pts[1] : pts[pts.length - 2];
-  const vx = tip.x - inner.x, vz = tip.z - inner.z;
+  // From the node back into the segment (tip - inner would arrive INTO the node
+  // and mirror every asymmetric junction onto its wrong side).
+  const vx = inner.x - tip.x, vz = inner.z - tip.z;
   const l = Math.hypot(vx, vz) || 1;
   return { dx: vx / l, dz: vz / l };
 }
@@ -707,7 +722,7 @@ function bisector(a: RoadArm, b: RoadArm): { x: number; z: number } | null {
 /** Nodes with 4+ arms, or 3 arms meeting an avenue, are signalised. */
 export function hasSignal(w: World, nodeId: number): boolean {
   const arms = nodeArms(w, nodeId);
-  return arms.length >= 4 || (arms.length === 3 && arms.some((a) => a.type === 2));
+  return arms.length >= 4 || (arms.length === 3 && arms.some((a) => baseRoadType(a.type) === 2));
 }
 
 /** Snapshot of every signalised node for traffic and (later) signal props. */
@@ -718,7 +733,7 @@ export function signalNodes(w: World): SignalInfo[] {
   const out: SignalInfo[] = [];
   for (const node of w.nodes) {
     const arms = nodeArms(w, node.id);
-    if (arms.length >= 4 || (arms.length === 3 && arms.some((a) => a.type === 2))) {
+    if (arms.length >= 4 || (arms.length === 3 && arms.some((a) => baseRoadType(a.type) === 2))) {
       out.push({
         id: node.id, x: node.x, z: node.z,
         arms: arms.map((a) => ({ dx: a.dx, dz: a.dz, ns: Math.abs(a.dx) <= Math.abs(a.dz) })),
@@ -769,6 +784,84 @@ export function redHold(w: World, tick: number, tile: number, hx: number, hz: nu
   return false;
 }
 
+/**
+ * Flip the travel direction of the one-way segment under a re-drawn stroke
+ * (same path, either stroke direction). Returns true when a segment flipped.
+ */
+export function toggleOneWayAt(w: World, pts: Pt[]): boolean {
+  if (pts.length < 2) return false;
+  const p0 = pts[0], p1 = pts[pts.length - 1];
+  for (const seg of w.segments) {
+    if (!seg.oneWay) continue;
+    const na = nodeById(w, seg.a), nb = nodeById(w, seg.b);
+    if (!na || !nb) continue;
+    const fwd = dist(p0.x, p0.z, na.x, na.z) <= SNAP_RADIUS && dist(p1.x, p1.z, nb.x, nb.z) <= SNAP_RADIUS;
+    const rev = dist(p0.x, p0.z, nb.x, nb.z) <= SNAP_RADIUS && dist(p1.x, p1.z, na.x, na.z) <= SNAP_RADIUS;
+    if ((fwd || rev) && coincides(seg.pts, pts)) {
+      seg.dir = seg.dir === -1 ? 1 : -1;
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Ring radius of a stamped roundabout, in tiles. */
+export const ROUNDABOUT_RADIUS = 1.5;
+
+/**
+ * Convert the junction at `nodeId` into a roundabout: the node's arms are
+ * re-plugged into four new ring nodes and joined by one-way street arcs
+ * circulating E→S→W→N, with the island recorded for the renderer. Returns
+ * false when the node has fewer than 3 arms (nothing to circulate).
+ */
+export function stampRoundabout(w: World, nodeId: number): boolean {
+  const centre = nodeById(w, nodeId);
+  if (!centre) return false;
+  if (nodeArms(w, nodeId).length < 3) return false;
+  const cx = centre.x, cz = centre.z, r = ROUNDABOUT_RADIUS;
+  const ring: RoadNode[] = [];
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2;
+    ring.push(makeNode(w, cx + Math.cos(a) * r, cz + Math.sin(a) * r));
+  }
+  const nearestRing = (dx: number, dz: number): RoadNode => {
+    let best = ring[0], bd = -Infinity;
+    for (const n of ring) {
+      const vx = n.x - cx, vz = n.z - cz;
+      const d = (vx * dx + vz * dz) / (r * (Math.hypot(dx, dz) || 1));
+      if (d > bd) { bd = d; best = n; }
+    }
+    return best;
+  };
+  for (const segId of [...centre.segs]) {
+    const seg = segById(w, segId);
+    if (!seg) continue;
+    if (seg.a === nodeId && seg.b === nodeId) { // centre pad: swallowed by the island
+      w.segments = w.segments.filter((s) => s.id !== segId);
+      continue;
+    }
+    const end = seg.a === nodeId ? "a" : "b";
+    const far = end === "a" ? seg.pts[seg.pts.length - 1] : seg.pts[0];
+    const target = nearestRing(far.x - cx, far.z - cz);
+    if (end === "a") { seg.a = target.id; seg.pts[0] = { x: target.x, z: target.z }; }
+    else { seg.b = target.id; seg.pts[seg.pts.length - 1] = { x: target.x, z: target.z }; }
+    attach(w, target.id, seg.id);
+    retile(w, seg);
+  }
+  w.nodes = w.nodes.filter((n) => n.id !== nodeId);
+  for (let k = 0; k < 4; k++) {
+    const p0 = ring[k], p1 = ring[(k + 1) % 4];
+    const ctrl = { x: cx + (p0.x - cx) + (p1.x - cx), z: cz + (p0.z - cz) + (p1.z - cz) };
+    const ids = addSegment(w, 4, [{ x: p0.x, z: p0.z }, ctrl, { x: p1.x, z: p1.z }]);
+    for (const id of ids) {
+      const seg = segById(w, id);
+      if (seg) seg.roundabout = true;
+    }
+  }
+  w.roundabouts.push({ x: cx, z: cz, r });
+  return true;
+}
+
 // ---------------------------------------------------------------- load
 
 /**
@@ -779,11 +872,11 @@ export function redHold(w: World, tick: number, tile: number, hx: number, hz: nu
  */
 export function rebuildNodes(w: World): void {
   if (adoptNodes(w)) return;
-  const keep = w.segments.map((s) => ({ type: s.type as RoadType, pts: s.pts, fixed: s.fixed }));
+  const keep = w.segments.map((s) => ({ type: s.type as RoadType, pts: s.pts, fixed: s.fixed, oneWay: s.oneWay, dir: s.dir, roundabout: s.roundabout }));
   w.segments = [];
   w.nodes = [];
   w.nextNodeId = 1;
-  for (const s of keep) addSegmentKeepId(w, s.type, s.pts, 0, s.fixed);
+  for (const s of keep) addSegmentKeepId(w, s.type, s.pts, 0, s.fixed, s.oneWay, s.dir, s.roundabout);
   let maxSeg = 0;
   for (const s of w.segments) maxSeg = Math.max(maxSeg, s.id);
   w.nextSegmentId = Math.max(w.nextSegmentId, maxSeg + 1);
@@ -794,8 +887,15 @@ export function rebuildNodes(w: World): void {
  * Re-add one saved segment through the graph (load path for old saves only).
  * Ids are renumbered; nothing outside the graph references them.
  */
-function addSegmentKeepId(w: World, type: RoadType, pts: Pt[], _id: number, fixed?: boolean): void {
-  addSegment(w, type, pts, { fixed });
+function addSegmentKeepId(w: World, type: RoadType, pts: Pt[], _id: number, fixed?: boolean, oneWay?: boolean, dir?: 1 | -1, roundabout?: boolean): void {
+  const ids = addSegment(w, type, pts, { fixed, oneWay });
+  // addSegment derives a→b from the stroke; restore the saved direction/flags.
+  for (const id of ids) {
+    const seg = segById(w, id);
+    if (!seg) continue;
+    if (oneWay) { seg.oneWay = true; seg.dir = dir ?? 1; }
+    if (roundabout) seg.roundabout = true;
+  }
 }
 
 /** Adopt saved a/b when every segment references consistent nodes. */

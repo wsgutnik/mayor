@@ -51,10 +51,14 @@ export function averageOfTexture(tex: THREE.Texture): [number, number, number] {
     c.width = c.height = 8;
     const ctx = c.getContext("2d");
     if (!ctx) return [0.55, 0.55, 0.55];
+    // Draw first: without it the canvas is blank, the average reads 0 and the detail pass over-brightens 20x.
+    ctx.drawImage(img, 0, 0, 8, 8);
     const px = ctx.getImageData(0, 0, 8, 8).data;
+    // The sampler returns linear values for an sRGB texture, so average in linear space too.
+    const lin = (v: number): number => Math.pow(v / 255, 2.2);
     let r = 0, g = 0, b = 0;
     for (let i = 0; i < 64; i++) {
-      r += px[i * 4] / 255; g += px[i * 4 + 1] / 255; b += px[i * 4 + 2] / 255;
+      r += lin(px[i * 4]); g += lin(px[i * 4 + 1]); b += lin(px[i * 4 + 2]);
     }
     return [r / 64, g / 64, b / 64];
   } catch {
@@ -141,7 +145,7 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
         uniform float uDetailOn;`)
       .replace("#include <map_fragment>", `
         vec3 baseDet = texture2D(map, vMapUv).rgb / max(uAvgBase, vec3(0.05));
-        float kerbness = (1.0 - smoothstep(0.03, 0.12, distance(vColor, uKerbColor)))
+        float kerbness = (1.0 - smoothstep(0.03, 0.12, distance(vColor.rgb, uKerbColor)))
           * uDetailOn;
         vec3 kerbDet = mix(texture2D(uKerbMap, vMapUv).rgb / max(uAvgKerb, vec3(0.05)),
                            texture2D(uSidewalkMap, vMapUv).rgb / max(uAvgSidewalk, vec3(0.05)), 0.6);

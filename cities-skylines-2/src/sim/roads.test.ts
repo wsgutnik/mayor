@@ -86,6 +86,28 @@ describe("road graph", () => {
     expect(zs.length).toBe(2);
   });
 
+  it("points every arm tangent from the node into its segment", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    s.money = 1e7;
+    // Avenue with two streets joining it at acute angles (asymmetric junction).
+    road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
+    road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
+    road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
+    const w = s.world;
+    for (const node of w.nodes) {
+      for (const arm of nodeArms(w, node.id)) {
+        const seg = w.segments.find((sg) => sg.id === arm.segId)!;
+        const pts = seg.pts;
+        const inner = arm.end === "a" ? pts[1] : pts[pts.length - 2];
+        const vx = inner.x - node.x, vz = inner.z - node.z;
+        const l = Math.hypot(vx, vz) || 1;
+        // Arrival direction (tip - inner) would give -1 and mirror the junction.
+        expect(arm.dx * (vx / l) + arm.dz * (vz / l)).toBeGreaterThan(0.99);
+      }
+    }
+  });
+
   it("merges straight degree-2 nodes on remove and drops orphans", () => {
     const s = newCity(3);
     const ey = flat(s);

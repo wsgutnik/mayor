@@ -85,7 +85,9 @@ function averageOfTexture(tex: THREE.Texture): [number, number, number] {
     const ctx = c.getContext("2d");
     if (!ctx) return [0.55, 0.55, 0.55];
     ctx.drawImage(img, 0, 0, 8, 8);
-    return averageOfPixels(ctx.getImageData(0, 0, 8, 8).data);
+    // The sampler returns linear values for these sRGB textures, so the divisor must be linear too.
+    const a = averageOfPixels(ctx.getImageData(0, 0, 8, 8).data);
+    return [Math.pow(a[0], 2.2), Math.pow(a[1], 2.2), Math.pow(a[2], 2.2)];
   } catch {
     return [0.55, 0.55, 0.55];
   }
@@ -202,7 +204,7 @@ export function createTerrainSplatMaterial(): TerrainSplat {
           vec3 detail = (g * grassW + s * sandW + r * rockW + d * dirtW)
                       / max(grassW + sandW + rockW + dirtW, 1e-4);
           // Snow reads as flat white, not textured rock (vColor is linear: snow ~0.9, sand ~0.5).
-          float snowM = smoothstep(0.7, 0.85, dot(vColor, vec3(0.3333)));
+          float snowM = smoothstep(0.7, 0.85, dot(vColor.rgb, vec3(0.3333)));
           detail = mix(detail, vec3(1.0), snowM);
           diffuseColor.rgb *= mix(vec3(1.0), detail, uSplat);
           // Cheap AO: low sun-facing gets full light, steep faces sit darker.

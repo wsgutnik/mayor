@@ -19,6 +19,9 @@ import { createRoadDetailMaterial, loadRoadDetailMaps, RoadDetail } from "./road
 import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat } from "./terrain-splat";
 import { LodSorter } from "./lod";
 import { QUALITY_PROFILE, qualityForPixelCap } from "../prefs";
+import { nodeArms, signalNodes, signalPhase } from "../sim/roads";
+import { PROP_KINDS, PropKind, planProps } from "../sim/props";
+import { PROP_TINT, propGeometry } from "./props";
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
@@ -113,6 +116,13 @@ export class CityRenderer {
   private stopMesh!: THREE.InstancedMesh;
   private treeMeshes = new Map<string, THREE.InstancedMesh>();
   private lampMesh!: THREE.InstancedMesh;
+  private propMeshes = new Map<PropKind, THREE.InstancedMesh>();
+  private signalPole!: THREE.InstancedMesh;
+  private signalLamp!: THREE.InstancedMesh;
+  /** Per signal-lamp instance: true when its arm runs north-south. */
+  private signalLampNs: boolean[] = [];
+  private lastSignalKey = "";
+  private propDensitySeen = -1;
   private water: WaterSurface | null = null;
   private noiseTex!: THREE.DataTexture;
   private dayLevel = 1;
@@ -352,6 +362,35 @@ export class CityRenderer {
     this.lodBox.setColorAt(0, this.whiteTint);
     this.lodBox.count = 0;
     own(this.lodBox);
+    // Street furniture and traffic-light poles/heads: procedural geometry
+    // first, swapped for the Blender prop when its GLB exists (same pattern
+    // as lamps). Signal lamps stay procedural so phase colours can drive them.
+    this.propMeshes.clear();
+    for (const kind of PROP_KINDS) {
+      const m: THREE.InstancedMesh = new THREE.InstancedMesh(propGeometry(kind), new THREE.MeshLambertMaterial({ color: "#ffffff" }), 1024);
+      m.count = 0;
+      m.frustumCulled = false;
+      own(m);
+      this.propMeshes.set(kind, m);
+      this.useProp(kind, (model) => {
+        if (!this.sized.includes(m)) return;
+        m.geometry = model.geometry;
+        m.material = model.materials;
+      });
+    }
+    this.signalPole = new THREE.InstancedMesh(propGeometry("traffic_light"), new THREE.MeshLambertMaterial({ color: "#ffffff" }) as THREE.Material, 256);
+    this.signalPole.count = 0;
+    this.signalPole.frustumCulled = false;
+    own(this.signalPole);
+    this.useProp("traffic_light", (model) => {
+      if (!this.sized.includes(this.signalPole)) return;
+      this.signalPole.geometry = model.geometry;
+      this.signalPole.material = model.materials;
+    });
+    this.signalLamp = new THREE.InstancedMesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({ color: "#ffffff" }), 256);
+    this.signalLamp.count = 0;
+    this.signalLamp.frustumCulled = false;
+    own(this.signalLamp);
     this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
@@ -720,6 +759,105 @@ export class CityRenderer {
     this.warnMesh.count = nw;
     this.warnMesh.instanceMatrix.needsUpdate = true;
     if (this.warnMesh.instanceColor) this.warnMesh.instanceColor.needsUpdate = true;
+    this.rebuildProps();
+    this.rebuildSignals();
+  }
+
+  /** Quality-tier density for decorative props (low/medium/high pixel caps). */
+  private propDensity(): number {
+    return this.qualityCap <= 1 ? 0.45 : this.qualityCap < 2 ? 0.75 : 1;
+  }
+
+  /** Fill the street-furniture instanced meshes from the deterministic plan. */
+  private rebuildProps(): void {
+    const w = this.world;
+    const density = this.propDensity();
+    this.propDensitySeen = density;
+    const counts = new Map<PropKind, number>();
+    const tint = new THREE.Color();
+    const d = this.dummy;
+    for (const p of planProps(w, density)) {
+      const mesh = this.propMeshes.get(p.kind);
+      if (!mesh) continue;
+      const c = counts.get(p.kind) ?? 0;
+      if (c >= mesh.instanceMatrix.count) continue;
+      d.position.set(p.x, heightAt(w, p.x, p.z) + 0.07, p.z);
+      d.rotation.set(0, p.yaw, 0);
+      d.scale.setScalar(1);
+      d.updateMatrix();
+      mesh.setMatrixAt(c, d.matrix);
+      mesh.setColorAt(c, tint.set(PROP_TINT[p.kind]));
+      counts.set(p.kind, c + 1);
+    }
+    for (const [kind, mesh] of this.propMeshes) {
+      mesh.count = counts.get(kind) ?? 0;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+    d.rotation.set(0, 0, 0);
+  }
+
+  /** One pole + lamp per arm at every signalised node, on the corner to the right of entering traffic. */
+  private rebuildSignals(): void {
+    const w = this.world;
+    const d = this.dummy;
+    const tint = new THREE.Color(PROP_TINT.traffic_light);
+    this.signalLampNs = [];
+    let n = 0;
+    for (const node of signalNodes(w)) {
+      for (const arm of nodeArms(w, node.id)) {
+        if (n >= this.signalPole.instanceMatrix.count) break;
+        const px = -arm.dz, pz = arm.dx; // left of the outward arm = right of traffic entering the node
+        const cx = node.x + arm.dx * (arm.halfWidth + 0.5) + px * (arm.halfWidth + 0.16);
+        const cz = node.z + arm.dz * (arm.halfWidth + 0.5) + pz * (arm.halfWidth + 0.16);
+        const y = heightAt(w, cx, cz) + 0.07;
+        d.position.set(cx, y, cz);
+        d.rotation.set(0, Math.atan2(-arm.dx, -arm.dz), 0);
+        d.scale.setScalar(1);
+        d.updateMatrix();
+        this.signalPole.setMatrixAt(n, d.matrix);
+        this.signalPole.setColorAt(n, tint);
+        d.position.set(cx - arm.dx * 0.09, y + 1.1, cz - arm.dz * 0.09);
+        d.updateMatrix();
+        this.signalLamp.setMatrixAt(n, d.matrix);
+        this.signalLampNs.push(Math.abs(arm.dx) <= Math.abs(arm.dz));
+        n++;
+      }
+    }
+    this.signalPole.count = n;
+    this.signalLamp.count = n;
+    this.signalPole.instanceMatrix.needsUpdate = true;
+    this.signalLamp.instanceMatrix.needsUpdate = true;
+    if (this.signalPole.instanceColor) this.signalPole.instanceColor.needsUpdate = true;
+    this.lastSignalKey = "";
+    d.rotation.set(0, 0, 0);
+  }
+
+  /**
+   * Lamp colours follow the two-phase cycle (with a 1 s amber at each change).
+   * Instance colours are rewritten only when the displayed state changes —
+   * a phase flip, the amber window, or day/night — never per frame.
+   */
+  private updateSignalColors(): void {
+    if (!this.signalLamp || this.signalLamp.count === 0) return;
+    const time = this.traffic?.time ?? 0;
+    const phase = signalPhase(time);
+    const cyc = ((time % 16) + 16) % 16;
+    const nsAmber = cyc >= 7 && cyc < 8, ewAmber = cyc >= 15;
+    const night = this.nightGlow > 0.25;
+    const key = `${phase}|${nsAmber ? 1 : 0}|${ewAmber ? 1 : 0}|${night ? 1 : 0}`;
+    if (key === this.lastSignalKey) return;
+    this.lastSignalKey = key;
+    const bright = 1 + this.nightGlow * 1.6; // lamps glow after dark
+    const col = new THREE.Color();
+    for (let i = 0; i < this.signalLamp.count; i++) {
+      const ns = this.signalLampNs[i];
+      const amber = ns ? nsAmber : ewAmber;
+      const green = ns ? phase === 0 : phase === 1;
+      col.set(amber ? "#ffb020" : green ? "#27e05a" : "#ff4038").multiplyScalar(bright);
+      this.signalLamp.setColorAt(i, col);
+    }
+    if (this.signalLamp.instanceColor) this.signalLamp.instanceColor.needsUpdate = true;
   }
 
   /** Yaw so a model's front (+z) faces the adjacent road, else a stable pseudo-random side. */
@@ -1326,6 +1464,8 @@ export class CityRenderer {
     this.updateBoats(dt, time);
     this.ambience.update(time, dt, this.dayLevel, this.skyCol);
     this.updateVehicles();
+    this.updateSignalColors();
+    if (this.propDensitySeen >= 0 && this.propDensitySeen !== this.propDensity()) this.rebuildProps();
     if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();
     if (this.frame % 90 === 0) this.markShadows();

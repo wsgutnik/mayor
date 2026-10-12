@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { newCity, placeRoad, CityState } from "../sim/sim";
 import { cidx, heightAt } from "../sim/world";
+import { nodeArms } from "../sim/roads";
 import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 
 const tris = (g: THREE.BufferGeometry): number =>
@@ -106,6 +107,50 @@ describe("road network geometry", () => {
     for (const y of lifts) expect(allowed.has(y)).toBe(true);
     expect(lifts.has("0.060")).toBe(true);
     expect(lifts.has("0.066")).toBe(true);
+  });
+
+  it("covers every arm mouth where streets meet an avenue at acute angles", () => {
+    const s = flatTown();
+    const ey = s.world.entry.y;
+    road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
+    road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
+    road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
+    const w = s.world;
+    const node = w.nodes.find((n) => n.segs.length === 4)!;
+    expect(node).toBeDefined();
+    const gy = (x: number, z: number): number => heightAt(w, x, z);
+    const g = buildRoadNetworkGeometry(w, gy);
+    const pos = g.attributes.position.array as Float32Array;
+    const idxAttr = g.index!;
+    const tris: number[][] = [];
+    for (let t = 0; t < idxAttr.count; t += 3) {
+      const vi = [idxAttr.getX(t), idxAttr.getX(t + 1), idxAttr.getX(t + 2)];
+      const ax = pos[vi[0] * 3], az = pos[vi[0] * 3 + 2];
+      const bx = pos[vi[1] * 3], bz = pos[vi[1] * 3 + 2];
+      const cx = pos[vi[2] * 3], cz = pos[vi[2] * 3 + 2];
+      const y = (pos[vi[0] * 3 + 1] + pos[vi[1] * 3 + 1] + pos[vi[2] * 3 + 1]) / 3;
+      if (Math.abs(y - gy((ax + bx + cx) / 3, (az + bz + cz) / 3) - 0.06) > 5e-4) continue;
+      // No zero-area slivers in the asphalt layer.
+      expect(Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2).toBeGreaterThan(1e-9);
+      tris.push([ax, az, bx, bz, cx, cz]);
+    }
+    const sign = (px: number, pz: number, ax: number, az: number, bx: number, bz: number): number =>
+      (px - bx) * (az - bz) - (ax - bx) * (pz - bz);
+    const covered = (px: number, pz: number): boolean => tris.some((t) => {
+      const d1 = sign(px, pz, t[0], t[1], t[2], t[3]);
+      const d2 = sign(px, pz, t[2], t[3], t[4], t[5]);
+      const d3 = sign(px, pz, t[4], t[5], t[0], t[1]);
+      return !((d1 < -1e-7 || d2 < -1e-7 || d3 < -1e-7) && (d1 > 1e-7 || d2 > 1e-7 || d3 > 1e-7));
+    });
+    // Every arm mouth is asphalt from the node centre out past the trims; the
+    // samples sit slightly off the centreline so ribbon halves cannot hide them.
+    for (const arm of nodeArms(w, node.id)) {
+      for (const d of [0.4, 0.9, 1.4]) {
+        const px = node.x + arm.dx * d - arm.dz * 0.05;
+        const pz = node.z + arm.dz * d + arm.dx * 0.05;
+        expect(covered(px, pz)).toBe(true);
+      }
+    }
   });
 
   it("builds preview strips without junctions", () => {

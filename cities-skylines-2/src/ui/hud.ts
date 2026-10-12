@@ -1,6 +1,6 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
 import { MAX_LINE_VEHICLES } from "../sim/transit";
-import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST } from "../sim/world";
+import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
 
@@ -38,6 +38,7 @@ const T: Record<string, ToolDef> = {
   cityhall: { id: "cityhall", label: "City hall", hint: "City hall (one per city): happiness and tax income", color: "#4f5f86", icon: { img: "kit/ico-martelo" } },
   substation: { id: "substation", label: "Substation", hint: "Substation: relays power to nearby roads", color: "#cfd3d6", icon: { img: "kit/ico-energia" } },
   bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "kit/ico-lixeira" } },
+  roundabout: { id: "roundabout", label: "Roundabout", hint: "Stamp a roundabout on a junction", color: "#9aa3b2", icon: { glyph: "⟳", color: "#9aa3b2" } },
 };
 
 const ZONE_TOOLS = ["res", "com", "ind"];
@@ -287,13 +288,14 @@ export class Hud {
 
     // Roads: class and drawing mode
     const flyRoad = el("div", "panel fly");
-    for (const t of [1, 2, 3] as RoadType[]) {
-      const name = t === 1 ? "Street" : t === 2 ? "Avenue" : "Highway";
-      const b = el("button", "tool", `<span class="ic">${t === 1 ? "─" : t === 2 ? "═" : "≡"}</span><span>${tr(name)}</span><small>$${ROAD_COST[t]}/${tr("tile")}</small>`);
+    for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
+      const glyph = t === 1 ? "─" : t === 2 ? "═" : t === 3 ? "≡" : t === 4 ? "→" : "⇒";
+      const b = el("button", "tool", `<span class="ic">${glyph}</span><span>${tr(ROAD_NAME[t])}</span><small>$${ROAD_COST[t]}/${tr("tile")}</small>`);
       b.addEventListener("click", () => { this.setRoadChoice(t, this.roadMode); this.hooks.onTool("road"); this.setTool("road"); });
       this.roadTypeBtns.set(t, b);
       flyRoad.appendChild(b);
     }
+    flyRoad.appendChild(this.toolButton(T.roundabout));
     flyRoad.appendChild(el("span", "sep"));
     for (const m of ROAD_MODES) {
       const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(m.label)}</span>`);

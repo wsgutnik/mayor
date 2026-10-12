@@ -149,7 +149,7 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast(tr("Autosave found: open the menu to continue")), 800);
 
 const lineTool = () => tool === "busline" || tool === "metroline";
-const placing = () => tool === "road" || lineTool();
+const placing = () => tool === "road" || lineTool() || tool === "roundabout";
 
 function cancelDraft(): void {
   draft = [];
@@ -188,6 +188,7 @@ function onLineTap(cx: number, cy: number): void {
 
 function refreshHint(): void {
   if (!placing()) return;
+  if (tool === "roundabout") { hud.setHint(tr("Tap a junction to stamp a roundabout")); return; }
   if (lineTool()) {
     const what = tr(tool === "metroline" ? "metro station" : "bus stop");
     hud.setHint(lineDraft.length < 2
@@ -240,6 +241,13 @@ function onTap(cx: number, cy: number): void {
   if (tool === "pan") { inspectAt(cx, cy); return; }
   if (!placing()) return;
   if (lineTool()) { onLineTap(cx, cy); return; }
+  if (tool === "roundabout") {
+    const raw = renderer.pickPoint(cx, cy);
+    if (!raw) return;
+    const res = applyTool(state, "roundabout", Math.floor(raw.x), Math.floor(raw.z));
+    if (!res.ok) hud.showToast(trReason(res.reason));
+    return;
+  }
   const raw = renderer.pickPoint(cx, cy);
   if (!raw) return;
   const p = snap(raw);

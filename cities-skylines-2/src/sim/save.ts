@@ -1,7 +1,7 @@
 import {
   CityState, newCity, refreshDerived,
 } from "./sim";
-import { BIOMES, FAC, Biome, generateWorld, RoadSegment, Stop, TransitLine, WorldLot } from "./world";
+import { BIOMES, FAC, Biome, generateWorld, RoadSegment, Roundabout, Stop, TransitLine, WorldLot } from "./world";
 
 export const SAVE_VERSION = 1;
 
@@ -25,6 +25,8 @@ interface SaveFile {
   level: string;
   facility: string;
   segments: RoadSegment[];
+  /** Roundabout islands; absent in saves from before the roundabout tool. */
+  roundabouts?: Roundabout[];
   stops: Stop[];
   lines: TransitLine[];
   nextSegmentId: number;
@@ -77,6 +79,7 @@ export function serialize(s: CityState): string {
     level: toB64(w.level),
     facility: toB64(w.facility),
     segments: w.segments,
+    roundabouts: w.roundabouts,
     stops: w.stops,
     lines: w.lines,
     nextSegmentId: w.nextSegmentId,
@@ -105,11 +108,19 @@ function validateStructure(f: SaveFile, n: number): void {
   for (const seg of f.segments) {
     if (!seg || !Number.isInteger(seg.id) || seg.id < 1 || segIds.has(seg.id)) bad();
     segIds.add(seg.id);
-    if (![1, 2, 3].includes(seg.type) || !Array.isArray(seg.tiles) || !Array.isArray(seg.pts)) bad();
+    if (![1, 2, 3, 4, 5].includes(seg.type) || !Array.isArray(seg.tiles) || !Array.isArray(seg.pts)) bad();
     if (seg.elevation !== undefined && seg.elevation !== "ground" && seg.elevation !== "bridge" && seg.elevation !== "tunnel") bad();
     if (seg.pts.length < 2 || seg.pts.length > 3 || seg.tiles.length > n * n) bad();
     if (!seg.tiles.every(tile)) bad();
     if (!seg.pts.every((p) => p && finite(p.x) && finite(p.z))) bad();
+    if (seg.oneWay !== undefined && typeof seg.oneWay !== "boolean") bad();
+    if (seg.dir !== undefined && seg.dir !== 1 && seg.dir !== -1) bad();
+  }
+  if (f.roundabouts !== undefined) {
+    if (!Array.isArray(f.roundabouts)) bad();
+    for (const r of f.roundabouts) {
+      if (!r || !finite(r.x) || !finite(r.z) || !finite(r.r) || r.r <= 0 || r.r > 8) bad();
+    }
   }
   const stopIds = new Set<number>();
   for (const st of f.stops) {
@@ -178,6 +189,7 @@ export function deserialize(json: string): CityState {
     throw new SaveError("The save file is damaged");
   }
   w.segments = f.segments;
+  w.roundabouts = f.roundabouts ?? [];
   w.stops = f.stops;
   w.lines = f.lines;
   // Counters must stay above every stored id, or the next road/line would reuse one.
