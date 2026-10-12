@@ -30,15 +30,32 @@ npm run build   # tipos + bundle em dist/
   nas ruas, faixas de pedestres e linhas de retenção nos cruzamentos, nuvens e fumaça de chaminé, e doze prédios do kit redesenhados
   (varandas, degraus, cercas, carros estacionados, silos, torre de mangueiras).
 
+
+- M15: detalhe. Texturas compartilhadas e oclusão ambiente nos modelos, nuvens e fumaça, doze prédios redesenhados.
+- M16: rede viária com nós. Grafo de estradas (`src/sim/roads.ts`): fim com fim, T e cruzamentos viram nós; esquinas com meio-fio
+  arredondado, faixas de pedestres e linhas de retenção (`src/render/roads.ts`); dados de semáforo por fase. Estradas só por Linha ou Curva.
+- M17: quadras e lotes (`src/sim/blocks.ts`). Zonas só até 4 lotes de uma estrada; lotes persistidos e voltados para a rua, um prédio por lote
+  (1×1 a 2×2 compostos), lotes vazios desenhados com meio-fio e sombreamento por profundidade.
+- M18: redes de água, esgoto e energia (`src/sim/networks.ts`). Instalações se ligam à estrada mais próxima (até 5 tiles); o serviço
+  corre pelas ruas e atende por capacidade, do mais próximo ao mais distante. Vista Subsolo (`U`) mostra tubos, válvulas e fluxo;
+  prédios sem serviço ganham um aviso.
+- M19: água com margem contínua pelo relevo, normais por onda, reflexo do céu, brilho do sol, espuma só na costa e três níveis de qualidade.
+- M23: pontes e túneis (`src/sim/elevation.ts`). O planejador marca vãos sobre água (até 12/20 tiles) e trechos em colina como ponte
+  (custo 3×) ou túnel (4×); tabuleiro, pilares e portais no mesmo mesh; zonas e lotes ignoram tabuleiros, e o terreno acima de um túnel fica livre.
+- Em produção: M20 (texturas HD, níveis de qualidade e LOD) e M21 (mão única, rotatória, semáforos e props de calçada).
+
+Documentação do processo, pesquisa e plano: [docs/process/](docs/process/). Progresso detalhado: [PROGRESS.md](PROGRESS.md). Guia para agentes: [AGENTS.md](AGENTS.md).
+
 ## Controles
 
 | | Mouse | Toque |
 |---|---|---|
-| Usar ferramenta | botão esquerdo (arrastar pinta; Linha/Curva: clique) | um dedo (Linha/Curva: toque) |
+| Usar ferramenta | botão esquerdo (zonas: arrastar pinta; estradas: clique início e fim, ou início, curva e fim) | um dedo (estradas: toque) |
 | Cancelar estrada | Esc | botão Finish road |
 | Mover câmera | botão direito, WASD/setas | ferramenta Move, ou dois dedos |
 | Girar | botão do meio, Q/E | dois dedos (torcer) |
 | Zoom | roda | pinça |
+| Vista Subsolo | `U` (ou Mapas → Subsolo) | Mapas → Subsolo |
 
 ## Status
 
@@ -47,7 +64,7 @@ npm run build   # tipos + bundle em dist/
   Prédios novos precisam de energia e água; nível 2 pede esgoto, nível 3 pede coleta de lixo.
 - M3: polícia, bombeiros, clínica, escola e parque; incêndios, felicidade e mapa de valor do solo.
   Sem estação de bombeiros um prédio pode pegar fogo; nível 3 exige escola; valor do solo escala a arrecadação.
-- M4: estradas livres. Toque ou clique inicio e fim (Linha) ou inicio, curva e fim (Curva); Pintar continua disponível.
+- M4: estradas livres. Toque ou clique início e fim (Linha) ou início, curva e fim (Curva); o modo Pintar foi removido das estradas (M16).
   Rua, avenida e rodovia (a rodovia liga mas não serve lotes); snapping em estradas existentes.
   A simulação continua em grade: cada via é rasterizada em tiles, então zonas, cobertura e conectividade seguem iguais.
 - M5: tráfego. Carros de moradores (casa para emprego) e caminhões (indústria para comércio) percorrem a rede
