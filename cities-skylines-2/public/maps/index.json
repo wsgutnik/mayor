@@ -10,7 +10,7 @@
       "terrain": "bay",
       "size": 128,
       "data": "/maps/baia-metropolitana.json",
-      "preview": "/maps/baia-metropolitana.jpg"
+      "preview": "/maps/baia-metropolitana.png"
     },
     {
       "id": "vale-verde",
@@ -22,7 +22,7 @@
       "terrain": "valley",
       "size": 128,
       "data": "/maps/vale-verde.json",
-      "preview": "/maps/vale-verde.jpg"
+      "preview": "/maps/vale-verde.png"
     },
     {
       "id": "arquipelago-azul",
@@ -34,7 +34,7 @@
       "terrain": "archipelago",
       "size": 128,
       "data": "/maps/arquipelago-azul.json",
-      "preview": "/maps/arquipelago-azul.jpg"
+      "preview": "/maps/arquipelago-azul.png"
     },
     {
       "id": "planicie-central",
@@ -46,7 +46,7 @@
       "terrain": "plains",
       "size": 128,
       "data": "/maps/planicie-central.json",
-      "preview": "/maps/planicie-central.jpg"
+      "preview": "/maps/planicie-central.png"
     }
   ]
 }

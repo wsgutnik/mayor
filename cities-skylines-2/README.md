@@ -14,6 +14,10 @@ npm run build   # tipos + bundle em dist/
 
 - M11: modelos 3D procedurais (casas, blocos, torres de vidro, galpões, fábricas) e instalações; janelas por textura que acendem à noite; prédios viram para a rua.
 
+- M12: mapas oficiais do Map Kit (Baía Metropolitana, Vale Verde, Arquipélago Azul, Planície Central), baixados para 128×128 por
+  `npm run maps` (decodifica o PNG de 16 bits, calcula a entrada de cada mapa) e escolhidos no menu. O motor aceita mapas de qualquer
+  tamanho e entrada em qualquer borda.
+
 ## Controles
 
 | | Mouse | Toque |

@@ -37,6 +37,8 @@ linguagem visual da UI. Não é paridade de features.
 | M8 | ✅ Empacotamento (Mac verificado; Windows e iPad por verificar) | PWA offline, Tauri Mac/Win, ícones, perf no iPad |
 | M9 | ✅ Identidade visual | Logo com coroa, ícones do HUD, painel de preferências (idioma, qualidade, autosave), indicadores |
 | M10 | ✅ Kit visual | Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas |
+| M11 | ✅ Modelos 3D | Casas, torres, galpões e instalações procedurais, janelas acesas à noite |
+| M12 | ✅ Mapas oficiais | Heightmaps do Map Kit carregados no jogo, seletor no menu |
 
 ## Arquitetura
 

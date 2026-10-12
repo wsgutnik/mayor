@@ -10,7 +10,8 @@
     "test": "vitest run",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "maps": "node scripts/convert-maps.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"

@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M10 concluído. Falta validar Windows e iPad.",
-    summary: "O kit visual do PDF entrou no jogo: ícones coloridos na interface, tiles isométricos nas zonas, seis terrenos selecionáveis com árvores e cores próprias, preferências em abas e o ícone do app em alta resolução.",
-    screenshot: { src: "img/m10-kit.jpg", caption: "M10: menu com o seletor de terreno do kit (Planície, Floresta, Rio, Litoral, Montanha, Deserto) sobre uma cidade em terreno de floresta." },
+    headline: "M12 concluído. Falta validar Windows e iPad.",
+    summary: "Os quatro mapas oficiais do kit entram no jogo a partir dos heightmaps de 16 bits, com seletor no menu. As caixas deram lugar a modelos 3D com janelas que acendem à noite. Codex e Muse trabalharam em paralelo: conversor de mapas, seletor e duas revisões de código.",
+    screenshot: { src: "img/m12-bay.jpg", caption: "M12: Baía Metropolitana carregada do heightmap oficial: costa, canal do rio, enseada e serras ao nordeste, em 128×128 tiles." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -175,10 +175,12 @@ npm run dev</pre>
       { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "done" },
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "done" },
       { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "done" },
-      { id: "M10", name: "Kit visual", desc: "Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas.", status: "done" }
+      { id: "M10", name: "Kit visual", desc: "Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas.", status: "done" },
+      { id: "M11", name: "Modelos 3D", desc: "Casas, torres, galpões e instalações procedurais; janelas acesas à noite; prédios voltados para a rua.", status: "done" },
+      { id: "M12", name: "Mapas oficiais", desc: "Heightmaps do Map Kit no jogo, conversor, seletor no menu, mapas de qualquer tamanho.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "76 testes passando, incluindo presets de terreno, entrada seca em todos e save com terreno" },
+      { ok: true, text: "104 testes passando: mapas, modelos, entrada em qualquer borda, correções da revisão" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
       { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar (ainda com o ícone antigo)" },
@@ -186,6 +188,20 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M12 · Mapas oficiais, com Codex e Muse em paralelo", items: [
+        "Conversor de mapas (Codex): decodifica o PNG de 16 bits sem dependências, reduz para 128×128, escolhe a entrada e gera JSON e prévias",
+        "Seletor de mapas no menu (Muse): cartões com prévia, dificuldade, descrição e idioma; terrenos aleatórios ficam numa seção própria",
+        "Motor: mapas de qualquer tamanho, entrada em qualquer borda e buffers do renderizador refeitos ao trocar de mapa",
+        "Arquipélago Azul tem água em todas as bordas: a entrada fica numa ilha, a cerca de 9 tiles da borda",
+        "Revisão do Codex (13 achados) e do Muse (14 achados) em docs/: corrigidos paradas órfãs, linhas sem rota, penalidade de energia e água, buffers do A*, validação de saves",
+        "Repositório no GitHub criado como privado: wsgutnik/mayor"
+      ] },
+      { date: "2026-10-12", title: "M11 · Modelos 3D procedurais", items: [
+        "18 modelos de prédio (3 zonas, 3 níveis, 2 variantes) e 10 de instalações, todos em poucos triângulos para instancing",
+        "Janelas por textura, com mapa de brilho que acende à noite",
+        "Prédios viram para a rua; altura varia por prédio",
+        "Testes: cobertura de todos os modelos, limites do tile e orçamento de triângulos"
+      ] },
       { date: "2026-10-12", title: "M10 · Kit visual do PDF", items: [
         "36 ícones coloridos do kit na barra de ferramentas, nos submenus, nos mapas e nos indicadores",
         "Tiles isométricos do kit como ícones de zona residencial, comercial e industrial",
