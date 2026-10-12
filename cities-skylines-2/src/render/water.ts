@@ -14,6 +14,33 @@ export function buildWaterInfo(w: World): Uint8Array {
       depth[i] = Math.max(0, -h);
     }
   }
+  // Distance to the nearest shore (in tiles) by a two-pass chamfer transform: this, not bed height, drives colour and foam,
+  // so water turns turquoise at the coast and deepens smoothly offshore instead of going flat navy.
+  const dist = new Float32Array(n * n);
+  for (let i = 0; i < n * n; i++) dist[i] = wet[i] ? 1e4 : 0;
+  const relax = (i: number, j: number, c: number) => { if (dist[j] + c < dist[i]) dist[i] = dist[j] + c; };
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const i = y * n + x;
+    if (x > 0) relax(i, i - 1, 1);
+    if (y > 0) relax(i, i - n, 1);
+    if (x > 0 && y > 0) relax(i, i - n - 1, 1.414);
+    if (x < n - 1 && y > 0) relax(i, i - n + 1, 1.414);
+  }
+  for (let y = n - 1; y >= 0; y--) for (let x = n - 1; x >= 0; x--) {
+    const i = y * n + x;
+    if (x < n - 1) relax(i, i + 1, 1);
+    if (y < n - 1) relax(i, i + n, 1);
+    if (x < n - 1 && y < n - 1) relax(i, i + n + 1, 1.414);
+    if (x > 0 && y < n - 1) relax(i, i + n - 1, 1.414);
+  }
+  for (let pass = 0; pass < 2; pass++) {
+    const copy = dist.slice();
+    for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
+      let a = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) a += copy[(y + dy) * n + x + dx];
+      dist[y * n + x] = Math.min(copy[y * n + x] + 1, a / 9);
+    }
+  }
   // Flow follows the local downhill direction of a smoothed bed; broad lakes and the open sea barely move.
   const smooth = (x: number, y: number) => {
     let s = 0, c = 0;
@@ -36,7 +63,7 @@ export function buildWaterInfo(w: World): Uint8Array {
       // Direction of descent; strength saturates for clear slopes and fades for flat water.
       const k = mag > 1e-4 ? Math.min(1, mag * 3.5) / mag : 0;
       const fx = -gx * k, fy = -gy * k;
-      out[i * 4] = Math.round(Math.min(1, depth[i] / 2.5) * 255);
+      out[i * 4] = Math.round(Math.min(1, Math.max(depth[i] / 2.5 * 0.4, dist[i] / 12)) * 255);
       out[i * 4 + 1] = Math.round((fx * 0.5 + 0.5) * 255);
       out[i * 4 + 2] = Math.round((fy * 0.5 + 0.5) * 255);
       out[i * 4 + 3] = wet[i] ? 255 : 0;
@@ -122,23 +149,37 @@ const FRAG = /* glsl */ `
     float ripple = mix(n0, n1, w);
     float fine = texture2D(uNoise, vWorld * 0.55 + vec2(uTime * 0.04, -uTime * 0.03)).r;
 
-    vec3 shallow = vec3(0.30, 0.66, 0.74);
-    vec3 deep = vec3(0.07, 0.25, 0.46);
-    vec3 col = mix(shallow, deep, smoothstep(0.0, 0.85, depth));
-    col += (ripple - 0.5) * 0.18 + (fine - 0.5) * 0.06;
+    // Colour by distance from shore (info.r): turquoise at the coast to deep blue offshore.
+    vec3 shore = vec3(0.42, 0.80, 0.78);
+    vec3 shallow = vec3(0.16, 0.58, 0.70);
+    vec3 deep = vec3(0.04, 0.22, 0.42);
+    vec3 col = mix(shore, shallow, smoothstep(0.0, 0.18, depth));
+    col = mix(col, deep, smoothstep(0.15, 0.85, depth));
 
-    // Sun glints and foam on the shallows and along fast water.
-    float glint = smoothstep(0.72, 0.9, ripple * 0.6 + fine * 0.5) * uSun;
-    col += vec3(1.0, 0.96, 0.85) * glint * 0.55;
-    float foamZone = (1.0 - smoothstep(0.0, 0.16, depth)) + strength * 0.25;
-    float foam = smoothstep(0.55, 0.75, ripple + fine * 0.25) * clamp(foamZone, 0.0, 1.0);
-    col = mix(col, vec3(0.95, 0.98, 1.0), foam * 0.7);
+    // Wave normal from the ripple noise, for a sun glint and a sky reflection that grows at grazing angles.
+    float e = 0.01;
+    float rx = texture2D(uNoise, base - d0 + vec2(e, uTime * 0.01)).r;
+    float rz = texture2D(uNoise, base - d0 + vec2(0.0, uTime * 0.01 + e)).r;
+    vec3 nrm = normalize(vec3((n0 - rx) * 5.0, 1.0, (n0 - rz) * 5.0));
+    vec3 V = normalize(cameraPosition - vec3(vWorld.x, 0.0, vWorld.y));
+    vec3 L = normalize(vec3(0.45, 0.75, 0.35));
+    float spec = pow(max(dot(reflect(-V, nrm), L), 0.0), 70.0) * uSun;
+    float fres = pow(1.0 - clamp(V.y, 0.0, 1.0), 3.0);
+    col = mix(col, uSky, fres * 0.55);
+    col += (ripple - 0.5) * 0.08 + (fine - 0.5) * 0.04;
+    col += vec3(1.0, 0.95, 0.82) * spec * 0.9;
 
-    // Follow the sky: dusk and night darken and cool the water; the sky colour bleeds in at grazing light.
+    // Foam: a thin animated fringe along the shore and a trace on fast water; nothing across open lakes.
+    float fringe = 1.0 - smoothstep(0.0, 0.05, depth);
+    float lap = 0.5 + 0.5 * sin(uTime * 0.9 + ripple * 6.0 + vWorld.x * 0.7 + vWorld.y * 0.5);
+    float foam = smoothstep(0.52, 0.72, ripple + fine * 0.3) * (fringe * (0.55 + 0.45 * lap) + strength * 0.12);
+    col = mix(col, vec3(0.96, 0.99, 1.0), clamp(foam, 0.0, 1.0) * 0.85);
+
+    // Follow the sky: dusk and night darken and cool the water.
     float lum = 0.35 + 0.65 * uSun;
     col *= lum;
-    col = mix(col, uSky * 0.55, 0.18);
-    gl_FragColor = vec4(col, 0.9 * wet);
+    col = mix(col, uSky * 0.5, 0.1);
+    gl_FragColor = vec4(col, mix(0.72, 0.94, smoothstep(0.0, 0.3, depth)) * wet);
     #include <fog_fragment>
   }
 `;

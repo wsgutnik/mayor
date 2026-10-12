@@ -1,6 +1,6 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
 import { MAX_LINE_VEHICLES } from "../sim/transit";
-import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, RoadType, ROAD_COST } from "../sim/world";
+import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
 
@@ -68,6 +68,7 @@ const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string
   { layer: COVER.TRANSIT, label: "Transit", glyph: "◴", color: "#9b7bff", img: "kit/ico-onibus" },
   { layer: LAND_VALUE_LAYER, label: "Land value", glyph: "▦", color: "#7fd35c", img: "kit/ico-grafico" },
   { layer: TRAFFIC_LAYER, label: "Traffic", glyph: "⇆", color: "#e5584f", img: "kit/ico-estrada" },
+  { layer: UNDERGROUND_LAYER, label: "Underground", glyph: "⌸", color: "#c89a5a" },
 ];
 
 export const toolColor = (t: ToolId) => (T[t] ? T[t].color : "#ffffff");

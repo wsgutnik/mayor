@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { CityState } from "../sim/sim";
 import {
-  ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, FacilityKind, idx, tileHeight, isLand, World,
+  ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
   RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt, Biome,
 } from "../sim/world";
 import { CameraRig } from "./camera";
@@ -116,6 +116,7 @@ export class CityRenderer {
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
+  private pipes!: THREE.InstancedMesh;
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
   private vehicleMesh!: THREE.InstancedMesh;
@@ -246,6 +247,8 @@ export class CityRenderer {
       return m;
     };
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.pipes = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.pipes.renderOrder = 0;
     const mkModel = (geo: THREE.BufferGeometry, capacity: number) => {
       const m = new THREE.InstancedMesh(geo, [this.winMat, this.plainMat], capacity);
       m.count = 0;
@@ -716,17 +719,52 @@ export class CityRenderer {
         }
         ind.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
       };
+      // Junction and corner patches: a pavement disc under an asphalt disc at every road end, so segments that meet at an
+      // angle join with rounded kerb corners instead of leaving wedge gaps, and dead ends close with a round cap.
+      const halfW = (type: RoadType): number => ROAD_DRAW_WIDTH[type] / 2 - (type === 1 ? 0.07 : 0.09);
+      const fan = (cx: number, cz: number, r: number, lift: number, color: string): void => {
+        c.set(color);
+        const n = 24, vi = pos.length / 3;
+        pos.push(cx, this.groundY(cx, cz) + lift, cz);
+        col.push(c.r, c.g, c.b);
+        uvs.push(cx / 0.6, cz / 0.6);
+        for (let k = 0; k < n; k++) {
+          const a = (k / n) * Math.PI * 2, x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+          pos.push(x, this.groundY(x, z) + lift, z);
+          col.push(c.r, c.g, c.b);
+          uvs.push(x / 0.6, z / 0.6);
+        }
+        for (let k = 0; k < n; k++) ind.push(vi, vi + 1 + k, vi + 1 + ((k + 1) % n));
+      };
+      const nodes: { x: number; z: number; r: number; lift: number; kerb: number }[] = [];
+      segs.forEach((seg, n) => {
+        if (seg.color || seg.type === 3 || seg.pts.length < 2) return;
+        const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
+        const kerb = seg.type === 1 ? 0.07 : 0.09;
+        const last = seg.pts.length - 1;
+        for (const i of [0, last]) {
+          const p = seg.pts[i];
+          const r = halfW(seg.type);
+          const hit = nodes.find((q) => Math.hypot(q.x - p.x, q.z - p.z) < 0.9);
+          if (hit) { hit.r = Math.max(hit.r, r); hit.lift = Math.max(hit.lift, lift); hit.kerb = Math.max(hit.kerb, kerb); }
+          else nodes.push({ x: p.x, z: p.z, r, lift, kerb });
+        }
+      });
+      for (const nd of nodes) {
+        fan(nd.x, nd.z, nd.r + nd.kerb, nd.lift + 0.012, "#c4c7cc");
+        fan(nd.x, nd.z, nd.r, nd.lift + 0.02, "#3b3f46");
+      }
       {
         for (const a of arms) {
           const hw = ROAD_DRAW_WIDTH[a.type] / 2 - (a.type === 1 ? 0.07 : 0.09);
           const d = 0.8;                                     // distance of the crossing from the junction centre
           const cx = a.p.x + a.dx * d, cz = a.p.z + a.dz * d;
-          const stripes = Math.max(3, Math.round(hw * 5));
+          const stripes = Math.max(4, Math.round(hw * 9));
           for (let k = 0; k < stripes; k++) {
             const t = ((k + 0.5) / stripes) * 2 - 1;        // across the road
-            quad(cx - a.dz * hw * t * 0.9, cz + a.dx * hw * t * 0.9, a.dx, a.dz, 0.1, hw * 0.9 / stripes * 0.55, a.lift + 0.014, "#f1f1ea");
+            quad(cx - a.dz * hw * t * 0.9, cz + a.dx * hw * t * 0.9, a.dx, a.dz, 0.13, hw * 0.9 / stripes * 0.5, a.lift + 0.028, "#f1f1ea");
           }
-          quad(a.p.x + a.dx * (d + 0.14), a.p.z + a.dz * (d + 0.14), -a.dz, a.dx, hw * 0.92, 0.012, a.lift + 0.014, "#f1f1ea");
+          quad(a.p.x + a.dx * (d + 0.14), a.p.z + a.dz * (d + 0.14), -a.dz, a.dx, hw * 0.92, 0.012, a.lift + 0.028, "#f1f1ea");
         }
       }
     }
@@ -954,9 +992,74 @@ export class CityRenderer {
 
   /** Show one service's coverage as a tinted layer; 0 hides it. */
   setOverlay(layer: OverlayLayer): void {
+    const wasUnder = this.overlayLayer === UNDERGROUND_LAYER;
     this.overlayLayer = layer;
     this.overlaySeen = -1;
     this.overlayLvSeen = -1;
+    const under = layer === UNDERGROUND_LAYER;
+    if (under !== wasUnder) this.setUndergroundLook(under);
+  }
+
+  /** Make the ground and everything on it translucent so the pipe networks underneath read clearly. */
+  private setUndergroundLook(on: boolean): void {
+    const fade = (m: THREE.Material | THREE.Material[], opacity: number) => {
+      for (const mat of Array.isArray(m) ? m : [m]) {
+        mat.transparent = on || mat.transparent && opacity < 1;
+        mat.opacity = opacity;
+        mat.depthWrite = !on;
+        mat.needsUpdate = true;
+      }
+    };
+    fade(this.terrain.material, on ? 0.6 : 1);
+    // soil: brown earth while looking underneath, the normal grass tint otherwise
+    (this.terrain.material as THREE.MeshLambertMaterial).color.set(on ? "#7a5a3c" : "#ffffff").multiplyScalar(on ? 1 : 1.3);
+    fade(this.roadMesh.material, on ? 0.45 : 1);
+    for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);
+    for (const m of this.fMeshes.values()) fade(m.material, on ? 0.45 : 1);
+    this.zones.visible = !on;
+    this.pipes.visible = on;
+    if (!on) this.pipes.count = 0;
+  }
+
+  /** Water, sewage and power runs under every road tile they cover, joined tile to tile. */
+  private rebuildPipes(): void {
+    const w = this.world;
+    const m = this.pipes;
+    const nets: { bit: number; color: string; off: number; depth: number; r: number }[] = [
+      { bit: COVER.WATER, color: "#2ea8e8", off: -0.16, depth: 0.22, r: 0.075 },
+      { bit: COVER.SEWAGE, color: "#a07848", off: 0.0, depth: 0.34, r: 0.095 },
+      { bit: COVER.POWER, color: "#f2c230", off: 0.16, depth: 0.16, r: 0.045 },
+    ];
+    const d = this.dummy;
+    const col = new THREE.Color();
+    let n = 0;
+    const cap = m.instanceMatrix.count;
+    const put = (x: number, y: number, z: number, sx: number, sy: number, sz: number, c: THREE.Color): void => {
+      if (n >= cap) return;
+      d.position.set(x, y, z);
+      d.scale.set(sx, sy, sz);
+      d.updateMatrix();
+      m.setMatrixAt(n, d.matrix);
+      m.setColorAt(n++, c);
+    };
+    for (const net of nets) {
+      col.set(net.color);
+      for (let y = 0; y < w.size; y++) {
+        for (let x = 0; x < w.size; x++) {
+          const i = idx(w, x, y);
+          if (!w.road[i] || !(w.cover[i] & net.bit)) continue;
+          const h = tileHeight(w, x, y) - net.depth;
+          const cx = x + 0.5, cz = y + 0.5;
+          // joints and straight runs: a block at the tile centre, then half-tile arms to each road neighbour
+          put(cx + net.off, h, cz + net.off, net.r * 2.1, net.r * 2.1, net.r * 2.1, col);
+          if (x + 1 < w.size && w.road[idx(w, x + 1, y)] && (w.cover[idx(w, x + 1, y)] & net.bit)) put(cx + 0.5, h, cz + net.off, 1.0, net.r * 1.8, net.r * 1.8, col);
+          if (y + 1 < w.size && w.road[idx(w, x, y + 1)] && (w.cover[idx(w, x, y + 1)] & net.bit)) put(cx + net.off, h, cz + 0.5, net.r * 1.8, net.r * 1.8, 1.0, col);
+        }
+      }
+    }
+    m.count = n;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
   private rebuildOverlay(): void {
@@ -966,6 +1069,7 @@ export class CityRenderer {
     this.overlayLvSeen = w.lvRevision;
     const layer = this.overlayLayer;
     if (!layer) { m.count = 0; return; }
+    if (layer === UNDERGROUND_LAYER) { m.count = 0; this.rebuildPipes(); return; }
     const isValue = layer === LAND_VALUE_LAYER;
     const isTraffic = layer === TRAFFIC_LAYER;
     const flat = new THREE.Color(OVERLAY_COLOR[layer] ?? "#ffffff");

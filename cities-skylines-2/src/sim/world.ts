@@ -22,6 +22,8 @@ export const COVER = {
 export const LAND_VALUE_LAYER = 4096;
 /** Pseudo-layer colouring road tiles by how full they are. */
 export const TRAFFIC_LAYER = 8192;
+/** Pseudo-layer: the underground view with water, sewage and power networks laid under the roads. */
+export const UNDERGROUND_LAYER = 16384;
 
 interface FacilityInfo {
   name: string; cost: number; upkeep: number; radius: number;
