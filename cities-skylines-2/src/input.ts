@@ -8,7 +8,10 @@ export interface InputHooks {
   paint(tile: Tile, first: boolean): void;
   /** True when the current tool paints; false means one-finger drag pans. */
   paintsWithPrimary(): boolean;
-  hover(tile: Tile | null): void;
+  /** Mouse moved with no button held. */
+  hover(clientX: number, clientY: number): void;
+  /** A press-and-release without dragging, when the primary tool does not paint. */
+  tap?(clientX: number, clientY: number): void;
 }
 
 /**
@@ -42,6 +45,8 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   let mode: "none" | "paint" | "pan" | "rotate" | "gesture" = "none";
   let last: Tile | null = null;
   let prev = { x: 0, y: 0 };
+  let downAt = { x: 0, y: 0, t: 0 };
+  let travelled = 0;
   let gesture: { cx: number; cy: number; dist: number; ang: number } | null = null;
 
   const measure = () => {
@@ -66,6 +71,8 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     el.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     prev = { x: e.clientX, y: e.clientY };
+    downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+    travelled = 0;
     if (pointers.size === 2) {
       mode = "gesture";
       last = null;
@@ -99,11 +106,16 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     if (mode === "paint") paintAt(e.clientX, e.clientY);
     else if (mode === "pan") r.rig.panPixels(e.clientX - prev.x, e.clientY - prev.y, r.viewportHeight);
     else if (mode === "rotate") r.rig.rotate(-(e.clientX - prev.x) * 0.006, (e.clientY - prev.y) * 0.004);
-    else if (e.pointerType === "mouse") hooks.hover(r.pick(e.clientX, e.clientY));
+    else if (e.pointerType === "mouse") hooks.hover(e.clientX, e.clientY);
+    travelled += Math.hypot(e.clientX - prev.x, e.clientY - prev.y);
     prev = { x: e.clientX, y: e.clientY };
   };
 
   const up = (e: PointerEvent) => {
+    const wasPrimaryPan = mode === "pan" && pointers.size === 1 && (e.pointerType !== "mouse" || e.button === 0);
+    if (wasPrimaryPan && hooks.tap && travelled < 8 && performance.now() - downAt.t < 500) {
+      hooks.tap(e.clientX, e.clientY);
+    }
     pointers.delete(e.pointerId);
     if (pointers.size < 2) gesture = null;
     if (pointers.size === 0) { mode = "none"; last = null; }

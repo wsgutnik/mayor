@@ -2,6 +2,7 @@ import { makeRng } from "./rng";
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, generateWorld, idx, inBounds,
   isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile,
+  ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
 } from "./world";
 
 export type FacilityTool =
@@ -44,7 +45,8 @@ export const USAGE = {
 
 export const DAYS_PER_MONTH = 30;
 export const MONTHS_PER_YEAR = 12;
-const ROAD_UPKEEP_PER_MONTH = 3;
+/** Longest single road segment, in tiles, so a mis-tap cannot drain the treasury. */
+const MAX_SEGMENT_TILES = 60;
 /** Minimum zone demand for a building to level up. A balanced city settles near 0.2-0.3. */
 const UPGRADE_DEMAND = 0.2;
 /** Daily chance that a building outside fire-station cover burns down. */
@@ -131,9 +133,69 @@ const ZONE_OF_TOOL = { res: ZONE.RES, com: ZONE.COM, ind: ZONE.IND } as const;
 
 export function countRoads(w: World): number {
   let n = 0;
-  for (let i = 0; i < w.road.length; i++) n += w.road[i];
+  for (let i = 0; i < w.road.length; i++) if (w.road[i]) n++;
   return n;
 }
+
+/** Monthly upkeep for all road tiles by class, minus the free entry road. */
+function roadUpkeep(w: World): number {
+  let total = 0;
+  for (let i = 0; i < w.road.length; i++) {
+    const t = w.road[i];
+    if (t) total += ROAD_UPKEEP[t as RoadType];
+  }
+  return Math.max(0, total - 3 * ROAD_UPKEEP[1]);
+}
+
+export interface RoadPlan {
+  ok: boolean;
+  reason?: string;
+  /** Tiles that would be occupied, and how many are new or upgraded. */
+  tiles: number[];
+  newTiles: number;
+  cost: number;
+}
+
+/** Validate a road segment and price it without changing anything. */
+export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
+  const w = s.world;
+  const bad = (reason: string, tiles: number[] = []): RoadPlan => ({ ok: false, reason, tiles, newTiles: 0, cost: 0 });
+  if (pts.length < 2 || pts.length > 3) return bad("A road needs a start and an end");
+  if (segmentLength(pts) > MAX_SEGMENT_TILES) return bad("Road is too long");
+  const { tiles, outOfBounds } = rasterizeRoad(w, type, pts);
+  if (outOfBounds) return bad("Outside the map", tiles);
+  let newTiles = 0;
+  for (const i of tiles) {
+    const x = i % w.size, y = (i / w.size) | 0;
+    if (!isLand(w, x, y)) return bad("Road would cross water", tiles);
+    if (w.facility[i]) return bad("Road would cross a building", tiles);
+    if (w.road[i] < type) newTiles++;
+  }
+  const cost = newTiles * ROAD_COST[type];
+  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles, newTiles, cost };
+  return { ok: true, tiles, newTiles, cost };
+}
+
+/** Build a road segment: flatten and clear the ground it covers, then charge for new tiles. */
+export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
+  const plan = planRoad(s, type, pts);
+  if (!plan.ok) return { ok: false, reason: plan.reason! };
+  if (plan.newTiles === 0) return { ok: true }; // already built at this class or better
+  const w = s.world;
+  levelTiles(w, plan.tiles);
+  for (const i of plan.tiles) {
+    w.zone[i] = 0;
+    w.level[i] = 0;
+  }
+  w.segments.push({ id: w.nextSegmentId++, type, pts: pts.map((p) => ({ ...p })), tiles: plan.tiles });
+  rebuildRoadRaster(w);
+  s.money -= plan.cost;
+  s.monthExpenses += plan.cost;
+  w.revision++;
+  return { ok: true };
+}
+
+export { ROAD_NAME };
 
 function facilityUpkeep(w: World): number {
   let total = 0;
@@ -145,7 +207,7 @@ function facilityUpkeep(w: World): number {
 }
 
 /** Apply a tool to one tile. All world mutation from the player goes through here. */
-export function applyTool(s: CityState, tool: ToolId, x: number, y: number): ToolResult {
+export function applyTool(s: CityState, tool: ToolId, x: number, y: number, roadType: RoadType = 1): ToolResult {
   const w = s.world;
   if (tool === "pan") return { ok: true };
   if (!inBounds(w, x, y)) return { ok: false, reason: "Outside the map" };
@@ -159,9 +221,12 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number): Too
     if (s.money < cost) return { ok: false, reason: "Not enough money" };
     s.money -= cost;
     s.monthExpenses += cost;
-    if (w.road[i]) w.connectivityDirty = true;
+    if (w.road[i]) {
+      // Bulldozing a road removes the whole segment it belongs to.
+      w.segments = w.segments.filter((seg) => seg.fixed || !seg.tiles.includes(i));
+      rebuildRoadRaster(w);
+    }
     if (w.facility[i]) w.coverageDirty = true;
-    w.road[i] = 0;
     w.zone[i] = 0;
     w.level[i] = 0;
     w.facility[i] = 0;
@@ -195,13 +260,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number): Too
   if (s.money < cost) return { ok: false, reason: "Not enough money" };
 
   if (tool === "road") {
-    if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
-    if (w.road[i]) return { ok: true };
-    flattenTile(w, x, y);
-    w.road[i] = 1;
-    w.zone[i] = 0;
-    w.level[i] = 0;
-    w.connectivityDirty = true;
+    // Painting lays a one-tile segment of the chosen class.
+    return placeRoad(s, roadType, [{ x: x + 0.5, z: y + 0.5 }, { x: x + 0.5, z: y + 0.5 }]);
   } else {
     const z = ZONE_OF_TOOL[tool];
     if (w.road[i]) return { ok: false, reason: "Tile is a road" };
@@ -335,7 +395,7 @@ export function step(s: CityState): void {
 
   const jobs = s.capacity.com + s.capacity.ind;
   const monthlyIncome = (s.population * 3 + Math.min(jobs, s.population * 0.65 + jobs * 0.2) * 4) * (s.taxRate / 0.1) * (0.6 + 0.8 * (s.landValue / 100));
-  const monthlyUpkeep = Math.max(0, countRoads(w) - 3) * ROAD_UPKEEP_PER_MONTH + facilityUpkeep(w);
+  const monthlyUpkeep = roadUpkeep(w) + facilityUpkeep(w);
   const inc = monthlyIncome / DAYS_PER_MONTH;
   const exp = monthlyUpkeep / DAYS_PER_MONTH;
   s.money += inc - exp;

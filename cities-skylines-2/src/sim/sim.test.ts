@@ -291,3 +291,114 @@ describe("civic services", () => {
     expect(Math.max(...Array.from(s.world.level))).toBe(3);
   });
 });
+
+import { placeRoad, planRoad, ROAD_NAME } from "./sim";
+import { ROAD, ROAD_COST, rasterizeRoad } from "./world";
+
+describe("free-form roads", () => {
+  const flat = (s: City) => {
+    const ey = s.world.entry.y;
+    for (let y = ey - 12; y <= ey + 12; y++)
+      for (let x = 0; x <= 40; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    return ey;
+  };
+  const connected4 = (w: City["world"], tiles: number[]) => {
+    const set = new Set(tiles);
+    const start = tiles[0];
+    const seen = new Set([start]);
+    const q = [start];
+    while (q.length) {
+      const i = q.pop()!;
+      const x = i % w.size, y = (i / w.size) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const j = (y + dy) * w.size + x + dx;
+        if (set.has(j) && !seen.has(j)) { seen.add(j); q.push(j); }
+      }
+    }
+    return seen.size === set.size;
+  };
+
+  it("a straight segment charges per tile and connects to the entry", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    const before = s.money;
+    const r = placeRoad(s, ROAD.STREET, [{ x: 2.5, z: ey + 0.5 }, { x: 12.5, z: ey + 0.5 }]);
+    expect(r.ok).toBe(true);
+    // tiles 3..12 are new (0..2 belong to the entry road)
+    expect(before - s.money).toBe(10 * ROAD_COST[1]);
+    step(s);
+    expect(s.world.connected[idx(s.world, 12, ey)]).toBe(1);
+  });
+
+  it("a curve stays 4-connected for every curvature", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    for (const ctrl of [{ x: 12, z: ey - 8 }, { x: 20, z: ey + 6.3 }, { x: 8.2, z: ey + 11 }]) {
+      const { tiles, outOfBounds } = rasterizeRoad(s.world, ROAD.STREET, [{ x: 5.5, z: ey + 0.5 }, ctrl, { x: 24.5, z: ey + 3.5 }]);
+      expect(outOfBounds).toBe(false);
+      expect(tiles.length).toBeGreaterThan(10);
+      expect(connected4(s.world, tiles)).toBe(true);
+    }
+  });
+
+  it("avenues are two tiles wide and highways three", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    const a = rasterizeRoad(s.world, ROAD.AVENUE, [{ x: 4.5, z: ey + 5 }, { x: 14.5, z: ey + 5 }]);
+    const h = rasterizeRoad(s.world, ROAD.HIGHWAY, [{ x: 4.5, z: ey + 5.5 }, { x: 14.5, z: ey + 5.5 }]);
+    const rows = (tiles: number[]) => new Set(tiles.map((i) => (i / s.world.size) | 0)).size;
+    expect(rows(a.tiles)).toBe(2);
+    expect(rows(h.tiles)).toBe(3);
+  });
+
+  it("refuses roads across water, off the map, or too long", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    carvePond(s, 10, ey + 4);
+    expect(planRoad(s, ROAD.STREET, [{ x: 10.5, z: ey + 2 }, { x: 10.5, z: ey + 8 }]).reason).toBe("Road would cross water");
+    expect(planRoad(s, ROAD.STREET, [{ x: 2, z: ey }, { x: -4, z: ey }]).reason).toBe("Outside the map");
+    expect(planRoad(s, ROAD.STREET, [{ x: 2, z: ey }, { x: 80, z: ey }]).reason).toBe("Road is too long");
+  });
+
+  it("highways connect but do not serve adjacent lots", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    addUtilities(s);
+    placeRoad(s, ROAD.HIGHWAY, [{ x: 3.5, z: ey + 0.5 }, { x: 12.5, z: ey + 0.5 }]);
+    for (let x = 4; x < 12; x++) applyTool(s, "res", x, ey - 2);
+    for (let d = 0; d < 300; d++) step(s);
+    expect(s.world.level.reduce((n, l) => n + l, 0)).toBe(0);
+    // an avenue in the same place serves them
+    const t = newCity(3);
+    flat(t);
+    addUtilities(t);
+    placeRoad(t, ROAD.AVENUE, [{ x: 3.5, z: ey + 0.5 }, { x: 12.5, z: ey + 0.5 }]);
+    for (let x = 4; x < 12; x++) applyTool(t, "res", x, ey - 1); // avenue covers rows ey..ey+1
+    for (let d = 0; d < 300; d++) step(t);
+    expect(t.world.level.reduce((n, l) => n + l, 0)).toBeGreaterThan(0);
+  });
+
+  it("bulldozing one tile removes the whole segment but not the entry", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    placeRoad(s, ROAD.STREET, [{ x: 3.5, z: ey + 0.5 }, { x: 14.5, z: ey + 0.5 }]);
+    expect(s.world.road[idx(s.world, 14, ey)]).toBe(1);
+    applyTool(s, "bulldoze", 8, ey);
+    expect(s.world.road[idx(s.world, 14, ey)]).toBe(0);
+    expect(s.world.road[idx(s.world, 3, ey)]).toBe(0);
+    expect(s.world.road[idx(s.world, 1, ey)]).toBe(1);
+  });
+
+  it("charges only for new tiles when upgrading and pays class-based upkeep", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    placeRoad(s, ROAD.STREET, [{ x: 3.5, z: ey + 0.5 }, { x: 9.5, z: ey + 0.5 }]);
+    const m = s.money;
+    placeRoad(s, ROAD.STREET, [{ x: 3.5, z: ey + 0.5 }, { x: 9.5, z: ey + 0.5 }]); // same again
+    expect(s.money).toBe(m);
+    expect(ROAD_NAME[2]).toBe("Avenue");
+    s.monthExpenses = 0;
+    for (let d = 0; d < 30; d++) step(s);
+    expect(s.lastMonth.expenses).toBeCloseTo(7 * 3); // 7 street tiles beyond the entry
+  });
+});

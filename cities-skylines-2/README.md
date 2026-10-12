@@ -14,7 +14,8 @@ npm run build   # tipos + bundle em dist/
 
 | | Mouse | Toque |
 |---|---|---|
-| Usar ferramenta | botão esquerdo (arrastar pinta) | um dedo |
+| Usar ferramenta | botão esquerdo (arrastar pinta; Linha/Curva: clique) | um dedo (Linha/Curva: toque) |
+| Cancelar estrada | Esc | botão Finish road |
 | Mover câmera | botão direito, WASD/setas | ferramenta Move, ou dois dedos |
 | Girar | botão do meio, Q/E | dois dedos (torcer) |
 | Zoom | roda | pinça |
@@ -26,4 +27,7 @@ npm run build   # tipos + bundle em dist/
   Prédios novos precisam de energia e água; nível 2 pede esgoto, nível 3 pede coleta de lixo.
 - M3: polícia, bombeiros, clínica, escola e parque; incêndios, felicidade e mapa de valor do solo.
   Sem estação de bombeiros um prédio pode pegar fogo; nível 3 exige escola; valor do solo escala a arrecadação.
-- Próximo: M4 (estradas livres: curvas, tipos de via, interseções).
+- M4: estradas livres. Toque ou clique inicio e fim (Linha) ou inicio, curva e fim (Curva); Pintar continua disponível.
+  Rua, avenida e rodovia (a rodovia liga mas não serve lotes); snapping em estradas existentes.
+  A simulação continua em grade: cada via é rasterizada em tiles, então zonas, cobertura e conectividade seguem iguais.
+- Próximo: M5 (agentes: cidadãos e veículos com pathfinding e tráfego).

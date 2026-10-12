@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { CityState } from "../sim/sim";
-import { ZONE, FAC, COVER, LAND_VALUE_LAYER, FacilityKind, idx, tileHeight, isLand, World } from "../sim/world";
+import {
+  ZONE, FAC, COVER, LAND_VALUE_LAYER, FacilityKind, idx, tileHeight, isLand, World,
+  RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt,
+} from "../sim/world";
 import { CameraRig } from "./camera";
 
 const BUILD_H = {
@@ -61,7 +64,8 @@ export class CityRenderer {
   private scene = new THREE.Scene();
   private terrain!: THREE.Mesh;
   private terrainGeo!: THREE.PlaneGeometry;
-  private roads!: THREE.InstancedMesh;
+  private roadMesh!: THREE.Mesh;
+  private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
   private buildings!: THREE.InstancedMesh;
   private facilities!: THREE.InstancedMesh;
@@ -102,7 +106,19 @@ export class CityRenderer {
       this.scene.add(m);
       return m;
     };
-    this.roads = mk(new THREE.MeshLambertMaterial({ color: "#3b3f46" }));
+    this.roadMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+    );
+    this.roadMesh.frustumCulled = false;
+    this.scene.add(this.roadMesh);
+    this.previewMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    this.previewMesh.frustumCulled = false;
+    this.previewMesh.visible = false;
+    this.scene.add(this.previewMesh);
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.buildings = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.facilities = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
@@ -165,7 +181,8 @@ export class CityRenderer {
   private rebuild(): void {
     const w = this.world;
     this.updateTerrain();
-    let nr = 0, nz = 0, nb = 0, nf = 0;
+    this.rebuildRoads();
+    let nz = 0, nb = 0, nf = 0;
     const d = this.dummy;
     const color = new THREE.Color();
     for (let y = 0; y < w.size; y++) {
@@ -180,11 +197,7 @@ export class CityRenderer {
           this.facilities.setMatrixAt(nf, d.matrix);
           this.facilities.setColorAt(nf++, fc);
         } else if (w.road[i]) {
-          // Pad extends below the surface so sloped neighbours never poke through.
-          d.position.set(x + 0.5, h + 0.06 - 0.5, y + 0.5);
-          d.scale.set(1, 1.0, 1);
-          d.updateMatrix();
-          this.roads.setMatrixAt(nr++, d.matrix);
+          // Drawn as ribbons (see buildRoadGeometry).
         } else if (w.zone[i]) {
           const z = w.zone[i] as 1 | 2 | 3;
           d.position.set(x + 0.5, h + 0.04 - 0.5, y + 0.5);
@@ -206,11 +219,88 @@ export class CityRenderer {
         }
       }
     }
-    for (const [m, n] of [[this.roads, nr], [this.zones, nz], [this.buildings, nb], [this.facilities, nf]] as const) {
+    for (const [m, n] of [[this.zones, nz], [this.buildings, nb], [this.facilities, nf]] as const) {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+  }
+
+  private groundY(x: number, z: number): number {
+    return heightAt(this.world, x, z);
+  }
+
+  /**
+   * Ribbon geometry for road segments: asphalt strip plus a centre line or median.
+   * `tint` replaces the per-class colours (used for the build preview).
+   */
+  private buildRoadGeometry(segs: { type: RoadType; pts: Pt[] }[], tint?: THREE.Color): THREE.BufferGeometry {
+    const pos: number[] = [];
+    const col: number[] = [];
+    const ind: number[] = [];
+    const c = new THREE.Color();
+    const strip = (samples: Pt[], halfW: number, lift: number, color: string) => {
+      if (tint) c.copy(tint); else c.set(color);
+      const base = pos.length / 3;
+      for (let i = 0; i < samples.length; i++) {
+        const a = samples[Math.max(0, i - 1)], b = samples[Math.min(samples.length - 1, i + 1)];
+        let tx = b.x - a.x, tz = b.z - a.z;
+        const l = Math.hypot(tx, tz) || 1;
+        tx /= l; tz /= l;
+        const nx = -tz, nz = tx;
+        const p = samples[i];
+        const y = this.groundY(p.x, p.z) + lift;
+        pos.push(p.x + nx * halfW, y, p.z + nz * halfW, p.x - nx * halfW, y, p.z - nz * halfW);
+        col.push(c.r, c.g, c.b, c.r, c.g, c.b);
+        if (i > 0) {
+          const k = base + (i - 1) * 2;
+          ind.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+        }
+      }
+    };
+    segs.forEach((seg, n) => {
+      const samples = curvePoints(seg.pts, 0.5);
+      const lift = 0.07 + (n % 7) * 0.002;
+      const hw = ROAD_DRAW_WIDTH[seg.type] / 2;
+      strip(samples, hw, lift, seg.type === 3 ? "#4a4f57" : "#3b3f46");
+      if (seg.type === 1) strip(samples, 0.04, lift + 0.01, "#6b717b");
+      else if (seg.type === 2) strip(samples, 0.16, lift + 0.01, "#5f8a4a");
+      else strip(samples, 0.14, lift + 0.01, "#b8bec6");
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(ind);
+    g.computeVertexNormals();
+    return g;
+  }
+
+  private rebuildRoads(): void {
+    this.roadMesh.geometry.dispose();
+    this.roadMesh.geometry = this.buildRoadGeometry(this.world.segments as RoadSegment[]);
+  }
+
+  /** Ghost of a road being drawn; null clears it. */
+  setRoadPreview(seg: { type: RoadType; pts: Pt[] } | null, valid = true): void {
+    this.previewMesh.visible = !!seg;
+    if (!seg) return;
+    this.previewMesh.geometry.dispose();
+    this.previewMesh.geometry = this.buildRoadGeometry([seg], new THREE.Color(valid ? "#7fe08a" : "#ff6b60"));
+    this.previewMesh.position.y = 0.05;
+  }
+
+  /** Ground position under a client-space pointer. */
+  pickPoint(clientX: number, clientY: number): Pt | null {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - r.left) / r.width) * 2 - 1,
+      -((clientY - r.top) / r.height) * 2 + 1,
+    );
+    this.raycaster.setFromCamera(ndc, this.rig.camera);
+    const hit = this.raycaster.intersectObject(this.terrain, false)[0];
+    if (!hit) return null;
+    if (!inBounds(this.world, Math.floor(hit.point.x), Math.floor(hit.point.z))) return null;
+    return { x: hit.point.x, z: hit.point.z };
   }
 
   /** Show one service's coverage as a tinted layer; 0 hides it. */

@@ -38,11 +38,38 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.PARK]: { name: "Park", cost: 150, upkeep: 10, radius: 8, capacity: 0, bit: COVER.PARK, nearWater: false },
 };
 
+/** Road classes. The grid stores the class per tile (0 = none). */
+export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3 } as const;
+export type RoadType = 1 | 2 | 3;
+/** Tiles of width a road occupies on the grid, and its drawn width in world units. */
+export const ROAD_TILE_WIDTH: Record<RoadType, number> = { 1: 1, 2: 2, 3: 3 };
+export const ROAD_DRAW_WIDTH: Record<RoadType, number> = { 1: 0.9, 2: 1.8, 3: 2.8 };
+export const ROAD_COST: Record<RoadType, number> = { 1: 20, 2: 45, 3: 90 };
+export const ROAD_UPKEEP: Record<RoadType, number> = { 1: 3, 2: 7, 3: 14 };
+export const ROAD_NAME: Record<RoadType, string> = { 1: "Street", 2: "Avenue", 3: "Highway" };
+
+/** A point on the ground plane; tile (x, y) covers [x, x+1) × [y, y+1). */
+export interface Pt { x: number; z: number }
+
+export interface RoadSegment {
+  id: number;
+  type: RoadType;
+  /** 2 points = straight, 3 points = quadratic Bézier with the middle one as control. */
+  pts: Pt[];
+  /** Tile indices this segment occupies. */
+  tiles: number[];
+  /** The pre-built entry road cannot be removed. */
+  fixed?: boolean;
+}
+
 export interface World {
   size: number;
   /** (size+1)^2 corner heights; water level is 0. */
   heights: Float32Array;
+  /** Road class per tile (ROAD.*), derived from `segments`. */
   road: Uint8Array;
+  segments: RoadSegment[];
+  nextSegmentId: number;
   zone: Uint8Array;
   /** Building level per tile, 0 = no building, 1..3. */
   level: Uint8Array;
@@ -119,6 +146,8 @@ export function generateWorld(size: number, seed: number): World {
     size,
     heights,
     road: new Uint8Array(size * size),
+    segments: [],
+    nextSegmentId: 1,
     zone: new Uint8Array(size * size),
     level: new Uint8Array(size * size),
     facility: new Uint8Array(size * size),
@@ -136,7 +165,12 @@ export function generateWorld(size: number, seed: number): World {
   for (let y = ey - 1; y <= ey + 2; y++) {
     for (let x = 0; x <= 5; x++) heights[y * s + x] = 0.35;
   }
-  for (let x = 0; x <= 2; x++) world.road[idx(world, x, ey)] = 1;
+  const entryTiles = [0, 1, 2].map((x) => idx(world, x, ey));
+  world.segments.push({
+    id: world.nextSegmentId++, type: 1, fixed: true, tiles: entryTiles,
+    pts: [{ x: 0.5, z: ey + 0.5 }, { x: 2.5, z: ey + 0.5 }],
+  });
+  rebuildRoadRaster(world);
   return world;
 }
 
@@ -163,11 +197,13 @@ export function updateConnectivity(w: World): void {
   }
 }
 
-/** Is the tile touching a road that is connected to the entry? */
+/** Is the tile touching a connected street or avenue? Highways carry traffic but serve no lots. */
 export function isServed(w: World, x: number, y: number): boolean {
   for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
     const nx = x + dx, ny = y + dy;
-    if (inBounds(w, nx, ny) && w.connected[idx(w, nx, ny)]) return true;
+    if (!inBounds(w, nx, ny)) continue;
+    const j = idx(w, nx, ny);
+    if (w.connected[j] && w.road[j] !== ROAD.HIGHWAY) return true;
   }
   return false;
 }
@@ -249,4 +285,98 @@ export function updateLandValue(w: World): boolean {
   }
   if (changed) w.lvRevision++;
   return changed;
+}
+
+/** Points along a segment's centreline, about `step` apart, endpoints included. */
+export function curvePoints(pts: Pt[], step = 0.25): Pt[] {
+  const [a, b, c] = pts.length === 3 ? [pts[0], pts[1], pts[2]] : [pts[0], null, pts[1]];
+  const len = b
+    ? Math.hypot(b.x - a.x, b.z - a.z) + Math.hypot(c.x - b.x, c.z - b.z)
+    : Math.hypot(c.x - a.x, c.z - a.z);
+  const n = Math.max(1, Math.ceil(len / step));
+  const out: Pt[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push(b
+      ? { x: u * u * a.x + 2 * u * t * b.x + t * t * c.x, z: u * u * a.z + 2 * u * t * b.z + t * t * c.z }
+      : { x: a.x + (c.x - a.x) * t, z: a.z + (c.z - a.z) * t });
+  }
+  return out;
+}
+
+/** Approximate centreline length in tiles. */
+export function segmentLength(pts: Pt[]): number {
+  const p = curvePoints(pts, 0.5);
+  let l = 0;
+  for (let i = 1; i < p.length; i++) l += Math.hypot(p[i].x - p[i - 1].x, p[i].z - p[i - 1].z);
+  return l;
+}
+
+/**
+ * Grid tiles a road of `type` along `pts` occupies. Width-1 roads are kept
+ * 4-connected so they stay connected under 4-neighbour rules.
+ */
+export function rasterizeRoad(w: World, type: RoadType, pts: Pt[]): { tiles: number[]; outOfBounds: boolean } {
+  const width = ROAD_TILE_WIDTH[type];
+  const seen = new Set<number>();
+  const tiles: number[] = [];
+  let oob = false;
+  const add = (x: number, y: number) => {
+    if (!inBounds(w, x, y)) { oob = true; return; }
+    const i = idx(w, x, y);
+    if (!seen.has(i)) { seen.add(i); tiles.push(i); }
+  };
+  let prev: { x: number; y: number } | null = null;
+  for (const p of curvePoints(pts)) {
+    if (width === 1) {
+      const x = Math.floor(p.x), y = Math.floor(p.z);
+      if (prev && prev.x !== x && prev.y !== y) add(x, prev.y);
+      add(x, y);
+      prev = { x, y };
+    } else {
+      const x0 = Math.floor(p.x - width / 2 + 0.5), y0 = Math.floor(p.z - width / 2 + 0.5);
+      for (let dy = 0; dy < width; dy++) for (let dx = 0; dx < width; dx++) add(x0 + dx, y0 + dy);
+    }
+  }
+  return { tiles, outOfBounds: oob };
+}
+
+/** Rebuild the per-tile road class from the segment list. */
+export function rebuildRoadRaster(w: World): void {
+  w.road.fill(0);
+  for (const seg of w.segments) {
+    for (const t of seg.tiles) if (w.road[t] < seg.type) w.road[t] = seg.type;
+  }
+  w.connectivityDirty = true;
+}
+
+/** Terrain surface height at a ground point (bilinear over the corner grid). */
+export function heightAt(w: World, x: number, z: number): number {
+  const s = w.size + 1;
+  const fx = Math.min(w.size - 1e-6, Math.max(0, x)), fz = Math.min(w.size - 1e-6, Math.max(0, z));
+  const x0 = Math.floor(fx), z0 = Math.floor(fz);
+  const tx = fx - x0, tz = fz - z0;
+  const h = w.heights;
+  const a = h[z0 * s + x0], b = h[z0 * s + x0 + 1], c = h[(z0 + 1) * s + x0], d = h[(z0 + 1) * s + x0 + 1];
+  return a + (b - a) * tx + (c - a) * tz + (a - b - c + d) * tx * tz;
+}
+
+/**
+ * Level the ground under a set of tiles: every corner takes the average of the
+ * tile means around it, so neighbouring road tiles meet without steps.
+ */
+export function levelTiles(w: World, tiles: number[]): void {
+  const s = w.size + 1;
+  const sum = new Map<number, number>();
+  const cnt = new Map<number, number>();
+  for (const t of tiles) {
+    const x = t % w.size, y = (t / w.size) | 0;
+    const m = tileHeight(w, x, y);
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+      const c = (y + dy) * s + x + dx;
+      sum.set(c, (sum.get(c) ?? 0) + m);
+      cnt.set(c, (cnt.get(c) ?? 0) + 1);
+    }
+  }
+  for (const [c, v] of sum) w.heights[c] = v / cnt.get(c)!;
 }

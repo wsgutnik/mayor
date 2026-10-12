@@ -1,5 +1,5 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
-import { COVER, LAND_VALUE_LAYER } from "../sim/world";
+import { COVER, LAND_VALUE_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -46,7 +46,17 @@ export const toolColor = (t: ToolId) => (T[t] ? T[t].color : "#ffffff");
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 const money = (n: number) => (n < 0 ? "-$" : "$") + fmt(Math.abs(n));
 
+export type RoadMode = "paint" | "line" | "curve";
+
+const ROAD_MODES: { mode: RoadMode; label: string; icon: string; hint: string }[] = [
+  { mode: "paint", label: "Paint", icon: "▪", hint: "Drag to paint road tiles" },
+  { mode: "line", label: "Line", icon: "╱", hint: "Tap a start, then an end" },
+  { mode: "curve", label: "Curve", icon: "⌒", hint: "Tap start, a bend point, then the end" },
+];
+
 export interface HudHooks {
+  onRoad(type: RoadType, mode: RoadMode): void;
+  onFinishRoad(): void;
   onTool(t: ToolId): void;
   onSpeed(s: number): void;
   onTax(rate: number): void;
@@ -92,6 +102,12 @@ export class Hud {
   private taxLabel!: HTMLElement;
   private hint!: HTMLElement;
   private flyUtil!: HTMLElement;
+  private flyRoad!: HTMLElement;
+  private roadTypeBtns = new Map<RoadType, HTMLElement>();
+  private roadModeBtns = new Map<RoadMode, HTMLElement>();
+  private finishBtn!: HTMLElement;
+  private roadType: RoadType = 1;
+  private roadMode: RoadMode = "paint";
   private flyCivic!: HTMLElement;
   private civicBtn!: HTMLElement;
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
@@ -183,7 +199,18 @@ export class Hud {
 
   private buildBottom(): void {
     const bar = el("div", "panel toolbar");
-    for (const id of ["pan", "road", "res", "com", "ind"]) bar.appendChild(this.toolButton(T[id]));
+    bar.appendChild(this.toolButton(T.pan));
+    const roads = el("button", "tool", `<span class="ic" style="color:#9aa3b2">═</span><span>Roads</span><small>▴</small>`);
+    roads.title = "Roads: streets, avenues and highways";
+    roads.addEventListener("click", () => {
+      this.toggleFly(this.flyRoad);
+      this.hooks.onTool("road");
+      this.setTool("road");
+      this.hooks.onRoad(this.roadType, this.roadMode);
+    });
+    this.toolBtns.set("road", roads);
+    bar.appendChild(roads);
+    for (const id of ["res", "com", "ind"]) bar.appendChild(this.toolButton(T[id]));
 
     this.groupBtn = el("button", "tool", `<span class="ic" style="color:#f2c230">⚡</span><span>Utilities</span><small>▴</small>`);
     this.groupBtn.addEventListener("click", () => this.toggleFly(this.flyUtil));
@@ -206,6 +233,29 @@ export class Hud {
 
     this.flyUtil = el("div", "panel fly");
     for (const id of UTILITY_TOOLS) this.flyUtil.appendChild(this.toolButton(T[id]));
+    this.flyRoad = el("div", "panel fly");
+    for (const t of [1, 2, 3] as RoadType[]) {
+      const b = el("button", "tool", `<span class="ic">${t === 1 ? "─" : t === 2 ? "═" : "≡"}</span><span>${ROAD_NAME[t]}</span><small>$${ROAD_COST[t]}/tile</small>`);
+      b.addEventListener("click", () => { this.setRoadChoice(t, this.roadMode); this.hooks.onTool("road"); this.setTool("road"); });
+      this.roadTypeBtns.set(t, b);
+      this.flyRoad.appendChild(b);
+    }
+    this.flyRoad.appendChild(el("span", "sep"));
+    for (const m of ROAD_MODES) {
+      const b = el("button", "tool", `<span class="ic">${m.icon}</span><span>${m.label}</span>`);
+      b.title = m.hint;
+      b.addEventListener("click", () => { this.setRoadChoice(this.roadType, m.mode); this.hooks.onTool("road"); this.setTool("road"); });
+      this.roadModeBtns.set(m.mode, b);
+      this.flyRoad.appendChild(b);
+    }
+    this.root.appendChild(this.flyRoad);
+    this.setRoadChoice(1, "paint", false);
+
+    this.finishBtn = el("button", "finish", "Finish road");
+    this.finishBtn.addEventListener("click", () => this.hooks.onFinishRoad());
+    this.finishBtn.hidden = true;
+    this.root.appendChild(this.finishBtn);
+
     this.flyCivic = el("div", "panel fly");
     for (const id of CIVIC_TOOLS) this.flyCivic.appendChild(this.toolButton(T[id]));
     this.flyView = el("div", "panel fly wrap");
@@ -229,6 +279,22 @@ export class Hud {
     this.root.appendChild(this.hint);
   }
 
+  setRoadChoice(type: RoadType, mode: RoadMode, notify = true): void {
+    this.roadType = type;
+    this.roadMode = mode;
+    this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === type));
+    this.roadModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
+    if (notify) this.hooks.onRoad(type, mode);
+  }
+
+  setHint(text: string): void {
+    this.hint.textContent = text;
+  }
+
+  showFinish(on: boolean): void {
+    this.finishBtn.hidden = !on;
+  }
+
   private toggleFly(which: HTMLElement): void {
     const open = which.classList.contains("open");
     this.closeFlyouts();
@@ -237,6 +303,7 @@ export class Hud {
 
   private closeFlyouts(): void {
     this.flyUtil.classList.remove("open");
+    this.flyRoad.classList.remove("open");
     this.flyCivic.classList.remove("open");
     this.flyView.classList.remove("open");
   }
