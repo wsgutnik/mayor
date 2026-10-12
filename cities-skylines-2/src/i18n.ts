@@ -90,6 +90,8 @@ const PT: Record<string, string> = {
   "Tile is a road": "O terreno é uma estrada", "Zones must be within 4 tiles of a road": "A zona deve ficar a até 4 lotes de uma estrada", "Tile is zoned": "O terreno é uma zona", "Tile is occupied": "O terreno está ocupado",
   "Outside the map": "Fora do mapa", "Cannot remove the highway entry": "A entrada da autoestrada não pode ser removida",
   "Road would cross water": "A estrada cruzaria a água", "Road would cross a building": "A estrada cruzaria uma construção",
+  "Bridge": "Ponte", "Tunnel": "Túnel",
+  "Bridge span too long": "Vão longo demais para uma ponte", "Tunnel span too long": "Trecho longo demais para um túnel",
   "Road is too long": "Estrada longa demais", "A road needs a start and an end": "Uma estrada precisa de início e fim",
   "Bus stops go on a road": "Pontos de ônibus ficam em estradas", "Not on a highway": "Não em autoestradas",
   "There is already a stop here": "Já existe uma parada aqui",

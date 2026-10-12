@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { World, curvePoints, idx, inBounds } from "../sim/world";
+import { RoadType, World, curvePoints, idx, inBounds, ROAD_DRAW_WIDTH, segElevation } from "../sim/world";
 import { NET, NetKind, facilityLinks } from "../sim/networks";
 
 /** Draw style per utility net: schematic colours shared with the infoviews. */
@@ -95,10 +95,46 @@ function strip(
   }
 }
 
+/** Tunnel centrelines for the underground view: dark conduits with a dashed guide line. Pure (tested). */
+export function tunnelPolylines(w: World): { pts: { x: number; z: number }[]; type: RoadType }[] {
+  const out: { pts: { x: number; z: number }[]; type: RoadType }[] = [];
+  for (const seg of w.segments) {
+    if (segElevation(seg) !== "tunnel") continue;
+    const a = seg.pts[0], b = seg.pts[seg.pts.length - 1];
+    if (Math.hypot(b.x - a.x, b.z - a.z) < 1e-6) continue;
+    out.push({ pts: curvePoints(seg.pts, 0.5), type: seg.type });
+  }
+  return out;
+}
+
+const CONDUIT = "#141920";
+const CONDUIT_DASH = "#7d8aa0";
+
+/** Dark conduit bands for every tunnel, each with a faint dashed centre line. */
+function stripTunnels(r: Ribbons, w: World, groundY: GroundY): void {
+  for (const t of tunnelPolylines(w)) {
+    const hw = ROAD_DRAW_WIDTH[t.type] / 2;
+    strip(r, t.pts, { color: CONDUIT, lateral: 0, depth: 0.55, halfWidth: hw }, groundY, true);
+    for (let i = 0; i + 1 < t.pts.length; i += 2) {
+      const p = t.pts[i], q = t.pts[i + 1];
+      let dx = q.x - p.x, dz = q.z - p.z;
+      const l = Math.hypot(dx, dz) || 1;
+      dx /= l; dz /= l;
+      const nx = -dz, nz = dx, o = 0.035;
+      const v0 = r.vert(p.x + nx * o, groundY(p.x, p.z) - 0.53, p.z + nz * o, CONDUIT_DASH, -1);
+      const v1 = r.vert(p.x - nx * o, groundY(p.x, p.z) - 0.53, p.z - nz * o, CONDUIT_DASH, -1);
+      const v2 = r.vert(q.x + nx * o, groundY(q.x, q.z) - 0.53, q.z + nz * o, CONDUIT_DASH, -1);
+      const v3 = r.vert(q.x - nx * o, groundY(q.x, q.z) - 0.53, q.z - nz * o, CONDUIT_DASH, -1);
+      r.quad(v0, v1, v2, v3);
+    }
+  }
+}
+
 /** Pipes along every live stretch of road centreline, plus facility stubs. */
 function buildRibbons(w: World, groundY: GroundY): { water: Ribbons; util: Ribbons } {
   const water = new Ribbons();
   const util = new Ribbons();
+  stripTunnels(util, w, groundY);
   for (const seg of w.segments) {
     const a = seg.pts[0], b = seg.pts[seg.pts.length - 1];
     const pad = seg.pts.length === 2 && Math.hypot(b.x - a.x, b.z - a.z) < 1e-6;

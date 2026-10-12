@@ -1,5 +1,6 @@
 import {
   Pt, RoadSegment, RoadType, World, curvePoints, rasterizeRoad, ROAD_DRAW_WIDTH,
+  Elevation, segElevation,
 } from "./world";
 
 /** A junction (or dead end) where segment ends meet. */
@@ -152,6 +153,7 @@ function splitSegment(w: World, seg: RoadSegment, x: number, z: number): RoadNod
   const rightSeg: RoadSegment = {
     id: w.nextSegmentId++, type: seg.type, pts: right, tiles: [], a: n.id, b: seg.b,
     ...(seg.fixed ? { fixed: true } : {}),
+    ...(seg.elevation !== undefined ? { elevation: seg.elevation } : {}),
   };
   seg.pts = left;
   seg.b = n.id;
@@ -337,6 +339,8 @@ function addPad(w: World, type: RoadType, p: Pt, fixedId: number): number[] {
 export interface AddSegmentOpts {
   /** Mark every created piece (entry road on the load path). */
   fixed?: boolean;
+  /** Vertical placement of every created piece (bridges/tunnels from the planner). */
+  elevation?: Elevation;
 }
 
 export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmentOpts): number[] {
@@ -364,6 +368,7 @@ export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmen
     const seg: RoadSegment = {
       id: w.nextSegmentId++, type, pts: piece, tiles: [], a: na.id, b: nb.id,
       ...(opts?.fixed ? { fixed: true } : {}),
+      ...(opts?.elevation !== undefined ? { elevation: opts.elevation } : {}),
     };
     retile(w, seg);
     w.segments.push(seg);
@@ -436,6 +441,7 @@ function tryMergeNode(w: World, nodeId: number): void {
   const [s1, s2] = node.segs.map((id) => segById(w, id));
   if (!s1 || !s2) return;
   if (s1.type !== s2.type || s1.fixed || s2.fixed) return;
+  if (segElevation(s1) !== segElevation(s2)) return;
   if (roughLength(s1.pts) < 1e-6 || roughLength(s2.pts) < 1e-6) return;
   const arms = nodeArms(w, nodeId);
   if (arms.length !== 2) return;

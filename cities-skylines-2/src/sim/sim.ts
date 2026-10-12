@@ -3,9 +3,11 @@ import { isRaining } from "./weather";
 import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
-  isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile,
+  isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
+  Elevation,
 } from "./world";
+import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan } from "./elevation";
 import { addSegment, rebuildNodes, removeSegment } from "./roads";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
@@ -183,6 +185,13 @@ function roadUpkeep(w: World): number {
   return Math.max(0, total - 3 * ROAD_UPKEEP[1]);
 }
 
+/** One graph piece of a planned road: ground approaches stay ground, the middle may be elevated. */
+export interface RoadPiece {
+  pts: Pt[];
+  elevation: Elevation;
+  tiles: number[];
+}
+
 export interface RoadPlan {
   ok: boolean;
   reason?: string;
@@ -190,7 +199,13 @@ export interface RoadPlan {
   tiles: number[];
   newTiles: number;
   cost: number;
+  /** Set when the middle of the road crosses water/a valley (bridge) or a hill (tunnel). */
+  span?: "bridge" | "tunnel";
+  pieces?: RoadPiece[];
 }
+
+/** Cost multiplier per tile for an elevated piece. */
+const pieceMult = (e: Elevation): number => (e === "bridge" ? BRIDGE_COST_MULT : e === "tunnel" ? TUNNEL_COST_MULT : 1);
 
 /** Validate a road segment and price it without changing anything. */
 export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
@@ -200,16 +215,63 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
   if (segmentLength(pts) > MAX_SEGMENT_TILES) return bad("Road is too long");
   const { tiles, outOfBounds } = rasterizeRoad(w, type, pts);
   if (outOfBounds) return bad("Outside the map", tiles);
-  let newTiles = 0;
-  for (const i of tiles) {
-    const x = i % w.size, y = (i / w.size) | 0;
-    if (!isLand(w, x, y)) return bad("Road would cross water", tiles);
-    if (w.facility[i]) return bad("Road would cross a building", tiles);
-    if (w.road[i] < type) newTiles++;
+  const found = detectSpan(w, type, pts);
+  if (!found.ok) return bad(found.reason, tiles);
+  const span = found.span;
+  let pieces: RoadPiece[];
+  if (!span) {
+    pieces = [{ pts, elevation: "ground", tiles }];
+  } else {
+    // The middle piece is elevated; degenerate (zero-length) approaches are dropped.
+    const parts: [Pt[], Elevation][] = [
+      [span.before, "ground"], [span.middle, span.kind], [span.after, "ground"],
+    ];
+    pieces = [];
+    for (const [part, elevation] of parts) {
+      if (segmentLength(part) < 0.05) continue;
+      pieces.push({ pts: part, elevation, tiles: rasterizeRoad(w, type, part).tiles });
+    }
+    if (!pieces.length) pieces = [{ pts, elevation: "ground", tiles }];
   }
-  const cost = newTiles * ROAD_COST[type];
-  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles, newTiles, cost };
-  return { ok: true, tiles, newTiles, cost };
+  // A tile shared by two pieces (shore joints) is priced once, at the higher rate,
+  // and counts as ground when any piece there is at grade.
+  const rate = new Map<number, number>();
+  const ground = new Set<number>();
+  const order: number[] = [];
+  for (const piece of pieces) {
+    const mult = pieceMult(piece.elevation);
+    for (const t of piece.tiles) {
+      if (!rate.has(t)) order.push(t);
+      rate.set(t, Math.max(rate.get(t) ?? 0, mult));
+      if (piece.elevation === "ground") ground.add(t);
+    }
+  }
+  // Wide roads stamp half a tile past each piece end: water the middle covers
+  // is deck, even when a ground approach overshoots onto it.
+  const middle = span ? pieces.find((p) => p.elevation !== "ground") : undefined;
+  if (middle && span?.kind === "bridge") {
+    const mset = new Set(middle.tiles);
+    for (const t of [...ground]) {
+      if (mset.has(t) && !isLand(w, t % w.size, (t / w.size) | 0)) ground.delete(t);
+    }
+  }
+  let newTiles = 0, cost = 0;
+  for (const t of order) {
+    const x = t % w.size, y = (t / w.size) | 0;
+    const elevated = !ground.has(t);
+    const under = elevated && span?.kind === "tunnel";
+    if (!under) {
+      if (!elevated && !isLand(w, x, y)) return bad("Road would cross water", order);
+      if (w.facility[t]) return bad("Road would cross a building", order);
+    }
+    if (w.road[t] < type) {
+      newTiles++;
+      cost += rate.get(t)! * ROAD_COST[type];
+    }
+  }
+  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles: order, newTiles, cost };
+  const builtSpan = middle ? span?.kind : undefined;
+  return { ok: true, tiles: order, newTiles, cost, ...(builtSpan ? { span: builtSpan } : {}), pieces };
 }
 
 /** Build a road: flatten and clear the ground it covers, then charge for new tiles. */
@@ -218,14 +280,24 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
   if (!plan.ok) return { ok: false, reason: plan.reason! };
   if (plan.newTiles === 0) return { ok: true }; // already built at this class or better
   const w = s.world;
-  levelTiles(w, plan.tiles);
-  for (const i of plan.tiles) {
+  const pieces = plan.pieces ?? [{ pts, elevation: "ground" as Elevation, tiles: plan.tiles }];
+  const groundTiles: number[] = [];
+  const clearTiles: number[] = [];
+  for (const piece of pieces) {
+    if (piece.elevation === "ground") groundTiles.push(...piece.tiles);
+    // Terrain is never levelled under a bridge or above a tunnel, and tunnel
+    // ground (zones, buildings) is left untouched.
+    if (piece.elevation !== "tunnel") clearTiles.push(...piece.tiles);
+  }
+  levelTiles(w, groundTiles);
+  for (const i of clearTiles) {
     w.zone[i] = 0;
     w.level[i] = 0;
   }
   // The graph snaps the ends to nearby nodes, splits T-junction sides and
-  // crossings, and upgrades roads paved over along the same path.
-  addSegment(w, type, pts);
+  // crossings, and upgrades roads paved over along the same path. Shared piece
+  // endpoints snap to the same node, so the elevated middle joins its approaches.
+  for (const piece of pieces) addSegment(w, type, piece.pts, { elevation: piece.elevation });
   rebuildRoadRaster(w);
   // Utility networks run under the roads, so new tarmac can light new buildings.
   w.coverageDirty = true;
@@ -286,7 +358,7 @@ export function refreshLots(s: CityState): void {
   for (let y = 0; y < w.size; y++) {
     for (let x = 0; x < w.size; x++) {
       const i = idx(w, x, y);
-      if (!w.zone[i] || w.lotAt[i] >= 0 || w.road[i] || w.facility[i] || !isLand(w, x, y)) continue;
+      if (!w.zone[i] || w.lotAt[i] >= 0 || blocksBuilding(w, i) || w.facility[i] || !isLand(w, x, y)) continue;
       const id = w.nextLotId++;
       const road = blocks.frontage.road[i];
       lots.push({
@@ -327,7 +399,7 @@ function extendLots(w: World, blocks: BlockInfo, lots: WorldLot[]): void {
       const ok = row.every((i) => {
         const x = i % w.size, y = (i / w.size) | 0;
         return (
-          x >= 0 && y >= 0 && x < w.size && y < w.size && w.lotAt[i] < 0 && !w.road[i] && !w.facility[i] &&
+          x >= 0 && y >= 0 && x < w.size && y < w.size && w.lotAt[i] < 0 && !blocksBuilding(w, i) && !w.facility[i] &&
           w.zone[i] === lot.zone && w.level[i] === lot.level && blocks.blockId[i] === block && isLand(w, x, y)
         );
       });
@@ -351,7 +423,7 @@ function lotsOutOfSync(w: World): boolean {
     if (w.lotAt[i] !== lot.id || w.zone[i] !== lot.zone || w.level[i] !== lot.level) return true;
   }
   for (let i = 0; i < w.zone.length; i++) {
-    if (!w.zone[i] || w.road[i] || w.facility[i] || w.lotAt[i] >= 0) continue;
+    if (!w.zone[i] || blocksBuilding(w, i) || w.facility[i] || w.lotAt[i] >= 0) continue;
     if (isLand(w, i % w.size, (i / w.size) | 0)) return true;
   }
   return false;
@@ -413,7 +485,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       rebuildRoadRaster(w);
       // Every bus stop that lost its road goes with it, not only the one under the cursor.
       for (const stop of [...w.stops]) {
-        if (stop.kind === "bus" && !w.road[stop.tile]) removeStopAt(w, stop.tile);
+        if (stop.kind === "bus" && !w.roadSurface[stop.tile]) removeStopAt(w, stop.tile);
       }
       w.coverageDirty = true;
     }
@@ -433,7 +505,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   if (isFacilityTool(tool)) {
     const type = FACILITY_OF_TOOL[tool];
     const info = FACILITY_INFO[type];
-    if (w.road[i]) return { ok: false, reason: "Tile is a road" };
+    if (blocksBuilding(w, i)) return { ok: false, reason: "Tile is a road" };
     if (w.zone[i]) return { ok: false, reason: "Tile is zoned" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
     if (type === FAC.CITYHALL && w.facility.includes(FAC.CITYHALL)) return { ok: false, reason: "There is already a city hall" };
@@ -460,7 +532,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     return placeRoad(s, roadType, [{ x: x + 0.5, z: y + 0.5 }, { x: x + 0.5, z: y + 0.5 }]);
   } else {
     const z = ZONE_OF_TOOL[tool];
-    if (w.road[i]) return { ok: false, reason: "Tile is a road" };
+    if (blocksBuilding(w, i)) return { ok: false, reason: "Tile is a road" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
     if (w.zone[i] === z) return { ok: true };
     // Zoning hugs the street grid: a tile needs street frontage within ZONE_DEPTH, like blocks in Cities: Skylines.

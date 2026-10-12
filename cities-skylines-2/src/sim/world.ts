@@ -83,6 +83,10 @@ export const ROAD_NAME: Record<RoadType, string> = { 1: "Street", 2: "Avenue", 3
 /** A point on the ground plane; tile (x, y) covers [x, x+1) × [y, y+1). */
 export interface Pt { x: number; z: number }
 
+/** Vertical placement of a road segment (M23). Absent in old saves; missing means ground. */
+export type Elevation = "ground" | "bridge" | "tunnel";
+export const segElevation = (seg: { elevation?: Elevation }): Elevation => seg.elevation ?? "ground";
+
 export interface RoadSegment {
   id: number;
   type: RoadType;
@@ -95,6 +99,7 @@ export interface RoadSegment {
   b: number;
   /** The pre-built entry road cannot be removed. */
   fixed?: boolean;
+  elevation?: Elevation;
 }
 
 export type Biome = "plains" | "forest" | "river" | "coast" | "mountain" | "desert";
@@ -126,8 +131,12 @@ export interface World {
   size: number;
   /** (size+1)^2 corner heights; water level is 0. */
   heights: Float32Array;
-  /** Road class per tile (ROAD.*), derived from `segments`. */
+  /** Road class per tile (ROAD.*), derived from `segments`. Bridges and tunnels stay connected here. */
   road: Uint8Array;
+  /** Road class per tile from ground segments only; bridge decks and tunnels are excluded (frontage, lots, utilities). */
+  roadSurface: Uint8Array;
+  /** Deck height per tile for bridge tiles, NaN elsewhere. Vehicles and the road mesh read this. */
+  deckH: Float32Array;
   segments: RoadSegment[];
   nextSegmentId: number;
   /** Junction graph: every segment end attaches to one of these. Rebuilt on load. */
@@ -250,6 +259,8 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     size,
     heights,
     road: new Uint8Array(size * size),
+    roadSurface: new Uint8Array(size * size),
+    deckH: new Float32Array(size * size).fill(NaN),
     segments: [],
     nextSegmentId: 1,
     nodes: [],
@@ -494,10 +505,124 @@ export function rasterizeRoad(w: World, type: RoadType, pts: Pt[]): { tiles: num
 /** Rebuild the per-tile road class from the segment list. */
 export function rebuildRoadRaster(w: World): void {
   w.road.fill(0);
+  w.roadSurface.fill(0);
+  w.deckH.fill(NaN);
   for (const seg of w.segments) {
-    for (const t of seg.tiles) if (w.road[t] < seg.type) w.road[t] = seg.type;
+    const surface = segElevation(seg) === "ground";
+    for (const t of seg.tiles) {
+      if (w.road[t] < seg.type) w.road[t] = seg.type;
+      if (surface && w.roadSurface[t] < seg.type) w.roadSurface[t] = seg.type;
+    }
+  }
+  for (const seg of w.segments) {
+    if (segElevation(seg) === "bridge") stampDeck(w, seg);
   }
   w.connectivityDirty = true;
+}
+
+/** A surface (ground-level) road tile: the only kind that serves lots and carries pipes. */
+export const isSurfaceRoad = (w: World, i: number): boolean => w.roadSurface[i] !== 0;
+/** A bridge-deck tile: connected for traffic, but not a surface road. */
+export const isBridgeTile = (w: World, i: number): boolean =>
+  w.road[i] !== 0 && w.roadSurface[i] === 0 && !Number.isNaN(w.deckH[i]);
+/** A tunnel tile: connected for traffic, with buildable ground above. */
+export const isTunnelTile = (w: World, i: number): boolean =>
+  w.road[i] !== 0 && w.roadSurface[i] === 0 && Number.isNaN(w.deckH[i]);
+/** Tiles a building cannot share: surface roads and bridge decks (tunnels run underneath). */
+export const blocksBuilding = (w: World, i: number): boolean =>
+  w.road[i] !== 0 && !isTunnelTile(w, i);
+
+// ------------------------------------------------------------ bridge deck profile
+
+/** Deck clearance above the higher shore. */
+export const BRIDGE_DECK_LIFT = 0.5;
+/** Ramp length at each end of the deck, in tiles (extended when the slope would be steep). */
+export const BRIDGE_RAMP_TILES = 2;
+/** Gentlest cap on the ramp gradient (rise per tile). */
+export const BRIDGE_MAX_SLOPE = 0.3;
+
+export interface DeckProfile {
+  length: number;
+  y0: number;
+  y1: number;
+  deck: number;
+  ramp0: number;
+  ramp1: number;
+}
+
+/** Level deck at max(shore heights) + lift, with smooth ramps up from each shore. */
+export function bridgeProfile(length: number, y0: number, y1: number): DeckProfile {
+  const deck = Math.max(y0, y1) + BRIDGE_DECK_LIFT;
+  const half = Math.max(0, length / 2);
+  // Each ramp is at least 2 tiles, extended so the gradient stays gentle.
+  const ramp0 = Math.min(half, Math.max(BRIDGE_RAMP_TILES, (deck - y0) / BRIDGE_MAX_SLOPE));
+  const ramp1 = Math.min(half, Math.max(BRIDGE_RAMP_TILES, (deck - y1) / BRIDGE_MAX_SLOPE));
+  return { length, y0, y1, deck, ramp0, ramp1 };
+}
+
+const smooth01 = (u: number): number => {
+  const c = Math.max(0, Math.min(1, u));
+  return c * c * (3 - 2 * c);
+};
+
+/** Deck height at arclength s from the start of the span. */
+export function deckYAt(p: DeckProfile, s: number): number {
+  const c = Math.max(0, Math.min(p.length, s));
+  const up = p.y0 + (p.deck - p.y0) * (p.ramp0 <= 0 ? 1 : smooth01(c / p.ramp0));
+  const dn = p.y1 + (p.deck - p.y1) * (p.ramp1 <= 0 ? 1 : smooth01((p.length - c) / p.ramp1));
+  return Math.min(up, dn);
+}
+
+export interface DeckSampler {
+  length: number;
+  yAt(s: number): number;
+  /** Arclength of the centreline point nearest (x, z). Linear scan: rebuild-time use only. */
+  sAt(x: number, z: number): number;
+  pos(s: number): Pt;
+}
+
+/** Deck heights along one bridge centreline, sampled from the terrain at its ends. */
+export function makeDeckSampler(w: World, pts: Pt[]): DeckSampler {
+  const raw = curvePoints(pts, 0.25);
+  const cum: number[] = [0];
+  for (let i = 1; i < raw.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(raw[i].x - raw[i - 1].x, raw[i].z - raw[i - 1].z));
+  }
+  const length = cum[cum.length - 1];
+  const prof = bridgeProfile(length, heightAt(w, pts[0].x, pts[0].z), heightAt(w, pts[pts.length - 1].x, pts[pts.length - 1].z));
+  const at = (s: number): { i: number; u: number } => {
+    const c = Math.max(0, Math.min(length, s));
+    let i = 0;
+    while (i < cum.length - 2 && cum[i + 1] < c) i++;
+    const span = Math.max(1e-9, cum[i + 1] - cum[i]);
+    return { i, u: (c - cum[i]) / span };
+  };
+  return {
+    length,
+    yAt: (s: number) => deckYAt(prof, s),
+    sAt: (x: number, z: number) => {
+      let bi = 0, bd = Infinity;
+      for (let i = 0; i < raw.length; i++) {
+        const d = (raw[i].x - x) * (raw[i].x - x) + (raw[i].z - z) * (raw[i].z - z);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      return cum[bi];
+    },
+    pos: (s: number) => {
+      const { i, u } = at(s);
+      const a = raw[i], b = raw[Math.min(raw.length - 1, i + 1)];
+      return { x: a.x + (b.x - a.x) * u, z: a.z + (b.z - a.z) * u };
+    },
+  };
+}
+
+/** Write the deck height into every raster tile of one bridge segment. */
+function stampDeck(w: World, seg: RoadSegment): void {
+  const sampler = makeDeckSampler(w, seg.pts);
+  for (const t of seg.tiles) {
+    const y = sampler.yAt(sampler.sAt((t % w.size) + 0.5, ((t / w.size) | 0) + 0.5));
+    if (Number.isNaN(w.deckH[t]) || y > w.deckH[t]) w.deckH[t] = y;
+  }
 }
 
 /** Terrain surface height at a ground point (bilinear over the corner grid). */

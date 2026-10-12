@@ -352,11 +352,16 @@ describe("free-form roads", () => {
     expect(rows(h.tiles)).toBe(3);
   });
 
-  it("refuses roads across water, off the map, or too long", () => {
+  it("bridges short water gaps, refuses long ones, off the map, or too long", () => {
     const s = newCity(3);
     const ey = flat(s);
     carvePond(s, 10, ey + 4);
-    expect(planRoad(s, ROAD.STREET, [{ x: 10.5, z: ey + 2 }, { x: 10.5, z: ey + 8 }]).reason).toBe("Road would cross water");
+    const over = planRoad(s, ROAD.STREET, [{ x: 10.5, z: ey + 2 }, { x: 10.5, z: ey + 8 }]);
+    expect(over.ok).toBe(true);
+    expect(over.span).toBe("bridge");
+    for (let y = ey - 1; y <= ey + 2; y++)
+      for (let x = 5; x <= 35; x++) s.world.heights[cidx(s.world, x, y)] = -1;
+    expect(planRoad(s, ROAD.STREET, [{ x: 3.5, z: ey + 0.5 }, { x: 36.5, z: ey + 0.5 }]).reason).toBe("Bridge span too long");
     expect(planRoad(s, ROAD.STREET, [{ x: 2, z: ey }, { x: -4, z: ey }]).reason).toBe("Outside the map");
     expect(planRoad(s, ROAD.STREET, [{ x: 2, z: ey }, { x: 80, z: ey }]).reason).toBe("Road is too long");
   });

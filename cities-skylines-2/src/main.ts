@@ -221,8 +221,9 @@ function updatePreview(): void {
   const plan = planRoad(state, roadType, seg.pts);
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok);
   const name = tr(ROAD_NAME[roadType]);
+  const spanHint = plan.span === "bridge" ? ` · ${tr("Bridge")}` : plan.span === "tunnel" ? ` · ${tr("Tunnel")}` : "";
   hud.setHint(plan.ok
-    ? tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost })
+    ? tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost }) + spanHint
     : `${name}: ${trReason(plan.reason!)}`);
 }
 

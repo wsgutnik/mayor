@@ -71,8 +71,8 @@ describe("lot planning", () => {
     const s = newCity(7, 24);
     const w = s.world;
     w.heights.fill(1);
-    for (let x = 4; x <= 20; x++) w.road[idx(w, x, 12)] = ROAD.STREET;
-    for (let y = 4; y <= 20; y++) w.road[idx(w, 8, y)] = ROAD.AVENUE;
+    for (let x = 4; x <= 20; x++) w.road[idx(w, x, 12)] = w.roadSurface[idx(w, x, 12)] = ROAD.STREET;
+    for (let y = 4; y <= 20; y++) w.road[idx(w, 8, y)] = w.roadSurface[idx(w, 8, y)] = ROAD.AVENUE;
     for (let y = 9; y <= 11; y++) for (let x = 9; x <= 11; x++) w.zone[idx(w, x, y)] = ZONE.RES;
     syncLots(s);
     // (9,9) ties both roads at equal distance; the higher class owns it.

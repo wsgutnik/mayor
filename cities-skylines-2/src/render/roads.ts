@@ -1,5 +1,8 @@
 import * as THREE from "three";
-import { Pt, RoadType, ROAD_DRAW_WIDTH, World, curvePoints } from "../sim/world";
+import {
+  Pt, RoadSegment, RoadType, ROAD_DRAW_WIDTH, World, curvePoints,
+  makeDeckSampler, segElevation, DeckSampler,
+} from "../sim/world";
 import { NodeLayout, NodeLayoutArm, halfAsphalt, kerbWidth, nodeById, nodeLayout } from "../sim/roads";
 
 /**
@@ -19,6 +22,10 @@ const LINE = "#d8d4b0";
 const AVE_LINE = "#e8e4c8";
 const MEDIAN = "#5f8a4a";
 const ZEBRA = "#f1f1ea";
+const CONCRETE = "#a8adb5";
+const PILLAR = "#8b9098";
+const PORTAL_DARK = "#0b0d12";
+const DECK_SHADOW = "#2b5d73";
 
 export interface StripSeg {
   type: RoadType;
@@ -260,6 +267,128 @@ function strip(
   }
 }
 
+// ------------------------------------------------------------ bridges & tunnels
+
+/** Full half width of a road including kerbs (highways have none). */
+function fullHalf(type: RoadType): number {
+  return type === 3 ? ROAD_DRAW_WIDTH[3] / 2 : halfAsphalt(type) + kerbWidth(type);
+}
+
+/** Solid box with absolute heights, yawed around Y. Winding is irrelevant (the road mesh is double-sided). */
+function box(
+  g: Geo, cx: number, cz: number, baseY: number,
+  sx: number, sy: number, sz: number, yaw: number, color: string,
+): void {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const at = (lx: number, y: number, lz: number): number =>
+    g.vert(cx + lx * c + lz * s, y, cz - lx * s + lz * c, color);
+  const hx = sx / 2, hz = sz / 2, top = baseY + sy;
+  const b0 = at(-hx, baseY, -hz), b1 = at(hx, baseY, -hz), b2 = at(hx, baseY, hz), b3 = at(-hx, baseY, hz);
+  const t0 = at(-hx, top, -hz), t1 = at(hx, top, -hz), t2 = at(hx, top, hz), t3 = at(-hx, top, hz);
+  g.tri(t0, t1, t2);
+  g.tri(t0, t2, t3);
+  g.tri(b0, t0, t1);
+  g.tri(b0, t1, b1);
+  g.tri(b1, t1, t2);
+  g.tri(b1, t2, b2);
+  g.tri(b2, t2, t3);
+  g.tri(b2, t3, b3);
+  g.tri(b3, t3, t0);
+  g.tri(b3, t0, b0);
+}
+
+/** Parapet walls along both deck edges, following the deck profile. */
+function parapets(g: Geo, type: RoadType, deck: DeckSampler): void {
+  const off = fullHalf(type) + 0.03;
+  const n = Math.max(1, Math.ceil(deck.length / 0.4));
+  for (const side of [-1, 1] as const) {
+    let prev: [number, number] | null = null;
+    for (let i = 0; i <= n; i++) {
+      const s = (deck.length * i) / n;
+      const p = deck.pos(s);
+      const q = deck.pos(Math.min(deck.length, s + 0.05));
+      let dx = q.x - p.x, dz = q.z - p.z;
+      const l = Math.hypot(dx, dz) || 1;
+      dx /= l; dz /= l;
+      const x = p.x - dz * side * off, z = p.z + dx * side * off;
+      const y = deck.yAt(s);
+      const cur: [number, number] = [g.vert(x, y + 0.03, z, CONCRETE), g.vert(x, y + 0.45, z, CONCRETE)];
+      if (prev) {
+        g.tri(prev[0], cur[0], prev[1]);
+        g.tri(prev[1], cur[0], cur[1]);
+      }
+      prev = cur;
+    }
+  }
+}
+
+/** One pier every 3 tiles, from the bed (or valley floor) up to the deck. */
+function pillars(g: Geo, deck: DeckSampler, groundY: GroundY): void {
+  for (let s = 1.5; s < deck.length - 1; s += 3) {
+    const p = deck.pos(s);
+    const top = deck.yAt(s) - 0.05;
+    const base = Math.min(groundY(p.x, p.z), 0) - 0.25;
+    if (top - base < 0.4) continue;
+    box(g, p.x, p.z, base, 0.36, top - base, 0.36, 0, PILLAR);
+  }
+}
+
+/** Dark ribbon on the water under the deck, so the crossing reads from far away. */
+function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY): void {
+  const hw = fullHalf(type) + 0.5;
+  const n = Math.max(1, Math.ceil(deck.length / 0.5));
+  let prev: [number, number] | null = null;
+  for (let i = 0; i <= n; i++) {
+    const s = (deck.length * i) / n;
+    const p = deck.pos(s);
+    if (groundY(p.x, p.z) > 0.08) { prev = null; continue; }
+    const q = deck.pos(Math.min(deck.length, s + 0.05));
+    let dx = q.x - p.x, dz = q.z - p.z;
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l; dz /= l;
+    const cur: [number, number] = [
+      g.vert(p.x - dz * hw, 0.05, p.z + dx * hw, DECK_SHADOW),
+      g.vert(p.x + dz * hw, 0.05, p.z - dx * hw, DECK_SHADOW),
+    ];
+    if (prev) {
+      g.tri(prev[0], cur[0], prev[1]);
+      g.tri(prev[1], cur[0], cur[1]);
+    }
+    prev = cur;
+  }
+}
+
+/** Unit tangent at one end of a segment, pointing away from the segment. */
+function endOut(seg: RoadSegment, end: "a" | "b"): { dx: number; dz: number } {
+  const pts = seg.pts;
+  const tip = end === "a" ? pts[0] : pts[pts.length - 1];
+  const inner = end === "a" ? pts[1] : pts[pts.length - 2];
+  const vx = tip.x - inner.x, vz = tip.z - inner.z;
+  const l = Math.hypot(vx, vz) || 1;
+  return { dx: vx / l, dz: vz / l };
+}
+
+/** Procedural tunnel mouth: two posts, a lintel and a dark opening. */
+function portal(g: Geo, m: Pt, dx: number, dz: number, type: RoadType, groundY: GroundY): void {
+  const hw = fullHalf(type);
+  const gy = groundY(m.x, m.z);
+  const yaw = Math.atan2(dx, dz);
+  const px = -dz, pz = dx;
+  const post = hw + 0.3;
+  box(g, m.x + px * post, m.z + pz * post, gy - 0.1, 0.36, 1.7, 0.6, yaw, CONCRETE);
+  box(g, m.x - px * post, m.z - pz * post, gy - 0.1, 0.36, 1.7, 0.6, yaw, CONCRETE);
+  box(g, m.x, m.z, gy + 1.25, 2 * (hw + 0.48), 0.35, 0.6, yaw, CONCRETE);
+  // The opening sits just inside the mouth so the lintel frames it.
+  const ix = m.x - dx * 0.05, iz = m.z - dz * 0.05;
+  const ow = hw + 0.1;
+  const a = g.vert(ix + px * ow, gy + 1.28, iz + pz * ow, PORTAL_DARK);
+  const b = g.vert(ix - px * ow, gy + 1.28, iz - pz * ow, PORTAL_DARK);
+  const c = g.vert(ix - px * ow, gy + 0.02, iz - pz * ow, PORTAL_DARK);
+  const d = g.vert(ix + px * ow, gy + 0.02, iz + pz * ow, PORTAL_DARK);
+  g.tri(a, b, c);
+  g.tri(a, c, d);
+}
+
 // ---------------------------------------------------------------- network
 
 /** Round dead-end cap: asphalt semicircle plus the kerb annulus around it. */
@@ -377,8 +506,11 @@ function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY): void {
 /**
  * Full road network in one geometry: trimmed ribbons, one asphalt polygon per
  * junction with kerb fillets, round dead-end caps, zebras on 3+ arm nodes.
+ * Bridges ride their deck profile with parapets, piers and a water shadow;
+ * tunnels show only their two portals (the ribbon stays buried). With
+ * `hideBridges` the decks are dropped for the underground view.
  */
-export function buildRoadNetworkGeometry(w: World, groundY: GroundY): THREE.BufferGeometry {
+export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hideBridges?: boolean }): THREE.BufferGeometry {
   const g = new Geo();
   const cache = new Map<number, NodeLayout | null>();
   const layoutOf = (id: number): NodeLayout | null => {
@@ -386,6 +518,16 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY): THREE.Buff
     return cache.get(id)!;
   };
   for (const seg of w.segments) {
+    const elev = segElevation(seg);
+    if (elev === "bridge" && opts?.hideBridges) continue;
+    if (elev === "tunnel") {
+      for (const end of ["a", "b"] as const) {
+        const tip = end === "a" ? seg.pts[0] : seg.pts[seg.pts.length - 1];
+        const o = endOut(seg, end);
+        portal(g, tip, o.dx, o.dz, seg.type, groundY);
+      }
+      continue;
+    }
     const samples = sampleCurve(seg.pts);
     const total = samples[samples.length - 1].s;
     if (total < 1e-6) {
@@ -399,8 +541,16 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY): THREE.Buff
       continue;
     }
     const la = layoutOf(seg.a), lb = layoutOf(seg.b);
+    const deck = elev === "bridge" ? makeDeckSampler(w, seg.pts) : null;
+    // A deck ribbon rides the profile instead of the terrain; its ramps meet the ground at the ends.
+    const gy = deck ? (x: number, z: number): number => deck.yAt(deck.sAt(x, z)) : groundY;
     // Ribbons run the full length to each node centre; the node patch below rounds the corners over them.
-    ribbon(g, seg.pts, seg.type, NO_TRIM, groundY);
+    ribbon(g, seg.pts, seg.type, NO_TRIM, gy);
+    if (deck) {
+      parapets(g, seg.type, deck);
+      pillars(g, deck, groundY);
+      deckShadow(g, seg.type, deck, groundY);
+    }
     // Dead ends close with a round cap (a lone arm, or a missing layout).
     for (const [end, l] of [["a", la], ["b", lb]] as const) {
       if ((l && l.arms.length > 1) || seg.type === 3) continue;
@@ -410,7 +560,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY): THREE.Buff
         : { x: samples[samples.length - 1].x - samples[samples.length - 2].x, z: samples[samples.length - 1].z - samples[samples.length - 2].z };
       const hw = halfAsphalt(seg.type);
       const kw = kerbWidth(seg.type);
-      deadEnd(g, tip, Math.atan2(dir.z, dir.x), hw, kw, groundY);
+      deadEnd(g, tip, Math.atan2(dir.z, dir.x), hw, kw, gy);
     }
   }
 

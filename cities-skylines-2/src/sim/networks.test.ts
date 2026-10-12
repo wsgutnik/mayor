@@ -67,7 +67,7 @@ describe("flood fill", () => {
     const dist = floodRoads(w, [idx(w, 3, ey)]);
     expect(dist[idx(w, 3, ey)]).toBe(0);
     expect(dist[idx(w, 10, ey)]).toBe(7);
-    w.road[idx(w, 10, ey + 8)] = 1; // an unconnected island tile
+    w.road[idx(w, 10, ey + 8)] = w.roadSurface[idx(w, 10, ey + 8)] = 1; // an unconnected island tile
     expect(floodRoads(w, [idx(w, 3, ey)])[idx(w, 10, ey + 8)]).toBe(-1);
   });
 
@@ -98,7 +98,7 @@ describe("flood fill", () => {
     w.facility[idx(w, 5, ey + 2)] = FAC.WATER;
     updateCoverage(w);
     expect(w.cover[idx(w, 18, ey - 1)] & COVER.POWER).toBeTruthy();
-    w.road[idx(w, 12, ey)] = 0; // the break
+    w.road[idx(w, 12, ey)] = w.roadSurface[idx(w, 12, ey)] = 0; // the break
     updateCoverage(w);
     expect(w.cover[idx(w, 8, ey - 1)] & COVER.POWER).toBeTruthy();
     expect(w.cover[idx(w, 18, ey - 1)] & COVER.POWER).toBeFalsy();
@@ -122,7 +122,7 @@ describe("flood fill", () => {
   it("runs power under highways but fronts no lots from them", () => {
     const { s, ey } = flatCity();
     const w = s.world;
-    for (let x = 3; x <= 12; x++) w.road[idx(w, x, ey)] = 3;
+    for (let x = 3; x <= 12; x++) w.road[idx(w, x, ey)] = w.roadSurface[idx(w, x, ey)] = 3;
     w.facility[idx(w, 5, ey + 2)] = FAC.POWER;
     w.zone[idx(w, 8, ey - 1)] = 1;
     updateCoverage(w);

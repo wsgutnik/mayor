@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CityState } from "../sim/sim";
 import {
   ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
-  RoadType, Pt, inBounds, heightAt, Biome,
+  RoadType, Pt, inBounds, heightAt, Biome, blocksBuilding, isTunnelTile,
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
@@ -536,8 +536,8 @@ export class CityRenderer {
           if (w.facility[i] === 1) smoke.push({ x: x + 0.7, y: h + 0.85, z: y + 0.72, strength: 1 });
           const mesh = this.fMeshes.get(w.facility[i] as FacilityKind);
           if (mesh) this.placeModel(mesh, counts, x, y, h, 1, tint.setScalar(1));
-        } else if (w.road[i]) {
-          // Drawn as ribbons (see buildRoadGeometry).
+        } else if (blocksBuilding(w, i)) {
+          // Drawn as ribbons (see buildRoadGeometry). Tunnels fall through: ground above keeps its trees.
         } else if (!w.zone[i]) {
           // Open ground: scatter plants by terrain preset, never on water or the entry strip.
           const r = hash(x * 7 + 3, y * 13 + 5);
@@ -631,11 +631,11 @@ export class CityRenderer {
     for (let y = 0; y < w.size && nl < this.lampMesh.instanceMatrix.count; y++) {
       for (let x = 0; x < w.size; x++) {
         const i2 = y * w.size + x;
-        const cls = w.road[i2];
+        const cls = w.roadSurface[i2];
         if (!cls || cls === 3 || (x + y * 3) % 4 !== 0) continue;
         for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
           const nx = x + dx, ny = y + dy;
-          if (!inBounds(w, nx, ny) || w.road[ny * w.size + nx] || w.facility[ny * w.size + nx]) continue;
+          if (!inBounds(w, nx, ny) || blocksBuilding(w, ny * w.size + nx) || w.facility[ny * w.size + nx]) continue;
           // the lamp sits on the neighbouring tile's edge nearest the road; its arm (+x) points at the road
           const px = nx + 0.5 - dx * 0.42, pz = ny + 0.5 - dy * 0.42;
           d.position.set(px, tileHeight(w, x, y) + 0.05, pz);
@@ -689,7 +689,7 @@ export class CityRenderer {
   /** Yaw so a model's front (+z) faces the adjacent road, else a stable pseudo-random side. */
   private facing(x: number, y: number): number {
     const w = this.world;
-    const road = (nx: number, ny: number) => inBounds(w, nx, ny) && w.road[ny * w.size + nx] > 0;
+    const road = (nx: number, ny: number) => inBounds(w, nx, ny) && w.roadSurface[ny * w.size + nx] > 0;
     if (road(x, y + 1)) return 0;
     if (road(x + 1, y)) return Math.PI / 2;
     if (road(x, y - 1)) return Math.PI;
@@ -740,7 +740,8 @@ export class CityRenderer {
 
   private rebuildRoads(): void {
     this.roadMesh.geometry.dispose();
-    this.roadMesh.geometry = buildRoadNetworkGeometry(this.world, (x, z) => this.groundY(x, z));
+    this.roadMesh.geometry = buildRoadNetworkGeometry(this.world, (x, z) => this.groundY(x, z),
+      { hideBridges: this.underground.visible });
     this.rebuildTransit();
   }
 
@@ -883,12 +884,12 @@ export class CityRenderer {
     const CAR = ["#e8eef5", "#d0453a", "#3a6fd0", "#2c2f36", "#e0b43a", "#58a86a", "#8a8f98", "#f2f2f2"];
     const counts = new Map<THREE.InstancedMesh, number>();
     /** Put one vehicle on the road: a Blender model when its GLB is ready, else the old box. */
-    const place = (name: string, x: number, z: number, hx: number, hz: number, tint: THREE.Color, boxScale: [number, number, number], boxLift: number) => {
+    const place = (name: string, x: number, z: number, hx: number, hz: number, tint: THREE.Color, boxScale: [number, number, number], boxLift: number, baseY: number) => {
       const glb = this.vehReady.has(name);
       const mesh = glb ? this.vehMeshes.get(name)! : this.vehicleMesh;
       const c = counts.get(mesh) ?? 0;
       if (c >= mesh.instanceMatrix.count) return;
-      d.position.set(x, heightAt(this.world, x, z) + (glb ? 0.07 : boxLift), z);
+      d.position.set(x, baseY + (glb ? 0.07 : boxLift), z);
       d.rotation.set(0, -Math.atan2(hz, hx), 0);
       if (glb) d.scale.setScalar(1); else d.scale.set(boxScale[0], boxScale[1], boxScale[2]);
       d.updateMatrix();
@@ -903,22 +904,32 @@ export class CityRenderer {
       hx /= l; hz /= l;
       return { x: ax + (bx - ax) * f - hz * lane, z: az + (bz - az) * f + hx * lane, hx, hz };
     };
+    const w = this.world;
     for (const v of t.vehicles) {
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
+      // Inside a tunnel the vehicle is hidden; on a deck it rides the deck height. Tile reads only.
+      const rt = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
+      if (isTunnelTile(w, rt)) continue;
       const p = heading(v.pts, i, v.progress - i, v.kind === 1 ? 0.12 : 0.1);
+      const dh = w.deckH[rt];
+      const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
       if (v.kind === 1) {
-        place("truck", p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17);
+        place("truck", p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17, baseY);
       } else {
-        place(CAR_MODELS[v.id % CAR_MODELS.length], p.x, p.z, p.hx, p.hz, col.set(CAR[(v.id * 7) % CAR.length]), [0.42, 0.17, 0.22], 0.17);
+        place(CAR_MODELS[v.id % CAR_MODELS.length], p.x, p.z, p.hx, p.hz, col.set(CAR[(v.id * 7) % CAR.length]), [0.42, 0.17, 0.22], 0.17, baseY);
       }
     }
     for (const v of t.transit) {
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
+      const rt = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
+      if (isTunnelTile(w, rt)) continue;
       const p = heading(v.pts, i, Math.min(1, v.progress - i), v.kind === "bus" ? 0.14 : 0);
+      const dh = w.deckH[rt];
+      const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
       place(v.kind === "bus" ? "bus" : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
-        v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3);
+        v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3, baseY);
     }
     for (const m of [this.vehicleMesh, ...this.vehMeshes.values()]) {
       m.count = counts.get(m) ?? 0;
@@ -933,7 +944,9 @@ export class CityRenderer {
     this.previewMesh.visible = !!seg;
     if (!seg) return;
     this.previewMesh.geometry.dispose();
-    this.previewMesh.geometry = this.buildRoadGeometry([seg], new THREE.Color(valid ? "#7fe08a" : "#ff6b60"));
+    // Clamped above the waterline so a bridge draft stays visible over the gap.
+    this.previewMesh.geometry = buildStripGeometry([seg], (x, z) => Math.max(this.groundY(x, z), 0.12),
+      new THREE.Color(valid ? "#7fe08a" : "#ff6b60"));
     this.previewMesh.position.y = 0.05;
   }
 
@@ -1001,6 +1014,8 @@ export class CityRenderer {
     this.warnMesh.visible = !on;
     if (this.water) this.water.mesh.visible = !on;
     this.underground.setVisible(on);
+    // Bridges are a surface feature: drop the decks while the soil is showing.
+    this.rebuildRoads();
   }
 
   private rebuildOverlay(): void {

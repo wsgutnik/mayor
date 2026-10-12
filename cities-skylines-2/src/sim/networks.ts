@@ -61,7 +61,7 @@ export function nearestRoadTile(w: World, fx: number, fy: number): number {
       const nx = fx + dx, ny = fy + dy;
       if (!inBounds(w, nx, ny)) continue;
       const t = idx(w, nx, ny);
-      if (!w.road[t]) continue;
+      if (!w.roadSurface[t]) continue;
       const d = Math.max(Math.abs(dx), Math.abs(dy));
       if (d < bd || (d === bd && t < best)) { bd = d; best = t; }
     }
@@ -94,12 +94,12 @@ export function facilityLinks(w: World): FacilityLink[] {
   return out;
 }
 
-/** Multi-source BFS over road tiles (4-neighbourhood). -1 marks unreachable tiles. */
+/** Multi-source BFS over surface road tiles (4-neighbourhood). -1 marks unreachable tiles. Pipes run under streets, not over bridge decks or through tunnels. */
 export function floodRoads(w: World, entries: readonly number[]): Int32Array {
   const dist = new Int32Array(w.size * w.size).fill(-1);
   const queue: number[] = [];
   for (const e of entries) {
-    if (w.road[e] && dist[e] < 0) { dist[e] = 0; queue.push(e); }
+    if (w.roadSurface[e] && dist[e] < 0) { dist[e] = 0; queue.push(e); }
   }
   let head = 0;
   while (head < queue.length) {
@@ -109,7 +109,7 @@ export function floodRoads(w: World, entries: readonly number[]): Int32Array {
       const nx = x + dx, ny = y + dy;
       if (!inBounds(w, nx, ny)) continue;
       const n = idx(w, nx, ny);
-      if (w.road[n] && dist[n] < 0) { dist[n] = dist[t] + 1; queue.push(n); }
+      if (w.roadSurface[n] && dist[n] < 0) { dist[n] = dist[t] + 1; queue.push(n); }
     }
   }
   return dist;
@@ -117,7 +117,7 @@ export function floodRoads(w: World, entries: readonly number[]): Int32Array {
 
 /** True when a live pipe is within NETWORK_REACH network hops of the frontage road tile. */
 export function withinReach(w: World, dist: Int32Array, front: number): boolean {
-  if (front < 0 || !w.road[front]) return false;
+  if (front < 0 || !w.roadSurface[front]) return false;
   if (dist[front] >= 0) return true;
   let frontier = [front];
   const seen = new Set([front]);
@@ -129,7 +129,7 @@ export function withinReach(w: World, dist: Int32Array, front: number): boolean 
         const nx = x + dx, ny = y + dy;
         if (!inBounds(w, nx, ny)) continue;
         const n = idx(w, nx, ny);
-        if (!w.road[n] || seen.has(n)) continue;
+        if (!w.roadSurface[n] || seen.has(n)) continue;
         if (dist[n] >= 0) return true;
         seen.add(n);
         next.push(n);

@@ -226,7 +226,7 @@ function accessTile(w: World, i: number, rng: () => number): number {
     const nx = x + dx, ny = y + dy;
     if (!inBounds(w, nx, ny)) continue;
     const j = idx(w, nx, ny);
-    if (w.connected[j] && w.road[j] !== ROAD.HIGHWAY) opts.push(j);
+    if (w.connected[j] && w.roadSurface[j] !== ROAD.NONE && w.roadSurface[j] !== ROAD.HIGHWAY) opts.push(j);
   }
   return opts.length ? opts[Math.floor(rng() * opts.length)] : -1;
 }

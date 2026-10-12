@@ -31,8 +31,8 @@ export function placeBusStop(s: CityState, x: number, y: number): ToolResult {
   const w = s.world;
   if (!inBounds(w, x, y)) return { ok: false, reason: "Outside the map" };
   const i = idx(w, x, y);
-  if (!w.road[i]) return { ok: false, reason: "Bus stops go on a road" };
-  if (w.road[i] === ROAD.HIGHWAY) return { ok: false, reason: "Not on a highway" };
+  if (!w.roadSurface[i]) return { ok: false, reason: "Bus stops go on a road" };
+  if (w.roadSurface[i] === ROAD.HIGHWAY) return { ok: false, reason: "Not on a highway" };
   if (stopAt(w, i)) return { ok: false, reason: "There is already a stop here" };
   if (s.money < BUS_STOP_COST) return { ok: false, reason: "Not enough money" };
   s.money -= BUS_STOP_COST;

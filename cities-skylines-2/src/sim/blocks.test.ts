@@ -5,7 +5,8 @@ import { ROAD, World, ZONE, generateWorld, idx } from "./world";
 
 function blank(size = 20): World {
   const w = generateWorld(size, 7);
-  w.road.fill(0); w.zone.fill(0); w.level.fill(0); w.facility.fill(0); w.connected.fill(0);
+  w.road.fill(0); w.roadSurface.fill(0); w.deckH.fill(NaN);
+  w.zone.fill(0); w.level.fill(0); w.facility.fill(0); w.connected.fill(0);
   w.segments.length = 0; w.heights.fill(1);
   return w;
 }
@@ -14,6 +15,7 @@ function roadLine(w: World, x0: number, y0: number, x1: number, y1: number) {
   const dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
   for (let x = x0, y = y0;; x += dx, y += dy) {
     w.road[idx(w, x, y)] = ROAD.STREET;
+    w.roadSurface[idx(w, x, y)] = ROAD.STREET;
     if (x === x1 && y === y1) break;
   }
 }

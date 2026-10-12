@@ -1,4 +1,4 @@
-import { ROAD, World, ZoneType, idx, isLand } from "./world";
+import { ROAD, World, ZoneType, blocksBuilding, idx, isLand } from "./world";
 
 /** Maximum number of cells between a kerb and the back of its zoning strip. */
 export const ZONE_DEPTH = 4;
@@ -40,7 +40,7 @@ export interface Lot {
 const DIRS = [[0, -1], [-1, 0], [1, 0], [0, 1]] as const;
 
 function roadFacing(w: World, rx: number, ry: number, x: number, y: number): Facing {
-  const at = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w.size && yy < w.size && !!w.road[idx(w, xx, yy)];
+  const at = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w.size && yy < w.size && !!w.roadSurface[idx(w, xx, yy)];
   const horizontal = +at(rx - 1, ry) + +at(rx + 1, ry);
   const vertical = +at(rx, ry - 1) + +at(rx, ry + 1);
   const vx = rx - x, vy = ry - y;
@@ -60,7 +60,7 @@ export function findFrontage(w: World): FrontageMap {
   // Expanding only from road cells is substantially cheaper than asking every
   // map cell to inspect its full diamond (roads are normally the sparse set).
   for (let ry = 0; ry < w.size; ry++) for (let rx = 0; rx < w.size; rx++) {
-    const ri = idx(w, rx, ry), cls = w.road[ri];
+    const ri = idx(w, rx, ry), cls = w.roadSurface[ri];
     if (!cls || cls === ROAD.HIGHWAY) continue;
     for (let oy = -ZONE_DEPTH; oy <= ZONE_DEPTH; oy++) {
       const span = ZONE_DEPTH - Math.abs(oy);
@@ -70,11 +70,11 @@ export function findFrontage(w: World): FrontageMap {
         const x = rx + ox, y = ry + oy;
         if (x < 0 || y < 0 || x >= w.size || y >= w.size) continue;
         const out = idx(w, x, y);
-        if (w.road[out]) continue;
+        if (blocksBuilding(w, out)) continue;
         const f = roadFacing(w, rx, ry, x, y), oldDist = distance[out] + 1, oldRoad = road[out];
         if (d < oldDist) corner[out] = 0;
         else if (d === oldDist && (f.dx !== dxOut[out] || f.dy !== dyOut[out])) corner[out] = 1;
-        const oldClass = oldRoad < 0 ? -1 : w.road[oldRoad];
+        const oldClass = oldRoad < 0 ? -1 : w.roadSurface[oldRoad];
         if (d < oldDist || (d === oldDist && (cls > oldClass || (cls === oldClass && ri < oldRoad)))) {
           road[out] = ri; distance[out] = d - 1; dxOut[out] = f.dx; dyOut[out] = f.dy;
         }
@@ -92,7 +92,7 @@ export function computeBlocks(w: World, frontage: FrontageMap = findFrontage(w))
   const queue = new Int32Array(n);
   let components = 0;
   for (let start = 0; start < n; start++) {
-    if (!w.road[start] || w.road[start] === ROAD.HIGHWAY || roadComponent[start] >= 0) continue;
+    if (!w.roadSurface[start] || w.roadSurface[start] === ROAD.HIGHWAY || roadComponent[start] >= 0) continue;
     let head = 0, tail = 0; queue[tail++] = start; roadComponent[start] = components;
     while (head < tail) {
       const i = queue[head++], x = i % w.size, y = (i / w.size) | 0;
@@ -100,7 +100,7 @@ export function computeBlocks(w: World, frontage: FrontageMap = findFrontage(w))
         const nx = x + ddx, ny = y + ddy;
         if (nx < 0 || ny < 0 || nx >= w.size || ny >= w.size) continue;
         const j = idx(w, nx, ny);
-        if (w.road[j] && w.road[j] !== ROAD.HIGHWAY && roadComponent[j] < 0) {
+        if (w.roadSurface[j] && w.roadSurface[j] !== ROAD.HIGHWAY && roadComponent[j] < 0) {
           roadComponent[j] = components; queue[tail++] = j;
         }
       }
@@ -155,7 +155,7 @@ export function planLots(w: World, blocks: BlockInfo, rng: () => number): Lot[] 
       if (x < 0 || y < 0 || x >= w.size || y >= w.size) return undefined;
       const i = idx(w, x, y);
       if (used[i] || blocks.blockId[i] !== blocks.blockId[front] || blocks.depth[i] !== d ||
-          w.zone[i] !== zone || w.level[i] !== level || w.road[i] || w.facility[i] || !isLand(w, x, y)) return undefined;
+          w.zone[i] !== zone || w.level[i] !== level || blocksBuilding(w, i) || w.facility[i] || !isLand(w, x, y)) return undefined;
       minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
     }
     for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) used[idx(w, x, y)] = 1;

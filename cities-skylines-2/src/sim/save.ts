@@ -106,6 +106,7 @@ function validateStructure(f: SaveFile, n: number): void {
     if (!seg || !Number.isInteger(seg.id) || seg.id < 1 || segIds.has(seg.id)) bad();
     segIds.add(seg.id);
     if (![1, 2, 3].includes(seg.type) || !Array.isArray(seg.tiles) || !Array.isArray(seg.pts)) bad();
+    if (seg.elevation !== undefined && seg.elevation !== "ground" && seg.elevation !== "bridge" && seg.elevation !== "tunnel") bad();
     if (seg.pts.length < 2 || seg.pts.length > 3 || seg.tiles.length > n * n) bad();
     if (!seg.tiles.every(tile)) bad();
     if (!seg.pts.every((p) => p && finite(p.x) && finite(p.z))) bad();
