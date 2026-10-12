@@ -38,4 +38,7 @@ npm run build   # tipos + bundle em dist/
   Passageiros pagam tarifa, tiram carros da rua, elevam o valor do solo e a felicidade. Painel de linhas com veículos e remoção.
 - M7: menu (☰) com 3 slots de save, autosave mensal, nova cidade por seed; ciclo dia e noite com janelas acesas;
   chuva (determinística por dia e seed) que deixa o trânsito 15% mais lento. Saves ficam em localStorage (~90 KB).
-- Próximo: M8 (PWA offline, Tauri para Mac e Windows, ícones, desempenho no iPad).
+- M8: empacotamento. PWA com service worker (offline), ícones e manifest; app de Mac com Tauri (`npm run desktop:build`,
+  `.app` de 10 MB e `.dmg` de 3 MB); exportar e importar saves por arquivo; resolução adaptativa e reconstrução da cena
+  limitada a uma vez a cada 80 ms para aliviar GPUs mais fracas. Instruções para iPad e Windows em [docs/INSTALL.md](docs/INSTALL.md).
+- Próximo: M9 (identidade visual: logo com coroa, ícones, preferências e HUD novos).

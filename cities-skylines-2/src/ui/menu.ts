@@ -4,6 +4,8 @@ export interface MenuHooks {
   onSave(slot: number): void;
   onLoad(slot: string): void;
   onNew(seed: number): void;
+  onExport(): void;
+  onImport(file: File): void;
   info(slot: string): SlotInfo | null;
 }
 
@@ -53,7 +55,17 @@ export class Menu {
     }
     rows.push(`<div class="menu-row new"><div><b>New city</b><small>Map seed</small></div>
       <span><input id="menu-seed" inputmode="numeric" value="${Math.floor(Math.random() * 99999)}"><button data-new>Generate</button></span></div>`);
+    rows.push(`<div class="menu-row"><div><b>Save file</b><small>Keep a copy or move it to another device</small></div>
+      <span><button data-export>Export</button><button data-import>Import</button>
+      <input id="menu-file" type="file" accept=".json,.mayor.json,application/json" hidden></span></div>`);
     this.body.innerHTML = rows.join("");
+    const fileInput = this.body.querySelector<HTMLInputElement>("#menu-file")!;
+    this.body.querySelector("[data-export]")!.addEventListener("click", () => this.hooks.onExport());
+    this.body.querySelector("[data-import]")!.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      const f = fileInput.files?.[0];
+      if (f) { this.hooks.onImport(f); this.close(); }
+    });
     this.body.querySelectorAll<HTMLButtonElement>("[data-save]").forEach((b) =>
       b.addEventListener("click", () => { this.hooks.onSave(Number(b.dataset.save)); this.render(); }));
     this.body.querySelectorAll<HTMLButtonElement>("[data-load]").forEach((b) =>

@@ -2,7 +2,7 @@ import "./ui/style.css";
 import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
-import { AUTOSAVE, loadFrom, saveTo, slotInfo } from "./storage";
+import { AUTOSAVE, exportFile, importFile, loadFrom, saveTo, slotInfo } from "./storage";
 import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
@@ -80,7 +80,17 @@ const menu = new Menu(app, {
     if (r.ok) { useCity(r.state); hud.showToast("City loaded"); } else hud.showToast(r.reason);
   },
   onNew: (seed) => { useCity(newCity(seed)); hud.showToast(`New city, seed ${seed}`); },
+  onExport: () => { exportFile(state); hud.showToast("Save file downloaded"); },
+  onImport: async (file) => {
+    const r = await importFile(file);
+    if (r.ok) { useCity(r.state); hud.showToast("City imported"); } else hud.showToast(r.reason);
+  },
 });
+
+// Offline support: only in production builds, where the file names are stable.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("/sw.js").catch(() => {}); });
+}
 if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast("Autosave found: open the menu to continue"), 800);
 
 const lineTool = () => tool === "busline" || tool === "metroline";

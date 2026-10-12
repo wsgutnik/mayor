@@ -162,8 +162,8 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M7 concluído. M8 em seguida.",
-    summary: "O jogo agora salva e carrega, abre cidades novas por seed, tem ciclo de dia e noite com janelas acesas e chuva que atrasa o trânsito. Falta empacotar para Mac, Windows e iPad.",
+    headline: "M8 concluído no Mac. M9 em seguida.",
+    summary: "O jogo agora vira app de Mac (Tauri), PWA instalável e offline para iPad, exporta e importa saves por arquivo e ajusta a resolução sozinho em GPUs mais lentas. Windows e iPad real ainda precisam ser testados em máquina própria.",
     screenshot: { src: "img/m7-menu.jpg", caption: "M7: menu com logo, autosave, três slots e nova cidade por seed; ao fundo, a cidade à noite sob chuva." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
@@ -173,15 +173,28 @@ npm run dev</pre>
       { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "done" },
       { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "done" },
       { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "done" },
-      { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "active" }
+      { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "done" },
+      { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "active" }
     ],
     checks: [
-      { ok: true, text: "63 testes passando, incluindo ida e volta de save, estado derivado recomputado, saves corrompidos e clima" },
+      { ok: true, text: "68 testes passando, incluindo a lógica do service worker com fakes de cache e rede" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
-      { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8); quadros por segundo reais só medidos no navegador do Mac" }
+      { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar" },
+      { ok: false, text: "Service worker não pôde ser registrado no navegador embutido daqui; só a lógica foi testada, com fakes" },
+      { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M8 · Empacotamento", items: [
+        "App de Mac com Tauri 2: Mayor.app de 10 MB e dmg de 3 MB; abre e fica estável por 6 s",
+        "PWA: manifest com ícones normal e maskable, apple-touch-icon e service worker (shell pré-cacheado, navegação com rede primeiro)",
+        "Exportar e importar saves por arquivo no menu, para não depender do armazenamento do Safari",
+        "Resolução adaptativa: cai em passos de 0,25 quando os quadros passam de 26 ms e recupera com folga",
+        "Reconstrução da cena limitada a uma vez a cada 80 ms ao pintar (a reconstrução custa 7,8 ms com 5 000 prédios no Mac)",
+        "Workflow de GitHub Actions para Mac e Windows (ainda sem repositório remoto, não executado)",
+        "Guia docs/INSTALL.md para iPad, Mac e Windows",
+        "Testes de simulação longos ganharam tempo limite maior para não falhar com a máquina ocupada"
+      ] },
       { date: "2026-10-12", title: "M7 · Persistência e meta", items: [
         "Salvar e carregar em três slots e autosave no início de cada mês, em localStorage (cerca de 90 KB por cidade)",
         "O save guarda só o que o jogador criou; cobertura, conectividade e valor do solo são recalculados ao carregar",

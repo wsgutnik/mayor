@@ -55,6 +55,9 @@ export const OVERLAY_COLOR: Record<number, string> = {
   [COVER.TRANSIT]: "#9b7bff",
 };
 
+/** Minimum time between full scene rebuilds. */
+const REBUILD_GAP_MS = 80;
+
 const hash = (x: number, y: number) => {
   let h = (x * 374761393 + y * 668265263) | 0;
   h = (h ^ (h >>> 13)) * 1274126177;
@@ -71,6 +74,13 @@ export class CityRenderer {
   private sun!: THREE.DirectionalLight;
   private rain!: THREE.LineSegments;
   private rainOn = false;
+  private lastRebuildAt = 0;
+  private pixelCap = 2;
+  private pixelRatio = 1;
+  private frameMs = 16;
+  private slowFor = 0;
+  private fastFor = 0;
+  private lastFrameAt = 0;
   private roadMesh!: THREE.Mesh;
   private metroMesh!: THREE.Mesh;
   private stopMesh!: THREE.InstancedMesh;
@@ -97,7 +107,9 @@ export class CityRenderer {
     this.world = state.world;
     const size = this.world.size;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.pixelCap = Math.min(window.devicePixelRatio, 2);
+    this.pixelRatio = this.pixelCap;
+    this.renderer.setPixelRatio(this.pixelRatio);
     this.container.appendChild(this.renderer.domElement);
 
     this.scene.background = new THREE.Color("#a9c8e8");
@@ -574,6 +586,7 @@ export class CityRenderer {
   resize(): void {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
+    this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(w, h);
     this.rig.resize(w / h);
   }
@@ -586,9 +599,42 @@ export class CityRenderer {
     return this.renderer.domElement;
   }
 
+  /**
+   * Keep the game smooth on slower GPUs (iPad): drop the render resolution when frames run long,
+   * and win it back when there is headroom. Pixel ratio moves in 0.25 steps between 1 and the cap.
+   */
+  private adaptResolution(now: number): void {
+    if (this.lastFrameAt) {
+      const dt = Math.min(100, now - this.lastFrameAt);
+      this.frameMs += (dt - this.frameMs) * 0.1;
+      if (this.frameMs > 26) { this.slowFor += dt; this.fastFor = 0; }
+      else if (this.frameMs < 14) { this.fastFor += dt; this.slowFor = 0; }
+      else { this.slowFor = 0; this.fastFor = 0; }
+      if (this.slowFor > 1500 && this.pixelRatio > 1) {
+        this.pixelRatio = Math.max(1, this.pixelRatio - 0.25);
+        this.slowFor = 0;
+        this.resize();
+      } else if (this.fastFor > 6000 && this.pixelRatio < this.pixelCap) {
+        this.pixelRatio = Math.min(this.pixelCap, this.pixelRatio + 0.25);
+        this.fastFor = 0;
+        this.resize();
+      }
+    }
+    this.lastFrameAt = now;
+  }
+
+  get currentPixelRatio(): number {
+    return this.pixelRatio;
+  }
+
   render(): void {
-    if (this.seenRevision !== this.world.revision) {
+    this.adaptResolution(performance.now());
+    // Painting bumps the revision every frame; rebuilding the scene costs several ms, so
+    // coalesce changes into at most one rebuild per REBUILD_GAP_MS.
+    const now = performance.now();
+    if (this.seenRevision !== this.world.revision && (now - this.lastRebuildAt >= REBUILD_GAP_MS || this.seenRevision === -1)) {
       this.seenRevision = this.world.revision;
+      this.lastRebuildAt = now;
       this.rebuild();
     }
     this.frame++;

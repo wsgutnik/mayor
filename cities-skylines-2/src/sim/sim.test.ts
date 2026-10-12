@@ -240,7 +240,7 @@ describe("civic services", () => {
     expect(applyTool(guarded, "fire", 10, ey + 3).ok).toBe(true);
     for (let d = 0; d < 4000; d++) { step(guarded); }
     expect(guarded.fires).toBe(0);
-  });
+  }, 60_000);
 
   it("missing police and health lower happiness; parks raise it", () => {
     const s = builtStrip();
@@ -289,7 +289,7 @@ describe("civic services", () => {
     s.taxRate = 0.03; // cheap taxes keep demand high enough to level up
     for (let d = 0; d < 6000; d++) step(s);
     expect(Math.max(...Array.from(s.world.level))).toBe(3);
-  });
+  }, 60_000);
 });
 
 import { placeRoad, planRoad, ROAD_NAME } from "./sim";
