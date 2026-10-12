@@ -6,3 +6,5 @@ cities-skylines-2/screenshots/
 
 # Raw extractions kept out of git
 cities-skylines-2/docs/img/brand/kit/
+__pycache__/
+*.pyc
