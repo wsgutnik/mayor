@@ -162,26 +162,36 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M5 concluído. M6 em seguida.",
-    summary: "A cidade agora tem trânsito: carros levam moradores ao trabalho e caminhões levam produtos da indústria ao comércio, escolhendo a rota mais rápida considerando o congestionamento. Vias lotadas atrasam todo mundo e derrubam a felicidade.",
-    screenshot: { src: "img/m5-traffic.jpg", caption: "M5: 109 veículos circulando; o infoview de tráfego pinta cada via de verde (livre) a vermelho (lotada)." },
+    headline: "M6 concluído. M7 em seguida.",
+    summary: "Agora há ônibus e metrô: o jogador coloca paradas e estações, liga em linhas circulares e compra veículos. Passageiros pagam tarifa, tiram carros da rua e valorizam a vizinhança.",
+    screenshot: { src: "img/m6-transit.jpg", caption: "M6: uma linha de ônibus de três paradas sobre a avenida e uma linha de metrô entre duas estações roxas; o painel à direita controla veículos por linha." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
       { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "done" },
       { id: "M4", name: "Estradas livres", desc: "Curvas, tipos de via, interseções e terreno cortado.", status: "done" },
       { id: "M5", name: "Agentes", desc: "Cidadãos e veículos com pathfinding, tráfego e congestionamento.", status: "done" },
-      { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "active" },
-      { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "todo" },
+      { id: "M6", name: "Transporte público", desc: "Ônibus, metrô, linhas e paradas.", status: "done" },
+      { id: "M7", name: "Persistência e meta", desc: "Salvar e carregar, mapas, ciclo dia e noite, clima.", status: "active" },
       { id: "M8", name: "Empacotamento", desc: "PWA offline, Tauri para Mac e Windows, desempenho no iPad.", status: "todo" }
     ],
     checks: [
-      { ok: true, text: "43 testes passando, incluindo pathfinding e um teste de desempenho do tráfego (menos de 5 ms por tick com 260 veículos)" },
+      { ok: true, text: "56 testes passando, incluindo linhas, ridership, metrô e efeitos no tráfego" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
-      { ok: true, text: "Jogado no navegador: 109 veículos, infoview de tráfego e 2,6 ms por quadro de renderização" },
+      { ok: true, text: "Jogado no navegador: paradas, linha de ônibus, estações de metrô, linha de metrô e painel de linhas" },
       { ok: false, text: "Ainda não testado em iPad nem empacotado com Tauri (M8); quadros por segundo reais só medidos no navegador do Mac" }
     ],
     log: [
+      { date: "2026-10-12", title: "M6 · Transporte público", items: [
+        "Paradas de ônibus em ruas e avenidas e estações de metrô em qualquer terreno livre (raio 6 e 9)",
+        "Linhas circulares criadas tocando as paradas em ordem; validação de rota por estrada para ônibus",
+        "Ônibus seguem as vias e entram na carga do tráfego; trens vão em linha reta e não disputam as vias",
+        "Passageiros por dia limitados por capacidade e pela cobertura de casas e empregos; tarifa de $1 (ônibus) e $1,50 (metrô)",
+        "Parte dos moradores deixa o carro: a geração de carros cai até 60% conforme a parcela de passageiros",
+        "Cobertura de transporte soma valor do solo e felicidade; novo infoview Transit",
+        "Painel de linhas: veículos por linha de 1 a 8, remover linha; bulldozer remove paradas e desfaz linhas com menos de duas",
+        "Trilhos do metrô desenhados no chão em cor própria de cada linha"
+      ] },
       { date: "2026-10-12", title: "M5 · Agentes e tráfego", items: [
         "Dois tipos de veículo: carros de moradores (casa para emprego) e caminhões (indústria para comércio)",
         "Rota por A* com custo de tempo por classe de via, inflado pela ocupação atual: o tráfego desvia de vias lotadas",

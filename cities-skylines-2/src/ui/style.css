@@ -118,3 +118,17 @@ body {
   padding: 10px 18px; font: 600 14px inherit; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.3);
 }
 .finish[hidden] { display: none; }
+
+/* M6: transit */
+.lines { position: absolute; right: 10px; top: calc(76px + var(--safe-top)); width: 260px; padding: 6px; display: none; flex-direction: column; gap: 4px; }
+.lines.has { display: flex; }
+.line-row { display: grid; grid-template-columns: 10px 1fr auto auto 26px 18px 26px 26px; gap: 6px; align-items: center; font-size: 12px; }
+.line-row i { width: 10px; height: 10px; border-radius: 50%; }
+.line-row .ln { font-weight: 600; }
+.line-row .lm { color: var(--muted); font-size: 11px; }
+.line-row b { text-align: center; font-variant-numeric: tabular-nums; }
+.line-row button { background: rgba(255,255,255,.08); color: var(--text); border: 0; border-radius: 6px; height: 26px; cursor: pointer; }
+.line-row button:disabled { opacity: .35; cursor: default; }
+.finish.create { bottom: calc(250px + var(--safe-bottom)); background: var(--good); }
+.finish.create[hidden] { display: none; }
+@media (max-width: 640px) { .lines { top: calc(130px + var(--safe-top)); } }

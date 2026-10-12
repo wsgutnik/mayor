@@ -1,6 +1,7 @@
 import "./ui/style.css";
 import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, ToolId } from "./sim/sim";
 import { newTraffic, tickTraffic } from "./sim/traffic";
+import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, toolColor } from "./ui/hud";
@@ -22,6 +23,8 @@ let roadMode: RoadMode = "paint";
 
 /** Points already placed for the road being drawn (start, and the bend in curve mode). */
 let draft: Pt[] = [];
+/** Stop ids picked so far for the transit line being built. */
+let lineDraft: number[] = [];
 let cursor: Pt | null = null;
 
 const hud = new Hud(app, {
@@ -36,22 +39,69 @@ const hud = new Hud(app, {
   onOverlay: (layer) => renderer.setOverlay(layer),
   onRoad: (t, m) => { roadType = t; roadMode = m; cancelDraft(); refreshHint(); },
   onFinishRoad: () => cancelDraft(),
+  onCreateLine: () => {
+    const kind = tool === "metroline" ? "metro" : "bus";
+    const res = createLine(state, kind, lineDraft);
+    if (res.ok) { hud.showToast("Line created"); cancelDraft(); } else hud.showToast(res.reason);
+  },
+  onLineVehicles: (id, delta) => {
+    const line = state.world.lines.find((l) => l.id === id);
+    if (!line) return;
+    const res = setLineVehicles(state, id, line.vehicles + delta);
+    if (!res.ok) hud.showToast(res.reason);
+  },
+  onRemoveLine: (id) => removeLine(state, id),
 });
 hud.setTool(tool);
 hud.setSpeed(speed);
 
-const placing = () => tool === "road" && roadMode !== "paint";
+const lineTool = () => tool === "busline" || tool === "metroline";
+const placing = () => (tool === "road" && roadMode !== "paint") || lineTool();
 
 function cancelDraft(): void {
   draft = [];
+  lineDraft = [];
   cursor = null;
   renderer.setRoadPreview(null);
+  renderer.setStopMarks([]);
   hud.showFinish(false);
+  hud.showCreateLine(false);
+  refreshHint();
+}
+
+/** Tap while building a transit line: pick the stop on (or next to) the tapped tile. */
+function onLineTap(cx: number, cy: number): void {
+  const raw = renderer.pickPoint(cx, cy);
+  if (!raw) return;
+  const kind = tool === "metroline" ? "metro" : "bus";
+  const w = state.world;
+  const tx = Math.floor(raw.x), ty = Math.floor(raw.z);
+  let found = null;
+  for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const x = tx + dx, y = ty + dy;
+    if (x < 0 || y < 0 || x >= w.size || y >= w.size) continue;
+    const st = stopAt(w, y * w.size + x);
+    if (st && st.kind === kind) { found = st; break; }
+  }
+  if (!found) { hud.showToast(`Tap a ${kind} ${kind === "bus" ? "stop" : "station"}`); return; }
+  if (lineDraft[lineDraft.length - 1] === found.id) return;
+  lineDraft.push(found.id);
+  renderer.setStopMarks(lineDraft.map((id) => w.stops.find((s) => s.id === id)!.tile),
+    kind === "metro" ? "#b9a3ff" : "#ffd84a");
+  hud.showFinish(true, "Cancel");
+  hud.showCreateLine(lineDraft.length >= 2);
   refreshHint();
 }
 
 function refreshHint(): void {
   if (!placing()) return;
+  if (lineTool()) {
+    const what = tool === "metroline" ? "metro station" : "bus stop";
+    hud.setHint(lineDraft.length < 2
+      ? `Tap ${what}s in the order the line should run (${lineDraft.length} picked)`
+      : `${lineDraft.length} stops. Tap more, or Create line (the route loops)`);
+    return;
+  }
   const name = ROAD_NAME[roadType];
   if (draft.length === 0) hud.setHint(`${name}: tap a start point (or an existing road to connect)`);
   else if (roadMode === "curve" && draft.length === 1) hud.setHint(`${name}: tap the bend point`);
@@ -85,6 +135,7 @@ function updatePreview(): void {
 
 function onTap(cx: number, cy: number): void {
   if (!placing()) return;
+  if (lineTool()) { onLineTap(cx, cy); return; }
   const raw = renderer.pickPoint(cx, cy);
   if (!raw) return;
   const p = snap(raw);
@@ -129,6 +180,7 @@ bindInput(renderer, {
   },
   hover: (cx, cy) => {
     if (tool === "pan") { renderer.setHover(null); return; }
+    if (lineTool()) { renderer.setHover(renderer.pick(cx, cy), toolColor(tool)); return; }
     if (placing()) {
       const raw = renderer.pickPoint(cx, cy);
       if (draft.length) {

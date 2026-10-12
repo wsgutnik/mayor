@@ -6,7 +6,7 @@ export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
 /** Facility kinds stored per tile: utilities (1-4) and civic services (5-9). */
 export const FAC = {
   NONE: 0, POWER: 1, WATER: 2, SEWAGE: 3, LANDFILL: 4,
-  POLICE: 5, FIRE: 6, CLINIC: 7, SCHOOL: 8, PARK: 9,
+  POLICE: 5, FIRE: 6, CLINIC: 7, SCHOOL: 8, PARK: 9, METRO: 10,
 } as const;
 export type FacilityType = (typeof FAC)[keyof typeof FAC];
 export type FacilityKind = Exclude<FacilityType, 0>;
@@ -14,13 +14,13 @@ export type FacilityKind = Exclude<FacilityType, 0>;
 /** Bits in World.cover. */
 export const COVER = {
   POWER: 1, WATER: 2, SEWAGE: 4, GARBAGE: 8,
-  POLICE: 16, FIRE: 32, HEALTH: 64, EDU: 128, PARK: 256,
+  POLICE: 16, FIRE: 32, HEALTH: 64, EDU: 128, PARK: 256, TRANSIT: 512,
 } as const;
 
 /** Pseudo-layer for the land value infoview (not a coverage bit). */
-export const LAND_VALUE_LAYER = 1024;
+export const LAND_VALUE_LAYER = 4096;
 /** Pseudo-layer colouring road tiles by how full they are. */
-export const TRAFFIC_LAYER = 2048;
+export const TRAFFIC_LAYER = 8192;
 
 interface FacilityInfo {
   name: string; cost: number; upkeep: number; radius: number;
@@ -38,7 +38,23 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.CLINIC]: { name: "Clinic", cost: 700, upkeep: 60, radius: 12, capacity: 0, bit: COVER.HEALTH, nearWater: false },
   [FAC.SCHOOL]: { name: "School", cost: 900, upkeep: 70, radius: 14, capacity: 0, bit: COVER.EDU, nearWater: false },
   [FAC.PARK]: { name: "Park", cost: 150, upkeep: 10, radius: 8, capacity: 0, bit: COVER.PARK, nearWater: false },
+  [FAC.METRO]: { name: "Metro station", cost: 1200, upkeep: 60, radius: 9, capacity: 0, bit: COVER.TRANSIT, nearWater: false },
 };
+
+/** Walking reach of a bus stop, in tiles. */
+export const BUS_STOP_RADIUS = 6;
+
+export type TransitKind = "bus" | "metro";
+export interface Stop { id: number; kind: TransitKind; tile: number }
+export interface TransitLine {
+  id: number;
+  kind: TransitKind;
+  /** Stop ids in visiting order; the route loops. */
+  stops: number[];
+  vehicles: number;
+  color: string;
+  name: string;
+}
 
 /** Road classes. The grid stores the class per tile (0 = none). */
 export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3 } as const;
@@ -72,6 +88,9 @@ export interface World {
   road: Uint8Array;
   segments: RoadSegment[];
   nextSegmentId: number;
+  stops: Stop[];
+  lines: TransitLine[];
+  nextTransitId: number;
   zone: Uint8Array;
   /** Building level per tile, 0 = no building, 1..3. */
   level: Uint8Array;
@@ -150,6 +169,9 @@ export function generateWorld(size: number, seed: number): World {
     road: new Uint8Array(size * size),
     segments: [],
     nextSegmentId: 1,
+    stops: [],
+    lines: [],
+    nextTransitId: 1,
     zone: new Uint8Array(size * size),
     level: new Uint8Array(size * size),
     facility: new Uint8Array(size * size),
@@ -235,6 +257,18 @@ export function nearWater(w: World, x: number, y: number, r: number): boolean {
 export function updateCoverage(w: World): void {
   w.cover.fill(0);
   w.coverageDirty = false;
+  for (const stop of w.stops) {
+    if (stop.kind !== "bus") continue;
+    const sx = stop.tile % w.size, sy = (stop.tile / w.size) | 0;
+    const r = BUS_STOP_RADIUS;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        const nx = sx + dx, ny = sy + dy;
+        if (inBounds(w, nx, ny)) w.cover[idx(w, nx, ny)] |= COVER.TRANSIT;
+      }
+    }
+  }
   for (let y = 0; y < w.size; y++) {
     for (let x = 0; x < w.size; x++) {
       const f = w.facility[idx(w, x, y)] as FacilityType;
@@ -258,7 +292,7 @@ export function updateCoverage(w: World): void {
  */
 export function updateLandValue(w: World): boolean {
   const BONUS: [number, number][] = [
-    [COVER.PARK, 18], [COVER.HEALTH, 8], [COVER.EDU, 8], [COVER.POLICE, 6], [COVER.FIRE, 6],
+    [COVER.PARK, 18], [COVER.TRANSIT, 8], [COVER.HEALTH, 8], [COVER.EDU, 8], [COVER.POLICE, 6], [COVER.FIRE, 6],
     [COVER.SEWAGE, 5], [COVER.GARBAGE, 4], [COVER.POWER, 4], [COVER.WATER, 4],
   ];
   let changed = false;

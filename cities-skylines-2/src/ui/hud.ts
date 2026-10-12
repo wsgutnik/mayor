@@ -1,4 +1,5 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
+import { MAX_LINE_VEHICLES } from "../sim/transit";
 import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 
@@ -21,11 +22,16 @@ const T: Record<string, ToolDef> = {
   clinic: { id: "clinic", label: "Clinic", icon: "✚", hint: "Clinic: health cover (radius 12)", color: "#f2f6fb" },
   school: { id: "school", label: "School", icon: "✎", hint: "School: education, needed for level 3 (radius 14)", color: "#f59a4a" },
   park: { id: "park", label: "Park", icon: "❀", hint: "Park: land value and happiness (radius 8)", color: "#48b85a" },
+  busstop: { id: "busstop", label: "Bus stop", icon: "◴", hint: "Place a bus stop on a street or avenue", color: "#3d8bff" },
+  metro: { id: "metro", label: "Metro", icon: "Ⓜ", hint: "Metro station: any free land tile (radius 9)", color: "#9b7bff" },
+  busline: { id: "busline", label: "Bus line", icon: "➰", hint: "Tap bus stops in order, then Create line", color: "#3d8bff" },
+  metroline: { id: "metroline", label: "Metro line", icon: "➿", hint: "Tap metro stations in order, then Create line", color: "#9b7bff" },
   bulldoze: { id: "bulldoze", label: "Bulldoze", icon: "✕", hint: "Remove roads, zones and facilities", color: "#e5584f" },
 };
 
 const UTILITY_TOOLS = ["power", "water", "sewage", "landfill"];
 const CIVIC_TOOLS = ["police", "fire", "clinic", "school", "park"];
+const TRANSIT_TOOLS = ["busstop", "metro", "busline", "metroline"];
 
 const LAYERS: { layer: OverlayLayer; label: string; icon: string; color: string }[] = [
   { layer: 0, label: "Off", icon: "○", color: "#ffffff" },
@@ -38,6 +44,7 @@ const LAYERS: { layer: OverlayLayer; label: string; icon: string; color: string 
   { layer: COVER.HEALTH, label: "Health", icon: "✚", color: "#f2f6fb" },
   { layer: COVER.EDU, label: "Education", icon: "✎", color: "#f59a4a" },
   { layer: COVER.PARK, label: "Parks", icon: "❀", color: "#48b85a" },
+  { layer: COVER.TRANSIT, label: "Transit", icon: "◴", color: "#9b7bff" },
   { layer: LAND_VALUE_LAYER, label: "Land value", icon: "▦", color: "#7fd35c" },
   { layer: TRAFFIC_LAYER, label: "Traffic", icon: "⇆", color: "#e5584f" },
 ];
@@ -57,6 +64,9 @@ const ROAD_MODES: { mode: RoadMode; label: string; icon: string; hint: string }[
 
 export interface HudHooks {
   onRoad(type: RoadType, mode: RoadMode): void;
+  onCreateLine(): void;
+  onLineVehicles(id: number, delta: number): void;
+  onRemoveLine(id: number): void;
   onFinishRoad(): void;
   onTool(t: ToolId): void;
   onSpeed(s: number): void;
@@ -84,6 +94,7 @@ const CIVIC_ROWS: { key: CivicKey; label: string; color: string }[] = [
   { key: "health", label: "Health", color: "#e8eef5" },
   { key: "edu", label: "Education", color: "#f59a4a" },
   { key: "park", label: "Parks", color: "#48b85a" },
+  { key: "transit", label: "Transit", color: "#9b7bff" },
 ];
 
 export class Hud {
@@ -111,6 +122,11 @@ export class Hud {
   private roadMode: RoadMode = "paint";
   private flyCivic!: HTMLElement;
   private civicBtn!: HTMLElement;
+  private flyTransit!: HTMLElement;
+  private transitBtn!: HTMLElement;
+  private createBtn!: HTMLElement;
+  private linesPanel!: HTMLElement;
+  private linesSig = "";
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private lvEl!: HTMLElement;
   private trafficFill!: HTMLElement;
@@ -227,6 +243,10 @@ export class Hud {
     this.civicBtn.addEventListener("click", () => this.toggleFly(this.flyCivic));
     bar.appendChild(this.civicBtn);
 
+    this.transitBtn = el("button", "tool", `<span class="ic" style="color:#9b7bff">◴</span><span>Transit</span><small>▴</small>`);
+    this.transitBtn.addEventListener("click", () => this.toggleFly(this.flyTransit));
+    bar.appendChild(this.transitBtn);
+
     bar.appendChild(this.toolButton(T.bulldoze));
 
     this.viewBtn = el("button", "tool", `<span class="ic">◉</span><span>Infoview</span><small>▴</small>`);
@@ -265,6 +285,8 @@ export class Hud {
 
     this.flyCivic = el("div", "panel fly");
     for (const id of CIVIC_TOOLS) this.flyCivic.appendChild(this.toolButton(T[id]));
+    this.flyTransit = el("div", "panel fly");
+    for (const id of TRANSIT_TOOLS) this.flyTransit.appendChild(this.toolButton(T[id]));
     this.flyView = el("div", "panel fly wrap");
     for (const l of LAYERS) {
       const b = el("button", "tool", `<span class="ic" style="color:${l.color}">${l.icon}</span><span>${l.label}</span>`);
@@ -280,6 +302,15 @@ export class Hud {
     this.layerBtns[0].classList.add("active");
     this.root.appendChild(this.flyUtil);
     this.root.appendChild(this.flyCivic);
+    this.root.appendChild(this.flyTransit);
+
+    this.createBtn = el("button", "finish create", "Create line");
+    this.createBtn.addEventListener("click", () => this.hooks.onCreateLine());
+    this.createBtn.hidden = true;
+    this.root.appendChild(this.createBtn);
+
+    this.linesPanel = el("div", "panel lines");
+    this.root.appendChild(this.linesPanel);
     this.root.appendChild(this.flyView);
 
     this.hint = el("div", "hint", "");
@@ -298,8 +329,33 @@ export class Hud {
     this.hint.textContent = text;
   }
 
-  showFinish(on: boolean): void {
+  showFinish(on: boolean, label = "Finish road"): void {
     this.finishBtn.hidden = !on;
+    this.finishBtn.textContent = label;
+  }
+
+  showCreateLine(on: boolean): void {
+    this.createBtn.hidden = !on;
+  }
+
+  /** Rebuild the lines list when lines, vehicles or ridership change. */
+  updateLines(s: CityState): void {
+    const sig = s.world.lines.map((l) => `${l.id}:${l.vehicles}:${l.stops.length}`).join("|");
+    if (sig === this.linesSig) return;
+    this.linesSig = sig;
+    this.linesPanel.classList.toggle("has", s.world.lines.length > 0);
+    this.linesPanel.innerHTML = "";
+    for (const l of s.world.lines) {
+      const row = el("div", "line-row",
+        `<i style="background:${l.color}"></i><span class="ln">${l.name}</span><span class="lm">${l.stops.length} stops</span>` +
+        `<button data-d="-1">−</button><b>${l.vehicles}</b><button data-d="1">+</button><button data-x>✕</button>`);
+      row.querySelector<HTMLButtonElement>('[data-d="-1"]')!.addEventListener("click", () => this.hooks.onLineVehicles(l.id, -1));
+      const plus = row.querySelector<HTMLButtonElement>('[data-d="1"]')!;
+      plus.disabled = l.vehicles >= MAX_LINE_VEHICLES;
+      plus.addEventListener("click", () => this.hooks.onLineVehicles(l.id, 1));
+      row.querySelector("[data-x]")!.addEventListener("click", () => this.hooks.onRemoveLine(l.id));
+      this.linesPanel.appendChild(row);
+    }
   }
 
   private toggleFly(which: HTMLElement): void {
@@ -312,6 +368,7 @@ export class Hud {
     this.flyUtil.classList.remove("open");
     this.flyRoad.classList.remove("open");
     this.flyCivic.classList.remove("open");
+    this.flyTransit.classList.remove("open");
     this.flyView.classList.remove("open");
   }
 
@@ -337,6 +394,7 @@ export class Hud {
     this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === t));
     this.groupBtn.classList.toggle("active", UTILITY_TOOLS.includes(t));
     this.civicBtn.classList.toggle("active", CIVIC_TOOLS.includes(t));
+    this.transitBtn.classList.toggle("active", TRANSIT_TOOLS.includes(t));
     this.hint.textContent = T[t].hint;
   }
 
@@ -385,6 +443,7 @@ export class Hud {
       ref.val.textContent = `${Math.round(v * 100)}%`;
     }
     this.lvEl.textContent = String(Math.round(s.landValue));
+    this.updateLines(s);
     this.trafficFill.style.width = `${Math.min(1, s.congestion) * 100}%`;
     this.trafficVal.textContent = `${s.vehicles} cars`;
     this.trafficVal.classList.toggle("neg", s.congestion > 0.4);

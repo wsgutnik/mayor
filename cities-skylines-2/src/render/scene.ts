@@ -36,6 +36,7 @@ const FACILITY_LOOK = {
   [FAC.CLINIC]: [0.8, 0.8, new THREE.Color("#e8eef5")],
   [FAC.SCHOOL]: [0.8, 0.9, new THREE.Color("#f08a3c")],
   [FAC.PARK]: [0.1, 0.96, new THREE.Color("#3fa34d")],
+  [FAC.METRO]: [0.7, 0.9, new THREE.Color("#7a5fd0")],
 } as const;
 
 /** 0 = off, a COVER bit, or LAND_VALUE_LAYER. */
@@ -51,6 +52,7 @@ export const OVERLAY_COLOR: Record<number, string> = {
   [COVER.HEALTH]: "#f2f6fb",
   [COVER.EDU]: "#f59a4a",
   [COVER.PARK]: "#48b85a",
+  [COVER.TRANSIT]: "#9b7bff",
 };
 
 const hash = (x: number, y: number) => {
@@ -66,6 +68,9 @@ export class CityRenderer {
   private terrain!: THREE.Mesh;
   private terrainGeo!: THREE.PlaneGeometry;
   private roadMesh!: THREE.Mesh;
+  private metroMesh!: THREE.Mesh;
+  private stopMesh!: THREE.InstancedMesh;
+  private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
   private buildings!: THREE.InstancedMesh;
@@ -116,6 +121,12 @@ export class CityRenderer {
     );
     this.roadMesh.frustumCulled = false;
     this.scene.add(this.roadMesh);
+    this.metroMesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
+    );
+    this.metroMesh.frustumCulled = false;
+    this.scene.add(this.metroMesh);
     this.previewMesh = new THREE.Mesh(
       new THREE.BufferGeometry(),
       new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }),
@@ -125,6 +136,8 @@ export class CityRenderer {
     this.scene.add(this.previewMesh);
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.buildings = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.vehicleMesh.count = 0;
     this.facilities = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
@@ -240,7 +253,7 @@ export class CityRenderer {
    * Ribbon geometry for road segments: asphalt strip plus a centre line or median.
    * `tint` replaces the per-class colours (used for the build preview).
    */
-  private buildRoadGeometry(segs: { type: RoadType; pts: Pt[] }[], tint?: THREE.Color): THREE.BufferGeometry {
+  private buildRoadGeometry(segs: { type: RoadType; pts: Pt[]; width?: number; color?: string; lift?: number }[], tint?: THREE.Color): THREE.BufferGeometry {
     const pos: number[] = [];
     const col: number[] = [];
     const ind: number[] = [];
@@ -266,7 +279,8 @@ export class CityRenderer {
     };
     segs.forEach((seg, n) => {
       const samples = curvePoints(seg.pts, 0.5);
-      const lift = 0.07 + (n % 7) * 0.002;
+      const lift = seg.lift ?? 0.07 + (n % 7) * 0.002;
+      if (seg.color) { strip(samples, (seg.width ?? 0.3) / 2, lift, seg.color); return; }
       const hw = ROAD_DRAW_WIDTH[seg.type] / 2;
       strip(samples, hw, lift, seg.type === 3 ? "#4a4f57" : "#3b3f46");
       if (seg.type === 1) strip(samples, 0.04, lift + 0.01, "#6b717b");
@@ -284,6 +298,64 @@ export class CityRenderer {
   private rebuildRoads(): void {
     this.roadMesh.geometry.dispose();
     this.roadMesh.geometry = this.buildRoadGeometry(this.world.segments as RoadSegment[]);
+    this.rebuildTransit();
+  }
+
+  /** Metro tracks as coloured ground lines, and bus stop posts. */
+  private rebuildTransit(): void {
+    const w = this.world;
+    const tracks: { type: RoadType; pts: Pt[]; width: number; color: string; lift: number }[] = [];
+    for (const line of w.lines) {
+      if (line.kind !== "metro") continue;
+      const n = line.stops.length;
+      for (let i = 0; i < n; i++) {
+        const a = w.stops.find((x) => x.id === line.stops[i]);
+        const b = w.stops.find((x) => x.id === line.stops[(i + 1) % n]);
+        if (!a || !b || a.id === b.id) continue;
+        const p = (t: number) => ({ x: (t % w.size) + 0.5, z: ((t / w.size) | 0) + 0.5 });
+        tracks.push({ type: 1, pts: [p(a.tile), p(b.tile)], width: 0.28, color: line.color, lift: 0.1 });
+      }
+    }
+    this.metroMesh.geometry.dispose();
+    this.metroMesh.geometry = this.buildRoadGeometry(tracks);
+
+    const m = this.stopMesh;
+    const d = this.dummy;
+    const col = new THREE.Color();
+    let n = 0;
+    for (const st of w.stops) {
+      if (st.kind !== "bus") continue;
+      const x = st.tile % w.size, y = (st.tile / w.size) | 0;
+      const line = w.lines.find((l) => l.stops.includes(st.id));
+      d.position.set(x + 0.2, tileHeight(w, x, y) + 0.4, y + 0.2);
+      d.scale.set(0.16, 0.7, 0.16);
+      d.updateMatrix();
+      m.setMatrixAt(n, d.matrix);
+      col.set(line ? line.color : "#8a95a8");
+      m.setColorAt(n, col);
+      n++;
+    }
+    m.count = n;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }
+
+  /** Mark tiles (stops picked while building a line). */
+  setStopMarks(tiles: number[], color = "#ffd84a"): void {
+    const m = this.markMesh;
+    const d = this.dummy;
+    const col = new THREE.Color(color);
+    tiles.forEach((t, i) => {
+      const x = t % this.world.size, y = (t / this.world.size) | 0;
+      d.position.set(x + 0.5, tileHeight(this.world, x, y) + 1.0, y + 0.5);
+      d.scale.set(0.3, 0.3, 0.3);
+      d.updateMatrix();
+      m.setMatrixAt(i, d.matrix);
+      m.setColorAt(i, col);
+    });
+    m.count = tiles.length;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
   /** Traffic whose vehicles are drawn and whose loads colour the traffic infoview. */
@@ -317,6 +389,27 @@ export class CityRenderer {
       d.updateMatrix();
       m.setMatrixAt(n, d.matrix);
       col.set(v.kind === 1 ? "#f08a3c" : CAR[v.id % CAR.length]);
+      m.setColorAt(n, col);
+      n++;
+    }
+    for (const v of t.transit) {
+      if (n >= m.instanceMatrix.count) break;
+      const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
+      if (i < 0) continue;
+      const f = Math.min(1, v.progress - i);
+      const ax = v.pts[i * 2], az = v.pts[i * 2 + 1], bx = v.pts[i * 2 + 2], bz = v.pts[i * 2 + 3];
+      let hx = bx - ax, hz = bz - az;
+      const l = Math.hypot(hx, hz) || 1;
+      hx /= l; hz /= l;
+      const lane = v.kind === "bus" ? 0.14 : 0;
+      const x = ax + (bx - ax) * f - hz * lane;
+      const z = az + (bz - az) * f + hx * lane;
+      d.position.set(x, heightAt(this.world, x, z) + (v.kind === "bus" ? 0.22 : 0.3), z);
+      d.rotation.set(0, -Math.atan2(hz, hx), 0);
+      if (v.kind === "bus") d.scale.set(0.8, 0.26, 0.28); else d.scale.set(1.2, 0.3, 0.4);
+      d.updateMatrix();
+      m.setMatrixAt(n, d.matrix);
+      col.set(v.color);
       m.setColorAt(n, col);
       n++;
     }

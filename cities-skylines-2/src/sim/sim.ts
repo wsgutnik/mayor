@@ -1,4 +1,5 @@
 import { makeRng } from "./rng";
+import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, generateWorld, idx, inBounds,
   isLand, isServed, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile,
@@ -7,12 +8,12 @@ import {
 
 export type FacilityTool =
   | "power" | "water" | "sewage" | "landfill"
-  | "police" | "fire" | "clinic" | "school" | "park";
-export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | FacilityTool;
+  | "police" | "fire" | "clinic" | "school" | "park" | "metro";
+export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | FacilityTool;
 
 const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   power: FAC.POWER, water: FAC.WATER, sewage: FAC.SEWAGE, landfill: FAC.LANDFILL,
-  police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK,
+  police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK, metro: FAC.METRO,
 };
 export const isFacilityTool = (t: ToolId): t is FacilityTool => t in FACILITY_OF_TOOL;
 
@@ -27,6 +28,10 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
   clinic: FACILITY_INFO[FAC.CLINIC].cost,
   school: FACILITY_INFO[FAC.SCHOOL].cost,
   park: FACILITY_INFO[FAC.PARK].cost,
+  metro: FACILITY_INFO[FAC.METRO].cost,
+  busstop: 100,
+  busline: 0,
+  metroline: 0,
 };
 
 /** Residents, commercial jobs, industrial jobs per building level (index = level). */
@@ -56,10 +61,10 @@ export interface Demand { r: number; c: number; i: number }
 export interface MonthReport { income: number; expenses: number }
 export interface UtilityStat { supply: number; demand: number }
 export type UtilityKey = "power" | "water" | "sewage" | "garbage";
-export type CivicKey = "police" | "fire" | "health" | "edu" | "park";
+export type CivicKey = "police" | "fire" | "health" | "edu" | "park" | "transit";
 
 const CIVIC_BIT: Record<CivicKey, number> = {
-  police: COVER.POLICE, fire: COVER.FIRE, health: COVER.HEALTH, edu: COVER.EDU, park: COVER.PARK,
+  police: COVER.POLICE, fire: COVER.FIRE, health: COVER.HEALTH, edu: COVER.EDU, park: COVER.PARK, transit: COVER.TRANSIT,
 };
 export const CIVIC_KEYS = Object.keys(CIVIC_BIT) as CivicKey[];
 
@@ -82,6 +87,8 @@ export interface CityState {
   landValue: number;
   /** Buildings lost to fire since the game began. */
   fires: number;
+  /** Daily passengers, fare income and share of commuters on transit. */
+  transit: { riders: number; income: number; share: number };
   /** Share of vehicles crawling (0..1), smoothed; written by tickTraffic. */
   congestion: number;
   /** Vehicles currently driving; written by tickTraffic. */
@@ -112,9 +119,10 @@ export function newCity(seed = 1337, size = 96): CityState {
     demand: { r: 0.5, c: 0.2, i: 0.2 },
     utilities: emptyUtilities(),
     happiness: 100,
-    coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0 },
+    coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 },
     landValue: 0,
     fires: 0,
+    transit: { riders: 0, income: 0, share: 0 },
     congestion: 0,
     vehicles: 0,
     lastMonth: { income: 0, expenses: 0 },
@@ -215,9 +223,10 @@ function facilityUpkeep(w: World): number {
 /** Apply a tool to one tile. All world mutation from the player goes through here. */
 export function applyTool(s: CityState, tool: ToolId, x: number, y: number, roadType: RoadType = 1): ToolResult {
   const w = s.world;
-  if (tool === "pan") return { ok: true };
+  if (tool === "pan" || tool === "busline" || tool === "metroline") return { ok: true };
   if (!inBounds(w, x, y)) return { ok: false, reason: "Outside the map" };
   const i = idx(w, x, y);
+  if (tool === "busstop") return placeBusStop(s, x, y);
   const cost = COST[tool];
   const isEntry = x <= 2 && y === w.entry.y;
 
@@ -227,6 +236,13 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (s.money < cost) return { ok: false, reason: "Not enough money" };
     s.money -= cost;
     s.monthExpenses += cost;
+    // A bus stop sits on its road: remove only the stop first, the road on the next click.
+    if (w.road[i] && !w.facility[i] && removeStopAt(w, i)) {
+      updateCoverage(w);
+      w.revision++;
+      return { ok: true };
+    }
+    if (w.facility[i] === FAC.METRO) removeStopAt(w, i);
     if (w.road[i]) {
       // Bulldozing a road removes the whole segment it belongs to.
       w.segments = w.segments.filter((seg) => seg.fixed || !seg.tiles.includes(i));
@@ -255,6 +271,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (s.money < cost) return { ok: false, reason: "Not enough money" };
     flattenTile(w, x, y);
     w.facility[i] = type;
+    if (type === FAC.METRO) registerMetroStation(w, i);
     w.coverageDirty = true;
     updateCoverage(w);
     s.money -= cost;
@@ -291,7 +308,7 @@ function recount(s: CityState): void {
   let res = 0, com = 0, ind = 0;
   const util = emptyUtilities();
   let built = 0, noSewage = 0, noGarbage = 0;
-  const civicCovered: Record<CivicKey, number> = { police: 0, fire: 0, health: 0, edu: 0, park: 0 };
+  const civicCovered: Record<CivicKey, number> = { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 };
   let lvSum = 0;
 
   for (let i = 0; i < w.facility.length; i++) {
@@ -336,7 +353,7 @@ function recount(s: CityState): void {
     : 0;
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
-      - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10,
+      - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10 + s.coverage.transit * 5,
     0, 100,
   );
 
@@ -401,7 +418,8 @@ export function step(s: CityState): void {
 
   const jobs = s.capacity.com + s.capacity.ind;
   const monthlyIncome = (s.population * 3 + Math.min(jobs, s.population * 0.65 + jobs * 0.2) * 4) * (s.taxRate / 0.1) * (0.6 + 0.8 * (s.landValue / 100));
-  const monthlyUpkeep = roadUpkeep(w) + facilityUpkeep(w);
+  updateTransit(s);
+  const monthlyUpkeep = roadUpkeep(w) + facilityUpkeep(w) + transitUpkeep(w);
   const inc = monthlyIncome / DAYS_PER_MONTH;
   const exp = monthlyUpkeep / DAYS_PER_MONTH;
   s.money += inc - exp;

@@ -1,6 +1,7 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
-import { ROAD, World, ZONE, idx, inBounds } from "./world";
+import { ROAD, World, ZONE, idx, inBounds, TransitKind } from "./world";
+import { straightTiles } from "./transit";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
 export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7 };
@@ -24,8 +25,28 @@ export interface Vehicle {
   speedFactor: number;
 }
 
+/** A bus or metro train looping over its line's stops. */
+export interface TransitVehicle {
+  id: number;
+  lineId: number;
+  kind: TransitKind;
+  color: string;
+  /** Index in line.stops of the stop being driven to. */
+  stopIdx: number;
+  tiles: number[];
+  pts: Float32Array;
+  progress: number;
+  /** Seconds left standing at a stop. */
+  dwell: number;
+}
+
+const METRO_SPEED = 8;
+const DWELL_SECONDS = 1.2;
+
 export interface TrafficState {
   vehicles: Vehicle[];
+  transit: TransitVehicle[];
+  transitRevision: number;
   /** Vehicles currently on each tile. */
   load: Uint16Array;
   completed: number;
@@ -42,7 +63,7 @@ export interface TrafficState {
 
 export function newTraffic(size: number, seed = 7): TrafficState {
   return {
-    vehicles: [], load: new Uint16Array(size * size), completed: 0, nextId: 1,
+    vehicles: [], transit: [], transitRevision: -1, load: new Uint16Array(size * size), completed: 0, nextId: 1,
     rng: makeRng(seed), spawnCarry: 0, truckCarry: 0, listRevision: -1,
     homes: [], shops: [], factories: [], jobs: [],
   };
@@ -174,6 +195,62 @@ function refreshLists(w: World, t: TrafficState): void {
   t.vehicles = t.vehicles.filter((v) => v.tiles.every((tile) => w.road[tile] > 0));
 }
 
+/** Route a transit vehicle from the previous stop to the one it is heading for. */
+function planLeg(w: World, t: TrafficState, v: TransitVehicle): boolean {
+  const line = w.lines.find((l) => l.id === v.lineId);
+  if (!line) return false;
+  const n = line.stops.length;
+  const from = w.stops.find((x) => x.id === line.stops[(v.stopIdx - 1 + n) % n]);
+  const to = w.stops.find((x) => x.id === line.stops[v.stopIdx % n]);
+  if (!from || !to) return false;
+  let tiles: number[] | null;
+  if (line.kind === "metro") tiles = straightTiles(w, from.tile, to.tile);
+  else tiles = findPath(w, t.load, from.tile, to.tile);
+  if (!tiles) return false;
+  if (tiles.length < 2) tiles = [from.tile, to.tile];
+  v.tiles = tiles;
+  v.pts = line.kind === "metro" ? centres(w, tiles) : smoothPath(w, tiles);
+  v.progress = 0;
+  return true;
+}
+
+function centres(w: World, tiles: number[]): Float32Array {
+  const pts = new Float32Array(tiles.length * 2);
+  tiles.forEach((tile, i) => {
+    pts[i * 2] = (tile % w.size) + 0.5;
+    pts[i * 2 + 1] = ((tile / w.size) | 0) + 0.5;
+  });
+  return pts;
+}
+
+/** Keep one vehicle object per purchased vehicle on each line. */
+function syncTransit(w: World, t: TrafficState): void {
+  t.transitRevision = w.revision;
+  const byLine = new Map<number, TransitVehicle[]>();
+  for (const v of t.transit) {
+    const line = w.lines.find((l) => l.id === v.lineId);
+    if (!line) continue;
+    v.color = line.color;
+    (byLine.get(v.lineId) ?? byLine.set(v.lineId, []).get(v.lineId)!).push(v);
+  }
+  const next: TransitVehicle[] = [];
+  for (const line of w.lines) {
+    const have = (byLine.get(line.id) ?? []).slice(0, line.vehicles);
+    // A vehicle whose stop was removed cannot continue; replace it from the first stop.
+    const ok = have.filter((v) => v.stopIdx < line.stops.length);
+    next.push(...ok);
+    for (let k = ok.length; k < line.vehicles; k++) {
+      const v: TransitVehicle = {
+        id: t.nextId++, lineId: line.id, kind: line.kind, color: line.color,
+        stopIdx: 1 % line.stops.length, tiles: [], pts: new Float32Array(0), progress: 0,
+        dwell: (k * DWELL_SECONDS * 3) / Math.max(1, line.vehicles),
+      };
+      if (planLeg(w, t, v)) next.push(v);
+    }
+  }
+  t.transit = next;
+}
+
 function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
   const w = s.world;
   const origins = kind === 0 ? t.homes : t.factories;
@@ -187,14 +264,39 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
   t.vehicles.push({ id: t.nextId++, kind, tiles, pts: smoothPath(w, tiles), progress: 0, speedFactor: 1 });
 }
 
+function moveTransit(w: World, t: TrafficState, dt: number): void {
+  for (const v of t.transit) {
+    if (v.dwell > 0) { v.dwell -= dt; continue; }
+    if (!v.tiles.length) continue;
+    const tile = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
+    let speed = METRO_SPEED;
+    if (v.kind === "bus") {
+      const cls = w.road[tile];
+      if (!cls) { v.progress = v.tiles.length; continue; }
+      const f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
+      speed = ROAD_SPEED[cls] * f * 0.9;
+    }
+    v.progress += speed * dt;
+    if (v.progress >= v.tiles.length - 1) {
+      const line = w.lines.find((l) => l.id === v.lineId);
+      if (!line) { v.tiles = []; continue; }
+      v.stopIdx = (v.stopIdx + 1) % line.stops.length;
+      v.dwell = DWELL_SECONDS;
+      if (!planLeg(w, t, v)) v.tiles = [];
+    }
+  }
+  t.transit = t.transit.filter((v) => v.tiles.length > 0);
+}
+
 /** Advance traffic by `dt` seconds of game time and publish stats onto the city state. */
 export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   const w = s.world;
   if (t.listRevision !== w.revision) refreshLists(w, t);
+  if (t.transitRevision !== w.revision) syncTransit(w, t);
   if (dt <= 0) return;
 
   // Spawn: commuters scale with residents, trucks with industry.
-  t.spawnCarry += (s.population / 150) * dt;
+  t.spawnCarry += (s.population / 150) * (1 - 0.6 * s.transit.share) * dt;
   t.truckCarry += (s.capacity.ind / 120) * dt;
   while (t.spawnCarry >= 1 && t.vehicles.length < MAX_VEHICLES) { t.spawnCarry -= 1; spawn(s, t, 0); }
   while (t.truckCarry >= 1 && t.vehicles.length < MAX_VEHICLES) { t.truckCarry -= 1; spawn(s, t, 1); }
@@ -203,6 +305,10 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
 
   t.load.fill(0);
   for (const v of t.vehicles) t.load[v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))]]++;
+  for (const v of t.transit) {
+    if (v.kind === "bus" && v.tiles.length) t.load[v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))]]++;
+  }
+  moveTransit(w, t, dt);
 
   let slow = 0;
   const alive: Vehicle[] = [];
