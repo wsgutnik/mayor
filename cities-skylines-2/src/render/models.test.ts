@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { buildModels, VARIANTS } from "./models";
+import { buildModels } from "./models";
+import { zoneEntries } from "../sim/catalog";
 import { FACILITY_INFO, ZONE } from "../sim/world";
 
 const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
@@ -8,13 +9,17 @@ const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attribute
 describe("procedural models", () => {
   const set = buildModels();
 
-  it("has every zone, level and variant", () => {
+  it("has one model per kit entry of every zone and level", () => {
+    let total = 0;
     for (const z of [ZONE.RES, ZONE.COM, ZONE.IND]) {
       for (const l of [1, 2, 3]) {
-        for (let v = 0; v < VARIANTS; v++) expect(set.buildings.has(`${z}-${l}-${v}`)).toBe(true);
+        const n = zoneEntries(z, l).length;
+        expect(n).toBeGreaterThan(0);
+        for (let v = 0; v < n; v++) expect(set.buildings.has(`${z}-${l}-${v}`)).toBe(true);
+        total += n;
       }
     }
-    expect(set.buildings.size).toBe(3 * 3 * VARIANTS);
+    expect(set.buildings.size).toBe(total);
   });
 
   it("has a model for every facility kind", () => {

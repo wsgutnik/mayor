@@ -7,6 +7,7 @@ export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
 export const FAC = {
   NONE: 0, POWER: 1, WATER: 2, SEWAGE: 3, LANDFILL: 4,
   POLICE: 5, FIRE: 6, CLINIC: 7, SCHOOL: 8, PARK: 9, METRO: 10,
+  HOSPITAL: 11, HIGHSCHOOL: 12, LIBRARY: 13, COMMUNITY: 14, MUSEUM: 15, CITYHALL: 16, SUBSTATION: 17,
 } as const;
 export type FacilityType = (typeof FAC)[keyof typeof FAC];
 export type FacilityKind = Exclude<FacilityType, 0>;
@@ -14,7 +15,7 @@ export type FacilityKind = Exclude<FacilityType, 0>;
 /** Bits in World.cover. */
 export const COVER = {
   POWER: 1, WATER: 2, SEWAGE: 4, GARBAGE: 8,
-  POLICE: 16, FIRE: 32, HEALTH: 64, EDU: 128, PARK: 256, TRANSIT: 512,
+  POLICE: 16, FIRE: 32, HEALTH: 64, EDU: 128, PARK: 256, TRANSIT: 512, CULTURE: 2048,
 } as const;
 
 /** Pseudo-layer for the land value infoview (not a coverage bit). */
@@ -39,6 +40,15 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.SCHOOL]: { name: "School", cost: 900, upkeep: 70, radius: 14, capacity: 0, bit: COVER.EDU, nearWater: false },
   [FAC.PARK]: { name: "Park", cost: 150, upkeep: 10, radius: 8, capacity: 0, bit: COVER.PARK, nearWater: false },
   [FAC.METRO]: { name: "Metro station", cost: 1200, upkeep: 60, radius: 9, capacity: 0, bit: COVER.TRANSIT, nearWater: false },
+  [FAC.HOSPITAL]: { name: "General hospital", cost: 1800, upkeep: 130, radius: 18, capacity: 0, bit: COVER.HEALTH, nearWater: false },
+  [FAC.HIGHSCHOOL]: { name: "Secondary school", cost: 1400, upkeep: 100, radius: 20, capacity: 0, bit: COVER.EDU, nearWater: false },
+  [FAC.LIBRARY]: { name: "Public library", cost: 700, upkeep: 40, radius: 12, capacity: 0, bit: COVER.CULTURE, nearWater: false },
+  [FAC.COMMUNITY]: { name: "Community centre", cost: 500, upkeep: 30, radius: 10, capacity: 0, bit: COVER.CULTURE, nearWater: false },
+  [FAC.MUSEUM]: { name: "City museum", cost: 1500, upkeep: 90, radius: 16, capacity: 0, bit: COVER.CULTURE, nearWater: false },
+  /** Effect is city-wide (happiness and tax), so its own radius is zero. */
+  [FAC.CITYHALL]: { name: "City hall", cost: 2500, upkeep: 150, radius: 0, capacity: 0, bit: 0, nearWater: false },
+  /** Extends the power network without adding supply. */
+  [FAC.SUBSTATION]: { name: "Substation", cost: 300, upkeep: 20, radius: 14, capacity: 0, bit: COVER.POWER, nearWater: false },
 };
 
 /** Walking reach of a bus stop, in tiles. */
@@ -333,7 +343,7 @@ export function updateCoverage(w: World): void {
  */
 export function updateLandValue(w: World): boolean {
   const BONUS: [number, number][] = [
-    [COVER.PARK, 18], [COVER.TRANSIT, 8], [COVER.HEALTH, 8], [COVER.EDU, 8], [COVER.POLICE, 6], [COVER.FIRE, 6],
+    [COVER.PARK, 18], [COVER.CULTURE, 10], [COVER.TRANSIT, 8], [COVER.HEALTH, 8], [COVER.EDU, 8], [COVER.POLICE, 6], [COVER.FIRE, 6],
     [COVER.SEWAGE, 5], [COVER.GARBAGE, 4], [COVER.POWER, 4], [COVER.WATER, 4],
   ];
   let changed = false;

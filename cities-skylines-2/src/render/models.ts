@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { FAC, FacilityKind, ZONE } from "../sim/world";
+import { zoneEntries } from "../sim/catalog";
+import { KIT_MAKERS, KIT_FACILITY_MAKERS } from "./kit-models";
 
 /** One part list per material group: group 0 shows windows, group 1 is plain colour. */
 interface Buf { pos: number[]; nrm: number[]; uv: number[]; col: number[]; idx: number[] }
@@ -9,7 +11,7 @@ const CELL_W = 0.17;
 const CELL_H = 0.19;
 
 /** Builds one merged low-poly model; tile-sized, base at y = 0, front facing +z. */
-class Builder {
+export class Builder {
   private win = newBuf();
   private plain = newBuf();
   private c = new THREE.Color();
@@ -126,7 +128,7 @@ class Builder {
 
 // ------------------------------------------------------------ building models
 
-type Maker = (b: Builder) => void;
+export type Maker = (b: Builder) => void;
 
 const RES_WALL = ["#efe6d6", "#e6d4b4"];
 const RES_ROOF = ["#c4553f", "#b9694b", "#5f6e86"];
@@ -225,6 +227,18 @@ const FACILITY: Record<FacilityKind, Maker> = {
   [FAC.PARK]: (b) => b.box(0, 0, 0, 0.92, 0.92, 0.04, "#6fbf6a", false, "#6fbf6a").cyl(-0.22, -0.2, 0.04, 0.025, 0.14, "#7a5a3a", 5)
     .cone(-0.22, -0.2, 0.16, 0.16, 0.38, "#2f8f4a", 7).cyl(0.24, 0.1, 0.04, 0.025, 0.12, "#7a5a3a", 5).cone(0.24, 0.1, 0.14, 0.14, 0.32, "#3a9a52", 7)
     .cyl(-0.05, 0.28, 0.04, 0.025, 0.1, "#7a5a3a", 5).cone(-0.05, 0.28, 0.12, 0.12, 0.28, "#2f8f4a", 7).box(0.2, -0.28, 0.04, 0.24, 0.07, 0.08, "#9a7448"),
+  [FAC.HOSPITAL]: (b) => b.box(0, 0, 0, 0.7, 0.5, 0.5, "#f4f6f9", true, "#d6dce6").box(0, 0, 0.5, 0.26, 0.26, 0.3, "#e8eef5", true)
+    .box(0, 0.26, 0.6, 0.2, 0.04, 0.06, "#d63a3a").box(0, 0.26, 0.6, 0.06, 0.04, 0.2, "#d63a3a"),
+  [FAC.HIGHSCHOOL]: (b) => b.box(-0.1, 0, 0, 0.6, 0.42, 0.34, "#e8a070", true, "#c98860").box(0.26, -0.1, 0, 0.26, 0.4, 0.3, "#d98a55", true, "#c98860")
+    .gable(-0.1, 0, 0.34, 0.6, 0.42, 0.1, "#8a4a3a", "#e8a070"),
+  [FAC.LIBRARY]: (b) => b.box(0, 0, 0, 0.64, 0.5, 0.38, "#d98a55", true, "#c98860").box(0, 0.1, 0.38, 0.4, 0.3, 0.12, "#7fb0dc", true, "#9ab8d4"),
+  [FAC.COMMUNITY]: (b) => b.box(0, 0, 0, 0.66, 0.46, 0.3, "#e6dccb", true, "#cfc3ae").box(0, 0.26, 0.08, 0.5, 0.14, 0.04, "#6a7280"),
+  [FAC.MUSEUM]: (b) => b.box(0, 0, 0, 0.7, 0.5, 0.34, "#efe6d2", true, "#d6cbb0").pyramid(0, 0, 0.34, 0.5, 0.36, 0.16, "#8aa8c8")
+    .cyl(-0.24, 0.26, 0, 0.04, 0.34, "#e8dfc8", 6).cyl(0.24, 0.26, 0, 0.04, 0.34, "#e8dfc8", 6),
+  [FAC.CITYHALL]: (b) => b.box(0, 0, 0, 0.74, 0.46, 0.4, "#efe6d2", true, "#d6cbb0").gable(0, 0, 0.4, 0.74, 0.46, 0.12, "#4f5f86", "#efe6d2")
+    .box(0, -0.1, 0.4, 0.2, 0.2, 0.3, "#efe6d2", true).pyramid(0, -0.1, 0.7, 0.22, 0.22, 0.18, "#4f5f86"),
+  [FAC.SUBSTATION]: (b) => b.box(-0.2, 0.2, 0, 0.3, 0.26, 0.22, "#cfd3d6", true, "#aab3bd").box(0.14, -0.1, 0, 0.5, 0.4, 0.04, "#9a9a92")
+    .box(0.0, -0.1, 0.04, 0.05, 0.05, 0.4, "#6b7078").box(0.28, -0.1, 0.04, 0.05, 0.05, 0.4, "#6b7078").box(0.14, -0.1, 0.44, 0.4, 0.04, 0.04, "#6b7078"),
   [FAC.METRO]: (b) => b.box(0, 0, 0, 0.56, 0.5, 0.3, "#8b6fe0", true, "#6f58c0").box(0, 0, 0.3, 0.7, 0.62, 0.05, "#e8e4f4")
     .box(0, 0.3, 0.05, 0.3, 0.06, 0.18, "#2f2840"),
 };
@@ -239,23 +253,24 @@ export function buildModels(): ModelSet {
   const buildings = new Map<string, THREE.BufferGeometry>();
   for (const zone of [ZONE.RES, ZONE.COM, ZONE.IND]) {
     for (const level of [1, 2, 3]) {
-      BY_ZONE[zone][level].forEach((make, variant) => {
+      const pool = BY_ZONE[zone][level];
+      // One model per kit entry. Entries without a dedicated model reuse the generic pool for now.
+      zoneEntries(zone, level).forEach((entry, i) => {
         const b = new Builder();
-        make(b);
-        buildings.set(`${zone}-${level}-${variant}`, b.build());
+        (KIT_MAKERS[entry.n] ?? pool[i % pool.length])(b);
+        buildings.set(`${zone}-${level}-${i}`, b.build());
       });
     }
   }
   const facilities = new Map<FacilityKind, THREE.BufferGeometry>();
   for (const [kind, make] of Object.entries(FACILITY)) {
     const b = new Builder();
-    make(b);
+    (KIT_FACILITY_MAKERS[Number(kind) as FacilityKind] ?? make)(b);
     facilities.set(Number(kind) as FacilityKind, b.build());
   }
   return { buildings, facilities };
 }
 
-export const VARIANTS = 2;
 
 /** Window texture: a pale wall with one dark pane per UV cell, and the matching glow map. */
 export function makeWindowTextures(): { map: THREE.CanvasTexture; glow: THREE.CanvasTexture } {

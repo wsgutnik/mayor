@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyTool, newCity, step, countRoads } from "./sim";
-import { ZONE, COVER, idx, isLand, cidx, updateCoverage } from "./world";
+import { ZONE, COVER, FAC, idx, isLand, cidx, updateCoverage } from "./world";
 
 type City = ReturnType<typeof newCity>;
 
@@ -443,5 +443,42 @@ describe("terrain presets", () => {
     const a = generateWorld(96, 7, "mountain"), b = generateWorld(96, 7, "mountain");
     expect(Array.from(a.heights)).toEqual(Array.from(b.heights));
     expect(a.biome).toBe("mountain");
+  });
+});
+
+describe("kit facilities", () => {
+  const flatCity = () => {
+    const s = newCity(3);
+    const ey = s.world.entry.y;
+    for (let y = ey - 10; y <= ey + 10; y++) for (let x = 0; x <= 40; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    s.money = 1e6;
+    return { s, ey };
+  };
+
+  it("places the new facilities and covers by their own radius", () => {
+    const { s, ey } = flatCity();
+    for (const [t, x] of [["hospital", 6], ["highschool", 9], ["library", 12], ["community", 15], ["museum", 18], ["substation", 21]] as const) {
+      expect(applyTool(s, t, x, ey + 3).ok).toBe(true);
+    }
+    updateCoverage(s.world);
+    expect(s.world.cover[idx(s.world, 6, ey - 12)] & COVER.HEALTH).toBeTruthy(); // hospital reaches 18
+    expect(s.world.cover[idx(s.world, 12, ey + 3 + 11)] & COVER.CULTURE).toBeTruthy();
+  });
+
+  it("allows one city hall, which lifts happiness and tax income", () => {
+    const { s, ey } = flatCity();
+    for (let x = 4; x < 16; x++) { applyTool(s, "road", x, ey); applyTool(s, "res", x, ey - 1); }
+    for (let i = 0; i < s.world.zone.length; i++) if (s.world.zone[i]) s.world.level[i] = 2;
+    // enough utilities that happiness is not pinned at zero
+    const kinds = [FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.LANDFILL];
+    for (let k = 0; k < 16; k++) s.world.facility[idx(s.world, 4 + k, ey + 7)] = kinds[k % 4];
+    s.world.coverageDirty = true;
+    step(s);
+    const before = s.happiness;
+    expect(applyTool(s, "cityhall", 6, ey + 4).ok).toBe(true);
+    expect(applyTool(s, "cityhall", 9, ey + 4)).toEqual({ ok: false, reason: "There is already a city hall" });
+    step(s);
+    expect(s.happiness).toBeGreaterThanOrEqual(before);
+    expect(s.happiness - before).toBeGreaterThan(0);
   });
 });

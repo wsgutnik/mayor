@@ -30,11 +30,21 @@ const T: Record<string, ToolDef> = {
   metro: { id: "metro", label: "Metro station", hint: "Metro station: any free land tile (radius 9)", color: "#9b7bff", icon: { img: "kit/ico-trem" } },
   busline: { id: "busline", label: "Bus line", hint: "Tap bus stops in order, then Create line", color: "#3d8bff", icon: { glyph: "➰", color: "#3d8bff" } },
   metroline: { id: "metroline", label: "Metro line", hint: "Tap metro stations in order, then Create line", color: "#9b7bff", icon: { glyph: "➿", color: "#9b7bff" } },
+  hospital: { id: "hospital", label: "Hospital", hint: "General hospital: wide health cover (radius 18)", color: "#f2f6fb", icon: { img: "kit/ico-maleta" } },
+  highschool: { id: "highschool", label: "High school", hint: "Secondary school: wide education cover (radius 20)", color: "#f59a4a", icon: { img: "kit/ico-formatura" } },
+  library: { id: "library", label: "Library", hint: "Public library: culture and happiness (radius 12)", color: "#d98a55", icon: { img: "kit/ico-governo" } },
+  community: { id: "community", label: "Community centre", hint: "Community centre: culture and happiness (radius 10)", color: "#e6dccb", icon: { img: "kit/ico-pessoas" } },
+  museum: { id: "museum", label: "Museum", hint: "City museum: culture and land value (radius 16)", color: "#efe6d2", icon: { img: "kit/ico-trofeu" } },
+  cityhall: { id: "cityhall", label: "City hall", hint: "City hall (one per city): happiness and tax income", color: "#4f5f86", icon: { img: "kit/ico-martelo" } },
+  substation: { id: "substation", label: "Substation", hint: "Substation: extends the power network (radius 14)", color: "#cfd3d6", icon: { img: "kit/ico-energia" } },
   bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "kit/ico-lixeira" } },
 };
 
 const ZONE_TOOLS = ["res", "com", "ind"];
-const SERVICE_TOOLS = ["power", "water", "sewage", "landfill", "police", "fire", "clinic", "school", "park"];
+const SERVICE_TOOLS = [
+  "power", "substation", "water", "sewage", "landfill", "police", "fire", "clinic", "hospital", "school", "highschool",
+  "park", "library", "community", "museum", "cityhall",
+];
 const TRANSIT_TOOLS = ["busstop", "metro", "busline", "metroline"];
 
 const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }[] = [
@@ -54,6 +64,7 @@ const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string
   { layer: COVER.HEALTH, label: "Health", glyph: "✚", color: "#f2f6fb", img: "kit/ico-maleta" },
   { layer: COVER.EDU, label: "Education", glyph: "✎", color: "#f59a4a", img: "kit/ico-formatura" },
   { layer: COVER.PARK, label: "Parks", glyph: "❀", color: "#48b85a", img: "kit/ico-arvore" },
+  { layer: COVER.CULTURE, label: "Culture", glyph: "✦", color: "#e8b35a", img: "kit/ico-trofeu" },
   { layer: COVER.TRANSIT, label: "Transit", glyph: "◴", color: "#9b7bff", img: "kit/ico-onibus" },
   { layer: LAND_VALUE_LAYER, label: "Land value", glyph: "▦", color: "#7fd35c", img: "kit/ico-grafico" },
   { layer: TRAFFIC_LAYER, label: "Traffic", glyph: "⇆", color: "#e5584f", img: "kit/ico-estrada" },
@@ -104,6 +115,7 @@ const CIVIC_ROWS: { key: CivicKey; label: string; color: string }[] = [
   { key: "edu", label: "Education", color: "#f59a4a" },
   { key: "park", label: "Parks", color: "#48b85a" },
   { key: "transit", label: "Transit", color: "#9b7bff" },
+  { key: "culture", label: "Culture", color: "#e8b35a" },
 ];
 
 const INDICATORS = [

@@ -5,7 +5,8 @@ import {
   RoadSegment, RoadType, Pt, ROAD_DRAW_WIDTH, curvePoints, inBounds, heightAt, Biome,
 } from "../sim/world";
 import { CameraRig } from "./camera";
-import { buildModels, makeWindowTextures, VARIANTS } from "./models";
+import { buildModels, makeWindowTextures } from "./models";
+import { zoneEntries, tileHash } from "../sim/catalog";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 
 const ZONE_TILE = {
@@ -27,6 +28,7 @@ export const OVERLAY_COLOR: Record<number, string> = {
   [COVER.HEALTH]: "#f2f6fb",
   [COVER.EDU]: "#f59a4a",
   [COVER.PARK]: "#48b85a",
+  [COVER.CULTURE]: "#e8b35a",
   [COVER.TRANSIT]: "#9b7bff",
 };
 
@@ -286,7 +288,8 @@ export class CityRenderer {
           const l = w.level[i];
           if (l) {
             const r = hash(x, y);
-            const mesh = this.bMeshes.get(`${z}-${l}-${Math.floor(hash(x + 17, y + 29) * VARIANTS)}`);
+            const variants = zoneEntries(z, l).length;
+            const mesh = this.bMeshes.get(`${z}-${l}-${Math.min(variants - 1, Math.floor(tileHash(x + 17, y + 29) * variants))}`);
             const shade = 0.9 + r * 0.2;
             if (mesh) this.placeModel(mesh, counts, x, y, h, 0.92 + r * 0.2, tint.setScalar(shade));
           }

@@ -9,12 +9,15 @@ import {
 
 export type FacilityTool =
   | "power" | "water" | "sewage" | "landfill"
-  | "police" | "fire" | "clinic" | "school" | "park" | "metro";
+  | "police" | "fire" | "clinic" | "school" | "park" | "metro"
+  | "hospital" | "highschool" | "library" | "community" | "museum" | "cityhall" | "substation";
 export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | FacilityTool;
 
 const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   power: FAC.POWER, water: FAC.WATER, sewage: FAC.SEWAGE, landfill: FAC.LANDFILL,
   police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK, metro: FAC.METRO,
+  hospital: FAC.HOSPITAL, highschool: FAC.HIGHSCHOOL, library: FAC.LIBRARY, community: FAC.COMMUNITY,
+  museum: FAC.MUSEUM, cityhall: FAC.CITYHALL, substation: FAC.SUBSTATION,
 };
 export const isFacilityTool = (t: ToolId): t is FacilityTool => t in FACILITY_OF_TOOL;
 
@@ -30,6 +33,13 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
   school: FACILITY_INFO[FAC.SCHOOL].cost,
   park: FACILITY_INFO[FAC.PARK].cost,
   metro: FACILITY_INFO[FAC.METRO].cost,
+  hospital: FACILITY_INFO[FAC.HOSPITAL].cost,
+  highschool: FACILITY_INFO[FAC.HIGHSCHOOL].cost,
+  library: FACILITY_INFO[FAC.LIBRARY].cost,
+  community: FACILITY_INFO[FAC.COMMUNITY].cost,
+  museum: FACILITY_INFO[FAC.MUSEUM].cost,
+  cityhall: FACILITY_INFO[FAC.CITYHALL].cost,
+  substation: FACILITY_INFO[FAC.SUBSTATION].cost,
   busstop: 100,
   busline: 0,
   metroline: 0,
@@ -62,10 +72,10 @@ export interface Demand { r: number; c: number; i: number }
 export interface MonthReport { income: number; expenses: number }
 export interface UtilityStat { supply: number; demand: number }
 export type UtilityKey = "power" | "water" | "sewage" | "garbage";
-export type CivicKey = "police" | "fire" | "health" | "edu" | "park" | "transit";
+export type CivicKey = "police" | "fire" | "health" | "edu" | "park" | "transit" | "culture";
 
 const CIVIC_BIT: Record<CivicKey, number> = {
-  police: COVER.POLICE, fire: COVER.FIRE, health: COVER.HEALTH, edu: COVER.EDU, park: COVER.PARK, transit: COVER.TRANSIT,
+  police: COVER.POLICE, fire: COVER.FIRE, health: COVER.HEALTH, edu: COVER.EDU, park: COVER.PARK, transit: COVER.TRANSIT, culture: COVER.CULTURE,
 };
 export const CIVIC_KEYS = Object.keys(CIVIC_BIT) as CivicKey[];
 
@@ -124,7 +134,7 @@ export function newCity(seed = 1337, size = 96, biome: Biome = "plains"): CitySt
     demand: { r: 0.5, c: 0.2, i: 0.2 },
     utilities: emptyUtilities(),
     happiness: 100,
-    coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 },
+    coverage: { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0, culture: 0 },
     landValue: 0,
     fires: 0,
     lvSeenRevision: -1,
@@ -277,6 +287,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (w.road[i]) return { ok: false, reason: "Tile is a road" };
     if (w.zone[i]) return { ok: false, reason: "Tile is zoned" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
+    if (type === FAC.CITYHALL && w.facility.includes(FAC.CITYHALL)) return { ok: false, reason: "There is already a city hall" };
     if (info.nearWater && !nearWater(w, x, y, 3)) {
       return { ok: false, reason: `${info.name} must be within 3 tiles of water` };
     }
@@ -320,7 +331,8 @@ function recount(s: CityState): void {
   let res = 0, com = 0, ind = 0;
   const util = emptyUtilities();
   let built = 0, noSewage = 0, noGarbage = 0, noPower = 0, noWater = 0;
-  const civicCovered: Record<CivicKey, number> = { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0 };
+  const hasCityHall = w.facility.includes(FAC.CITYHALL);
+  const civicCovered: Record<CivicKey, number> = { police: 0, fire: 0, health: 0, edu: 0, park: 0, transit: 0, culture: 0 };
   let lvSum = 0;
 
   for (let i = 0; i < w.facility.length; i++) {
@@ -369,7 +381,8 @@ function recount(s: CityState): void {
     : 0;
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
-      - missingPower * 25 - missingWater * 25 - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10 + s.coverage.transit * 5,
+      - missingPower * 25 - missingWater * 25 - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10 + s.coverage.transit * 5 + s.coverage.culture * 8
+      + (hasCityHall ? 6 : 0),
     0, 100,
   );
 
@@ -445,7 +458,7 @@ export function step(s: CityState): void {
   recount(s);
 
   const jobs = s.capacity.com + s.capacity.ind;
-  const monthlyIncome = (s.population * 3 + Math.min(jobs, s.population * 0.65 + jobs * 0.2) * 4) * (s.taxRate / 0.1) * (0.6 + 0.8 * (s.landValue / 100));
+  const monthlyIncome = (s.population * 3 + Math.min(jobs, s.population * 0.65 + jobs * 0.2) * 4) * (s.taxRate / 0.1) * (0.6 + 0.8 * (s.landValue / 100)) * (w.facility.includes(FAC.CITYHALL) ? 1.05 : 1);
   updateTransit(s);
   const monthlyUpkeep = roadUpkeep(w) + facilityUpkeep(w) + transitUpkeep(w);
   const inc = monthlyIncome / DAYS_PER_MONTH;
