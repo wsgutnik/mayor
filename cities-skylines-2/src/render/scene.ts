@@ -8,6 +8,7 @@ import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry } from "../sim/catalog";
 import { loadGlb, LoadedModel } from "./glb-models";
+import { WaterSurface, makeNoiseTexture } from "./water";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 
 const ZONE_TILE = {
@@ -43,6 +44,26 @@ const BIOME_LOOK: Record<Biome, { sand: string; grass: string; rock: string; roc
   desert: { sand: "#dcc084", grass: "#d2b57a", rock: "#a9946a", rockAt: 3.0, snowAt: 99, trees: 0.012, leaf: ["#6f8f4a", "#7d9a52"] },
 };
 
+/** Which Blender prop a scattered plant uses, with cumulative weights per terrain preset. */
+const TREE_SPECIES = ["tree_oak", "tree_pine", "tree_poplar", "tree_cherry", "tree_autumn", "tree_palm", "bush", "bush_flowers", "rock"] as const;
+type Species = (typeof TREE_SPECIES)[number];
+const SPECIES_WEIGHTS: Record<Biome, [Species, number][]> = {
+  plains: [["tree_oak", 0.4], ["tree_poplar", 0.15], ["bush", 0.2], ["bush_flowers", 0.08], ["tree_cherry", 0.06], ["tree_autumn", 0.06], ["rock", 0.05]],
+  forest: [["tree_pine", 0.42], ["tree_oak", 0.33], ["tree_poplar", 0.05], ["bush", 0.1], ["tree_autumn", 0.06], ["rock", 0.04]],
+  river: [["tree_oak", 0.38], ["tree_poplar", 0.25], ["bush", 0.18], ["tree_cherry", 0.1], ["bush_flowers", 0.04], ["rock", 0.05]],
+  coast: [["tree_palm", 0.35], ["tree_oak", 0.2], ["bush", 0.22], ["bush_flowers", 0.08], ["rock", 0.1], ["tree_poplar", 0.05]],
+  mountain: [["tree_pine", 0.58], ["rock", 0.24], ["tree_oak", 0.1], ["bush", 0.08]],
+  desert: [["tree_palm", 0.18], ["bush", 0.32], ["rock", 0.5]],
+};
+const SPECIES_SCALE: Record<Species, [number, number]> = {
+  tree_oak: [0.9, 1.5], tree_pine: [0.9, 1.6], tree_poplar: [0.9, 1.4], tree_cherry: [0.9, 1.3], tree_autumn: [0.9, 1.4],
+  tree_palm: [0.9, 1.3], bush: [0.8, 1.4], bush_flowers: [0.9, 1.3], rock: [0.6, 1.5],
+};
+/** Vehicle props: which GLB each kind of mover uses. */
+const CAR_MODELS = ["car_sedan", "car_hatch", "car_suv", "van"];
+const VEHICLE_PROPS = [...CAR_MODELS, "truck", "bus", "train"];
+const BOAT_PROPS = ["boat_motor", "boat_sail", "boat_ferry"];
+
 /** Minimum time between full scene rebuilds. */
 const REBUILD_GAP_MS = 80;
 
@@ -72,7 +93,22 @@ export class CityRenderer {
   private roadMesh!: THREE.Mesh;
   private metroMesh!: THREE.Mesh;
   private stopMesh!: THREE.InstancedMesh;
-  private trees!: THREE.InstancedMesh;
+  private treeMeshes = new Map<string, THREE.InstancedMesh>();
+  private lampMesh!: THREE.InstancedMesh;
+  private water: WaterSurface | null = null;
+  private noiseTex!: THREE.DataTexture;
+  private dayLevel = 1;
+  private skyCol = new THREE.Color("#a9c8e8");
+  private props = new Map<string, LoadedModel | null>();
+  private propPending = new Set<string>();
+  private propWaiters = new Map<string, ((m: LoadedModel) => void)[]>();
+  private vehMeshes = new Map<string, THREE.InstancedMesh>();
+  private vehReady = new Set<string>();
+  private boatMeshes = new Map<string, THREE.InstancedMesh>();
+  private boatReady = new Set<string>();
+  private boats: { x: number; z: number; a: number; speed: number; turn: number; prop: string; phase: number }[] = [];
+  private whiteTint = new THREE.Color("#ffffff");
+  private lastFrame = 0;
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
@@ -147,6 +183,24 @@ export class CityRenderer {
     });
     this.plainMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.models = buildModels();
+    this.noiseTex = makeNoiseTexture(128);
+    const fallback = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+    for (const name of VEHICLE_PROPS) {
+      const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), 320);
+      m.count = 0;
+      m.frustumCulled = false;
+      this.scene.add(m);
+      this.vehMeshes.set(name, m);
+      this.useProp(name, (model) => { m.geometry = model.geometry; m.material = model.materials; this.vehReady.add(name); });
+    }
+    for (const name of BOAT_PROPS) {
+      const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), 16);
+      m.count = 0;
+      m.frustumCulled = false;
+      this.scene.add(m);
+      this.boatMeshes.set(name, m);
+      this.useProp(name, (model) => { m.geometry = model.geometry; m.material = model.materials; this.boatReady.add(name); });
+    }
     this.buildWorldResources();
 
     this.hover = new THREE.Mesh(
@@ -187,21 +241,128 @@ export class CityRenderer {
     this.fMeshes.clear();
     for (const [k, g] of this.models.buildings) this.bMeshes.set(k, mkModel(g, Math.ceil(cap * 0.6)));
     for (const [k, g] of this.models.facilities) this.fMeshes.set(k, mkModel(g, Math.ceil(cap * 0.3)));
-    this.trees = new THREE.InstancedMesh(new THREE.ConeGeometry(0.17, 0.62, 6).translate(0, 0.31, 0), new THREE.MeshLambertMaterial({ color: "#ffffff" }), cap);
-    this.trees.count = 0;
-    this.trees.frustumCulled = false;
-    own(this.trees);
+    // Plants: one instanced mesh per species; cones stand in until its GLB arrives.
+    this.treeMeshes.clear();
+    const cone = new THREE.ConeGeometry(0.17, 0.62, 6).translate(0, 0.31, 0);
+    for (const sp of TREE_SPECIES) {
+      const m: THREE.InstancedMesh = new THREE.InstancedMesh(cone, new THREE.MeshLambertMaterial({ color: "#ffffff" }), Math.ceil(cap / 3));
+      m.count = 0;
+      m.frustumCulled = false;
+      own(m);
+      this.treeMeshes.set(sp, m);
+      this.useProp(sp, (model) => {
+        if (!this.sized.includes(m)) return;
+        m.geometry = model.geometry;
+        m.material = model.materials;
+      });
+    }
+    this.lampMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.02, 0.3, 0.02).translate(0, 0.15, 0), new THREE.MeshLambertMaterial({ color: "#3a3f47" }), Math.ceil(cap / 3));
+    this.lampMesh.count = 0;
+    this.lampMesh.frustumCulled = false;
+    own(this.lampMesh);
+    this.useProp("lamp", (model) => {
+      if (!this.sized.includes(this.lampMesh)) return;
+      this.lampMesh.geometry = model.geometry;
+      this.lampMesh.material = model.materials;
+    });
     this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
-    const water = new THREE.Mesh(
-      new THREE.PlaneGeometry(size * 3, size * 3).rotateX(-Math.PI / 2),
-      new THREE.MeshLambertMaterial({ color: "#3c78b4", transparent: true, opacity: 0.88 }),
-    );
-    water.position.set(size / 2, -0.02, size / 2);
-    own(water);
+    this.water = new WaterSurface(this.world, this.noiseTex);
+    own(this.water.mesh);
+    this.seedBoats();
     this.applyGlbModels();
+  }
+
+  /** Run `apply` with a prop's GLB as soon as it is available (immediately when cached). */
+  private useProp(name: string, apply: (m: LoadedModel) => void): void {
+    const hit = this.props.get(name);
+    const done = (model: LoadedModel) => {
+      apply(model);
+      for (const g of model.glow) {
+        this.glowMats.add(g);
+        g.emissiveIntensity = this.nightGlow;
+      }
+    };
+    if (hit) { done(hit); return; }
+    if (hit === null) return;
+    const list = this.propWaiters.get(name) ?? [];
+    list.push(done);
+    this.propWaiters.set(name, list);
+    if (this.propPending.has(name)) return;
+    this.propPending.add(name);
+    loadGlb(`/models/props/${name}.glb`).then((model) => {
+      this.props.set(name, model);
+      this.propPending.delete(name);
+      const waiters = this.propWaiters.get(name) ?? [];
+      this.propWaiters.delete(name);
+      if (model) waiters.forEach((f) => f(model));
+    });
+  }
+
+  /** A few boats drifting on the larger bodies of water. */
+  private seedBoats(): void {
+    const w = this.world;
+    const n = w.size;
+    const spots: [number, number][] = [];
+    let wet = 0;
+    for (let y = 2; y < n - 2; y += 1) {
+      for (let x = 2; x < n - 2; x += 1) {
+        if (isLand(w, x, y)) continue;
+        wet++;
+        // only open water: no land within two tiles
+        let open = true;
+        for (let dy = -2; dy <= 2 && open; dy++) for (let dx = -2; dx <= 2; dx++) if (isLand(w, x + dx, y + dy)) { open = false; break; }
+        if (open) spots.push([x, y]);
+      }
+    }
+    this.boats = [];
+    if (spots.length < 12) return;
+    const count = Math.min(10, Math.floor(wet / 400) + 2);
+    for (let i = 0; i < count; i++) {
+      const [x, y] = spots[Math.floor(hash(i * 13 + 1, n + 5) * spots.length)];
+      this.boats.push({
+        x: x + 0.5, z: y + 0.5, a: hash(i, 7) * Math.PI * 2, speed: 0.35 + hash(i, 3) * 0.5,
+        turn: hash(i, 11) < 0.5 ? -1 : 1, prop: BOAT_PROPS[i % BOAT_PROPS.length], phase: hash(i, 17) * 6.28,
+      });
+    }
+  }
+
+  private updateBoats(dt: number, time: number): void {
+    const w = this.world;
+    const d = this.dummy;
+    const counts = new Map<string, number>();
+    for (const b of this.boats) {
+      // steer away from land: look ahead and turn until the water ahead is clear
+      for (let tries = 0; tries < 3; tries++) {
+        const ax = b.x + Math.cos(b.a) * 1.4, az = b.z + Math.sin(b.a) * 1.4;
+        const ix = Math.floor(ax), iz = Math.floor(az);
+        if (inBounds(w, ix, iz) && !isLand(w, ix, iz)) break;
+        b.a += b.turn * 0.7;
+      }
+      b.a += Math.sin(time * 0.4 + b.phase) * 0.15 * dt;
+      b.x += Math.cos(b.a) * b.speed * dt;
+      b.z += Math.sin(b.a) * b.speed * dt;
+      if (!inBounds(w, Math.floor(b.x), Math.floor(b.z))) { b.a += Math.PI; b.x = Math.min(w.size - 1, Math.max(1, b.x)); b.z = Math.min(w.size - 1, Math.max(1, b.z)); }
+      const mesh = this.boatMeshes.get(b.prop);
+      if (!mesh || !this.boatReady.has(b.prop)) continue;
+      const c = counts.get(b.prop) ?? 0;
+      if (c >= mesh.instanceMatrix.count) continue;
+      d.position.set(b.x, -0.02 + Math.sin(time * 1.3 + b.phase) * 0.012, b.z);
+      d.rotation.set(0, -b.a, Math.sin(time * 0.9 + b.phase) * 0.04);
+      d.scale.setScalar(1);
+      d.updateMatrix();
+      mesh.setMatrixAt(c, d.matrix);
+      mesh.setColorAt(c, this.whiteTint);
+      counts.set(b.prop, c + 1);
+    }
+    for (const [name, mesh] of this.boatMeshes) {
+      mesh.count = counts.get(name) ?? 0;
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    }
+    d.rotation.set(0, 0, 0);
   }
 
   /** Swap procedural models for the Blender ones as they arrive; instance data is untouched. */
@@ -247,6 +408,7 @@ export class CityRenderer {
   private disposeWorldResources(): void {
     const models = new Set<THREE.BufferGeometry>([...this.models.buildings.values(), ...this.models.facilities.values()]);
     for (const m of this.glb.values()) if (m) models.add(m.geometry);
+    for (const m of this.props.values()) if (m) models.add(m.geometry);
     for (const o of this.sized) {
       this.scene.remove(o);
       const m = o as THREE.Mesh;
@@ -299,7 +461,8 @@ export class CityRenderer {
     const w = this.world;
     this.updateTerrain();
     this.rebuildRoads();
-    let nz = 0, nt = 0;
+    let nz = 0, nl = 0;
+    const treeCounts = new Map<THREE.InstancedMesh, number>();
     const counts = new Map<THREE.InstancedMesh, number>();
     const tint = new THREE.Color();
     const look = BIOME_LOOK[w.biome];
@@ -315,16 +478,30 @@ export class CityRenderer {
         } else if (w.road[i]) {
           // Drawn as ribbons (see buildRoadGeometry).
         } else if (!w.zone[i]) {
-          // Open ground: scatter trees by terrain preset, never on water or the entry strip.
+          // Open ground: scatter plants by terrain preset, never on water or the entry strip.
           const r = hash(x * 7 + 3, y * 13 + 5);
           if (r < look.trees && isLand(w, x, y) && h > 0.2 && h < look.rockAt + 1.5 && Math.hypot(x - w.entry.x, y - w.entry.y) > 5) {
             const j1 = hash(x + 101, y + 211), j2 = hash(x + 307, y + 53);
-            const sc = 0.8 + j1 * 0.9;
-            d.position.set(x + 0.2 + j1 * 0.6, h, y + 0.2 + j2 * 0.6);
-            d.scale.set(sc, sc * (0.9 + j2 * 0.5), sc);
-            d.updateMatrix();
-            this.trees.setMatrixAt(nt, d.matrix);
-            this.trees.setColorAt(nt++, leaf[Math.floor(j2 * leaf.length) % leaf.length]);
+            // pick a species from the cumulative weights of this terrain
+            let acc = 0, species: Species = "tree_oak";
+            const pick = hash(x + 419, y + 97);
+            for (const [sp, wt] of SPECIES_WEIGHTS[w.biome]) { acc += wt; if (pick <= acc) { species = sp; break; } }
+            const mesh = this.treeMeshes.get(species)!;
+            const c = treeCounts.get(mesh) ?? 0;
+            if (c < mesh.instanceMatrix.count) {
+              const [lo, hi] = SPECIES_SCALE[species];
+              const sc = lo + j1 * (hi - lo);
+              d.position.set(x + 0.15 + j1 * 0.7, h, y + 0.15 + j2 * 0.7);
+              d.rotation.set(0, j2 * 6.28, 0);
+              d.scale.set(sc, sc * (0.9 + j2 * 0.35), sc);
+              d.updateMatrix();
+              mesh.setMatrixAt(c, d.matrix);
+              // cones (before the GLB lands) take the biome's leaf colour; models are lightly shaded
+              if (this.props.get(species)) mesh.setColorAt(c, tint.setScalar(0.85 + j2 * 0.3));
+              else mesh.setColorAt(c, leaf[Math.floor(j2 * leaf.length) % leaf.length]);
+              treeCounts.set(mesh, c + 1);
+              d.rotation.set(0, 0, 0);
+            }
           }
         } else if (w.zone[i]) {
           const z = w.zone[i] as 1 | 2 | 3;
@@ -344,12 +521,40 @@ export class CityRenderer {
         }
       }
     }
-    this.trees.count = nt;
-    this.trees.instanceMatrix.needsUpdate = true;
-    if (this.trees.instanceColor) this.trees.instanceColor.needsUpdate = true;
     this.zones.count = nz;
     this.zones.instanceMatrix.needsUpdate = true;
     if (this.zones.instanceColor) this.zones.instanceColor.needsUpdate = true;
+    // Street lamps on the verge of every fourth street and avenue tile, arm turned over the road.
+    for (let y = 0; y < w.size && nl < this.lampMesh.instanceMatrix.count; y++) {
+      for (let x = 0; x < w.size; x++) {
+        const i2 = y * w.size + x;
+        const cls = w.road[i2];
+        if (!cls || cls === 3 || (x + y * 3) % 4 !== 0) continue;
+        for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          const nx = x + dx, ny = y + dy;
+          if (!inBounds(w, nx, ny) || w.road[ny * w.size + nx] || w.facility[ny * w.size + nx]) continue;
+          // the lamp sits on the neighbouring tile's edge nearest the road; its arm (+x) points at the road
+          const px = nx + 0.5 - dx * 0.42, pz = ny + 0.5 - dy * 0.42;
+          d.position.set(px, tileHeight(w, x, y) + 0.05, pz);
+          d.rotation.set(0, -Math.atan2(-dy, -dx), 0);
+          d.scale.setScalar(1);
+          d.updateMatrix();
+          this.lampMesh.setMatrixAt(nl, d.matrix);
+          this.lampMesh.setColorAt(nl++, tint.setScalar(1));
+          d.rotation.set(0, 0, 0);
+          break;
+        }
+        if (nl >= this.lampMesh.instanceMatrix.count) break;
+      }
+    }
+    this.lampMesh.count = nl;
+    this.lampMesh.instanceMatrix.needsUpdate = true;
+    if (this.lampMesh.instanceColor) this.lampMesh.instanceColor.needsUpdate = true;
+    for (const m of this.treeMeshes.values()) {
+      m.count = treeCounts.get(m) ?? 0;
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
     for (const m of [...this.bMeshes.values(), ...this.fMeshes.values()]) {
       m.count = counts.get(m) ?? 0;
       m.instanceMatrix.needsUpdate = true;
@@ -545,6 +750,8 @@ export class CityRenderer {
     sky.lerp(new THREE.Color("#f0a070"), dusk * 0.45);
     if (raining) sky.lerp(new THREE.Color("#6f7d8c"), 0.55);
     (this.scene.background as THREE.Color).copy(sky);
+    this.dayLevel = day * (raining ? 0.6 : 1);
+    this.skyCol.copy(sky);
     const fog = this.scene.fog as THREE.Fog;
     fog.color.copy(sky);
     fog.near = raining ? 40 : 90;
@@ -568,57 +775,54 @@ export class CityRenderer {
 
   private updateVehicles(): void {
     const t = this.traffic;
-    const m = this.vehicleMesh;
     if (!t) return;
     const d = this.dummy;
     const col = new THREE.Color();
-    const CAR = ["#e8eef5", "#d0453a", "#3a6fd0", "#2c2f36", "#e0b43a", "#58a86a"];
-    let n = 0;
-    for (const v of t.vehicles) {
-      if (n >= m.instanceMatrix.count) break;
-      const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
-      if (i < 0) continue;
-      const f = v.progress - i;
-      const ax = v.pts[i * 2], az = v.pts[i * 2 + 1], bx = v.pts[i * 2 + 2], bz = v.pts[i * 2 + 3];
+    const CAR = ["#e8eef5", "#d0453a", "#3a6fd0", "#2c2f36", "#e0b43a", "#58a86a", "#8a8f98", "#f2f2f2"];
+    const counts = new Map<THREE.InstancedMesh, number>();
+    /** Put one vehicle on the road: a Blender model when its GLB is ready, else the old box. */
+    const place = (name: string, x: number, z: number, hx: number, hz: number, tint: THREE.Color, boxScale: [number, number, number], boxLift: number) => {
+      const glb = this.vehReady.has(name);
+      const mesh = glb ? this.vehMeshes.get(name)! : this.vehicleMesh;
+      const c = counts.get(mesh) ?? 0;
+      if (c >= mesh.instanceMatrix.count) return;
+      d.position.set(x, heightAt(this.world, x, z) + (glb ? 0.07 : boxLift), z);
+      d.rotation.set(0, -Math.atan2(hz, hx), 0);
+      if (glb) d.scale.setScalar(1); else d.scale.set(boxScale[0], boxScale[1], boxScale[2]);
+      d.updateMatrix();
+      mesh.setMatrixAt(c, d.matrix);
+      mesh.setColorAt(c, tint);
+      counts.set(mesh, c + 1);
+    };
+    const heading = (pts: Float32Array, i: number, f: number, lane: number) => {
+      const ax = pts[i * 2], az = pts[i * 2 + 1], bx = pts[i * 2 + 2], bz = pts[i * 2 + 3];
       let hx = bx - ax, hz = bz - az;
       const l = Math.hypot(hx, hz) || 1;
       hx /= l; hz /= l;
-      const lane = v.kind === 1 ? 0.12 : 0.1;
-      const x = ax + (bx - ax) * f - hz * lane;
-      const z = az + (bz - az) * f + hx * lane;
-      d.position.set(x, heightAt(this.world, x, z) + 0.17, z);
-      d.rotation.set(0, -Math.atan2(hz, hx), 0);
-      if (v.kind === 1) d.scale.set(0.58, 0.24, 0.26); else d.scale.set(0.42, 0.17, 0.22);
-      d.updateMatrix();
-      m.setMatrixAt(n, d.matrix);
-      col.set(v.kind === 1 ? "#f08a3c" : CAR[v.id % CAR.length]);
-      m.setColorAt(n, col);
-      n++;
+      return { x: ax + (bx - ax) * f - hz * lane, z: az + (bz - az) * f + hx * lane, hx, hz };
+    };
+    for (const v of t.vehicles) {
+      const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
+      if (i < 0) continue;
+      const p = heading(v.pts, i, v.progress - i, v.kind === 1 ? 0.12 : 0.1);
+      if (v.kind === 1) {
+        place("truck", p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17);
+      } else {
+        place(CAR_MODELS[v.id % CAR_MODELS.length], p.x, p.z, p.hx, p.hz, col.set(CAR[(v.id * 7) % CAR.length]), [0.42, 0.17, 0.22], 0.17);
+      }
     }
     for (const v of t.transit) {
-      if (n >= m.instanceMatrix.count) break;
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
-      const f = Math.min(1, v.progress - i);
-      const ax = v.pts[i * 2], az = v.pts[i * 2 + 1], bx = v.pts[i * 2 + 2], bz = v.pts[i * 2 + 3];
-      let hx = bx - ax, hz = bz - az;
-      const l = Math.hypot(hx, hz) || 1;
-      hx /= l; hz /= l;
-      const lane = v.kind === "bus" ? 0.14 : 0;
-      const x = ax + (bx - ax) * f - hz * lane;
-      const z = az + (bz - az) * f + hx * lane;
-      d.position.set(x, heightAt(this.world, x, z) + (v.kind === "bus" ? 0.22 : 0.3), z);
-      d.rotation.set(0, -Math.atan2(hz, hx), 0);
-      if (v.kind === "bus") d.scale.set(0.8, 0.26, 0.28); else d.scale.set(1.2, 0.3, 0.4);
-      d.updateMatrix();
-      m.setMatrixAt(n, d.matrix);
-      col.set(v.color);
-      m.setColorAt(n, col);
-      n++;
+      const p = heading(v.pts, i, Math.min(1, v.progress - i), v.kind === "bus" ? 0.14 : 0);
+      place(v.kind === "bus" ? "bus" : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
+        v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3);
     }
-    m.count = n;
-    m.instanceMatrix.needsUpdate = true;
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    for (const m of [this.vehicleMesh, ...this.vehMeshes.values()]) {
+      m.count = counts.get(m) ?? 0;
+      m.instanceMatrix.needsUpdate = true;
+      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    }
     d.rotation.set(0, 0, 0);
   }
 
@@ -788,6 +992,11 @@ export class CityRenderer {
       pos.needsUpdate = true;
       this.rain.position.set(this.rig.target.x, 0, this.rig.target.z);
     }
+    const dt = this.lastFrame ? Math.min(0.1, (now - this.lastFrame) / 1000) : 0.016;
+    this.lastFrame = now;
+    const time = now / 1000;
+    this.water?.update(time, this.dayLevel, this.skyCol);
+    this.updateBoats(dt, time);
     this.updateVehicles();
     if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();

@@ -22,6 +22,10 @@ npm run build   # tipos + bundle em dist/
   um modelo 3D por prédio, sete instalações novas (hospital, escola secundária, biblioteca, centro comunitário, museu, prefeitura,
   subestação) e cartão de inspeção ao tocar num prédio com a ferramenta Mover, com a miniatura do kit.
 
+- M14: Blender. Modelos feitos por script (`blender/`, `blender -b ... build_all.py`) e exportados em GLB para `public/models/`:
+  prédios do kit, nove espécies de plantas, sete veículos, três barcos, poste e banco. O jogo carrega os GLB com instancing e acende
+  faróis e janelas à noite. Água com profundidade, ondulação, espuma e correnteza (campo de fluxo derivado do relevo), barcos à deriva.
+
 ## Controles
 
 | | Mouse | Toque |

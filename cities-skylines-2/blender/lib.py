@@ -35,8 +35,10 @@ PALETTE = {
     "roof_dark": ("#2b303a", 0.8, None, 0),
     "roof_green": ("#3f7a4e", 0.7, None, 0),
     "glass_blue": ("#5b94d0", 0.15, None, 0),
-    "glass_dark": ("#34475f", 0.2, None, 0),
-    "glow_window": ("#34475f", 0.2, "#ffd27a", 1.0),
+    "glass_dark": ("#3d5a82", 0.2, None, 0),
+    "slab": ("#aeb4bb", 0.9, None, 0),
+    "hedge": ("#3b8a47", 0.95, None, 0),
+    "glow_window": ("#3d5a82", 0.2, "#ffd27a", 1.0),
     "glow_sign": ("#f5c04a", 0.4, "#ffc94d", 1.0),
     "concrete": ("#c9ccd0", 0.9, None, 0),
     "asphalt": ("#4b4f56", 0.95, None, 0),
@@ -53,6 +55,34 @@ PALETTE = {
     "sign_blue": ("#2f6fd0", 0.6, None, 0),
     "sign_orange": ("#ee8a2c", 0.6, None, 0),
     "black": ("#1b1d22", 0.8, None, 0),
+    # foliage and nature
+    "leaf_a": ("#4c9a46", 0.9, None, 0),
+    "leaf_b": ("#3a8040", 0.9, None, 0),
+    "leaf_c": ("#68b251", 0.9, None, 0),
+    "leaf_pine": ("#2c6a3f", 0.9, None, 0),
+    "leaf_pine_b": ("#24583a", 0.9, None, 0),
+    "leaf_pink": ("#f0a3c4", 0.9, None, 0),
+    "leaf_autumn": ("#e0802c", 0.9, None, 0),
+    "leaf_dry": ("#9aa04a", 0.95, None, 0),
+    "palm_frond": ("#3f9a4a", 0.85, None, 0),
+    "bark": ("#6e4e34", 0.95, None, 0),
+    "rock": ("#8c8a82", 0.95, None, 0),
+    "flower_red": ("#d8453a", 0.8, None, 0),
+    "flower_yellow": ("#f2c230", 0.8, None, 0),
+    # vehicles and props (body is white so the game can tint it per instance)
+    "car_body": ("#ffffff", 0.35, None, 0),
+    "car_glass": ("#26323f", 0.1, None, 0),
+    "tire": ("#17181b", 0.9, None, 0),
+    "rim": ("#b9bfc7", 0.4, None, 0),
+    "headlight": ("#fff1c0", 0.3, "#fff1c0", 1.0),
+    "glow_head": ("#fff1c0", 0.3, "#fff1c0", 1.0),
+    "glow_tail": ("#a01818", 0.3, "#ff3030", 1.0),
+    "glow_lamp": ("#f5e6b0", 0.3, "#ffd88a", 1.0),
+    "lamp_pole": ("#3a3f47", 0.5, None, 0),
+    "bench_wood": ("#8a5a34", 0.85, None, 0),
+    "hull_white": ("#f2f4f6", 0.5, None, 0),
+    "hull_blue": ("#2d5fa8", 0.5, None, 0),
+    "sail": ("#f7f3e8", 0.7, None, 0),
 }
 
 
@@ -175,22 +205,49 @@ class Model:
     def cone(self, cx, cy, z0, r, h, mat, seg=7):
         self.cyl(cx, cy, z0, r, h, mat, seg=seg, r_top=0.0005, cap=False)
 
+    def blob(self, cx, cy, cz, rx, ry, rz, mat, subdiv=1, jitter=0.12, seed=0):
+        """Low-poly ellipsoid (icosphere) with a little deterministic noise, for canopies and bushes."""
+        geom = bmesh.ops.create_icosphere(self.bm, subdivisions=subdiv, radius=1.0)
+        rng = random.Random(seed or int((cx * 977 + cy * 131 + cz * 31) * 1000) & 0xFFFF)
+        verts = [v for v in geom["verts"]]
+        for v in verts:
+            k = 1.0 + rng.uniform(-jitter, jitter)
+            v.co = (cx + v.co.x * rx * k, cy + v.co.y * ry * k, cz + v.co.z * rz * k)
+        i = self._slot(mat)
+        faces = {f for v in verts for f in v.link_faces}
+        for f in faces:
+            f.material_index = i
+
+    def wheel(self, cx, cy, cz, r, w, axis="y", mat="tire", rim="rim", seg=8):
+        """A short cylinder lying on its side (axis y = along the car's width)."""
+        for side in (-1, 1):
+            pass
+        y0 = cy - w / 2
+        for i in range(seg):
+            a0, a1 = 2 * math.pi * i / seg, 2 * math.pi * (i + 1) / seg
+            p0 = (cx + math.cos(a0) * r, cz + math.sin(a0) * r)
+            p1 = (cx + math.cos(a1) * r, cz + math.sin(a1) * r)
+            self._quad([(p0[0], y0, p0[1]), (p1[0], y0, p1[1]), (p1[0], y0 + w, p1[1]), (p0[0], y0 + w, p0[1])], mat)
+            self._tri([(cx, y0, cz), (p1[0], y0, p1[1]), (p0[0], y0, p0[1])], rim)
+            self._tri([(cx, y0 + w, cz), (p0[0], y0 + w, p0[1]), (p1[0], y0 + w, p1[1])], rim)
+
     # -- details ----------------------------------------------------------
-    def windows(self, cx, cy, z0, w, d, h, floors, cols=None, lit=0.35, sides="fbrl", margin=0.06, off=0.003):
-        """Window rows on a box's walls: one emissive/dark quad per window (2 triangles each)."""
-        cols = cols or max(1, round(w / 0.16))
+    def windows(self, cx, cy, z0, w, d, h, floors, cols=None, lit=0.35, sides="fbrl", margin=0.05, off=0.003, slabs=True):
+        """Window rows on a box's walls: one emissive/dark quad per window, plus a thin slab line per floor."""
+        cols = cols or max(1, round(w / 0.13))
+        lit = max(lit, 0.45)
         x0, x1, y0, y1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2
         fh = h / floors
         for fl in range(floors):
-            za = z0 + fl * fh + fh * 0.28
-            zb = z0 + fl * fh + fh * 0.78
+            za = z0 + fl * fh + fh * 0.2
+            zb = z0 + fl * fh + fh * 0.8
             for side in sides:
-                n = cols if side in "fb" else max(1, round(d / 0.16))
+                n = cols if side in "fb" else max(1, round(d / 0.13))
                 span = (x1 - x0) if side in "fb" else (y1 - y0)
                 cw = (span - 2 * margin) / n
                 for c in range(n):
-                    u0 = -span / 2 + margin + c * cw + cw * 0.18
-                    u1 = -span / 2 + margin + (c + 1) * cw - cw * 0.18
+                    u0 = -span / 2 + margin + c * cw + cw * 0.12
+                    u1 = -span / 2 + margin + (c + 1) * cw - cw * 0.12
                     mat = "glow_window" if self.rng.random() < lit else "glass_dark"
                     if side == "f":
                         self._quad([(cx + u0, y0 - off, za), (cx + u1, y0 - off, za), (cx + u1, y0 - off, zb), (cx + u0, y0 - off, zb)], mat)
@@ -200,6 +257,15 @@ class Model:
                         self._quad([(x1 + off, cy + u0, za), (x1 + off, cy + u1, za), (x1 + off, cy + u1, zb), (x1 + off, cy + u0, zb)], mat)
                     else:
                         self._quad([(x0 - off, cy + u1, za), (x0 - off, cy + u0, za), (x0 - off, cy + u0, zb), (x0 - off, cy + u1, zb)], mat)
+            if slabs and fl > 0:
+                zs = z0 + fl * fh
+                t = 0.012
+                if "f" in sides:
+                    self._quad([(x0, y0 - 0.006, zs - t / 2), (x1, y0 - 0.006, zs - t / 2), (x1, y0 - 0.006, zs + t / 2), (x0, y0 - 0.006, zs + t / 2)], "slab")
+                if "r" in sides:
+                    self._quad([(x1 + 0.006, y0, zs - t / 2), (x1 + 0.006, y1, zs - t / 2), (x1 + 0.006, y1, zs + t / 2), (x1 + 0.006, y0, zs + t / 2)], "slab")
+                if "l" in sides:
+                    self._quad([(x0 - 0.006, y1, zs - t / 2), (x0 - 0.006, y0, zs - t / 2), (x0 - 0.006, y0, zs + t / 2), (x0 - 0.006, y1, zs + t / 2)], "slab")
 
     def glass_band(self, cx, cy, z0, w, d, h, mat="glass_blue", inset=0.004):
         """A skin of glazing on the front and sides of a box, for office towers."""
@@ -224,6 +290,9 @@ class Model:
             m = 0.07
             self._quad([(-w / 2 + 0.01, -d / 2 + 0.01, 0.031), (w / 2 - 0.01, -d / 2 + 0.01, 0.031), (w / 2 - 0.01, -d / 2 + m, 0.031), (-w / 2 + 0.01, -d / 2 + m, 0.031)], "grass")
             self._quad([(-w / 2 + 0.01, d / 2 - m, 0.031), (w / 2 - 0.01, d / 2 - m, 0.031), (w / 2 - 0.01, d / 2 - 0.01, 0.031), (-w / 2 + 0.01, d / 2 - 0.01, 0.031)], "grass")
+            # low hedges: front verge and the left edge
+            self.box(0, -d / 2 + 0.035, 0.03, w * 0.86, 0.03, 0.035, "hedge", roof="hedge")
+            self.box(-w / 2 + 0.035, 0.0, 0.03, 0.03, d * 0.7, 0.035, "hedge", roof="hedge")
 
     # -- output -----------------------------------------------------------
     def build(self):

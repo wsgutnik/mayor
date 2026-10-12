@@ -17,7 +17,7 @@ import bpy  # noqa: E402
 
 import lib  # noqa: E402
 import preview  # noqa: E402
-from registry import REGISTRY  # noqa: E402
+from registry import REGISTRY, PROPS  # noqa: E402
 
 
 def parse():
@@ -41,7 +41,7 @@ def parse():
 
 def load_modules():
     for m in pkgutil.iter_modules([HERE]):
-        if m.name.startswith("buildings_"):
+        if m.name.startswith("buildings_") or m.name.startswith("props_"):
             importlib.import_module(m.name)
 
 
@@ -67,6 +67,20 @@ def main():
             preview.render(os.path.join(opts["previews"], f"{n:02d}.png"))
         print("MODEL " + json.dumps({"n": n, "name": name, "tris": tris, "inside_tile": ok,
                                       "bounds": [round(b, 3) for b in bounds]}))
+    if opts["only"] is None or "props" in sys.argv:
+        pdir = os.path.join(opts["out"], "props")
+        os.makedirs(pdir, exist_ok=True)
+        for pname in sorted(PROPS):
+            lib.clear()
+            m = lib.Model(pname)
+            PROPS[pname](m)
+            ob = m.build()
+            ok, bounds = lib.check_bounds(ob, limit=0.75, max_h=3.0)
+            lib.export_glb(ob, os.path.join(pdir, f"{pname}.glb"))
+            if opts["previews"]:
+                preview.setup_scene(top=max(0.3, bounds[5]))
+                preview.render(os.path.join(opts["previews"], f"prop-{pname}.png"))
+            print("PROP " + json.dumps({"name": pname, "tris": lib.triangle_count(ob), "bounds": [round(b, 3) for b in bounds]}))
 
 
 main()

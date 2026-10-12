@@ -19,10 +19,10 @@ def setup_scene(width=480, height=360, top=0.6):
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
     bg.inputs["Color"].default_value = (0.05, 0.09, 0.16, 1)
-    bg.inputs["Strength"].default_value = 1.0
+    bg.inputs["Strength"].default_value = 1.6
     sc.world = world
     sun = bpy.data.lights.new("sun", "SUN")
-    sun.energy = 3.0
+    sun.energy = 4.2
     so = bpy.data.objects.new("sun", sun)
     so.rotation_euler = (math.radians(50), math.radians(10), math.radians(-35))
     sc.collection.objects.link(so)
