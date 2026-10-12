@@ -114,7 +114,14 @@ describe("zone blocks", () => {
     for (let i = 0; i < w.zone.length; i++) if ((i * 2654435761 >>> 0) % 5 === 0) w.zone[i] = ZONE.RES;
     // Warm the JIT; the measured operation includes frontage and grouping.
     computeBlocks(w);
-    const start = performance.now(); computeBlocks(w); const elapsed = performance.now() - start;
-    expect(elapsed).toBeLessThan(15);
+    // Median of several runs: a single sample is noisy when other processes load the machine.
+    const runs: number[] = [];
+    for (let k = 0; k < 7; k++) {
+      const start = performance.now();
+      computeBlocks(w);
+      runs.push(performance.now() - start);
+    }
+    runs.sort((a, b) => a - b);
+    expect(runs[3]).toBeLessThan(15);
   });
 });
