@@ -39,6 +39,7 @@ linguagem visual da UI. Não é paridade de features.
 | M10 | ✅ Kit visual | Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas |
 | M11 | ✅ Modelos 3D | Casas, torres, galpões e instalações procedurais, janelas acesas à noite |
 | M12 | ✅ Mapas oficiais | Heightmaps do Map Kit carregados no jogo, seletor no menu |
+| M13 | ✅ Kit de prédios | Catálogo de 40 prédios, modelos por entrada, sete instalações, inspetor |
 
 ## Arquitetura
 

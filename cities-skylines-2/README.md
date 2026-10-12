@@ -18,6 +18,10 @@ npm run build   # tipos + bundle em dist/
   `npm run maps` (decodifica o PNG de 16 bits, calcula a entrada de cada mapa) e escolhidos no menu. O motor aceita mapas de qualquer
   tamanho e entrada em qualquer borda.
 
+- M13: Kit de Prédios Básicos (40 prédios). Catálogo com nomes e categorias do kit (R1-R5, C1-C4, I1-I4, serviços e utilidades),
+  um modelo 3D por prédio, sete instalações novas (hospital, escola secundária, biblioteca, centro comunitário, museu, prefeitura,
+  subestação) e cartão de inspeção ao tocar num prédio com a ferramenta Mover, com a miniatura do kit.
+
 ## Controles
 
 | | Mouse | Toque |

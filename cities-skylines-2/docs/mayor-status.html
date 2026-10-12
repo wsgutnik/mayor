@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M12 concluído. Falta validar Windows e iPad.",
-    summary: "Os quatro mapas oficiais do kit entram no jogo a partir dos heightmaps de 16 bits, com seletor no menu. As caixas deram lugar a modelos 3D com janelas que acendem à noite. Codex e Muse trabalharam em paralelo: conversor de mapas, seletor e duas revisões de código.",
-    screenshot: { src: "img/m12-bay.jpg", caption: "M12: Baía Metropolitana carregada do heightmap oficial: costa, canal do rio, enseada e serras ao nordeste, em 128×128 tiles." },
+    headline: "M13 concluído. Falta validar Windows e iPad.",
+    summary: "O Kit de Prédios Básicos virou catálogo no jogo: 40 prédios com nome e categoria, um modelo 3D por prédio, sete instalações novas e um cartão de inspeção com a miniatura do kit ao tocar em qualquer prédio.",
+    screenshot: { src: "img/m13-inspector.jpg", caption: "M13: tocar num prédio com a ferramenta Mover abre o cartão do kit: nome, categoria S4, serviços atendidos, manutenção e raio." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -177,10 +177,11 @@ npm run dev</pre>
       { id: "M9", name: "Identidade visual", desc: "Logo com coroa, ícones do HUD, painel de preferências com idioma e qualidade, indicadores.", status: "done" },
       { id: "M10", name: "Kit visual", desc: "Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas.", status: "done" },
       { id: "M11", name: "Modelos 3D", desc: "Casas, torres, galpões e instalações procedurais; janelas acesas à noite; prédios voltados para a rua.", status: "done" },
-      { id: "M12", name: "Mapas oficiais", desc: "Heightmaps do Map Kit no jogo, conversor, seletor no menu, mapas de qualquer tamanho.", status: "done" }
+      { id: "M12", name: "Mapas oficiais", desc: "Heightmaps do Map Kit no jogo, conversor, seletor no menu, mapas de qualquer tamanho.", status: "done" },
+      { id: "M13", name: "Kit de prédios", desc: "Catálogo de 40 prédios, modelos por entrada, sete instalações e inspetor com miniaturas.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "104 testes passando: mapas, modelos, entrada em qualquer borda, correções da revisão" },
+      { ok: true, text: "118 testes passando: catálogo, inspeção, modelos por entrada, instalações novas e correções de toque" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
       { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar (ainda com o ícone antigo)" },
@@ -188,6 +189,14 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M13 · Kit de Prédios Básicos", items: [
+        "Catálogo com os 40 prédios do kit: número, nome em português e inglês, categoria, uso e miniatura recortada de cada página",
+        "Cada prédio zoneado usa o modelo da sua entrada (Codex); 37 modelos novos de prédios e instalações, no máximo 128 triângulos",
+        "Sete instalações novas: hospital (raio 18), escola secundária (raio 20), biblioteca, centro comunitário, museu, prefeitura e subestação",
+        "Cultura entra como serviço, com infoview, efeito na felicidade e no valor do solo; prefeitura única por cidade melhora felicidade e arrecadação",
+        "Cartão de inspeção (Muse): miniatura, nome, categoria, nível, moradores ou empregos, valor do solo, serviços atendidos, manutenção e raio",
+        "Correções de toque e acessibilidade da revisão: terceiro dedo, pointercancel, alvos de 44 px, foco visível, rótulos e áreas seguras"
+      ] },
       { date: "2026-10-12", title: "M12 · Mapas oficiais, com Codex e Muse em paralelo", items: [
         "Conversor de mapas (Codex): decodifica o PNG de 16 bits sem dependências, reduz para 128×128, escolhe a entrada e gera JSON e prévias",
         "Seletor de mapas no menu (Muse): cartões com prévia, dificuldade, descrição e idioma; terrenos aleatórios ficam numa seção própria",

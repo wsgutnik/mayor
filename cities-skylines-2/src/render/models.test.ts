@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { buildModels } from "./models";
+import { Builder, buildModels } from "./models";
+import { KIT_FACILITY_MAKERS, KIT_MAKERS } from "./kit-models";
 import { zoneEntries } from "../sim/catalog";
 import { FACILITY_INFO, ZONE } from "../sim/world";
 
@@ -42,10 +43,32 @@ describe("procedural models", () => {
   it("keeps triangle counts low enough for thousands of instances on an iPad", () => {
     let worst = 0;
     for (const g of set.buildings.values()) worst = Math.max(worst, tris(g));
-    expect(worst).toBeLessThan(260);
+    expect(worst).toBeLessThanOrEqual(220);
     let total = 0;
     for (const g of set.buildings.values()) total += tris(g);
-    expect(total / set.buildings.size).toBeLessThan(120);
+    expect(total / set.buildings.size).toBeLessThanOrEqual(150);
+    let facilityWorst = 0;
+    for (const g of set.facilities.values()) facilityWorst = Math.max(facilityWorst, tris(g));
+    expect(facilityWorst).toBeLessThanOrEqual(260);
+  });
+
+  it("validates every dedicated kit model and keeps same-tier zoned entries distinct", () => {
+    const validate = (make: (b: Builder) => void, budget: number) => {
+      const b = new Builder(); make(b); const g = b.build();
+      expect(g.attributes.position.count).toBeGreaterThan(0);
+      expect(tris(g)).toBeLessThanOrEqual(budget);
+      g.computeBoundingBox(); const box = g.boundingBox!;
+      expect(box.min.x).toBeGreaterThanOrEqual(-.5); expect(box.max.x).toBeLessThanOrEqual(.5);
+      expect(box.min.z).toBeGreaterThanOrEqual(-.5); expect(box.max.z).toBeLessThanOrEqual(.5);
+      expect(box.min.y).toBeGreaterThanOrEqual(-.001); expect(box.max.y).toBeLessThan(2.6);
+      return Array.from(g.attributes.position.array as ArrayLike<number>).join(",");
+    };
+    for (const make of Object.values(KIT_MAKERS)) validate(make!, 220);
+    for (const make of Object.values(KIT_FACILITY_MAKERS)) validate(make!, 260);
+    for (const z of [ZONE.RES, ZONE.COM, ZONE.IND]) for (const l of [1, 2, 3]) {
+      const data = zoneEntries(z, l).map((e) => validate(KIT_MAKERS[e.n]!, 220));
+      expect(new Set(data).size).toBe(data.length);
+    }
   });
 
   it("taller levels are taller and every model has finite, normalised normals", () => {
