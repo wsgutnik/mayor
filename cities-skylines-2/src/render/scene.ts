@@ -1099,12 +1099,14 @@ export class CityRenderer {
     for (const v of t.vehicles) {
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
-      // Inside a tunnel the vehicle is hidden; on a deck it rides the deck height. Tile reads only.
-      const rt = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
-      if (isTunnelTile(w, rt)) continue;
+      // Layer decides height: tunnel hidden, deck rides deckH, ground stays low even under a deck.
+      const vi = Math.min(v.tiles.length - 1, Math.floor(v.progress));
+      const rt = v.tiles[vi];
+      const layer = v.layers ? v.layers[vi] : (isTunnelTile(w, rt) ? 2 : w.roadDeck[rt] && !w.roadSurface[rt] ? 1 : 0);
+      if (layer === 2) continue;
       const p = heading(v.pts, i, v.progress - i, v.kind === 1 ? 0.12 : 0.1);
       const dh = w.deckH[rt];
-      const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
+      const baseY = layer === 1 && !Number.isNaN(dh) ? dh : heightAt(w, p.x, p.z);
       if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
       if (v.kind === 1) {
         place(pickLook(TRUCK_LOOKS, v.id), p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17, baseY);
@@ -1115,11 +1117,13 @@ export class CityRenderer {
     for (const v of t.transit) {
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
-      const rt = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
-      if (isTunnelTile(w, rt)) continue;
+      const vi = Math.min(v.tiles.length - 1, Math.floor(v.progress));
+      const rt = v.tiles[vi];
+      const layer = v.layers ? v.layers[vi] : (isTunnelTile(w, rt) ? 2 : w.roadDeck[rt] && !w.roadSurface[rt] ? 1 : 0);
+      if (layer === 2) continue;
       const p = heading(v.pts, i, Math.min(1, v.progress - i), v.kind === "bus" ? 0.14 : 0);
       const dh = w.deckH[rt];
-      const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
+      const baseY = layer === 1 && !Number.isNaN(dh) ? dh : heightAt(w, p.x, p.z);
       if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
       place(v.kind === "bus" ? pickLook(BUS_LOOKS, v.id) : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
         v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3, baseY);

@@ -25,7 +25,7 @@ const ZEBRA = "#f1f1ea";
 const CONCRETE = "#a8adb5";
 const PILLAR = "#8b9098";
 const PORTAL_DARK = "#0b0d12";
-const DECK_SHADOW = "#2b5d73";
+const DECK_SHADOW = "#1b232b";
 
 export interface StripSeg {
   type: RoadType;
@@ -337,33 +337,53 @@ function parapets(g: Geo, type: RoadType, deck: DeckSampler): void {
   }
 }
 
-/** One pier every 3 tiles, from the bed (or valley floor) up to the deck. */
-function pillars(g: Geo, deck: DeckSampler, groundY: GroundY): void {
+/** One pier every 3 tiles, from the bed (or valley floor) up to the deck. Over a road, piers sit beside it. */
+function pillars(g: Geo, deck: DeckSampler, groundY: GroundY, w?: World, type?: RoadType): void {
   for (let s = 1.5; s < deck.length - 1; s += 3) {
     const p = deck.pos(s);
     const top = deck.yAt(s) - 0.05;
     const base = Math.min(groundY(p.x, p.z), 0) - 0.25;
     if (top - base < 0.4) continue;
-    box(g, p.x, p.z, base, 0.36, top - base, 0.36, 0, PILLAR);
+    let cx = p.x, cz = p.z;
+    if (w) {
+      const tx = Math.floor(p.x), ty = Math.floor(p.z);
+      if (tx >= 0 && ty >= 0 && tx < w.size && ty < w.size && w.roadSurface[ty * w.size + tx]) {
+        const q = deck.pos(Math.min(deck.length, s + 0.05));
+        let dx = q.x - p.x, dz = q.z - p.z;
+        const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+        const off = (type ? fullHalf(type) : 0.5) + 0.55;
+        cx = p.x - dz * off; cz = p.z + dx * off;
+        // If that side is also road (wide avenue), use the other side.
+        const tx2 = Math.floor(cx), ty2 = Math.floor(cz);
+        if (tx2 >= 0 && ty2 >= 0 && tx2 < w.size && ty2 < w.size && w.roadSurface[ty2 * w.size + tx2]) {
+          cx = p.x + dz * off; cz = p.z - dx * off;
+        }
+      }
+    }
+    box(g, cx, cz, base, 0.36, top - base, 0.36, 0, PILLAR);
   }
 }
 
-/** Dark ribbon on the water under the deck, so the crossing reads from far away. */
-function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY): void {
+/** Dark ribbon under the deck (water or the road below), so the crossing reads from far away. */
+function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY, w?: World): void {
   const hw = fullHalf(type) + 0.5;
   const n = Math.max(1, Math.ceil(deck.length / 0.5));
   let prev: [number, number] | null = null;
   for (let i = 0; i <= n; i++) {
     const s = (deck.length * i) / n;
     const p = deck.pos(s);
-    if (groundY(p.x, p.z) > 0.08) { prev = null; continue; }
+    const tx = Math.floor(p.x), ty = Math.floor(p.z);
+    const overRoad = !!w && tx >= 0 && ty >= 0 && tx < w.size && ty < w.size && w.roadSurface[ty * w.size + tx] !== 0;
+    const gy = groundY(p.x, p.z);
+    if (!overRoad && gy > 0.08) { prev = null; continue; }
+    const shadowY = overRoad ? gy + 0.075 : 0.05;
     const q = deck.pos(Math.min(deck.length, s + 0.05));
     let dx = q.x - p.x, dz = q.z - p.z;
     const l = Math.hypot(dx, dz) || 1;
     dx /= l; dz /= l;
     const cur: [number, number] = [
-      g.vert(p.x - dz * hw, 0.05, p.z + dx * hw, DECK_SHADOW),
-      g.vert(p.x + dz * hw, 0.05, p.z - dx * hw, DECK_SHADOW),
+      g.vert(p.x - dz * hw, shadowY, p.z + dx * hw, DECK_SHADOW),
+      g.vert(p.x + dz * hw, shadowY, p.z - dx * hw, DECK_SHADOW),
     ];
     if (prev) {
       g.tri(prev[0], cur[0], prev[1]);
@@ -563,8 +583,8 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     ribbon(g, seg.pts, seg.type, NO_TRIM, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0);
     if (deck) {
       parapets(g, seg.type, deck);
-      pillars(g, deck, groundY);
-      deckShadow(g, seg.type, deck, groundY);
+      pillars(g, deck, groundY, w, seg.type);
+      deckShadow(g, seg.type, deck, groundY, w);
     }
     // Dead ends close with a round cap (a lone arm, or a missing layout).
     for (const [end, l] of [["a", la], ["b", lb]] as const) {

@@ -397,9 +397,13 @@ export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmen
   if (endA) { poly[0] = { x: endA.x, z: endA.z }; }
   if (endB) { poly[poly.length - 1] = { x: endB.x, z: endB.z }; }
 
-  // 3. Transverse crossings split the roads they cut.
+  // 3. Transverse crossings split the roads they cut. Crossings across
+  // levels (bridge/tunnel vs ground, or bridge vs tunnel) get no node:
+  // the roads pass over/under each other and stay separate in the graph.
+  const newElev: Elevation = opts?.elevation ?? "ground";
   const cutAt: Pt[] = [];
   for (const seg of [...w.segments]) {
+    if (segElevation(seg) !== newElev) continue;
     for (const c of crossingsWith(poly, seg)) {
       if (nearestNode(w, c.x, c.z, SNAP_RADIUS)) continue;
       if (cutAt.some((k) => dist(k.x, k.z, c.x, c.z) < SNAP_RADIUS)) continue;
@@ -719,9 +723,17 @@ function bisector(a: RoadArm, b: RoadArm): { x: number; z: number } | null {
 
 // ---------------------------------------------------------------- signals
 
+/** Ground arms only: deck/tunnel arms never signalise a node (M24). */
+export function groundArms(w: World, nodeId: number): RoadArm[] {
+  return nodeArms(w, nodeId).filter((a) => {
+    const seg = segById(w, a.segId);
+    return !seg || segElevation(seg) === "ground";
+  });
+}
+
 /** Nodes with 4+ arms, or 3 arms meeting an avenue, are signalised. */
 export function hasSignal(w: World, nodeId: number): boolean {
-  const arms = nodeArms(w, nodeId);
+  const arms = groundArms(w, nodeId);
   return arms.length >= 4 || (arms.length === 3 && arms.some((a) => baseRoadType(a.type) === 2));
 }
 
@@ -732,7 +744,7 @@ export interface SignalInfo { id: number; x: number; z: number; arms: SignalArm[
 export function signalNodes(w: World): SignalInfo[] {
   const out: SignalInfo[] = [];
   for (const node of w.nodes) {
-    const arms = nodeArms(w, node.id);
+    const arms = groundArms(w, node.id);
     if (arms.length >= 4 || (arms.length === 3 && arms.some((a) => baseRoadType(a.type) === 2))) {
       out.push({
         id: node.id, x: node.x, z: node.z,
@@ -872,11 +884,11 @@ export function stampRoundabout(w: World, nodeId: number): boolean {
  */
 export function rebuildNodes(w: World): void {
   if (adoptNodes(w)) return;
-  const keep = w.segments.map((s) => ({ type: s.type as RoadType, pts: s.pts, fixed: s.fixed, oneWay: s.oneWay, dir: s.dir, roundabout: s.roundabout }));
+  const keep = w.segments.map((s) => ({ type: s.type as RoadType, pts: s.pts, fixed: s.fixed, oneWay: s.oneWay, dir: s.dir, roundabout: s.roundabout, elevation: s.elevation }));
   w.segments = [];
   w.nodes = [];
   w.nextNodeId = 1;
-  for (const s of keep) addSegmentKeepId(w, s.type, s.pts, 0, s.fixed, s.oneWay, s.dir, s.roundabout);
+  for (const s of keep) addSegmentKeepId(w, s.type, s.pts, 0, s.fixed, s.oneWay, s.dir, s.roundabout, s.elevation);
   let maxSeg = 0;
   for (const s of w.segments) maxSeg = Math.max(maxSeg, s.id);
   w.nextSegmentId = Math.max(w.nextSegmentId, maxSeg + 1);
@@ -887,8 +899,8 @@ export function rebuildNodes(w: World): void {
  * Re-add one saved segment through the graph (load path for old saves only).
  * Ids are renumbered; nothing outside the graph references them.
  */
-function addSegmentKeepId(w: World, type: RoadType, pts: Pt[], _id: number, fixed?: boolean, oneWay?: boolean, dir?: 1 | -1, roundabout?: boolean): void {
-  const ids = addSegment(w, type, pts, { fixed, oneWay });
+function addSegmentKeepId(w: World, type: RoadType, pts: Pt[], _id: number, fixed?: boolean, oneWay?: boolean, dir?: 1 | -1, roundabout?: boolean, elevation?: Elevation): void {
+  const ids = addSegment(w, type, pts, { fixed, oneWay, elevation });
   // addSegment derives a→b from the stroke; restore the saved direction/flags.
   for (const id of ids) {
     const seg = segById(w, id);

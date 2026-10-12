@@ -10,7 +10,7 @@ import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
-import { Hud, RoadMode, toolColor } from "./ui/hud";
+import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
 import { Pt, ROAD_NAME, RoadType, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { setLang, tr, trReason, getLang } from "./i18n";
 import { MapData, MapIndex } from "./sim/maps";
@@ -34,6 +34,7 @@ let overlay: OverlayLayer = 0;
 let speed = 1;
 let roadType: RoadType = 1;
 let roadMode: RoadMode = "line";
+let roadLevel: RoadLevel = "ground";
 
 /** Points already placed for the road being drawn (start, and the bend in curve mode). */
 let draft: Pt[] = [];
@@ -52,7 +53,7 @@ function makeHud(): Hud {
   onSpeed: (s) => { speed = s; hud.setSpeed(s); },
   onTax: (r) => { state.taxRate = r; },
   onOverlay: (layer) => { overlay = layer; renderer.setOverlay(layer); },
-  onRoad: (t, m) => { roadType = t; roadMode = m; cancelDraft(); refreshHint(); },
+  onRoad: (t, m, lvl) => { roadType = t; roadMode = m; if (lvl) roadLevel = lvl; cancelDraft(); refreshHint(); },
   onFinishRoad: () => cancelDraft(),
   onMenu: () => menu.toggle(),
   onCreateLine: () => {
@@ -78,7 +79,7 @@ hud.setTips(prefs.tips);
 function rebuildHud(): void {
   hud.destroy();
   hud = makeHud();
-  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, tips: prefs.tips });
+  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, tips: prefs.tips });
   cancelDraft();
   menu.raise();
   menu.refresh();
@@ -219,7 +220,7 @@ function updatePreview(): void {
   const seg = currentSegment();
   if (!seg) { renderer.setRoadPreview(null); return; }
   // Before the bend point is set in curve mode, show the straight guide.
-  const plan = planRoad(state, roadType, seg.pts);
+  const plan = planRoad(state, roadType, seg.pts, roadLevel);
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok);
   const name = tr(ROAD_NAME[roadType]);
   const spanHint = plan.span === "bridge" ? ` · ${tr("Bridge")}` : plan.span === "tunnel" ? ` · ${tr("Tunnel")}` : "";
@@ -266,7 +267,7 @@ function onTap(cx: number, cy: number): void {
     return;
   }
   const seg = currentSegment()!;
-  const res = placeRoad(state, roadType, seg.pts);
+  const res = placeRoad(state, roadType, seg.pts, roadLevel);
   if (res.ok) {
     // Keep drawing from the end point, like a continuous road.
     draft = [p];
@@ -319,6 +320,8 @@ window.addEventListener("keydown", (e) => {
     overlay = overlay === UNDERGROUND_LAYER ? 0 : UNDERGROUND_LAYER;
     renderer.setOverlay(overlay);
     hud.setOverlay(overlay);
+  } else if (e.key === "e" || e.key === "E") {
+    if (tool === "road") { roadLevel = hud.cycleRoadLevel(); cancelDraft(); refreshHint(); }
   }
 });
 

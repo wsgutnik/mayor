@@ -17,8 +17,9 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | Frota de veículos | feito | 23 variantes paramétricas: carros (táxi, polícia, minivan, picape…), vans, caminhões (baú, lixo, utilitário, betoneira, prancha, tanque), semis (baú, contêiner), ônibus (urbano, articulado, escolar, dois andares, rodoviário, mini) |
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
+| M24 Separação de níveis | feito | viaduto e passagem inferior sem nó, botões Solo / Elevado / Subterrâneo e tecla E, tráfego por camada |
 
-Testes: 266 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 279 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
@@ -36,9 +37,8 @@ lotes validados só no tile âncora ao sincronizar.
 
 ## Limitações conhecidas
 
-- M24 (separação de níveis) em produção com o Muse (`muse-grade`).
 
-- Pontes e túneis não têm separação de níveis: cruzar outra rua cria um nó.
+- Separação de níveis só pelos botões Elevado/Subterrâneo; sem detecção automática de cruzamento.
 - A mediana da avenida para antes do canto em curvas fechadas.
 - Regiões alcançáveis só por ponte ou túnel precisam de energia e água locais.
 - A rede de utilidades usa um pool por rede ordenado por proximidade, não orçamento por instalação.
@@ -57,7 +57,7 @@ CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cad
 
 ## Próximos passos
 
-1. M24: separação de níveis (ponte ou túnel cruzando outra rua sem nó) e tráfego por pista.
+1. Tráfego por pista (referência: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, fases C e E).
 2. Desempenho do grafo e dos semáforos (achados abertos).
 3. M22: pedestres em movimento, polimento, validação em Windows e iPad.
 4. Tráfego por pista (referência: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, fases C e E).

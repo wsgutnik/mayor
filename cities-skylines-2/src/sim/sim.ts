@@ -7,7 +7,7 @@ import {
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, isOneWayType, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
   Elevation,
 } from "./world";
-import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan } from "./elevation";
+import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
 import { addSegment, rebuildNodes, removeSegment, stampRoundabout, toggleOneWayAt } from "./roads";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
@@ -208,17 +208,73 @@ export interface RoadPlan {
 /** Cost multiplier per tile for an elevated piece. */
 const pieceMult = (e: Elevation): number => (e === "bridge" ? BRIDGE_COST_MULT : e === "tunnel" ? TUNNEL_COST_MULT : 1);
 
+/** Road-tool level modifier (M24): Solo / Elevado / Subterrâneo. */
+export type RoadLevel = "ground" | "elevated" | "tunnel";
+export type RoadLevelInput = RoadLevel | "bridge" | "underground" | { level?: string; elevation?: string };
+export function normalizeRoadLevel(input?: RoadLevelInput): RoadLevel {
+  const v = typeof input === "string" ? input : input?.level ?? input?.elevation ?? "ground";
+  if (v === "elevated" || v === "bridge") return "elevated";
+  if (v === "tunnel" || v === "underground") return "tunnel";
+  return "ground";
+}
+/** Ramp length at each end of an explicit overpass/underpass, in tiles. */
+export const RAMP_TILES = 3;
+
+/** Does the middle of `pts` cross a road, water or terrain that needs elevation? */
+function needsElevation(w: World, pts: Pt[], kind: "bridge" | "tunnel"): boolean {
+  const { tiles } = rasterizeRoad(w, 1, pts);
+  // Any existing road tile under the drawn path (excluding the very ends,
+  // which join the graph at grade) counts as something to cross.
+  for (let i = 1; i + 1 < tiles.length; i++) {
+    if (w.road[tiles[i]]) return true;
+  }
+  // Terrain spans (water/valley for bridges, hills for tunnels) also count.
+  const found = detectSpan(w, 1, pts);
+  if (found.ok && found.span && found.span.kind === kind) return true;
+  if (kind === "bridge") {
+    for (const t of tiles) if (!isLand(w, t % w.size, (t / w.size) | 0)) return true;
+  }
+  return false;
+}
+
 /** Validate a road segment and price it without changing anything. */
-export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
+export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: RoadLevelInput = "ground"): RoadPlan {
+  const level = normalizeRoadLevel(levelInput);
   const w = s.world;
   const bad = (reason: string, tiles: number[] = []): RoadPlan => ({ ok: false, reason, tiles, newTiles: 0, cost: 0 });
   if (pts.length < 2 || pts.length > 3) return bad("A road needs a start and an end");
   if (segmentLength(pts) > MAX_SEGMENT_TILES) return bad("Road is too long");
   const { tiles, outOfBounds } = rasterizeRoad(w, type, pts);
   if (outOfBounds) return bad("Outside the map", tiles);
+  // Explicit Elevado/Subterrâneo: deck/tunnel over everything crossed,
+  // with 3-tile ground ramps at both ends (M24). Reuses splitPtsAt/pieces.
+  if (level !== "ground") {
+    const kind = level === "elevated" ? "bridge" as const : "tunnel" as const;
+    const len = segmentLength(pts);
+    if (kind === "tunnel" && len < 4) return bad("Tunnel too short", tiles);
+    if (len < 2) return bad("Nothing to cross", tiles);
+    if (!needsElevation(w, pts, kind)) return bad("Nothing to cross", tiles);
+    const ramp = Math.min(RAMP_TILES, Math.floor((len - 1) / 2));
+    if (ramp < 1) return bad("Nothing to cross", tiles);
+    const t0 = ramp / len, t1 = 1 - ramp / len;
+    const [before, middle, after] = splitPtsAt(pts, t0, t1);
+    const span = { kind, t0, t1, spanTiles: rasterizeRoad(w, type, middle).tiles.length, before, middle, after };
+    const foundSpan = span;
+    // Fall through to shared pricing below using foundSpan.
+    return planWithSpan(s, type, pts, tiles, foundSpan, bad);
+  }
   const found = detectSpan(w, type, pts);
   if (!found.ok) return bad(found.reason, tiles);
   const span = found.span;
+  return planWithSpan(s, type, pts, tiles, span, bad);
+}
+
+function planWithSpan(
+  s: CityState, type: RoadType, pts: Pt[], tiles: number[],
+  span: { kind: "bridge" | "tunnel"; before: Pt[]; middle: Pt[]; after: Pt[] } | null,
+  bad: (reason: string, tiles?: number[]) => RoadPlan,
+): RoadPlan {
+  const w = s.world;
   let pieces: RoadPiece[];
   if (!span) {
     pieces = [{ pts, elevation: "ground", tiles }];
@@ -265,7 +321,10 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
       if (!elevated && !isLand(w, x, y)) return bad("Road would cross water", order);
       if (w.facility[t]) return bad("Road would cross a building", order);
     }
-    if (w.road[t] < type) {
+    const layerExisting = elevated
+      ? (span?.kind === "tunnel" ? w.roadTunnel[t] : w.roadDeck[t])
+      : w.road[t];
+    if (layerExisting < type) {
       newTiles++;
       cost += rate.get(t)! * ROAD_COST[type];
     }
@@ -276,8 +335,8 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[]): RoadPlan {
 }
 
 /** Build a road: flatten and clear the ground it covers, then charge for new tiles. */
-export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
-  const plan = planRoad(s, type, pts);
+export function placeRoad(s: CityState, type: RoadType, pts: Pt[], level: RoadLevelInput = "ground"): ToolResult {
+  const plan = planRoad(s, type, pts, level);
   if (!plan.ok) return { ok: false, reason: plan.reason! };
   if (plan.newTiles === 0) {
     // Re-drawing a one-way road with the same tool flips its direction (free).
@@ -513,12 +572,17 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (w.facility[i] === FAC.METRO) removeStopAt(w, i);
     // Remember it: the raster rebuild below clears the tile, and lots/frontage must still be invalidated.
     const hadRoad = !!w.road[i];
+    let removedElevated = false;
     if (w.road[i]) {
-      // Bulldozing a road removes every segment covering the tile; the graph
-      // merges straight joints back and drops orphaned nodes.
-      for (const seg of [...w.segments]) {
-        if (!seg.fixed && seg.tiles.includes(i)) removeSegment(w, seg.id);
-      }
+      // Grade separation (M24): an elevated piece is removed whole and
+      // leaves ground roads intact; ground roads go only when no elevated
+      // piece covers the tile (so the road under a deck survives a deck
+      // bulldoze, and the deck survives a ground-road bulldoze elsewhere).
+      const covering = w.segments.filter((seg) => !seg.fixed && seg.tiles.includes(i));
+      const elevatedSegs = covering.filter((seg) => (seg.elevation ?? "ground") !== "ground");
+      const targets = elevatedSegs.length ? elevatedSegs : covering;
+      removedElevated = elevatedSegs.length > 0;
+      for (const seg of targets) removeSegment(w, seg.id);
       rebuildRoadRaster(w);
       // Every bus stop that lost its road goes with it, not only the one under the cursor.
       for (const stop of [...w.stops]) {
@@ -529,9 +593,13 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (w.facility[i]) w.coverageDirty = true;
     if (hadRoad) dirtyRoads(w);
     else if (w.zone[i] || w.facility[i]) dirtyZones(w);
-    w.zone[i] = 0;
-    w.level[i] = 0;
-    w.facility[i] = 0;
+    // When only an elevated piece was removed, the ground at this tile
+    // (road below a deck, zone/facility above a tunnel) stays untouched.
+    if (!removedElevated) {
+      w.zone[i] = 0;
+      w.level[i] = 0;
+      w.facility[i] = 0;
+    }
     if (w.coverageDirty) updateCoverage(w);
     w.revision++;
     return { ok: true };

@@ -149,6 +149,12 @@ export interface World {
   road: Uint8Array;
   /** Road class per tile from ground segments only; bridge decks and tunnels are excluded (frontage, lots, utilities). */
   roadSurface: Uint8Array;
+  /** Road class per tile from bridge segments only (derived, not saved). */
+  roadDeck: Uint8Array;
+  /** Road class per tile from tunnel segments only (derived, not saved). */
+  roadTunnel: Uint8Array;
+  /** 1 where a tile hosts a shared node between ground and elevated segments (ramp link; layer switch allowed). */
+  roadLink: Uint8Array;
   /** Deck height per tile for bridge tiles, NaN elsewhere. Vehicles and the road mesh read this. */
   deckH: Float32Array;
   segments: RoadSegment[];
@@ -279,6 +285,9 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     heights,
     road: new Uint8Array(size * size),
     roadSurface: new Uint8Array(size * size),
+    roadDeck: new Uint8Array(size * size),
+    roadTunnel: new Uint8Array(size * size),
+    roadLink: new Uint8Array(size * size),
     deckH: new Float32Array(size * size).fill(NaN),
     segments: [],
     nextSegmentId: 1,
@@ -341,25 +350,42 @@ export function isEntryTile(w: World, x: number, y: number): boolean {
   return false;
 }
 
-/** Recompute which road tiles are reachable from the entry (4-neighbour BFS). */
+/** Layer of a tile: 0 ground, 1 bridge deck, 2 tunnel. */
+export type RoadLayer = 0 | 1 | 2;
+export const layerClass = (w: World, tile: number, layer: RoadLayer): number =>
+  layer === 0 ? w.roadSurface[tile] : layer === 1 ? w.roadDeck[tile] : w.roadTunnel[tile];
+
+/** Recompute which road tiles are reachable from the entry (layer-aware BFS). */
 export function updateConnectivity(w: World): void {
   w.connected.fill(0);
   w.connectivityDirty = false;
   const start = idx(w, w.entry.x, w.entry.y);
   if (!w.road[start]) return;
-  const queue = [start];
-  w.connected[start] = 1;
+  const n = w.size * w.size;
+  const seen = new Uint8Array(n * 3);
+  const queue: number[] = [];
+  const push = (tile: number, layer: RoadLayer) => {
+    const k = tile * 3 + layer;
+    if (seen[k] || !layerClass(w, tile, layer)) return;
+    seen[k] = 1;
+    queue.push(k);
+    w.connected[tile] = 1;
+  };
+  // Entry is a ground road.
+  if (w.roadSurface[start]) push(start, 0);
+  else if (w.roadDeck[start]) push(start, 1);
+  else if (w.roadTunnel[start]) push(start, 2);
   while (queue.length) {
-    const i = queue.pop()!;
-    const x = i % w.size, y = (i / w.size) | 0;
+    const k = queue.pop()!;
+    const tile = (k / 3) | 0, layer = (k % 3) as RoadLayer;
+    const x = tile % w.size, y = (tile / w.size) | 0;
+    if (w.roadLink[tile]) {
+      for (const l of [0, 1, 2] as RoadLayer[]) if (l !== layer) push(tile, l);
+    }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const nx = x + dx, ny = y + dy;
       if (!inBounds(w, nx, ny)) continue;
-      const j = idx(w, nx, ny);
-      if (w.road[j] && !w.connected[j]) {
-        w.connected[j] = 1;
-        queue.push(j);
-      }
+      push(idx(w, nx, ny), layer);
     }
   }
 }
@@ -528,12 +554,34 @@ export function rasterizeRoad(w: World, type: RoadType, pts: Pt[]): { tiles: num
 export function rebuildRoadRaster(w: World): void {
   w.road.fill(0);
   w.roadSurface.fill(0);
+  w.roadDeck.fill(0);
+  w.roadTunnel.fill(0);
+  w.roadLink.fill(0);
   w.deckH.fill(NaN);
   for (const seg of w.segments) {
-    const surface = segElevation(seg) === "ground";
+    const elev = segElevation(seg);
     for (const t of seg.tiles) {
       if (w.road[t] < seg.type) w.road[t] = seg.type;
-      if (surface && w.roadSurface[t] < seg.type) w.roadSurface[t] = seg.type;
+      if (elev === "ground" && w.roadSurface[t] < seg.type) w.roadSurface[t] = seg.type;
+      else if (elev === "bridge" && w.roadDeck[t] < seg.type) w.roadDeck[t] = seg.type;
+      else if (elev === "tunnel" && w.roadTunnel[t] < seg.type) w.roadTunnel[t] = seg.type;
+    }
+  }
+  // Ramp links: nodes shared by ground and elevated segments allow layer switches.
+  {
+    const elevOf = new Map<number, Elevation>();
+    for (const seg of w.segments) elevOf.set(seg.id, segElevation(seg));
+    for (const node of w.nodes) {
+      let hasGround = false, hasElev = false;
+      for (const sid of node.segs) {
+        const e = elevOf.get(sid);
+        if (e === "ground") hasGround = true;
+        else if (e) hasElev = true;
+      }
+      if (hasGround && hasElev) {
+        const tx = Math.floor(node.x), ty = Math.floor(node.z);
+        if (inBounds(w, tx, ty)) w.roadLink[idx(w, tx, ty)] = 1;
+      }
     }
   }
   for (const seg of w.segments) {
@@ -579,12 +627,16 @@ export function rebuildRoadRaster(w: World): void {
 
 /** A surface (ground-level) road tile: the only kind that serves lots and carries pipes. */
 export const isSurfaceRoad = (w: World, i: number): boolean => w.roadSurface[i] !== 0;
+/** True when a bridge deck occupies the tile (it may share the tile with a ground road). */
+export const hasDeck = (w: World, i: number): boolean => w.roadDeck[i] !== 0;
+/** True when a tunnel occupies the tile (it may share the tile with a ground road). */
+export const hasTunnel = (w: World, i: number): boolean => w.roadTunnel[i] !== 0;
 /** A bridge-deck tile: connected for traffic, but not a surface road. */
 export const isBridgeTile = (w: World, i: number): boolean =>
-  w.road[i] !== 0 && w.roadSurface[i] === 0 && !Number.isNaN(w.deckH[i]);
+  w.roadDeck[i] !== 0 && w.roadSurface[i] === 0;
 /** A tunnel tile: connected for traffic, with buildable ground above. */
 export const isTunnelTile = (w: World, i: number): boolean =>
-  w.road[i] !== 0 && w.roadSurface[i] === 0 && Number.isNaN(w.deckH[i]);
+  w.roadTunnel[i] !== 0 && w.roadSurface[i] === 0;
 /** Tiles a building cannot share: surface roads and bridge decks (tunnels run underneath). */
 export const blocksBuilding = (w: World, i: number): boolean =>
   w.road[i] !== 0 && !isTunnelTile(w, i);

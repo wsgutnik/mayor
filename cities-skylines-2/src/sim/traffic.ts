@@ -1,6 +1,6 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
-import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity } from "./world";
+import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity, layerClass, RoadLayer } from "./world";
 import { SignalInfo, signalNodes, signalPhase } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
@@ -19,6 +19,8 @@ export interface Vehicle {
   /** 0 = commuter car, 1 = goods truck. */
   kind: 0 | 1;
   tiles: number[];
+  /** Road layer per tile (0 ground, 1 deck, 2 tunnel); absent means ground. */
+  layers?: Uint8Array;
   /** Smoothed centreline, x/z pairs, one per tile, so cars follow curved roads. */
   pts: Float32Array;
   /** Index into `tiles`, fractional. */
@@ -36,6 +38,7 @@ export interface TransitVehicle {
   /** Index in line.stops of the stop being driven to. */
   stopIdx: number;
   tiles: number[];
+  layers?: Uint8Array;
   pts: Float32Array;
   progress: number;
   /** Seconds left standing at a stop. */
@@ -151,55 +154,82 @@ function crossCost(cls: number, load: number): number {
 
 const scratch = { n: 0, g: new Float32Array(0), prev: new Int32Array(0), stamp: new Uint32Array(0), gen: 0 };
 
-/** Fastest route over road tiles given current loads, or null when unreachable. */
-export function findPath(w: World, load: Uint16Array, from: number, to: number): number[] | null {
+const preferredLayer = (w: World, tile: number): RoadLayer =>
+  w.roadSurface[tile] ? 0 : w.roadDeck[tile] ? 1 : 2;
+
+export interface LayeredPath { tiles: number[]; layers: Uint8Array }
+
+/** Layer-aware fastest route: deck/tunnel and ground meet only at ramp links. */
+export function findLayeredPath(w: World, load: Uint16Array, from: number, to: number): LayeredPath | null {
   if (!w.road[from] || !w.road[to]) return null;
-  if (from === to) return [from];
+  const fromLayer = preferredLayer(w, from);
+  const toLayer = preferredLayer(w, to);
+  if (from === to) return { tiles: [from], layers: new Uint8Array([fromLayer]) };
   const n = w.size * w.size;
-  if (scratch.n !== n) {
-    scratch.n = n;
-    scratch.g = new Float32Array(n);
-    scratch.prev = new Int32Array(n);
-    scratch.stamp = new Uint32Array(n);
+  const states = n * 3;
+  if (scratch.n !== states) {
+    scratch.n = states;
+    scratch.g = new Float32Array(states);
+    scratch.prev = new Int32Array(states);
+    scratch.stamp = new Uint32Array(states);
     scratch.gen = 0;
   }
-  // Generation stamps stand in for refilling the arrays on every search.
   const gen = ++scratch.gen;
   const { g, prev, stamp } = scratch;
   const G = (i: number) => (stamp[i] === gen ? g[i] : Infinity);
   const heap = new MinHeap();
   const minCost = 1 / ROAD_SPEED[ROAD.HIGHWAY];
   const tx = to % w.size, ty = (to / w.size) | 0;
-  stamp[from] = gen; g[from] = 0; prev[from] = -1;
-  heap.push(0, from);
+  const start = from * 3 + fromLayer;
+  const goal = to * 3 + toLayer;
+  stamp[start] = gen; g[start] = 0; prev[start] = -1;
+  heap.push(0, start);
   while (heap.size) {
     const cur = heap.pop();
-    if (cur === to) break;
-    const cx = cur % w.size, cy = (cur / w.size) | 0;
+    if (cur === goal) break;
+    const tile = (cur / 3) | 0, layer = (cur % 3) as RoadLayer;
+    const cx = tile % w.size, cy = (tile / w.size) | 0;
     const gc = G(cur);
+    // Layer switch only at ramp links (shared ground/elevated nodes).
+    if (w.roadLink[tile]) {
+      for (const l of [0, 1, 2] as RoadLayer[]) {
+        if (l === layer || !layerClass(w, tile, l)) continue;
+        const ns = tile * 3 + l;
+        const ng = gc + 0.01;
+        if (ng < G(ns)) { stamp[ns] = gen; g[ns] = ng; prev[ns] = cur; heap.push(ng + (Math.abs(cx - tx) + Math.abs(cy - ty)) * minCost, ns); }
+      }
+    }
     for (const [dx, dy] of NEIGHBOURS) {
       const nx = cx + dx, ny = cy + dy;
       if (!inBounds(w, nx, ny)) continue;
       const j = ny * w.size + nx;
-      const cls = w.road[j];
+      const cls = layerClass(w, j, layer);
       if (!cls) continue;
-      // One-way tiles may only be crossed with their travel direction (the
-      // dot threshold still allows turning onto/off a diagonal one-way).
-      if ((w.dirX[cur] || w.dirZ[cur]) && w.dirX[cur] * dx + w.dirZ[cur] * dy < -0.35) continue;
+      if ((w.dirX[tile] || w.dirZ[tile]) && w.dirX[tile] * dx + w.dirZ[tile] * dy < -0.35) continue;
       if ((w.dirX[j] || w.dirZ[j]) && w.dirX[j] * dx + w.dirZ[j] * dy < -0.35) continue;
+      const ns = j * 3 + layer;
       const ng = gc + crossCost(cls, load[j]);
-      if (ng < G(j)) {
-        stamp[j] = gen;
-        g[j] = ng;
-        prev[j] = cur;
-        heap.push(ng + (Math.abs(nx - tx) + Math.abs(ny - ty)) * minCost, j);
+      if (ng < G(ns)) {
+        stamp[ns] = gen; g[ns] = ng; prev[ns] = cur;
+        heap.push(ng + (Math.abs(nx - tx) + Math.abs(ny - ty)) * minCost, ns);
       }
     }
   }
-  if (stamp[to] !== gen) return null;
-  const out: number[] = [];
-  for (let c = to; c !== -1; c = prev[c]) out.push(c);
-  return out.reverse();
+  if (stamp[goal] !== gen) return null;
+  const revTiles: number[] = [];
+  const revLayers: number[] = [];
+  for (let c = goal; c !== -1; c = prev[c]) {
+    const t = (c / 3) | 0;
+    if (revTiles.length && revTiles[revTiles.length - 1] === t) { revLayers[revLayers.length - 1] = c % 3; continue; }
+    revTiles.push(t); revLayers.push(c % 3);
+  }
+  revTiles.reverse(); revLayers.reverse();
+  return { tiles: revTiles, layers: new Uint8Array(revLayers) };
+}
+
+/** Fastest route over road tiles given current loads, or null when unreachable. */
+export function findPath(w: World, load: Uint16Array, from: number, to: number): number[] | null {
+  return findLayeredPath(w, load, from, to)?.tiles ?? null;
 }
 
 /** Moving average over tile centres, endpoints pinned, so vehicles round curves. */
@@ -258,11 +288,13 @@ function planLeg(w: World, t: TrafficState, v: TransitVehicle): boolean {
   const to = w.stops.find((x) => x.id === line.stops[v.stopIdx % n]);
   if (!from || !to) return false;
   let tiles: number[] | null;
+  let layers: Uint8Array | undefined;
   if (line.kind === "metro") tiles = straightTiles(w, from.tile, to.tile);
-  else tiles = findPath(w, t.load, from.tile, to.tile);
+  else { const lp = findLayeredPath(w, t.load, from.tile, to.tile); tiles = lp?.tiles ?? null; layers = lp?.layers; }
   if (!tiles) return false;
   if (tiles.length < 2) tiles = [from.tile, to.tile];
   v.tiles = tiles;
+  v.layers = layers;
   v.pts = line.kind === "metro" ? centres(w, tiles) : smoothPath(w, tiles);
   v.progress = 0;
   return true;
@@ -313,9 +345,9 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
   const a = accessTile(w, origins[Math.floor(t.rng() * origins.length)], t.rng);
   const b = accessTile(w, dests[Math.floor(t.rng() * dests.length)], t.rng);
   if (a < 0 || b < 0) return;
-  const tiles = findPath(w, t.load, a, b);
-  if (!tiles || tiles.length < 2) return;
-  t.vehicles.push({ id: t.nextId++, kind, tiles, pts: smoothPath(w, tiles), progress: 0, speedFactor: 1 });
+  const lp = findLayeredPath(w, t.load, a, b);
+  if (!lp || lp.tiles.length < 2) return;
+  t.vehicles.push({ id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts: smoothPath(w, lp.tiles), progress: 0, speedFactor: 1 });
 }
 
 function moveTransit(w: World, t: TrafficState, dt: number, weather: number): void {
@@ -381,7 +413,9 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     const cls = w.road[tile];
     if (!cls) continue;
     let f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
-    if (f > RED_CRAWL && t.sigNodes.length) f = Math.min(f, redCrawl(w, t, tile, v.tiles[Math.min(v.tiles.length - 1, at + 1)], phase));
+    // Vehicles on a deck or in a tunnel ignore ground signals (M24).
+    const onGround = !v.layers || v.layers[at] === 0;
+    if (onGround && f > RED_CRAWL && t.sigNodes.length) f = Math.min(f, redCrawl(w, t, tile, v.tiles[Math.min(v.tiles.length - 1, at + 1)], phase));
     v.speedFactor = f;
     if (f < 0.6) slow++;
     v.progress += ROAD_SPEED[cls] * f * (s.raining ? RAIN_SPEED_FACTOR : 1) * dt;

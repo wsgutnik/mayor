@@ -5,6 +5,7 @@ import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
 
 export type RoadMode = "paint" | "line" | "curve";
+export type RoadLevel = "ground" | "elevated" | "tunnel";
 
 /** Art from the brand sheet (public/ui) or a plain glyph. */
 interface Icon { img?: string; glyph?: string; color?: string }
@@ -53,6 +54,12 @@ const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }
   { mode: "curve", label: "Curve", glyph: "⌒", hint: "Tap start, a bend point, then the end" },
 ];
 
+const ROAD_LEVELS: { level: RoadLevel; label: string; glyph: string }[] = [
+  { level: "ground", label: "Ground", glyph: "─" },
+  { level: "elevated", label: "Elevated", glyph: "⌒" },
+  { level: "tunnel", label: "Underground", glyph: "⌄" },
+];
+
 const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string; img?: string }[] = [
   { layer: 0, label: "Off", glyph: "○", color: "#ffffff" },
   { layer: COVER.POWER, label: "Power", glyph: "⚡", color: "#f2c230", img: "kit/ico-energia" },
@@ -84,7 +91,7 @@ const iconHtml = (i: Icon) =>
 
 export interface HudHooks {
   onMenu(): void;
-  onRoad(type: RoadType, mode: RoadMode): void;
+  onRoad(type: RoadType, mode: RoadMode, level?: RoadLevel): void;
   onCreateLine(): void;
   onLineVehicles(id: number, delta: number): void;
   onRemoveLine(id: number): void;
@@ -151,8 +158,10 @@ export class Hud {
   private layerBtns: HTMLElement[] = [];
   private roadTypeBtns = new Map<RoadType, HTMLElement>();
   private roadModeBtns = new Map<RoadMode, HTMLElement>();
+  private roadLevelBtns = new Map<RoadLevel, HTMLElement>();
   private roadType: RoadType = 1;
   private roadMode: RoadMode = "line";
+  private roadLevel: RoadLevel = "ground";
   private svc = new Map<UtilityKey, { fill: HTMLElement; val: HTMLElement }>();
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private ind = new Map<string, { fill: HTMLElement; val: HTMLElement }>();
@@ -304,14 +313,24 @@ export class Hud {
       this.roadModeBtns.set(m.mode, b);
       flyRoad.appendChild(b);
     }
+    flyRoad.appendChild(el("span", "sep"));
+    const lvlLabel = el("span", "level-label", tr("Level"));
+    flyRoad.appendChild(lvlLabel);
+    for (const lv of ROAD_LEVELS) {
+      const b = el("button", "tool", `<span class="ic">${lv.glyph}</span><span>${tr(lv.label)}</span>`);
+      b.addEventListener("click", () => { this.setRoadLevel(lv.level); this.hooks.onTool("road"); this.setTool("road"); });
+      this.roadLevelBtns.set(lv.level, b);
+      flyRoad.appendChild(b);
+    }
     const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
       this.hooks.onTool("road");
       this.setTool("road");
-      this.hooks.onRoad(this.roadType, this.roadMode);
+      this.hooks.onRoad(this.roadType, this.roadMode, this.roadLevel);
     });
     this.toolBtns.set("road", roads);
     bar.appendChild(roads);
     this.setRoadChoice(1, "line", false);
+    this.setRoadLevel("ground", false);
 
     const flyZones = el("div", "panel fly");
     for (const id of ZONE_TOOLS) flyZones.appendChild(this.toolButton(T[id]));
@@ -385,8 +404,9 @@ export class Hud {
   // ------------------------------------------------------------------ state
 
   /** Restore the controls after the HUD was rebuilt (language change). */
-  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; tips: boolean }): void {
+  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; tips: boolean }): void {
     this.setRoadChoice(opts.roadType, opts.roadMode, false);
+    if (opts.roadLevel) this.setRoadLevel(opts.roadLevel, false);
     this.setTool(opts.tool);
     this.setSpeed(opts.speed);
     this.setTips(opts.tips);
@@ -412,14 +432,28 @@ export class Hud {
   }
 
   setRoadChoice(type: RoadType, mode: RoadMode, notify = true): void {
-    // Painting tile by tile cannot make clean junctions; roads are drawn as lines or curves (old saves of the
-    // preference may still say "paint").
     if (mode === "paint") mode = "line";
     this.roadType = type;
     this.roadMode = mode;
     this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === type));
     this.roadModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
-    if (notify) this.hooks.onRoad(type, mode);
+    if (notify) this.hooks.onRoad(type, mode, this.roadLevel);
+  }
+
+  setRoadLevel(level: RoadLevel, notify = true): void {
+    this.roadLevel = level;
+    this.roadLevelBtns.forEach((b, l) => b.classList.toggle("active", l === level));
+    if (notify) this.hooks.onRoad(this.roadType, this.roadMode, level);
+  }
+
+  getRoadLevel(): RoadLevel { return this.roadLevel; }
+
+  /** Cycle Solo → Elevado → Subterrâneo (key E). */
+  cycleRoadLevel(): RoadLevel {
+    const order: RoadLevel[] = ["ground", "elevated", "tunnel"];
+    const next = order[(order.indexOf(this.roadLevel) + 1) % order.length];
+    this.setRoadLevel(next);
+    return next;
   }
 
   setTool(t: ToolId): void {

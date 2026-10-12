@@ -4,7 +4,7 @@ export type Lang = "pt" | "en";
 const PT: Record<string, string> = {
   // top bar and panels
   "Population": "População", "Jobs": "Empregos", "Date": "Data", "Balance": "Saldo",
-  "Services": "Serviços", "Economy": "Economia", "Land value": "Valor do solo", "Traffic": "Tráfego", "Underground": "Subsolo",
+  "Services": "Serviços", "Economy": "Economia", "Land value": "Valor do solo", "Traffic": "Tráfego", "Underground": "Subterrâneo",
   "Income (last month)": "Receita (mês passado)", "Expenses (last month)": "Despesas (mês passado)",
   "Tax rate": "Imposto", "cars": "carros", "none": "nenhum", "stops": "paradas", "tile": "trecho", "mo": "mês",
   "Popularity": "Popularidade", "Budget": "Orçamento", "Environment": "Meio ambiente",
@@ -14,6 +14,7 @@ const PT: Record<string, string> = {
   "Move": "Mover", "Roads": "Estradas", "Zones": "Zonas", "Bulldoze": "Demolir", "Infoview": "Mapas",
   "Residential": "Residencial", "Commercial": "Comercial", "Industrial": "Industrial",
   "Street": "Rua", "Avenue": "Avenida", "Highway": "Autoestrada", "Paint": "Pintar", "Line": "Linha", "Curve": "Curva",
+  "Ground": "Solo", "Elevated": "Elevado",
   "One-way street": "Rua de mão única", "One-way avenue": "Avenida de mão única", "Roundabout": "Rotatória",
   "Stamp a roundabout on a junction": "Carimbe uma rotatória num cruzamento",
   "Tap a junction to stamp a roundabout": "Toque num cruzamento para criar a rotatória",
@@ -100,6 +101,7 @@ const PT: Record<string, string> = {
   "Road would cross water": "A estrada cruzaria a água", "Road would cross a building": "A estrada cruzaria uma construção",
   "Bridge": "Ponte", "Tunnel": "Túnel",
   "Bridge span too long": "Vão longo demais para uma ponte", "Tunnel span too long": "Trecho longo demais para um túnel",
+  "Nothing to cross": "Nada para cruzar", "Tunnel too short": "Túnel curto demais",
   "Road is too long": "Estrada longa demais", "A road needs a start and an end": "Uma estrada precisa de início e fim",
   "Bus stops go on a road": "Pontos de ônibus ficam em estradas", "Not on a highway": "Não em autoestradas",
   "There is already a stop here": "Já existe uma parada aqui",
