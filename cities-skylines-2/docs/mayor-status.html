@@ -162,9 +162,9 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M14 concluído. Falta validar Windows e iPad.",
-    summary: "O mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
-    screenshot: { src: "img/m14-blender.jpg", caption: "M14: ruas com calçada e faixa, casas de telhado azul, apartamentos, torres de vidro, fábricas e instalações do kit, com árvores de várias espécies e a costa ao fundo." },
+    headline: "M15 concluído. Falta validar Windows e iPad.",
+    summary: "M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
+    screenshot: { src: "img/m15-hero.jpg", caption: "M15: prédios redesenhados em Blender — casa inicial, sobrado moderno, café com terraço, delegacia, quartel dos bombeiros e fábrica pesada." },
     milestones: [
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
@@ -179,7 +179,8 @@ npm run dev</pre>
       { id: "M11", name: "Modelos 3D", desc: "Casas, torres, galpões e instalações procedurais; janelas acesas à noite; prédios voltados para a rua.", status: "done" },
       { id: "M12", name: "Mapas oficiais", desc: "Heightmaps do Map Kit no jogo, conversor, seletor no menu, mapas de qualquer tamanho.", status: "done" },
       { id: "M13", name: "Kit de prédios", desc: "Catálogo de 40 prédios, modelos por entrada, sete instalações e inspetor com miniaturas.", status: "done" },
-      { id: "M14", name: "Blender, natureza e água", desc: "Modelos do kit em GLB, plantas, veículos, barcos, postes, vias detalhadas e água com correnteza.", status: "done" }
+      { id: "M14", name: "Blender, natureza e água", desc: "Modelos do kit em GLB, plantas, veículos, barcos, postes, vias detalhadas e água com correnteza.", status: "done" },
+      { id: "M15", name: "Detalhe", desc: "Texturas, oclusão ambiente, faixas de pedestres, nuvens, fumaça e doze prédios principais redesenhados.", status: "done" }
     ],
     checks: [
       { ok: true, text: "122 testes passando, incluindo leitura de todos os GLB, limites do tile e orçamento de triângulos" },
@@ -190,6 +191,14 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M15 · Detalhe", items: [
+        "Texturas compartilhadas (tijolo, telha, concreto, asfalto, grama) geradas por script e aplicadas aos GLB, com tintas por tabela de padrões",
+        "Oclusão ambiente nos vértices dos modelos e textura no terreno",
+        "Faixas de pedestres e linhas de retenção nos cruzamentos (extremidade com extremidade e em T)",
+        "Nuvens e fumaça de chaminé e usina",
+        "Doze prédios redesenhados: casas 1–4, loja, café, mercado, delegacia, bombeiros, armazém e fábricas, com varandas, degraus, cercas, carros, silos e torre de mangueiras",
+        "Auxiliares novos na biblioteca Blender: varanda, porta, degraus, cerca, ar-condicionado, carro estacionado, claraboia, placa, chaminé"
+      ] },
       { date: "2026-10-12", title: "M14 · Blender, natureza e água", items: [
         "Pipeline em Blender 5.2 por script (blender/): biblioteca de modelagem, exportação em GLB e prévia isométrica comparada com a arte do kit",
         "37 prédios e instalações do kit em GLB (Codex: 2–19, Muse: 21–30 e 34–39, eu: 1, 20 e 40), de 150 a 410 triângulos, com janelas, lajes e sebes",
