@@ -87,7 +87,7 @@ const PT: Record<string, string> = {
   "Fire! A building burned down. Build a fire station.": "Incêndio! Um prédio queimou. Construa um posto de bombeiros.",
   // sim reasons
   "Not enough money": "Dinheiro insuficiente", "Cannot build on water": "Não é possível construir na água",
-  "Tile is a road": "O terreno é uma estrada", "Zones must be within 4 tiles of a road": "A zona deve ficar a até 4 quadras de uma estrada", "Tile is zoned": "O terreno é uma zona", "Tile is occupied": "O terreno está ocupado",
+  "Tile is a road": "O terreno é uma estrada", "Zones must be within 4 tiles of a road": "A zona deve ficar a até 4 lotes de uma estrada", "Tile is zoned": "O terreno é uma zona", "Tile is occupied": "O terreno está ocupado",
   "Outside the map": "Fora do mapa", "Cannot remove the highway entry": "A entrada da autoestrada não pode ser removida",
   "Road would cross water": "A estrada cruzaria a água", "Road would cross a building": "A estrada cruzaria uma construção",
   "Road is too long": "Estrada longa demais", "A road needs a start and an end": "Uma estrada precisa de início e fim",
