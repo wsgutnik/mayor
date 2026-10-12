@@ -227,6 +227,9 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[]): ToolResult {
   // crossings, and upgrades roads paved over along the same path.
   addSegment(w, type, pts);
   rebuildRoadRaster(w);
+  // Utility networks run under the roads, so new tarmac can light new buildings.
+  w.coverageDirty = true;
+  updateCoverage(w);
   s.money -= plan.cost;
   s.monthExpenses += plan.cost;
   dirtyRoads(w);
@@ -464,6 +467,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     w.zone[i] = z;
     w.level[i] = 0;
     dirtyZones(w);
+    // A new lot reserves network capacity, which can unserve farther lots.
+    w.coverageDirty = true;
   }
   s.money -= cost;
   s.monthExpenses += cost;
@@ -610,7 +615,11 @@ export function step(s: CityState): void {
       else if (d < -0.3 && rng() < 0.01) { setLotLevel(w, lot, lvl - 1); changed = true; }
     }
   }
-  if (changed) w.revision++;
+  if (changed) {
+    // Levels set demand, so regrow the networks before the recount reads them.
+    updateCoverage(w);
+    w.revision++;
+  }
 
   recount(s);
 

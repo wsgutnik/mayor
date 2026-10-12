@@ -14,6 +14,7 @@ import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
+import { UndergroundView } from "./underground";
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
@@ -95,6 +96,7 @@ export class CityRenderer {
   private rain!: THREE.LineSegments;
   private rainOn = false;
   private lastRebuildAt = 0;
+  private lastUndergroundAt = 0;
   private pixelCap = 2;
   private qualityCap = 2;
   private pixelRatio = 1;
@@ -128,7 +130,8 @@ export class CityRenderer {
   private previewMesh!: THREE.Mesh;
   private zones!: THREE.InstancedMesh;
   private kerbs!: THREE.InstancedMesh;
-  private pipes!: THREE.InstancedMesh;
+  private underground!: UndergroundView;
+  private warnMesh!: THREE.InstancedMesh;
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
   private vehicleMesh!: THREE.InstancedMesh;
@@ -240,6 +243,7 @@ export class CityRenderer {
       this.boatMeshes.set(name, m);
       this.useProp(name, (model) => { m.geometry = model.geometry; m.material = model.materials; this.boatReady.add(name); });
     }
+    this.underground = new UndergroundView(this.scene);
     this.buildWorldResources();
 
     this.hover = new THREE.Mesh(
@@ -270,8 +274,11 @@ export class CityRenderer {
     };
     this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.kerbs = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
-    this.pipes = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
-    this.pipes.renderOrder = 0;
+    // Amber diamonds over buildings missing power or water (red when both are out).
+    this.warnMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ toneMapped: false }), cap);
+    this.warnMesh.count = 0;
+    this.warnMesh.frustumCulled = false;
+    own(this.warnMesh);
     const mkModel = (geo: THREE.BufferGeometry, capacity: number) => {
       const m = new THREE.InstancedMesh(geo, [this.winMat, this.plainMat], capacity);
       m.count = 0;
@@ -656,6 +663,26 @@ export class CityRenderer {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+    // Warning diamonds over buildings missing power or water (hidden underground).
+    let nw = 0;
+    const wcap = this.warnMesh.instanceMatrix.count;
+    for (let y = 0; y < w.size && nw < wcap; y++) {
+      for (let x = 0; x < w.size && nw < wcap; x++) {
+        const i = idx(w, x, y);
+        if (!w.level[i]) continue;
+        const c = w.cover[i];
+        const missing = (c & COVER.POWER ? 0 : 1) + (c & COVER.WATER ? 0 : 2);
+        if (!missing) continue;
+        d.position.set(x + 0.5, tileHeight(w, x, y) + 1.15, y + 0.5);
+        d.scale.setScalar(1);
+        d.updateMatrix();
+        this.warnMesh.setMatrixAt(nw, d.matrix);
+        this.warnMesh.setColorAt(nw++, tint.set(missing === 3 ? "#ff5a3c" : "#ffb02e"));
+      }
+    }
+    this.warnMesh.count = nw;
+    this.warnMesh.instanceMatrix.needsUpdate = true;
+    if (this.warnMesh.instanceColor) this.warnMesh.instanceColor.needsUpdate = true;
   }
 
   /** Yaw so a model's front (+z) faces the adjacent road, else a stable pseudo-random side. */
@@ -809,6 +836,8 @@ export class CityRenderer {
     this.seenRevision = -1;
     this.overlaySeen = -1;
     this.overlayLvSeen = -1;
+    // Fresh materials arrive opaque; re-ghost them when the soil is showing.
+    this.setUndergroundLook(this.overlayLayer === UNDERGROUND_LAYER);
   }
 
   /**
@@ -925,7 +954,7 @@ export class CityRenderer {
 
   /** Instanced models cast and receive sun shadows; flat overlays and ribbons only receive. Re-run as meshes appear. */
   private markShadows(): void {
-    const flat = new Set<THREE.Object3D>([this.zones, this.kerbs, this.overlay, this.pipes, this.hover, this.water?.mesh as THREE.Object3D].filter(Boolean) as THREE.Object3D[]);
+    const flat = new Set<THREE.Object3D>([this.zones, this.kerbs, this.overlay, ...this.underground.objects, this.hover, this.water?.mesh as THREE.Object3D].filter(Boolean) as THREE.Object3D[]);
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || flat.has(o)) return;
@@ -944,7 +973,7 @@ export class CityRenderer {
     if (under !== wasUnder) this.setUndergroundLook(under);
   }
 
-  /** Make the ground and everything on it translucent so the pipe networks underneath read clearly. */
+  /** Ghost the surface over a dark soil backdrop so the pipe networks underneath read clearly. */
   private setUndergroundLook(on: boolean): void {
     const fade = (m: THREE.Material | THREE.Material[], opacity: number) => {
       for (const mat of Array.isArray(m) ? m : [m]) {
@@ -954,67 +983,46 @@ export class CityRenderer {
         mat.needsUpdate = true;
       }
     };
-    fade(this.terrain.material, on ? 0.6 : 1);
+    fade(this.terrain.material, on ? 0.35 : 1);
     // soil: brown earth while looking underneath, the normal grass tint otherwise
-    (this.terrain.material as THREE.MeshLambertMaterial).color.set(on ? "#7a5a3c" : "#ffffff").multiplyScalar(on ? 1 : 1.3);
-    fade(this.roadMesh.material, on ? 0.45 : 1);
+    (this.terrain.material as THREE.MeshLambertMaterial).color.set(on ? "#6b5a44" : "#ffffff").multiplyScalar(on ? 1 : 1.3);
+    fade(this.roadMesh.material, on ? 0.4 : 1);
     for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);
     for (const m of this.fMeshes.values()) fade(m.material, on ? 0.45 : 1);
     this.zones.visible = !on;
     this.kerbs.visible = !on;
-    this.pipes.visible = on;
-    if (!on) this.pipes.count = 0;
-  }
-
-  /** Water, sewage and power runs under every road tile they cover, joined tile to tile. */
-  private rebuildPipes(): void {
-    const w = this.world;
-    const m = this.pipes;
-    const nets: { bit: number; color: string; off: number; depth: number; r: number }[] = [
-      { bit: COVER.WATER, color: "#2ea8e8", off: -0.16, depth: 0.22, r: 0.075 },
-      { bit: COVER.SEWAGE, color: "#a07848", off: 0.0, depth: 0.34, r: 0.095 },
-      { bit: COVER.POWER, color: "#f2c230", off: 0.16, depth: 0.16, r: 0.045 },
-    ];
-    const d = this.dummy;
-    const col = new THREE.Color();
-    let n = 0;
-    const cap = m.instanceMatrix.count;
-    const put = (x: number, y: number, z: number, sx: number, sy: number, sz: number, c: THREE.Color): void => {
-      if (n >= cap) return;
-      d.position.set(x, y, z);
-      d.scale.set(sx, sy, sz);
-      d.updateMatrix();
-      m.setMatrixAt(n, d.matrix);
-      m.setColorAt(n++, c);
-    };
-    for (const net of nets) {
-      col.set(net.color);
-      for (let y = 0; y < w.size; y++) {
-        for (let x = 0; x < w.size; x++) {
-          const i = idx(w, x, y);
-          if (!w.road[i] || !(w.cover[i] & net.bit)) continue;
-          const h = tileHeight(w, x, y) - net.depth;
-          const cx = x + 0.5, cz = y + 0.5;
-          // joints and straight runs: a block at the tile centre, then half-tile arms to each road neighbour
-          put(cx + net.off, h, cz + net.off, net.r * 2.1, net.r * 2.1, net.r * 2.1, col);
-          if (x + 1 < w.size && w.road[idx(w, x + 1, y)] && (w.cover[idx(w, x + 1, y)] & net.bit)) put(cx + 0.5, h, cz + net.off, 1.0, net.r * 1.8, net.r * 1.8, col);
-          if (y + 1 < w.size && w.road[idx(w, x, y + 1)] && (w.cover[idx(w, x, y + 1)] & net.bit)) put(cx + net.off, h, cz + 0.5, net.r * 1.8, net.r * 1.8, 1.0, col);
-        }
-      }
-    }
-    m.count = n;
-    m.instanceMatrix.needsUpdate = true;
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    // Surface clutter hides; the ghosted buildings keep their lots readable.
+    for (const m of this.treeMeshes.values()) m.visible = !on;
+    this.lampMesh.visible = !on;
+    this.stopMesh.visible = !on;
+    this.vehicleMesh.visible = !on;
+    for (const m of this.vehMeshes.values()) m.visible = !on;
+    for (const m of this.boatMeshes.values()) m.visible = !on;
+    this.metroMesh.visible = !on;
+    this.warnMesh.visible = !on;
+    if (this.water) this.water.mesh.visible = !on;
+    this.underground.setVisible(on);
   }
 
   private rebuildOverlay(): void {
     const w = this.world;
     const m = this.overlay;
+    const layer = this.overlayLayer;
+    if (!layer) { this.overlaySeen = w.revision; m.count = 0; return; }
+    if (layer === UNDERGROUND_LAYER) {
+      m.count = 0;
+      // Like the main rebuild, at most one pipe rebuild per gap while painting;
+      // overlaySeen stays stale so the next frames retry until the gap passes.
+      const now = performance.now();
+      if (now - this.lastUndergroundAt >= REBUILD_GAP_MS || this.overlaySeen === -1) {
+        this.lastUndergroundAt = now;
+        this.overlaySeen = w.revision;
+        this.underground.rebuild(this.world, (x, z) => this.groundY(x, z));
+      }
+      return;
+    }
     this.overlaySeen = w.revision;
     this.overlayLvSeen = w.lvRevision;
-    const layer = this.overlayLayer;
-    if (!layer) { m.count = 0; return; }
-    if (layer === UNDERGROUND_LAYER) { m.count = 0; this.rebuildPipes(); return; }
     const isValue = layer === LAND_VALUE_LAYER;
     const isTraffic = layer === TRAFFIC_LAYER;
     const flat = new THREE.Color(OVERLAY_COLOR[layer] ?? "#ffffff");
@@ -1159,6 +1167,7 @@ export class CityRenderer {
     this.lastFrame = now;
     const time = now / 1000;
     this.water?.update(time, this.dayLevel, this.skyCol, this.sunDir, this.rig.target.x, this.rig.target.z);
+    if (this.underground.visible) this.underground.update(time);
     this.updateBoats(dt, time);
     this.ambience.update(time, dt, this.dayLevel, this.skyCol);
     this.updateVehicles();

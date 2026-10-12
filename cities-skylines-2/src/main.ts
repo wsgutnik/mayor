@@ -8,9 +8,10 @@ import { describeTile } from "./sim/inspect";
 import { AUTOSAVE, exportFile, importFile, loadFrom, saveTo, slotInfo } from "./storage";
 import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
+import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, toolColor } from "./ui/hud";
-import { Pt, ROAD_NAME, RoadType, tileHeight } from "./sim/world";
+import { Pt, ROAD_NAME, RoadType, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { setLang, tr, trReason, getLang } from "./i18n";
 import { MapData, MapIndex } from "./sim/maps";
 import { newCityFromMap } from "./sim/map-world";
@@ -29,6 +30,7 @@ let traffic: TrafficState = newTraffic(state.world.size);
 renderer.setTraffic(traffic);
 renderer.setQualityCap(QUALITY_PIXEL_CAP[prefs.quality]);
 let tool: ToolId = "road";
+let overlay: OverlayLayer = 0;
 let speed = 1;
 let roadType: RoadType = 1;
 let roadMode: RoadMode = "paint";
@@ -49,7 +51,7 @@ function makeHud(): Hud {
   },
   onSpeed: (s) => { speed = s; hud.setSpeed(s); },
   onTax: (r) => { state.taxRate = r; },
-  onOverlay: (layer) => renderer.setOverlay(layer),
+  onOverlay: (layer) => { overlay = layer; renderer.setOverlay(layer); },
   onRoad: (t, m) => { roadType = t; roadMode = m; cancelDraft(); refreshHint(); },
   onFinishRoad: () => cancelDraft(),
   onMenu: () => menu.toggle(),
@@ -304,6 +306,10 @@ window.addEventListener("keydown", (e) => {
     if (menu.isOpen) menu.close();
     else if (inspector.isOpen) { inspector.hide(); renderer.setHover(null); }
     else cancelDraft();
+  } else if (e.key === "u" || e.key === "U") {
+    overlay = overlay === UNDERGROUND_LAYER ? 0 : UNDERGROUND_LAYER;
+    renderer.setOverlay(overlay);
+    hud.setOverlay(overlay);
   }
 });
 

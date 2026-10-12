@@ -30,6 +30,7 @@ export class Inspector {
   private chipsEl: HTMLElement;
   private facRows: HTMLElement;
   private upkeepVal: HTMLElement;
+  private radiusRow: HTMLElement;
   private radiusVal: HTMLElement;
   private closeBtn: HTMLButtonElement;
   private open = false;
@@ -120,7 +121,7 @@ export class Inspector {
     this.upkeepVal.className = "insp-val";
     upkeepRow.appendChild(upkeepLabel);
     upkeepRow.appendChild(this.upkeepVal);
-    const radiusRow = document.createElement("div");
+    const radiusRow = this.radiusRow = document.createElement("div");
     radiusRow.className = "insp-row";
     const radiusLabel = document.createElement("span");
     radiusLabel.className = "insp-lbl";
@@ -196,6 +197,8 @@ export class Inspector {
       this.root.querySelector<HTMLElement>('[data-k="upkeep-label"]')!.textContent = tr("Upkeep");
       this.root.querySelector<HTMLElement>('[data-k="radius-label"]')!.textContent = tr("Radius");
       this.upkeepVal.textContent = `$${info.upkeep}/${tr("mo")}`;
+      // Networked utilities (usina, bomba, esgoto, subestação) show no radius.
+      this.radiusRow.hidden = info.radius === 0;
       this.radiusVal.textContent = `${info.radius} ${tr("tiles")}`;
     }
 

@@ -1,6 +1,9 @@
 import { CityState, CAPACITY, syncLots } from "./sim";
 import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
-import { COVER, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, idx, inBounds } from "./world";
+import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, idx, inBounds } from "./world";
+
+/** Utilities served through the road network have no radius to report. */
+const NETWORKED = new Set<FacilityKind>([FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.SUBSTATION]);
 
 /** What the inspector card shows about one tile. Plain data, so the UI needs no simulation knowledge. */
 export interface TileInfo {
@@ -57,7 +60,7 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
     const e = facilityEntry(fac);
     return {
       ...base, kind: "facility", ...(e ? fromEntry(e) : { name: info.name, nameEn: info.name }),
-      upkeep: info.upkeep, radius: info.radius,
+      upkeep: info.upkeep, radius: NETWORKED.has(fac) ? 0 : info.radius,
     };
   }
   if (w.road[i]) {

@@ -124,7 +124,15 @@ describe("ridership and effects", () => {
   it("bus stops raise coverage and happiness", () => {
     const { s, ey } = town();
     // Basic utilities everywhere, so the baseline happiness is well above zero.
-    for (const [x, f] of [[10, FAC.POWER], [11, FAC.WATER], [12, FAC.SEWAGE], [13, FAC.LANDFILL], [14, FAC.POLICE], [15, FAC.CLINIC]] as const) {
+    // Networks carry by capacity, so the town gets a plant, pump and outlet per
+    // neighbourhood instead of the single set that radius coverage needed.
+    for (const [x, f] of [
+      [8, FAC.POWER], [16, FAC.POWER], [24, FAC.POWER],
+      [9, FAC.WATER], [17, FAC.WATER], [25, FAC.WATER],
+      [10, FAC.SEWAGE], [18, FAC.SEWAGE], [26, FAC.SEWAGE],
+      [11, FAC.LANDFILL], [19, FAC.LANDFILL],
+      [14, FAC.POLICE], [15, FAC.CLINIC],
+    ] as const) {
       s.world.facility[idx(s.world, x, ey + 4)] = f;
     }
     updateCoverage(s.world);

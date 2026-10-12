@@ -17,9 +17,9 @@ const T: Record<string, ToolDef> = {
   res: { id: "res", label: "Residential", hint: "Zone residential", color: "#4fbf6a", icon: { img: "kit/tile-residential" } },
   com: { id: "com", label: "Commercial", hint: "Zone commercial", color: "#4a8fe0", icon: { img: "kit/tile-commercial" } },
   ind: { id: "ind", label: "Industrial", hint: "Zone industrial", color: "#e0b43a", icon: { img: "kit/tile-industrial" } },
-  power: { id: "power", label: "Power plant", hint: "Place a power plant (radius 14)", color: "#f2c230", icon: { img: "kit/ico-energia" } },
-  water: { id: "water", label: "Water pump", hint: "Place a water pump near water (radius 10)", color: "#39b6e8", icon: { img: "kit/ico-agua" } },
-  sewage: { id: "sewage", label: "Sewage", hint: "Place a sewage outlet near water (radius 10)", color: "#a07848", icon: { glyph: "≋", color: "#a07848" } },
+  power: { id: "power", label: "Power plant", hint: "Place a power plant (feeds the road grid)", color: "#f2c230", icon: { img: "kit/ico-energia" } },
+  water: { id: "water", label: "Water pump", hint: "Place a water pump near water (feeds the road grid)", color: "#39b6e8", icon: { img: "kit/ico-agua" } },
+  sewage: { id: "sewage", label: "Sewage", hint: "Place a sewage outlet near water (feeds the road grid)", color: "#a07848", icon: { glyph: "≋", color: "#a07848" } },
   landfill: { id: "landfill", label: "Landfill", hint: "Place a landfill (radius 12)", color: "#9aa3ad", icon: { img: "kit/ico-reciclar" } },
   police: { id: "police", label: "Police", hint: "Police station: crime cover (radius 12)", color: "#3d6ee8", icon: { img: "kit/ico-escudo" } },
   fire: { id: "fire", label: "Fire", hint: "Fire station: stops fires (radius 12)", color: "#ee5a4c", icon: { img: "kit/ico-extintor" } },
@@ -36,7 +36,7 @@ const T: Record<string, ToolDef> = {
   community: { id: "community", label: "Community centre", hint: "Community centre: culture and happiness (radius 10)", color: "#e6dccb", icon: { img: "kit/ico-pessoas" } },
   museum: { id: "museum", label: "Museum", hint: "City museum: culture and land value (radius 16)", color: "#efe6d2", icon: { img: "kit/ico-trofeu" } },
   cityhall: { id: "cityhall", label: "City hall", hint: "City hall (one per city): happiness and tax income", color: "#4f5f86", icon: { img: "kit/ico-martelo" } },
-  substation: { id: "substation", label: "Substation", hint: "Substation: extends the power network (radius 14)", color: "#cfd3d6", icon: { img: "kit/ico-energia" } },
+  substation: { id: "substation", label: "Substation", hint: "Substation: relays power to nearby roads", color: "#cfd3d6", icon: { img: "kit/ico-energia" } },
   bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "kit/ico-lixeira" } },
 };
 
@@ -331,8 +331,7 @@ export class Hud {
       const b = el("button", "tool", `${iconHtml(l.img ? { img: l.img } : { glyph: l.glyph, color: l.color })}<span>${tr(l.label)}</span>`);
       b.addEventListener("click", () => {
         this.hooks.onOverlay(l.layer);
-        this.layerBtns.forEach((x) => x.classList.toggle("active", x === b));
-        this.viewBtn.classList.toggle("active", l.layer !== 0);
+        this.setOverlay(l.layer);
         this.closeFlyouts();
       });
       this.layerBtns.push(b);
@@ -432,6 +431,12 @@ export class Hud {
   setSpeed(s: number): void {
     const order = [0, 1, 2, 4];
     this.speedBtns.forEach((b, i) => b.classList.toggle("active", order[i] === s));
+  }
+
+  /** Highlight the active infoview (also used by the U keyboard shortcut). */
+  setOverlay(layer: OverlayLayer): void {
+    LAYERS.forEach((l, i) => this.layerBtns[i]?.classList.toggle("active", l.layer === layer));
+    this.viewBtn.classList.toggle("active", layer !== 0);
   }
 
   setSky(tod: number, raining: boolean): void {

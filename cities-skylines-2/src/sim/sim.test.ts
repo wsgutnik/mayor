@@ -167,13 +167,14 @@ describe("utilities", () => {
     expect(applyTool(s, "landfill", 4, ey + 2).ok).toBe(false);
   });
 
-  it("covers tiles within the radius and not beyond", () => {
+  it("serves roads along the network from a linked plant, and nothing beyond it", () => {
     const s = newCity();
     const ey = s.world.entry.y;
+    for (let x = 3; x < 13; x++) applyTool(s, "road", x, ey);
     applyTool(s, "power", 5, ey + 2);
     updateCoverage(s.world);
-    expect(s.world.cover[idx(s.world, 5, ey - 5)] & COVER.POWER).toBeTruthy();
-    expect(s.world.cover[idx(s.world, 5 + 15, ey + 2)] & COVER.POWER).toBeFalsy();
+    expect(s.world.cover[idx(s.world, 10, ey)] & COVER.POWER).toBeTruthy();
+    expect(s.world.cover[idx(s.world, 5, ey - 5)] & COVER.POWER).toBeFalsy();
   });
 
   it("bulldozing a facility removes its coverage", () => {
@@ -181,10 +182,10 @@ describe("utilities", () => {
     const ey = s.world.entry.y;
     applyTool(s, "power", 5, ey + 2);
     updateCoverage(s.world);
-    expect(s.world.cover[idx(s.world, 5, ey)] & COVER.POWER).toBeTruthy();
+    expect(s.world.cover[idx(s.world, 1, ey)] & COVER.POWER).toBeTruthy();
     applyTool(s, "bulldoze", 5, ey + 2);
     step(s);
-    expect(s.world.cover[idx(s.world, 5, ey)] & COVER.POWER).toBeFalsy();
+    expect(s.world.cover[idx(s.world, 1, ey)] & COVER.POWER).toBeFalsy();
   });
 
   it("reports shortage and lowers happiness when demand exceeds supply", () => {

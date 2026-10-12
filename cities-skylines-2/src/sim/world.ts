@@ -1,5 +1,6 @@
 import { makeRng } from "./rng";
 import type { RoadNode } from "./roads";
+import { updateNetworkCoverage } from "./networks";
 
 export const ZONE = { NONE: 0, RES: 1, COM: 2, IND: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
@@ -153,6 +154,8 @@ export interface World {
   facility: Uint8Array;
   /** Bitmask of COVER.* services reaching each tile. */
   cover: Uint16Array;
+  /** Bitmask of NET.* floods reaching each road tile (see networks.ts); 0 elsewhere. */
+  nets: Uint8Array;
   /** 0..100 per tile, derived from services, parks and nearby industry. */
   landValue: Uint8Array;
   /** Bumped when any land value changes (overlay refresh). */
@@ -264,6 +267,7 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     lotsDirty: true,
     facility: new Uint8Array(size * size),
     cover: new Uint16Array(size * size),
+    nets: new Uint8Array(size * size),
     landValue: new Uint8Array(size * size),
     lvRevision: 1,
     coverageDirty: true,
@@ -359,9 +363,10 @@ export function nearWater(w: World, x: number, y: number, r: number): boolean {
   return false;
 }
 
-/** Recompute which services reach each tile (Euclidean radius around each facility). */
+/** Recompute which services reach each tile (networks for power/water/sewage, radius for the rest). */
 export function updateCoverage(w: World): void {
   w.cover.fill(0);
+  w.nets.fill(0);
   w.coverageDirty = false;
   for (const stop of w.stops) {
     if (stop.kind !== "bus") continue;
@@ -375,10 +380,13 @@ export function updateCoverage(w: World): void {
       }
     }
   }
+  updateNetworkCoverage(w);
   for (let y = 0; y < w.size; y++) {
     for (let x = 0; x < w.size; x++) {
       const f = w.facility[idx(w, x, y)] as FacilityType;
       if (!f) continue;
+      // Power, water and sewage cover through the road network, not by radius.
+      if (f === FAC.POWER || f === FAC.WATER || f === FAC.SEWAGE || f === FAC.SUBSTATION) continue;
       const info = FACILITY_INFO[f as FacilityKind];
       const r = info.radius;
       for (let dy = -r; dy <= r; dy++) {
