@@ -19,6 +19,29 @@ export const defaultPrefs = (): Prefs => ({
 /** Highest device-pixel-ratio the renderer may use at each quality level. */
 export const QUALITY_PIXEL_CAP: Record<Quality, number> = { low: 1, medium: 1.5, high: 2 };
 
+/** What each quality tier buys: shadow map, terrain splat set, vegetation, LOD range. */
+export interface QualityProfile {
+  pixelCap: number;
+  shadow: 0 | 1024 | 2048;
+  /** Terrain splat: flat vertex colours, 512 px layers, or full 1024 px layers. */
+  splat: "off" | "md" | "hd";
+  /** Tree/prop scatter multiplier. */
+  veg: number;
+  /** Full-detail radius in tiles around the camera target. */
+  lodDist: number;
+}
+
+export const QUALITY_PROFILE: Record<Quality, QualityProfile> = {
+  low: { pixelCap: 1, shadow: 0, splat: "off", veg: 0.45, lodDist: 30 },
+  medium: { pixelCap: 1.5, shadow: 1024, splat: "md", veg: 0.75, lodDist: 45 },
+  high: { pixelCap: 2, shadow: 2048, splat: "hd", veg: 1, lodDist: 70 },
+};
+
+/** Tier back from a pixel cap (mirrors QUALITY_PIXEL_CAP; the scene only gets the cap). */
+export function qualityForPixelCap(cap: number): Quality {
+  return cap <= 1 ? "low" : cap < 2 ? "medium" : "high";
+}
+
 export function loadPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(KEY);

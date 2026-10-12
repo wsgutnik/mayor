@@ -77,6 +77,9 @@ const PT: Record<string, string> = {
   "Left button / one finger": "Botão esquerdo / um dedo", "Right button, WASD / two fingers": "Botão direito, WASD / dois dedos",
   "Middle button, Q E / twist": "Botão do meio, Q E / torcer", "Wheel / pinch": "Roda / pinça", "Apply": "Aplicar", "Language": "Idioma", "Graphics quality": "Qualidade gráfica",
   "Low": "Baixa", "High": "Alta", "Low quality": "Baixa", "Medium quality": "Média", "High quality": "Alta", "Show tips": "Mostrar dicas",
+  "No shadows · flat ground · fewer trees": "Sem sombras · solo chapado · menos árvores",
+  "Soft shadows · textured ground": "Sombras suaves · solo texturizado",
+  "Sharp shadows · detailed ground · dense trees": "Sombras nítidas · solo detalhado · árvores densas",
   "Save automatically": "Salvar automaticamente", "Dynamic day/night": "Modo dia/noite dinâmico",
   "Restore defaults": "Restaurar padrões", "OK": "OK", "Resolution": "Resolução", "Auto": "Auto",
   // toasts

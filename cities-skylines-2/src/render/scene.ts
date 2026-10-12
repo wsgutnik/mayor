@@ -15,6 +15,10 @@ import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 import { UndergroundView } from "./underground";
+import { createRoadDetailMaterial, loadRoadDetailMaps, RoadDetail } from "./road-material";
+import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat } from "./terrain-splat";
+import { LodSorter } from "./lod";
+import { QUALITY_PROFILE, qualityForPixelCap } from "../prefs";
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
@@ -123,6 +127,20 @@ export class CityRenderer {
   private boats: { x: number; z: number; a: number; speed: number; turn: number; prop: string; phase: number }[] = [];
   private whiteTint = new THREE.Color("#ffffff");
   private grassTex!: THREE.Texture;
+  private splat!: TerrainSplat;
+  private splatTier: "off" | SplatTier = "off";
+  private roadDetail!: RoadDetail;
+  private maxAniso = 4;
+  private lod = new LodSorter();
+  private lodBox!: THREE.InstancedMesh;
+  private lodDist = 70;
+  private lodEnabled = true;
+  private vegMul = 1;
+  private lodFull = new Map<THREE.InstancedMesh, number>();
+  private lodAt = new THREE.Vector3(1e9, 0, 0);
+  private lodStatsCache = { total: 0, near: 0, boxed: 0, culled: 0 };
+  private fogBase = 0.0042;
+  private lampGlowWarmed = false;
   private ambience!: Ambience;
   private asphaltTex!: THREE.Texture;
   private lastFrame = 0;
@@ -175,8 +193,12 @@ export class CityRenderer {
     };
     this.grassTex = detail("grass");
     this.asphaltTex = detail("asphalt");
+    this.splat = createTerrainSplatMaterial();
+    this.roadDetail = createRoadDetailMaterial(this.asphaltTex);
+    this.maxAniso = this.renderer.capabilities.getMaxAnisotropy();
+    loadRoadDetailMaps(this.asphaltTex, this.maxAniso, (m) => this.roadDetail.setMaps(m));
     this.scene.background = new THREE.Color("#a9c8e8");
-    this.scene.fog = new THREE.Fog("#a9c8e8", 90, 260);
+    this.scene.fog = new THREE.FogExp2("#a9c8e8", 0.0042);
     this.hemi = new THREE.HemisphereLight("#ffffff", "#6b7a5a", 1.35);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight("#fff4de", 1.8);
@@ -200,7 +222,7 @@ export class CityRenderer {
     // Size-independent parts: ribbons, previews, shared models and window materials.
     this.roadMesh = new THREE.Mesh(
       new THREE.BufferGeometry(),
-      new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: this.asphaltTex, color: new THREE.Color(1.35, 1.35, 1.35) }),
+      this.roadDetail.material,
     );
     this.roadMesh.frustumCulled = false;
     this.scene.add(this.roadMesh);
@@ -313,7 +335,23 @@ export class CityRenderer {
       if (!this.sized.includes(this.lampMesh)) return;
       this.lampMesh.geometry = model.geometry;
       this.lampMesh.material = model.materials;
+      // Warmer street light: the bulb emissive reads sodium, not white.
+      if (!this.lampGlowWarmed) {
+        this.lampGlowWarmed = true;
+        for (const g of model.glow) g.emissive.set("#ffc27d");
+      }
     });
+    // Cheap far buildings: one shared box mesh fed by the LOD pass.
+    this.lodFull.clear();
+    this.lodBox = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.9, 0.7, 0.9).translate(0, 0.35, 0),
+      new THREE.MeshLambertMaterial({ color: "#ffffff" }), cap,
+    );
+    this.lodBox.count = 0;
+    this.lodBox.frustumCulled = false;
+    this.lodBox.setColorAt(0, this.whiteTint);
+    this.lodBox.count = 0;
+    own(this.lodBox);
     this.stopMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.markMesh = mk(new THREE.MeshBasicMaterial({ color: "#ffffff" }));
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
@@ -480,12 +518,10 @@ export class CityRenderer {
       "color",
       new THREE.BufferAttribute(new Float32Array((n + 1) * (n + 1) * 3), 3),
     );
-    this.terrain = new THREE.Mesh(
-      this.terrainGeo,
-      new THREE.MeshLambertMaterial({ vertexColors: true, map: this.grassTex, color: new THREE.Color(1.3, 1.3, 1.3) }),
-    );
-    // one texture repeat per three tiles gives the ground grain without visible tiling
-    this.grassTex.repeat.set(n / 3, n / 3);
+    this.terrain = new THREE.Mesh(this.terrainGeo, this.splat.material);
+    // Blend bands follow the same biome heights the vertex colours use.
+    const look = BIOME_LOOK[this.world.biome];
+    this.splat.setParams({ sandAt: 0.3, rockAt: look.rockAt, slopeRock: 0.32 });
   }
 
   private updateTerrain(): void {
@@ -541,7 +577,7 @@ export class CityRenderer {
         } else if (!w.zone[i]) {
           // Open ground: scatter plants by terrain preset, never on water or the entry strip.
           const r = hash(x * 7 + 3, y * 13 + 5);
-          if (r < look.trees && isLand(w, x, y) && h > 0.2 && h < look.rockAt + 1.5 && Math.hypot(x - w.entry.x, y - w.entry.y) > 5) {
+          if (r < look.trees * this.vegMul && isLand(w, x, y) && h > 0.2 && h < look.rockAt + 1.5 && Math.hypot(x - w.entry.x, y - w.entry.y) > 5) {
             const j1 = hash(x + 101, y + 211), j2 = hash(x + 307, y + 53);
             // pick a species from the cumulative weights of this terrain
             let acc = 0, species: Species = "tree_oak";
@@ -855,10 +891,10 @@ export class CityRenderer {
     (this.scene.background as THREE.Color).copy(sky);
     this.dayLevel = day * (raining ? 0.6 : 1);
     this.skyCol.copy(sky);
-    const fog = this.scene.fog as THREE.Fog;
+    const fog = this.scene.fog as THREE.FogExp2;
     fog.color.copy(sky);
-    fog.near = raining ? 40 : 90;
-    fog.far = raining ? 150 : 260;
+    this.fogBase = raining ? 0.009 : 0.0042 + (1 - day) * 0.0008;
+    this.renderer.toneMappingExposure = 0.85 + day * 0.2 - dusk * 0.05;
     const a = (tod - 0.25) * Math.PI * 2;
     this.sunDir.set(-Math.cos(a) * 60, Math.max(6, Math.sin(a) * 70 + 8), 30);
     this.sun.intensity = (0.15 + 1.7 * day) * (raining ? 0.5 : 1);
@@ -905,6 +941,9 @@ export class CityRenderer {
       return { x: ax + (bx - ax) * f - hz * lane, z: az + (bz - az) * f + hx * lane, hx, hz };
     };
     const w = this.world;
+    const tx = this.rig.target.x, tz = this.rig.target.z;
+    const vd2 = this.lodDist * this.lodDist;
+    const lodV = this.lodEnabled;
     for (const v of t.vehicles) {
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
@@ -914,6 +953,7 @@ export class CityRenderer {
       const p = heading(v.pts, i, v.progress - i, v.kind === 1 ? 0.12 : 0.1);
       const dh = w.deckH[rt];
       const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
+      if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
       if (v.kind === 1) {
         place("truck", p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17, baseY);
       } else {
@@ -928,6 +968,7 @@ export class CityRenderer {
       const p = heading(v.pts, i, Math.min(1, v.progress - i), v.kind === "bus" ? 0.14 : 0);
       const dh = w.deckH[rt];
       const baseY = Number.isNaN(dh) ? heightAt(w, p.x, p.z) : dh;
+      if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
       place(v.kind === "bus" ? "bus" : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
         v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3, baseY);
     }
@@ -995,10 +1036,11 @@ export class CityRenderer {
         mat.needsUpdate = true;
       }
     };
-    fade(this.terrain.material, on ? 0.35 : 1);
-    // soil: brown earth while looking underneath, the normal grass tint otherwise
-    (this.terrain.material as THREE.MeshLambertMaterial).color.set(on ? "#6b5a44" : "#ffffff").multiplyScalar(on ? 1 : 1.3);
-    fade(this.roadMesh.material, on ? 0.4 : 1);
+    fade(this.terrain.material, on ? 0.6 : 1);
+    // soil: brown earth while looking underneath, the normal tint otherwise
+    (this.terrain.material as THREE.MeshStandardMaterial).color.set(on ? "#7a5a3c" : "#ffffff");
+    fade(this.roadMesh.material, on ? 0.45 : 1);
+    fade(this.lodBox.material, on ? 0.3 : 1);
     for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);
     for (const m of this.fMeshes.values()) fade(m.material, on ? 0.45 : 1);
     this.zones.visible = !on;
@@ -1139,17 +1181,110 @@ export class CityRenderer {
     this.qualityCap = cap;
     this.pixelCap = Math.min(window.devicePixelRatio || 1, cap);
     this.pixelRatio = Math.min(this.pixelRatio, this.pixelCap);
+    const profile = QUALITY_PROFILE[qualityForPixelCap(cap)];
     // shadows by tier: off on low, a 1k map on medium, 2k on high
-    const res = cap <= 1 ? 0 : cap < 2 ? 1024 : 2048;
+    const res = profile.shadow;
     this.sun.castShadow = res > 0;
     if (res > 0 && this.sun.shadow.mapSize.x !== res) {
       this.sun.shadow.mapSize.set(res, res);
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
     }
+    // Terrain splat follows the tier; low renders flat vertex colours.
+    if (profile.splat !== this.splatTier) {
+      this.splatTier = profile.splat;
+      if (profile.splat === "off") this.splat.setEnabled(false);
+      else {
+        const tier = profile.splat;
+        loadSplatMaps(tier, this.grassTex, this.maxAniso, (m) => {
+          if (this.splatTier !== tier) return; // the tier moved on mid-load
+          this.splat.setMaps(m);
+          this.splat.setEnabled(true);
+        });
+      }
+    }
+    // Vegetation density needs a rebuild; the LOD range needs a fresh pass.
+    if (profile.veg !== this.vegMul) {
+      this.vegMul = profile.veg;
+      this.seenRevision = -1;
+    }
+    this.lodDist = profile.lodDist;
+    this.lodAt.set(1e9, 0, 0);
     // Water detail follows the same tier: flat ripple, then normals, then foam.
     this.water?.setTier(tierForPixelCap(cap));
     this.resize();
+  }
+
+  /** Debug/measure switch for the distance LOD (on by default). */
+  setLodEnabled(on: boolean): void {
+    this.lodEnabled = on;
+    for (const [m, full] of this.lodFull) {
+      if (this.sized.includes(m)) m.count = full;
+    }
+    this.lodBox.count = 0;
+    if (this.lodBox.instanceColor) this.lodBox.instanceColor.needsUpdate = true;
+    if (on) this.updateLod(false);
+  }
+
+  /** Last LOD pass counts plus live draw stats, for the perf readout. */
+  lodStats(): { lod: boolean; dist: number; total: number; near: number; boxed: number; culled: number; triangles: number; calls: number } {
+    const info = this.renderer.info.render;
+    return { lod: this.lodEnabled, dist: this.lodDist, ...this.lodStatsCache, triangles: info.triangles, calls: info.calls };
+  }
+
+  /**
+   * Distance-bucket LOD: every registered mesh is ordered near-first around
+   * the camera target, then only counts change — small far props hide, far
+   * buildings move to the shared box mesh. After a rebuild the full counts
+   * are re-recorded; otherwise they are restored before re-partitioning.
+   */
+  private updateLod(afterRebuild: boolean): void {
+    const cx = this.rig.target.x, cz = this.rig.target.z;
+    this.lodAt.set(cx, 0, cz);
+    const dist = this.lodEnabled ? this.lodDist : Infinity;
+    let total = 0, near = 0;
+    const full = (m: THREE.InstancedMesh): number => {
+      if (afterRebuild || !this.lodFull.has(m)) this.lodFull.set(m, m.count);
+      m.count = this.lodFull.get(m)!;
+      return m.count;
+    };
+    const box = this.lodBox;
+    const boxM = box.instanceMatrix.array as Float32Array;
+    const boxC = box.instanceColor?.array as Float32Array | undefined;
+    let slots = 0;
+    for (const m of this.bMeshes.values()) {
+      if (full(m) === 0) continue;
+      const r = this.lod.partition(m, cx, cz, dist);
+      m.count = this.lodEnabled ? r.near : r.total;
+      total += r.total;
+      near += m.count;
+      if (this.lodEnabled && boxC && m.instanceColor) {
+        const sm = m.instanceMatrix.array as Float32Array;
+        const sc = m.instanceColor.array as Float32Array;
+        for (let i = r.near; i < r.total && slots < box.instanceMatrix.count; i++) {
+          boxM.set(sm.subarray(i * 16, i * 16 + 16), slots * 16);
+          boxC.set(sc.subarray(i * 3, i * 3 + 3), slots * 3);
+          slots++;
+        }
+      }
+    }
+    box.count = slots;
+    box.instanceMatrix.needsUpdate = true;
+    if (box.instanceColor) box.instanceColor.needsUpdate = true;
+    for (const m of this.treeMeshes.values()) {
+      if (full(m) === 0) { m.count = 0; continue; }
+      const r = this.lod.partition(m, cx, cz, dist, { farKeep: (s) => s >= 1 });
+      m.count = this.lodEnabled ? r.kept : r.total;
+      total += r.total;
+      near += m.count;
+    }
+    if (full(this.lampMesh) > 0) {
+      const r = this.lod.partition(this.lampMesh, cx, cz, dist);
+      this.lampMesh.count = this.lodEnabled ? r.kept : r.total;
+      total += r.total;
+      near += this.lampMesh.count;
+    }
+    this.lodStatsCache = { total, near, boxed: slots, culled: total - near - slots };
   }
 
   get currentPixelRatio(): number {
@@ -1165,8 +1300,14 @@ export class CityRenderer {
       this.seenRevision = this.world.revision;
       this.lastRebuildAt = now;
       this.rebuild();
+      this.updateLod(true);
     }
     this.frame++;
+    if (this.frame % 45 === 0) {
+      const t = this.rig.target;
+      const dx = t.x - this.lodAt.x, dz = t.z - this.lodAt.z;
+      if (dx * dx + dz * dz > 36) this.updateLod(false);
+    }
     if (this.rainOn) {
       const pos = this.rain.geometry.attributes.position as THREE.BufferAttribute;
       const a = pos.array as Float32Array;
@@ -1197,6 +1338,9 @@ export class CityRenderer {
       sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 1; sc.far = 220;
       sc.updateProjectionMatrix();
     }
+    // Height-flavoured fog: thin haze from high above, thicker at street level.
+    const fog = this.scene.fog as THREE.FogExp2;
+    fog.density = this.fogBase * THREE.MathUtils.clamp(1.25 - this.rig.camera.position.y / 140, 0.65, 1.25);
     this.renderer.render(this.scene, this.rig.camera);
   }
 }

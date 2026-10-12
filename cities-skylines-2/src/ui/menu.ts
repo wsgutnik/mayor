@@ -187,10 +187,16 @@ export class Menu {
       ["general", "General", "kit/ico-engrenagem"], ["graphics", "Graphics", "kit/ico-globo"],
       ["gameplay", "Gameplay", "kit/ico-martelo"], ["controls", "Controls", "kit/ico-ajuda"],
     ];
+    const qdesc: Record<Quality, string> = {
+      low: "No shadows · flat ground · fewer trees",
+      medium: "Soft shadows · textured ground",
+      high: "Sharp shadows · detailed ground · dense trees",
+    };
     const panes: Record<string, string> = {
       general: `<div class="menu-row"><b>${tr("Language")}</b>${sel("pf-lang", [["pt", "Português (Brasil)"], ["en", "English"]], draft.lang)}</div>
         ${chk("pf-tips", tr("Show tips"), draft.tips)}`,
       graphics: `<div class="menu-row"><b>${tr("Graphics quality")}</b>${sel("pf-quality", [["low", tr("Low quality")], ["medium", tr("Medium quality")], ["high", tr("High quality")]], draft.quality)}</div>
+        <div class="menu-row"><small id="pf-qdesc">${tr(qdesc[draft.quality])}</small></div>
         ${chk("pf-daynight", tr("Dynamic day/night"), draft.dayNight)}`,
       gameplay: `${chk("pf-auto", tr("Save automatically"), draft.autosave)}${chk("pf-tips2", tr("Show tips"), draft.tips)}`,
       controls: `<table class="keys">
@@ -212,7 +218,11 @@ export class Menu {
       if (e) e.addEventListener("change", () => apply(e));
     };
     bind("#pf-lang", (e) => { draft.lang = e.value as Lang; });
-    bind("#pf-quality", (e) => { draft.quality = e.value as Quality; });
+    bind("#pf-quality", (e) => {
+      draft.quality = e.value as Quality;
+      const desc = q("#pf-qdesc");
+      if (desc) desc.textContent = tr(qdesc[draft.quality]);
+    });
     bind("#pf-tips", (e) => { draft.tips = (e as HTMLInputElement).checked; });
     bind("#pf-tips2", (e) => { draft.tips = (e as HTMLInputElement).checked; });
     bind("#pf-auto", (e) => { draft.autosave = (e as HTMLInputElement).checked; });
