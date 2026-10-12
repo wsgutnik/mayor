@@ -8,7 +8,7 @@ import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry } from "../sim/catalog";
 import { loadGlb, LoadedModel } from "./glb-models";
-import { WaterSurface, makeNoiseTexture } from "./water";
+import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 
@@ -44,6 +44,9 @@ const BIOME_LOOK: Record<Biome, { sand: string; grass: string; rock: string; roc
   mountain: { sand: "#bdb59a", grass: "#628554", rock: "#85817a", rockAt: 3.2, snowAt: 7.2, trees: 0.12, leaf: ["#2f6a34", "#285c2c"] },
   desert: { sand: "#dcc084", grass: "#d2b57a", rock: "#a9946a", rockAt: 3.0, snowAt: 99, trees: 0.012, leaf: ["#6f8f4a", "#7d9a52"] },
 };
+
+/** Deep bed colour the underwater terrain fades to (shows through shallow water). */
+const BED_MUD = new THREE.Color("#2b4a3a");
 
 /** Which Blender prop a scattered plant uses, with cumulative weights per terrain preset. */
 const TREE_SPECIES = ["tree_oak", "tree_pine", "tree_poplar", "tree_cherry", "tree_autumn", "tree_palm", "bush", "bush_flowers", "rock"] as const;
@@ -87,6 +90,7 @@ export class CityRenderer {
   private rainOn = false;
   private lastRebuildAt = 0;
   private pixelCap = 2;
+  private qualityCap = 2;
   private pixelRatio = 1;
   private frameMs = 16;
   private slowFor = 0;
@@ -300,6 +304,7 @@ export class CityRenderer {
     this.vehicleMesh = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     this.overlay = mk(new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, depthWrite: false }));
     this.water = new WaterSurface(this.world, this.noiseTex);
+    this.water.setTier(tierForPixelCap(this.qualityCap));
     own(this.water.mesh);
     this.seedBoats();
     this.applyGlbModels();
@@ -477,7 +482,13 @@ export class CityRenderer {
       const h = this.world.heights[i];
       pos.setY(i, h);
       const j = (hash(i % s, (i / s) | 0) - 0.5) * 0.04;
-      if (h < 0.3) c.set(look.sand);
+      if (h < 0) {
+        // Bed under water: wet sand sinking to dark mud with depth, so it reads through shallow water.
+        c.set(look.sand).lerp(BED_MUD, Math.min(1, -h / 2));
+      } else if (h < 0.25) {
+        // Damp band just above the waterline.
+        c.set(look.sand).multiplyScalar(0.72);
+      } else if (h < 0.3) c.set(look.sand);
       else if (h < look.rockAt) c.set(look.grass).offsetHSL(0, 0, j - h * 0.015);
       else if (h < look.snowAt) c.set(look.rock).offsetHSL(0, 0, j);
       else c.set("#eef2f6");
@@ -1195,6 +1206,7 @@ export class CityRenderer {
 
   /** Highest pixel ratio the quality setting allows (also bounded by the display). */
   setQualityCap(cap: number): void {
+    this.qualityCap = cap;
     this.pixelCap = Math.min(window.devicePixelRatio || 1, cap);
     this.pixelRatio = Math.min(this.pixelRatio, this.pixelCap);
     // shadows by tier: off on low, a 1k map on medium, 2k on high
@@ -1205,6 +1217,8 @@ export class CityRenderer {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
     }
+    // Water detail follows the same tier: flat ripple, then normals, then foam.
+    this.water?.setTier(tierForPixelCap(cap));
     this.resize();
   }
 
@@ -1236,7 +1250,7 @@ export class CityRenderer {
     const dt = this.lastFrame ? Math.min(0.1, (now - this.lastFrame) / 1000) : 0.016;
     this.lastFrame = now;
     const time = now / 1000;
-    this.water?.update(time, this.dayLevel, this.skyCol);
+    this.water?.update(time, this.dayLevel, this.skyCol, this.sunDir, this.rig.target.x, this.rig.target.z);
     this.updateBoats(dt, time);
     this.ambience.update(time, dt, this.dayLevel, this.skyCol);
     this.updateVehicles();
