@@ -78,6 +78,28 @@ describe("save and load", () => {
     expect(back.world.facility[cidx(back.world, 18, ey - 6)]).toBe(FAC.SUBSTATION);
   });
 
+  it("rejects duplicate segment ids, bad base64 and non-finite heights, and keeps id counters above stored ids", () => {
+    const s = builtCity();
+    const json = serialize(s);
+    const f = JSON.parse(json);
+    const dup = JSON.parse(json);
+    dup.segments.push({ ...dup.segments[0] });
+    expect(() => deserialize(JSON.stringify(dup))).toThrow(SaveError);
+    const b64 = JSON.parse(json);
+    b64.zone = "%%%not-base64%%%";
+    expect(() => deserialize(JSON.stringify(b64))).toThrow(SaveError);
+    const nan = JSON.parse(json);
+    const raw = Uint8Array.from(atob(nan.heights), (c) => c.charCodeAt(0));
+    new DataView(raw.buffer).setFloat32(0, NaN, true);
+    nan.heights = btoa(String.fromCharCode(...raw));
+    expect(() => deserialize(JSON.stringify(nan))).toThrow(SaveError);
+    // a counter that lags behind stored ids is lifted above them
+    f.nextSegmentId = 1;
+    const back = deserialize(JSON.stringify(f));
+    const maxId = Math.max(...back.world.segments.map((g) => g.id));
+    expect(back.world.nextSegmentId).toBeGreaterThan(maxId);
+  });
+
   it("stays small enough for localStorage", () => {
     expect(serialize(builtCity()).length).toBeLessThan(400_000);
   });

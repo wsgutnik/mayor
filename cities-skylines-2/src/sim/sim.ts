@@ -402,6 +402,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       return { ok: true };
     }
     if (w.facility[i] === FAC.METRO) removeStopAt(w, i);
+    // Remember it: the raster rebuild below clears the tile, and lots/frontage must still be invalidated.
+    const hadRoad = !!w.road[i];
     if (w.road[i]) {
       // Bulldozing a road removes every segment covering the tile; the graph
       // merges straight joints back and drops orphaned nodes.
@@ -416,7 +418,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       w.coverageDirty = true;
     }
     if (w.facility[i]) w.coverageDirty = true;
-    if (w.road[i]) dirtyRoads(w);
+    if (hadRoad) dirtyRoads(w);
     else if (w.zone[i] || w.facility[i]) dirtyZones(w);
     w.zone[i] = 0;
     w.level[i] = 0;

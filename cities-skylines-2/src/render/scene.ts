@@ -456,6 +456,7 @@ export class CityRenderer {
   }
 
   private disposeWorldResources(): void {
+    this.water?.dispose();
     const models = new Set<THREE.BufferGeometry>([...this.models.buildings.values(), ...this.models.facilities.values()]);
     for (const m of this.glb.values()) if (m) models.add(m.geometry);
     for (const m of this.props.values()) if (m) models.add(m.geometry);
@@ -824,14 +825,12 @@ export class CityRenderer {
 
   /** Swap in another world; rebuilds size-dependent buffers when the map size differs. (load / new city). */
   setWorld(world: World): void {
-    if (world.size !== this.world.size) {
-      this.disposeWorldResources();
-      this.world = world;
-      this.buildWorldResources();
-      this.ambience.setMapSize(world.size);
-      this.rig.setBounds(world.size);
-    }
+    // Always rebuild: water bed/flow textures, boats and instance buffers all belong to the previous world.
+    this.disposeWorldResources();
     this.world = world;
+    this.buildWorldResources();
+    this.ambience.setMapSize(world.size);
+    this.rig.setBounds(world.size);
     this.focusEntry();
     this.seenRevision = -1;
     this.overlaySeen = -1;

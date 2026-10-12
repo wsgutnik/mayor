@@ -44,7 +44,12 @@ function toB64(bytes: Uint8Array): string {
 }
 
 function fromB64(b64: string): Uint8Array {
-  const s = atob(b64);
+  let s: string;
+  try {
+    s = atob(b64);
+  } catch {
+    throw new SaveError("The save file is damaged");
+  }
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
   return out;
@@ -96,8 +101,11 @@ function validateStructure(f: SaveFile, n: number): void {
   if (!f.entry || !finite(f.entry.x) || !finite(f.entry.y)) bad();
   if (!f.lastMonth || !finite(f.lastMonth.income) || !finite(f.lastMonth.expenses)) bad();
   if (!Array.isArray(f.segments) || !Array.isArray(f.stops) || !Array.isArray(f.lines)) bad();
+  const segIds = new Set<number>();
   for (const seg of f.segments) {
-    if (!seg || ![1, 2, 3].includes(seg.type) || !Array.isArray(seg.tiles) || !Array.isArray(seg.pts)) bad();
+    if (!seg || !Number.isInteger(seg.id) || seg.id < 1 || segIds.has(seg.id)) bad();
+    segIds.add(seg.id);
+    if (![1, 2, 3].includes(seg.type) || !Array.isArray(seg.tiles) || !Array.isArray(seg.pts)) bad();
     if (seg.pts.length < 2 || seg.pts.length > 3 || seg.tiles.length > n * n) bad();
     if (!seg.tiles.every(tile)) bad();
     if (!seg.pts.every((p) => p && finite(p.x) && finite(p.z))) bad();
@@ -105,7 +113,13 @@ function validateStructure(f: SaveFile, n: number): void {
   const stopIds = new Set<number>();
   for (const st of f.stops) {
     if (!st || !tile(st.tile) || (st.kind !== "bus" && st.kind !== "metro") || !finite(st.id)) bad();
+    if (stopIds.has(st.id)) bad();
     stopIds.add(st.id);
+  }
+  const lineIds = new Set<number>();
+  for (const l of f.lines) {
+    if (!l || lineIds.has(l.id)) bad();
+    lineIds.add(l.id);
   }
   for (const l of f.lines) {
     if (!l || !Array.isArray(l.stops) || !l.stops.every((id) => stopIds.has(id))) bad();
@@ -113,13 +127,21 @@ function validateStructure(f: SaveFile, n: number): void {
   }
   if (f.lots !== undefined) {
     if (!Array.isArray(f.lots) || f.lots.length > n * n || !finite(f.nextLotId)) bad();
+    const lotIds = new Set<number>();
+    const taken = new Uint8Array(n * n);
     for (const l of f.lots) {
-      if (!l || !Number.isInteger(l.id) || l.id < 1) bad();
+      if (!l || !Number.isInteger(l.id) || l.id < 1 || lotIds.has(l.id)) bad();
+      lotIds.add(l.id);
       for (const k of ["x", "y", "w", "h"] as const) if (!Number.isInteger(l[k])) bad();
       if (l.x < 0 || l.y < 0 || l.w < 1 || l.h < 1 || l.w > 4 || l.h > 4 || l.x + l.w > n || l.y + l.h > n) bad();
       if (!l.facing || ![-1, 0, 1].includes(l.facing.dx) || ![-1, 0, 1].includes(l.facing.dy)) bad();
       if (![1, 2, 3].includes(l.zone) || ![0, 1, 2, 3].includes(l.level)) bad();
       if (l.depthFromRoad !== -1 && (l.depthFromRoad < 0 || l.depthFromRoad > 3)) bad();
+      // footprints must not overlap
+      for (let y = l.y; y < l.y + l.h; y++) for (let x = l.x; x < l.x + l.w; x++) {
+        if (taken[y * n + x]) bad();
+        taken[y * n + x] = 1;
+      }
     }
   }
 }
@@ -145,7 +167,9 @@ export function deserialize(json: string): CityState {
     return a;
   };
   if (heights.length !== (n + 1) * (n + 1) * 4) throw new SaveError("The save file is damaged");
-  w.heights.set(new Float32Array(heights.buffer, heights.byteOffset, heights.byteLength / 4));
+  const hf = new Float32Array(heights.buffer, heights.byteOffset, heights.byteLength / 4);
+  for (let i = 0; i < hf.length; i++) if (!Number.isFinite(hf[i])) throw new SaveError("The save file is damaged");
+  w.heights.set(hf);
   w.zone.set(bytes(f.zone, n * n));
   w.level.set(bytes(f.level, n * n));
   w.facility.set(bytes(f.facility, n * n));
@@ -155,12 +179,13 @@ export function deserialize(json: string): CityState {
   w.segments = f.segments;
   w.stops = f.stops;
   w.lines = f.lines;
-  w.nextSegmentId = f.nextSegmentId;
-  w.nextTransitId = f.nextTransitId;
+  // Counters must stay above every stored id, or the next road/line would reuse one.
+  w.nextSegmentId = Math.max(f.nextSegmentId, ...f.segments.map((g) => g.id + 1), 1);
+  w.nextTransitId = Math.max(f.nextTransitId, ...f.stops.map((g) => g.id + 1), ...f.lines.map((g) => g.id + 1), 1);
   if (f.lots !== undefined) {
     // Lots ride along with the save; the tile mirror still self-heals them in refreshDerived.
     w.lots = f.lots;
-    w.nextLotId = f.nextLotId!;
+    w.nextLotId = Math.max(f.nextLotId!, ...f.lots.map((l) => l.id + 1), 1);
     w.lotAt.fill(-1);
     for (const l of w.lots) {
       for (let y = l.y; y < l.y + l.h; y++) {
