@@ -1,0 +1,52 @@
+{
+  "maps": [
+    {
+      "id": "baia-metropolitana",
+      "name": "Baía Metropolitana",
+      "nameEn": "Metropolitan Bay",
+      "description": "Costa, rio e espaço para porto, bairros e pontes. Ideal para turismo e logística.",
+      "descriptionEn": "Coast, river and room for a harbour, districts and bridges. Ideal for tourism and logistics.",
+      "difficulty": "medium",
+      "terrain": "bay",
+      "size": 128,
+      "data": "/maps/baia-metropolitana.json",
+      "preview": "/maps/baia-metropolitana.jpg"
+    },
+    {
+      "id": "vale-verde",
+      "name": "Vale Verde",
+      "nameEn": "Green Valley",
+      "description": "Serras laterais e um rio central. Cidades lineares, represas e travessias.",
+      "descriptionEn": "Side ridges and a central river. Linear cities, dams and crossings.",
+      "difficulty": "medium",
+      "terrain": "valley",
+      "size": 128,
+      "data": "/maps/vale-verde.json",
+      "preview": "/maps/vale-verde.jpg"
+    },
+    {
+      "id": "arquipelago-azul",
+      "name": "Arquipélago Azul",
+      "nameEn": "Blue Archipelago",
+      "description": "Ilhas separadas por mar aberto. Desafio de balsas, portos e serviços nas ilhas.",
+      "descriptionEn": "Islands set in open sea. A challenge of ferries, ports and island services.",
+      "difficulty": "advanced",
+      "terrain": "archipelago",
+      "size": 128,
+      "data": "/maps/arquipelago-azul.json",
+      "preview": "/maps/arquipelago-azul.jpg"
+    },
+    {
+      "id": "planicie-central",
+      "name": "Planície Central",
+      "nameEn": "Central Plains",
+      "description": "Terreno aberto com um rio sinuoso. O melhor mapa para aprender zoneamento e trânsito.",
+      "descriptionEn": "Open land with a winding river. The best map to learn zoning and traffic.",
+      "difficulty": "beginner",
+      "terrain": "plains",
+      "size": 128,
+      "data": "/maps/planicie-central.json",
+      "preview": "/maps/planicie-central.jpg"
+    }
+  ]
+}

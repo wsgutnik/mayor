@@ -3,3 +3,6 @@ dist/
 .DS_Store
 # Referências de terceiros: usar localmente, não versionar
 cities-skylines-2/screenshots/
+
+# Raw extractions kept out of git
+cities-skylines-2/docs/img/brand/kit/
