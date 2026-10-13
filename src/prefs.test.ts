@@ -35,21 +35,27 @@ describe("quality tiers", () => {
 });
 
 describe("zoning preference", () => {
-  it("defaults to the classic tile grid and round-trips the oriented mode", () => {
+  it("defaults to street-aligned lots, keeps an explicit choice and migrates old prefs", () => {
     const store = new Map<string, string>();
     (globalThis as unknown as { localStorage: unknown }).localStorage = {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => { store.set(k, v); },
     };
-    expect(defaultPrefs().zoning).toBe("tiles");
+    expect(defaultPrefs().zoning).toBe("oriented");
+    expect(loadPrefs().zoning).toBe("oriented");
+    // An explicit choice is kept across reloads.
+    savePrefs({ ...defaultPrefs(), zoning: "tiles" });
     expect(loadPrefs().zoning).toBe("tiles");
     savePrefs({ ...defaultPrefs(), zoning: "oriented" });
     expect(loadPrefs().zoning).toBe("oriented");
-    store.set("mayor:prefs", JSON.stringify({ zoning: "diagonal" }));
-    expect(loadPrefs().zoning).toBe("tiles");
+    // Old prefs (no version) that only stored "tiles" because it used to be the default move to the new default.
+    store.set("mayor:prefs", JSON.stringify({ zoning: "tiles" }));
+    expect(loadPrefs().zoning).toBe("oriented");
+    store.set("mayor:prefs", JSON.stringify({ zoning: "diagonal", zoningV: 2 }));
+    expect(loadPrefs().zoning).toBe("oriented");
   });
 
-  it("new worlds start in the classic mode with empty oriented state", () => {
+  it("a bare generated world is classic with empty oriented state (the game applies the preference)", () => {
     const w = generateWorld(32, 3);
     expect(w.zoning).toBe("tiles");
     expect(w.nextOLotId).toBe(1);

@@ -21,7 +21,7 @@ Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with sc
 | Street furniture | done | shelters, bus-stop signs, kiosks, ticket machines, benches, planters, alternating street lights (GLB with procedural fallback) |
 | Graph and signal performance | done | segment/node indices, per-tile signal lookup, full-footprint lot sync |
 | M26 CS1 zone-cell rules | done | nearer road wins, oldest segment on ties, slope limit, row cut behind obstacles |
-| M27 Oriented zoning | merged, off by default | segment-frame zone blocks, oriented lots with free yaw, tile mirror, save v2 with v1 migration, oriented rendering and ground-point painting; opt in with "Street-aligned lots (experimental)" in Preferences. P9 (make it the default) is pending a longer play-test |
+| M27 Oriented zoning | merged, **default since P9** | segment-frame zone blocks, oriented lots with free yaw, tile mirror, save v2 with v1 migration, oriented rendering and ground-point painting; "Street-aligned lots" in Preferences turns it off; old prefs without a stored choice move to the new default; kerb strips fixed to the front edge |
 | M28 Visual assets | done | audit script and strict Blender export, manifest, base/variant registry, rear/side facades for the kit (#05-#37, #39, #40), per-building budget 700 triangles, detailed vehicles, five v2 reference buildings with 3 LODs behind `?visualV2=1` and a manifest gate |
 | Utilities over bridges | done | layer-aware flood: power, water and sewage cross bridges and tunnels at ramps |
 | UI-1 Interface | done | UI scale and panel opacity prefs, collapsible persistent panels (key H), road-build readout (cost, length, slope, level, reason) |
@@ -103,7 +103,7 @@ CI and packaging are local: `npm run ci` (types, tests, build) before each merge
 
 ## Next Steps
 
-1. P9: play-test oriented zoning on diagonal and curved streets, polish kerbs and growth, then make it the default.
+1. Oriented zoning polish: ragged block edges where rows are cut off, growth in deeper rows, pad thickness (it is the default now).
 2. UI-2/UI-3 remainder: whole-road upgrade stroke, density and lot visualisation, inspector diagnostics, economy dashboard (numbers from the real sim).
 3. Assets: runtime LOD1/LOD2 for the v2 references, rear facades for the few remaining plain models, multi-tile footprints for #27/#21/#31-#33/#34/#40 (needs a save-version bump), then real Mac/iPad profiling.
 4. Per-lane traffic (reference: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, phases C and E).

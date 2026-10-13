@@ -93,7 +93,7 @@ const PT: Record<string, string> = {
   "Use tool": "Usar ferramenta", "Move camera": "Mover câmera", "Rotate": "Girar", "Zoom": "Zoom",
   "Left button / one finger": "Botão esquerdo / um dedo", "Right button, WASD / two fingers": "Botão direito, WASD / dois dedos",
   "Middle button, Q E / twist": "Botão do meio, Q E / torcer", "Wheel / pinch": "Roda / pinça", "Apply": "Aplicar", "Language": "Idioma", "Graphics quality": "Qualidade gráfica",
-  "Low": "Baixa", "High": "Alta", "Low quality": "Baixa", "Medium quality": "Média", "High quality": "Alta", "Show tips": "Mostrar dicas", "Street-aligned lots (experimental)": "Lotes alinhados à rua (experimental)",
+  "Low": "Baixa", "High": "Alta", "Low quality": "Baixa", "Medium quality": "Média", "High quality": "Alta", "Show tips": "Mostrar dicas", "Street-aligned lots": "Lotes alinhados à rua",
   "No shadows · flat ground · fewer trees": "Sem sombras · solo chapado · menos árvores",
   "Soft shadows · textured ground": "Sombras suaves · solo texturizado",
   "Sharp shadows · detailed ground · dense trees": "Sombras nítidas · solo detalhado · árvores densas",

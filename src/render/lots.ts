@@ -87,9 +87,12 @@ export function orientedModelCells(f: LotFrame): { x: number; z: number }[] {
   return out;
 }
 
-/** Kerb strip along the front edge of an oriented lot. */
+/**
+ * Kerb strip along the front edge of an oriented lot. Lot frames face +z (toward the road, like the GLB models), so
+ * the front edge is +d/2; measured on a diagonal-and-curve test city, +d/2 is the nearer edge for every lot.
+ */
 export function orientedKerb(f: LotFrame): { x: number; z: number; len: number; yaw: number } {
-  const p = rotateCell(f, 0, -f.d / 2);
+  const p = rotateCell(f, 0, f.d / 2);
   return { x: p.x, z: p.z, len: f.w, yaw: f.yaw };
 }
 

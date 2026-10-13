@@ -60,7 +60,7 @@ describe("lot layout", () => {
   });
 
   it("returns oriented kerb and pad transforms", () => {
-    expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 19, len: 3, yaw: 0 });
+    expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 21, len: 3, yaw: 0 });
     expect(orientedPad({ cx: 10, cz: 20, yaw: 0.5, w: 3, d: 2 })).toEqual({ x: 10, z: 20, sx: 3, sz: 2, yaw: 0.5 });
   });
 

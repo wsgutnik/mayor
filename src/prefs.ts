@@ -19,6 +19,8 @@ export interface Prefs {
 }
 
 const KEY = "mayor:prefs";
+/** 2 = street-aligned lots became the default; an explicit choice saved at this version is kept. */
+const ZONING_PREF_VERSION = 2;
 
 /** Slider range for the interface-scale setting. */
 export const UI_SCALE = { min: 0.8, max: 1.4, step: 0.1, def: 1 } as const;
@@ -26,7 +28,7 @@ export const UI_SCALE = { min: 0.8, max: 1.4, step: 0.1, def: 1 } as const;
 export const UI_OPACITY = { min: 0.6, max: 1, step: 0.05, def: 1 } as const;
 
 export const defaultPrefs = (): Prefs => ({
-  lang: detectLang(), quality: "high", tips: true, autosave: true, dayNight: true, zoning: "tiles",
+  lang: detectLang(), quality: "high", tips: true, autosave: true, dayNight: true, zoning: "oriented",
   uiScale: UI_SCALE.def, uiOpacity: UI_OPACITY.def,
 });
 
@@ -97,7 +99,9 @@ export function loadPrefs(): Prefs {
       tips: typeof p.tips === "boolean" ? p.tips : d.tips,
       autosave: typeof p.autosave === "boolean" ? p.autosave : d.autosave,
       dayNight: typeof p.dayNight === "boolean" ? p.dayNight : d.dayNight,
-      zoning: p.zoning === "oriented" || p.zoning === "tiles" ? p.zoning : d.zoning,
+      // Prefs written before the street-aligned cutover (no zoningV) stored "tiles" only because it was the default.
+      zoning: (p as { zoningV?: number }).zoningV === ZONING_PREF_VERSION && (p.zoning === "oriented" || p.zoning === "tiles")
+        ? p.zoning : d.zoning,
       uiScale: p.uiScale === undefined ? d.uiScale : clampUiScale(p.uiScale),
       uiOpacity: p.uiOpacity === undefined ? d.uiOpacity : clampUiOpacity(p.uiOpacity),
     };
@@ -108,7 +112,7 @@ export function loadPrefs(): Prefs {
 
 export function savePrefs(p: Prefs): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    localStorage.setItem(KEY, JSON.stringify({ ...p, zoningV: ZONING_PREF_VERSION }));
   } catch {
     /* storage blocked: preferences last for this session only */
   }

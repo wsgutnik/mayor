@@ -200,7 +200,7 @@ export class Menu {
         ${chk("pf-daynight", tr("Dynamic day/night"), draft.dayNight)}
         <div class="menu-row slider"><b>${tr("Interface scale")}</b><span><input type="range" id="pf-uiscale" min="0.8" max="1.4" step="0.1" value="${draft.uiScale}" aria-label="${tr("Interface scale")}"><small id="pf-uiscale-v">${Math.round(draft.uiScale * 100)}%</small></span></div>
         <div class="menu-row slider"><b>${tr("Panel opacity")}</b><span><input type="range" id="pf-uiopacity" min="0.6" max="1" step="0.05" value="${draft.uiOpacity}" aria-label="${tr("Panel opacity")}"><small id="pf-uiopacity-v">${Math.round(draft.uiOpacity * 100)}%</small></span></div>`,
-      gameplay: `${chk("pf-auto", tr("Save automatically"), draft.autosave)}${chk("pf-tips2", tr("Show tips"), draft.tips)}${chk("pf-zoning", tr("Street-aligned lots (experimental)"), draft.zoning === "oriented")}`,
+      gameplay: `${chk("pf-auto", tr("Save automatically"), draft.autosave)}${chk("pf-tips2", tr("Show tips"), draft.tips)}${chk("pf-zoning", tr("Street-aligned lots"), draft.zoning === "oriented")}`,
       controls: `<table class="keys">
         <tr><td>${tr("Use tool")}</td><td>${tr("Left button / one finger")}</td></tr>
         <tr><td>${tr("Move camera")}</td><td>${tr("Right button, WASD / two fingers")}</td></tr>
