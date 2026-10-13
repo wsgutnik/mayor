@@ -162,6 +162,8 @@ export interface World {
   /** Junction graph: every segment end attaches to one of these. Rebuilt on load. */
   nodes: RoadNode[];
   nextNodeId: number;
+  /** Bumped by every structural road-graph mutation; derived caches key off this. */
+  graphRevision: number;
   /** Unit travel direction per tile for one-way roads (0,0 = two-way/none), derived in rebuildRoadRaster. */
   dirX: Float32Array;
   dirZ: Float32Array;
@@ -293,6 +295,7 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     nextSegmentId: 1,
     nodes: [],
     nextNodeId: 1,
+    graphRevision: 1,
     dirX: new Float32Array(size * size),
     dirZ: new Float32Array(size * size),
     roundabouts: [],

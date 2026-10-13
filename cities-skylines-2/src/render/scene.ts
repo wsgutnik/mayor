@@ -384,7 +384,8 @@ export class CityRenderer {
     // as lamps). Signal lamps stay procedural so phase colours can drive them.
     this.propMeshes.clear();
     for (const kind of PROP_KINDS) {
-      const m: THREE.InstancedMesh = new THREE.InstancedMesh(propGeometry(kind), new THREE.MeshLambertMaterial({ color: "#ffffff" }), 1024);
+      const capacity = kind.startsWith("shelter_") || kind === "stop_sign_bus" || kind === "kiosk_route" || kind === "ticket_machine" ? 256 : 1024;
+      const m: THREE.InstancedMesh = new THREE.InstancedMesh(propGeometry(kind), new THREE.MeshLambertMaterial({ color: "#ffffff" }), capacity);
       m.count = 0;
       m.frustumCulled = false;
       own(m);
@@ -726,6 +727,8 @@ export class CityRenderer {
     this.kerbs.count = nk;
     this.kerbs.instanceMatrix.needsUpdate = true;
     if (this.kerbs.instanceColor) this.kerbs.instanceColor.needsUpdate = true;
+    const furniturePlan = planProps(w, this.propDensity());
+    const alternateLamps = furniturePlan.filter((p) => p.kind === "streetlight_b");
     // Street lamps on the verge of every fourth street and avenue tile, arm turned over the road.
     for (let y = 0; y < w.size && nl < this.lampMesh.instanceMatrix.count; y++) {
       for (let x = 0; x < w.size; x++) {
@@ -737,6 +740,7 @@ export class CityRenderer {
           if (!inBounds(w, nx, ny) || blocksBuilding(w, ny * w.size + nx) || w.facility[ny * w.size + nx]) continue;
           // the lamp sits on the neighbouring tile's edge nearest the road; its arm (+x) points at the road
           const px = nx + 0.5 - dx * 0.42, pz = ny + 0.5 - dy * 0.42;
+          if (alternateLamps.some((p) => Math.hypot(p.x - px, p.z - pz) < 1.5)) continue;
           d.position.set(px, tileHeight(w, x, y) + 0.05, pz);
           d.rotation.set(0, -Math.atan2(-dy, -dx), 0);
           d.scale.setScalar(1);
@@ -783,7 +787,7 @@ export class CityRenderer {
     this.warnMesh.count = nw;
     this.warnMesh.instanceMatrix.needsUpdate = true;
     if (this.warnMesh.instanceColor) this.warnMesh.instanceColor.needsUpdate = true;
-    this.rebuildProps();
+    this.rebuildProps(furniturePlan);
     this.rebuildSignals();
   }
 
@@ -793,14 +797,14 @@ export class CityRenderer {
   }
 
   /** Fill the street-furniture instanced meshes from the deterministic plan. */
-  private rebuildProps(): void {
+  private rebuildProps(planned?: readonly ReturnType<typeof planProps>[number][]): void {
     const w = this.world;
     const density = this.propDensity();
     this.propDensitySeen = density;
     const counts = new Map<PropKind, number>();
     const tint = new THREE.Color();
     const d = this.dummy;
-    for (const p of planProps(w, density)) {
+    for (const p of planned ?? planProps(w, density)) {
       const mesh = this.propMeshes.get(p.kind);
       if (!mesh) continue;
       const c = counts.get(p.kind) ?? 0;

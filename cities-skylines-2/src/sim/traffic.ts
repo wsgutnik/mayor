@@ -66,9 +66,11 @@ export interface TrafficState {
   jobs: number[];
   /** Game seconds driven (signal phases derive from this). */
   time: number;
-  /** Signalised nodes, refreshed when the world revision moves. */
+  /** Signalised nodes, refreshed when the road graph revision moves. */
   sigRev: number;
   sigNodes: SignalInfo[];
+  /** Signal approaches near each road tile, rebuilt with sigNodes. */
+  sigByTile: Map<number, SignalInfo[]>;
 }
 
 export function newTraffic(size: number, seed = 7): TrafficState {
@@ -76,7 +78,7 @@ export function newTraffic(size: number, seed = 7): TrafficState {
     vehicles: [], transit: [], transitRevision: -1, load: new Uint16Array(size * size), completed: 0, nextId: 1,
     rng: makeRng(seed), spawnCarry: 0, truckCarry: 0, listRevision: -1,
     homes: [], shops: [], factories: [], jobs: [],
-    time: 0, sigRev: -1, sigNodes: [],
+    time: 0, sigRev: -1, sigNodes: [], sigByTile: new Map(),
   };
 }
 
@@ -87,27 +89,54 @@ const RED_CRAWL = 0.3;
  * 1 when the route from `tile` to `next` may proceed, RED_CRAWL when it enters
  * a signalised node against the phase. Allocation-free over the cached nodes.
  */
-function redCrawl(w: World, t: TrafficState, tile: number, next: number, phase: 0 | 1): number {
+export function redCrawl(w: World, t: TrafficState, tile: number, next: number, phase: 0 | 1): number {
   const hx = (next % w.size) - (tile % w.size);
   const hz = ((next / w.size) | 0) - ((tile / w.size) | 0);
   if (hx === 0 && hz === 0) return 1;
   const hl = Math.hypot(hx, hz);
   const cx = (tile % w.size) + 0.5, cz = ((tile / w.size) | 0) + 0.5;
-  for (const sn of t.sigNodes) {
-    const vx = sn.x - cx, vz = sn.z - cz;
-    const d = Math.hypot(vx, vz);
-    if (d > 1.7 || d < 1e-6) continue;
-    if ((vx * hx + vz * hz) / (d * hl) < 0.5) continue; // not heading at this node
-    const ux = hx / hl, uz = hz / hl;
-    let best = 0, bd = -Infinity;
-    for (let k = 0; k < sn.arms.length; k++) {
-      // The arm being travelled: its outward direction opposes the heading.
-      const s = -(sn.arms[k].dx * ux + sn.arms[k].dz * uz);
-      if (s > bd) { bd = s; best = k; }
+  const here = t.sigByTile.get(tile);
+  const ahead = next === tile ? undefined : t.sigByTile.get(next);
+  if (!here && !ahead) return 1;
+  const visit = (signals: SignalInfo[] | undefined, skip: SignalInfo[] | undefined): number => {
+    if (!signals) return 1;
+    for (const sn of signals) {
+      if (skip?.includes(sn)) continue;
+      const vx = sn.x - cx, vz = sn.z - cz;
+      const d = Math.hypot(vx, vz);
+      if (d > 1.7 || d < 1e-6) continue;
+      if ((vx * hx + vz * hz) / (d * hl) < 0.5) continue; // not heading at this node
+      const ux = hx / hl, uz = hz / hl;
+      let best = 0, bd = -Infinity;
+      for (let k = 0; k < sn.arms.length; k++) {
+        // The arm being travelled: its outward direction opposes the heading.
+        const s = -(sn.arms[k].dx * ux + sn.arms[k].dz * uz);
+        if (s > bd) { bd = s; best = k; }
+      }
+      if (bd > 0.3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return RED_CRAWL;
     }
-    if (bd > 0.3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return RED_CRAWL;
+    return 1;
+  };
+  const first = visit(here, undefined);
+  return first === RED_CRAWL ? first : visit(ahead, here);
+}
+
+export function indexSignals(w: World, signals: SignalInfo[]): Map<number, SignalInfo[]> {
+  const out = new Map<number, SignalInfo[]>();
+  for (const sn of signals) {
+    const x0 = Math.max(0, Math.ceil(sn.x - 2.2));
+    const x1 = Math.min(w.size - 1, Math.floor(sn.x + 1.2));
+    const y0 = Math.max(0, Math.ceil(sn.z - 2.2));
+    const y1 = Math.min(w.size - 1, Math.floor(sn.z + 1.2));
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+      const dx = sn.x - (x + 0.5), dz = sn.z - (y + 0.5);
+      if (Math.hypot(dx, dz) > 1.7 || (dx === 0 && dz === 0)) continue;
+      const tile = y * w.size + x;
+      const list = out.get(tile);
+      if (list) list.push(sn); else out.set(tile, [sn]);
+    }
   }
-  return 1;
+  return out;
 }
 
 // ---------------------------------------------------------------- pathfinding
@@ -398,9 +427,10 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   }
   moveTransit(w, t, dt, s.raining ? RAIN_SPEED_FACTOR : 1);
 
-  if (t.sigRev !== w.revision) {
-    t.sigRev = w.revision;
+  if (t.sigRev !== (w.graphRevision ?? 0)) {
+    t.sigRev = w.graphRevision ?? 0;
     t.sigNodes = signalNodes(w);
+    t.sigByTile = indexSignals(w, t.sigNodes);
   }
   t.time += dt;
   const phase = signalPhase(t.time);

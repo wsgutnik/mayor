@@ -66,4 +66,25 @@ describe("Blender kit models", () => {
     const lamp = mergeScene(await load(join(MODELS, "props", "lamp.glb")))!;
     expect(lamp.glow.some((g) => g.name === "glow_lamp")).toBe(true);
   });
+
+  it("street-furniture pack assets keep their authored bounds and 130-triangle budget", async () => {
+    const expected: Record<string, [number, number, number]> = {
+      shelter_small: [0.24, 0.36, 0.22], shelter_glass: [0.20, 0.40, 0.18],
+      bench_road: [0.06, 0.20, 0.18], planter_street: [0.10, 0.18, 0.17],
+      streetlight_b: [0.03, 0.11, 0.32], kiosk_route: [0.03, 0.08, 0.22],
+      ticket_machine: [0.06, 0.07, 0.18], stop_sign_bus: [0.05, 0.07, 0.28],
+    };
+    for (const [name, bounds] of Object.entries(expected)) {
+      const model = mergeScene(await load(join(MODELS, "props", `${name}.glb`)))!;
+      model.geometry.computeBoundingBox();
+      const box = model.geometry.boundingBox!, size = new THREE.Vector3();
+      box.getSize(size);
+      expect(tris(model.geometry), name).toBeLessThanOrEqual(130);
+      // Export converts Blender Z-up to Three Y-up: footprint is X/Z and height is Y.
+      expect(size.x, name).toBeLessThanOrEqual(bounds[0] + 0.01);
+      expect(size.z, name).toBeLessThanOrEqual(bounds[1] + 0.01);
+      expect(size.y, name).toBeLessThanOrEqual(bounds[2] + 0.01);
+      expect(box.min.y, name).toBeGreaterThanOrEqual(-0.01);
+    }
+  });
 });

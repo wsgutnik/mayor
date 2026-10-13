@@ -25,6 +25,32 @@ const road = (s: CityState, type: 1 | 2 | 3, pts: [number, number][]) => {
 const sortedTiles = (tiles: number[]): number[] => [...tiles].sort((a, b) => a - b);
 
 describe("road graph", () => {
+  it("keeps indexed lookups and arms consistent through graph mutations", () => {
+    const s = newCity(31, 48), ey = flat(s), w = s.world;
+    const brute = (nodeId: number) => {
+      const node = w.nodes.find((n) => n.id === nodeId);
+      if (!node) return [];
+      return node.segs.filter((id) => {
+        const seg = w.segments.find((sg) => sg.id === id);
+        return !!seg && (seg.a === nodeId || seg.b === nodeId) && Math.hypot(
+          seg.pts[seg.pts.length - 1].x - seg.pts[0].x,
+          seg.pts[seg.pts.length - 1].z - seg.pts[0].z,
+        ) > 1e-6;
+      }).sort((a, b) => a - b);
+    };
+    const check = () => {
+      for (const node of w.nodes) {
+        expect(nodeById(w, node.id)).toBe(node);
+        expect(nodeArms(w, node.id).map((a) => a.segId).sort((a, b) => a - b)).toEqual(brute(node.id));
+      }
+    };
+    road(s, 1, [[5.5, ey + .5], [30.5, ey + .5]]); check();
+    road(s, 1, [[16.5, ey - 8], [16.5, ey + 8]]); check(); // split/crossing
+    const removable = w.segments.find((sg) => !sg.fixed && sg.pts.some((p) => p.z > ey + 2))!;
+    expect(removeSegment(w, removable.id)).toBe(true); check();
+    expect(applyTool(s, "bulldoze", 8, ey).ok).toBe(true); check();
+  });
+
   it("snaps ends to nearby nodes and shares them", () => {
     const s = newCity(3);
     const ey = flat(s);

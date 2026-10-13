@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { applyTool, newCity, placeRoad, CityState } from "./sim";
 import { deserialize, serialize } from "./save";
 import { findPath, newTraffic } from "./traffic";
-import { planProps } from "./props";
-import { cidx, idx, RoadType } from "./world";
+import { NEW_PROP_KINDS, PROP_YAW_OFFSET, planProps } from "./props";
+import { cidx, FAC, idx, RoadType } from "./world";
 
 function flat(s: CityState) {
   const ey = s.world.entry.y;
@@ -176,7 +176,7 @@ describe("sidewalk props plan", () => {
     for (const t of trees) {
       expect([2, 5]).toContain(s.world.road[idx(s.world, Math.floor(t.x), Math.floor(t.z))]);
     }
-    expect(plan.filter((p) => p.kind === "bus_shelter").length).toBe(1);
+    expect(plan.filter((p) => p.kind === "shelter_small" || p.kind === "shelter_glass")).toHaveLength(1);
   });
 
   it("thins decorative props with density but keeps shelters", () => {
@@ -188,7 +188,53 @@ describe("sidewalk props plan", () => {
     const full = planProps(s.world, 1);
     const low = planProps(s.world, 0.25);
     expect(low.length).toBeLessThan(full.length);
-    expect(low.filter((p) => p.kind === "bus_shelter").length).toBe(1);
+    expect(low.filter((p) => p.kind === "shelter_small" || p.kind === "shelter_glass")).toHaveLength(1);
     expect(planProps(s.world, 1)).toEqual(full); // deterministic
+  });
+
+  it("plans the new furniture deterministically by quality tier on clear sidewalk tiles", () => {
+    const s = newCity(13);
+    const ey = flat(s);
+    road(s, 2, [[5.5, ey + 6.5], [45.5, ey + 6.5]]);
+    road(s, 1, [[5.5, ey + 0.5], [45.5, ey + 0.5]]);
+    expect(applyTool(s, "busstop", 14, ey).ok).toBe(true);
+    const hi = planProps(s.world, 1), medium = planProps(s.world, 0.75), low = planProps(s.world, 0.45);
+    expect(planProps(s.world, 1)).toEqual(hi);
+    expect(low.length).toBeLessThanOrEqual(medium.length);
+    expect(medium.length).toBeLessThanOrEqual(hi.length);
+    const fresh = hi.filter((p) => (NEW_PROP_KINDS as readonly string[]).includes(p.kind));
+    for (const p of fresh) {
+      const x = Math.floor(p.x), y = Math.floor(p.z), i = idx(s.world, x, y);
+      expect(s.world.road[i], p.kind).toBe(0);
+      expect(s.world.roadDeck[i], p.kind).toBe(0);
+      expect(s.world.roadTunnel[i], p.kind).toBe(0);
+      expect(s.world.facility[i], p.kind).toBe(0);
+      expect(s.world.lotAt[i], p.kind).toBe(-1);
+    }
+    expect(fresh.some((p) => p.kind === "bench_road")).toBe(true);
+    expect(fresh.some((p) => p.kind === "planter_street")).toBe(true);
+    expect(fresh.some((p) => p.kind === "streetlight_b")).toBe(true);
+  });
+
+  it("gives every bus stop one variant shelter and equips only metro entries", () => {
+    const s = newCity(17);
+    const ey = flat(s);
+    road(s, 1, [[5.5, ey + 0.5], [40.5, ey + 0.5]]);
+    expect(applyTool(s, "busstop", 12, ey).ok).toBe(true);
+    expect(applyTool(s, "busstop", 25, ey).ok).toBe(true);
+    const metroTile = idx(s.world, 20, ey + 3);
+    s.world.facility[metroTile] = FAC.METRO;
+    s.world.stops.push({ id: s.world.nextTransitId++, kind: "metro", tile: metroTile });
+    const plan = planProps(s.world, 1);
+    expect(plan.filter((p) => p.kind === "shelter_small" || p.kind === "shelter_glass")).toHaveLength(2);
+    for (const kind of ["kiosk_route", "ticket_machine"] as const) {
+      const items = plan.filter((p) => p.kind === kind);
+      expect(items).toHaveLength(1);
+      expect(Math.hypot(items[0].x - 20.5, items[0].z - (ey + 3.5))).toBeLessThan(1.2);
+    }
+  });
+
+  it("has an explicit GLB yaw offset for every new kind", () => {
+    expect(Object.keys(PROP_YAW_OFFSET).sort()).toEqual([...NEW_PROP_KINDS].sort());
   });
 });

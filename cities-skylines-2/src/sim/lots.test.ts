@@ -41,6 +41,18 @@ function jobsRow(s: CityState, x0 = 4, x1 = 19) {
 }
 
 describe("lot planning", () => {
+  it("detects an out-of-sync interior footprint tile", () => {
+    const { s } = flatCity();
+    zonedStrip(s);
+    syncLots(s);
+    const lot = s.world.lots.find((l) => l.w * l.h > 1)!;
+    const x = lot.x + lot.w - 1, y = lot.y + lot.h - 1;
+    const oldId = lot.id;
+    s.world.zone[idx(s.world, x, y)] = ZONE.COM;
+    syncLots(s);
+    expect(s.world.lotAt[idx(s.world, x, y)]).not.toBe(oldId);
+  });
+
   it("covers every zoned tile with exactly one street-facing lot", () => {
     const { s } = flatCity();
     const { x0, x1, ey } = zonedStrip(s);

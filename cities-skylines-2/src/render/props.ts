@@ -71,6 +71,40 @@ export function propGeometry(kind: PropKind | "traffic_light"): THREE.BufferGeom
         placed(new THREE.CylinderGeometry(0.03, 0.04, 0.3, 6), 0, 0.32, 0),
         placed(new THREE.IcosahedronGeometry(0.26, 0), 0, 0.68, 0),
       ]);
+    case "shelter_small":
+    case "shelter_glass":
+      return merge([
+        placed(new THREE.BoxGeometry(0.24, 0.025, 0.36), 0, 0.21, 0),
+        placed(new THREE.BoxGeometry(0.025, 0.21, 0.025), -0.1, 0.105, 0.14),
+        placed(new THREE.BoxGeometry(0.025, 0.21, 0.025), 0.1, 0.105, 0.14),
+        placed(new THREE.BoxGeometry(0.2, 0.025, 0.08), 0, 0.09, 0.08),
+      ]);
+    case "bench_road":
+      return merge([
+        placed(new THREE.BoxGeometry(0.06, 0.035, 0.2), 0, 0.09, 0),
+        placed(new THREE.BoxGeometry(0.025, 0.13, 0.2), 0.025, 0.14, 0),
+        placed(new THREE.BoxGeometry(0.035, 0.08, 0.035), 0, 0.04, -0.07),
+        placed(new THREE.BoxGeometry(0.035, 0.08, 0.035), 0, 0.04, 0.07),
+      ]);
+    case "planter_street":
+      return merge([
+        placed(new THREE.CylinderGeometry(0.05, 0.07, 0.08, 8), 0, 0.04, 0),
+        placed(new THREE.SphereGeometry(0.075, 8, 5), 0, 0.13, 0),
+      ]);
+    case "streetlight_b":
+      return merge([
+        placed(new THREE.CylinderGeometry(0.009, 0.013, 0.3, 6), 0, 0.15, 0),
+        placed(new THREE.BoxGeometry(0.018, 0.018, 0.1), 0, 0.3, -0.04),
+      ]);
+    case "kiosk_route":
+      return merge([placed(new THREE.BoxGeometry(0.035, 0.22, 0.08), 0, 0.11, 0)]);
+    case "ticket_machine":
+      return merge([placed(new THREE.BoxGeometry(0.06, 0.18, 0.07), 0, 0.09, 0)]);
+    case "stop_sign_bus":
+      return merge([
+        placed(new THREE.CylinderGeometry(0.008, 0.01, 0.24, 6), 0, 0.12, 0),
+        placed(new THREE.BoxGeometry(0.05, 0.07, 0.012), 0, 0.245, 0),
+      ]);
     case "traffic_light":
       // Pole with a vertical three-lamp head; the lit lamp itself is a
       // separate instanced sphere in scene.ts so its colour can follow phase.
@@ -88,5 +122,13 @@ export const PROP_TINT: Record<PropKind | "traffic_light", string> = {
   bench: "#8a6b4a",
   bus_shelter: "#5a7d9a",
   planter_tree: "#4f8a43",
+  shelter_small: "#5a7d9a",
+  shelter_glass: "#81a9b8",
+  bench_road: "#87694c",
+  planter_street: "#4f8a43",
+  streetlight_b: "#343a42",
+  kiosk_route: "#3776a8",
+  ticket_machine: "#707985",
+  stop_sign_bus: "#2f6c9f",
   traffic_light: "#2e3238",
 };

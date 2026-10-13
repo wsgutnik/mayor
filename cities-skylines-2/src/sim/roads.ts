@@ -37,10 +37,33 @@ export function cornerRadius(type: RoadType): number {
   return baseRoadType(type) === 1 ? 0.25 : 0.4;
 }
 
-export const segById = (w: World, id: number): RoadSegment | undefined =>
-  w.segments.find((s) => s.id === id);
-export const nodeById = (w: World, id: number): RoadNode | undefined =>
-  w.nodes.find((n) => n.id === id);
+interface GraphIndexes {
+  revision: number;
+  segments: Map<number, RoadSegment>;
+  nodes: Map<number, RoadNode>;
+}
+const graphIndexes = new WeakMap<World, GraphIndexes>();
+
+function indexes(w: World): GraphIndexes {
+  const revision = w.graphRevision ?? 0; // old saves/world fixtures
+  let cached = graphIndexes.get(w);
+  if (!cached || cached.revision !== revision) {
+    cached = {
+      revision,
+      segments: new Map(w.segments.map((s) => [s.id, s])),
+      nodes: new Map(w.nodes.map((n) => [n.id, n])),
+    };
+    graphIndexes.set(w, cached);
+  }
+  return cached;
+}
+
+function touchGraph(w: World): void {
+  w.graphRevision = (w.graphRevision ?? 0) + 1;
+}
+
+export const segById = (w: World, id: number): RoadSegment | undefined => indexes(w).segments.get(id);
+export const nodeById = (w: World, id: number): RoadNode | undefined => indexes(w).nodes.get(id);
 
 const dist = (ax: number, az: number, bx: number, bz: number): number =>
   Math.hypot(ax - bx, az - bz);
@@ -120,6 +143,7 @@ function nearestNode(w: World, x: number, z: number, radius: number): RoadNode |
 function makeNode(w: World, x: number, z: number): RoadNode {
   const n: RoadNode = { id: w.nextNodeId++, x, z, segs: [] };
   w.nodes.push(n);
+  touchGraph(w);
   return n;
 }
 
@@ -135,6 +159,7 @@ function detach(w: World, nodeId: number, segId: number): void {
 
 function retile(w: World, seg: RoadSegment): void {
   seg.tiles = rasterizeRoad(w, seg.type, seg.pts).tiles;
+  touchGraph(w);
 }
 
 /**
@@ -163,6 +188,7 @@ function splitSegment(w: World, seg: RoadSegment, x: number, z: number): RoadNod
   retile(w, seg);
   retile(w, rightSeg);
   w.segments.push(rightSeg);
+  touchGraph(w);
   n.segs.push(seg.id, rightSeg.id);
   if (bNode) {
     bNode.segs = bNode.segs.map((id) => (id === seg.id ? rightSeg.id : id));
@@ -319,6 +345,7 @@ function addPad(w: World, type: RoadType, p: Pt, fixedId: number): number[] {
       };
       retile(w, link);
       w.segments.push(link);
+      touchGraph(w);
       attach(w, join.id, link.id);
       attach(w, nn.id, link.id);
       return [link.id];
@@ -331,6 +358,7 @@ function addPad(w: World, type: RoadType, p: Pt, fixedId: number): number[] {
   };
   retile(w, seg);
   w.segments.push(seg);
+  touchGraph(w);
   attach(w, node.id, seg.id);
   return [seg.id];
 }
@@ -384,6 +412,7 @@ export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmen
     };
     retile(w, seg);
     w.segments.push(seg);
+    touchGraph(w);
     attach(w, na.id, seg.id);
     if (nb.id !== na.id) attach(w, nb.id, seg.id);
     created.push(seg.id);
@@ -484,6 +513,7 @@ function tryMergeNode(w: World, nodeId: number): void {
   attach(w, farNode2, s1.id);
   w.segments = w.segments.filter((s) => s.id !== s2.id);
   w.nodes = w.nodes.filter((n) => n.id !== nodeId);
+  touchGraph(w);
 }
 
 /** Remove a segment; merges straight degree-2 nodes and drops orphan nodes. */
@@ -491,11 +521,12 @@ export function removeSegment(w: World, segId: number): boolean {
   const seg = segById(w, segId);
   if (!seg || seg.fixed) return false;
   w.segments = w.segments.filter((s) => s.id !== segId);
+  touchGraph(w);
   for (const nodeId of [seg.a, seg.b]) {
     detach(w, nodeId, segId);
     const node = nodeById(w, nodeId);
     if (!node) continue;
-    if (node.segs.length === 0) w.nodes = w.nodes.filter((n) => n.id !== nodeId);
+    if (node.segs.length === 0) { w.nodes = w.nodes.filter((n) => n.id !== nodeId); touchGraph(w); }
     else tryMergeNode(w, nodeId);
   }
   return true;
@@ -850,6 +881,7 @@ export function stampRoundabout(w: World, nodeId: number): boolean {
     if (!seg) continue;
     if (seg.a === nodeId && seg.b === nodeId) { // centre pad: swallowed by the island
       w.segments = w.segments.filter((s) => s.id !== segId);
+      touchGraph(w);
       continue;
     }
     const end = seg.a === nodeId ? "a" : "b";
@@ -861,6 +893,7 @@ export function stampRoundabout(w: World, nodeId: number): boolean {
     retile(w, seg);
   }
   w.nodes = w.nodes.filter((n) => n.id !== nodeId);
+  touchGraph(w);
   for (let k = 0; k < 4; k++) {
     const p0 = ring[k], p1 = ring[(k + 1) % 4];
     const ctrl = { x: cx + (p0.x - cx) + (p1.x - cx), z: cz + (p0.z - cz) + (p1.z - cz) };
@@ -883,10 +916,11 @@ export function stampRoundabout(w: World, nodeId: number): boolean {
  * heal into nodes.
  */
 export function rebuildNodes(w: World): void {
-  if (adoptNodes(w)) return;
+  if (adoptNodes(w)) { touchGraph(w); return; }
   const keep = w.segments.map((s) => ({ type: s.type as RoadType, pts: s.pts, fixed: s.fixed, oneWay: s.oneWay, dir: s.dir, roundabout: s.roundabout, elevation: s.elevation }));
   w.segments = [];
   w.nodes = [];
+  touchGraph(w);
   w.nextNodeId = 1;
   for (const s of keep) addSegmentKeepId(w, s.type, s.pts, 0, s.fixed, s.oneWay, s.dir, s.roundabout, s.elevation);
   let maxSeg = 0;
@@ -936,6 +970,7 @@ function adoptNodes(w: World): boolean {
   // Node ids are issued sequentially, so id order is creation order.
   nodes.sort((a, b) => a.id - b.id);
   w.nodes = nodes;
+  touchGraph(w);
   w.nextNodeId = Math.max(w.nextNodeId, maxId + 1, 1);
   for (const n of w.nodes) {
     n.segs = w.segments.filter((s) => s.a === n.id || s.b === n.id).map((s) => s.id);

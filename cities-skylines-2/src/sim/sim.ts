@@ -518,8 +518,13 @@ function extendLots(w: World, blocks: BlockInfo, lots: WorldLot[]): void {
 /** True when tiles were edited behind the lots' back (tests and old saves poke tiles directly). */
 function lotsOutOfSync(w: World): boolean {
   for (const lot of w.lots) {
-    const i = idx(w, lot.x, lot.y);
-    if (w.lotAt[i] !== lot.id || w.zone[i] !== lot.zone || w.level[i] !== lot.level) return true;
+    for (let y = lot.y; y < lot.y + lot.h; y++) {
+      let i = y * w.size + lot.x;
+      const end = i + lot.w;
+      for (; i < end; i++) {
+        if (w.lotAt[i] !== lot.id || w.zone[i] !== lot.zone || w.level[i] !== lot.level) return true;
+      }
+    }
   }
   for (let i = 0; i < w.zone.length; i++) {
     if (!w.zone[i] || blocksBuilding(w, i) || w.facility[i] || w.lotAt[i] >= 0) continue;

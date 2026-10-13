@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTool, newCity, placeRoad, step, CityState } from "./sim";
-import { findPath, newTraffic, tickTraffic, ROAD_CAPACITY, ROAD_SPEED } from "./traffic";
+import { findPath, indexSignals, newTraffic, redCrawl, tickTraffic, ROAD_CAPACITY, ROAD_SPEED } from "./traffic";
+import { signalNodes, signalPhase } from "./roads";
 import { ROAD, FAC, cidx, idx, updateConnectivity } from "./world";
 
 /** Dry, flat ground around the entry so layouts do not depend on the seed. */
@@ -77,6 +78,40 @@ function town(seed = 5) {
 }
 
 describe("traffic simulation", () => {
+  it("matches the old brute-force signal scan on a randomised grid", () => {
+    const s = newCity(91, 64), w = s.world;
+    w.heights.fill(.35); s.money = 1e9;
+    for (let y = 12; y <= 44; y += 8) line(s, ROAD.AVENUE, 5, y, 55, y);
+    for (let x = 10; x <= 50; x += 8) line(s, ROAD.STREET, x, 7, x, 51);
+    const t = newTraffic(w.size);
+    t.sigNodes = signalNodes(w); t.sigByTile = indexSignals(w, t.sigNodes);
+    const brute = (tile: number, next: number, phase: 0 | 1) => {
+      const hx = next % w.size - tile % w.size;
+      const hz = ((next / w.size) | 0) - ((tile / w.size) | 0);
+      if (!hx && !hz) return 1;
+      const hl = Math.hypot(hx, hz), cx = tile % w.size + .5, cz = ((tile / w.size) | 0) + .5;
+      for (const sn of t.sigNodes) {
+        const vx = sn.x - cx, vz = sn.z - cz, d = Math.hypot(vx, vz);
+        if (d > 1.7 || d < 1e-6 || (vx * hx + vz * hz) / (d * hl) < .5) continue;
+        let bd = -Infinity, best = 0;
+        for (let k = 0; k < sn.arms.length; k++) {
+          const score = -(sn.arms[k].dx * hx / hl + sn.arms[k].dz * hz / hl);
+          if (score > bd) { bd = score; best = k; }
+        }
+        if (bd > .3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return .3;
+      }
+      return 1;
+    };
+    let seed = 1234567;
+    const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let n = 0; n < 2000; n++) {
+      const x = 1 + (rnd() * 62 | 0), y = 1 + (rnd() * 62 | 0), d = dirs[rnd() * 4 | 0];
+      const tile = idx(w, x, y), next = idx(w, x + d[0], y + d[1]), phase = signalPhase(rnd() * 40);
+      expect(redCrawl(w, t, tile, next, phase)).toBe(brute(tile, next, phase));
+    }
+  });
+
   it("spawns commuters, moves them, and completes trips", () => {
     const { s, t } = town();
     for (let i = 0; i < 600; i++) tickTraffic(s, t, 0.1);
