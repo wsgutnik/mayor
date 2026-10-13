@@ -6,6 +6,8 @@ export interface InputHooks {
   /** Called for every tile the active tool should touch while painting. */
   /** `first` is true for the tile where the stroke began (one-shot tools use only that). */
   paint(tile: Tile, first: boolean): void;
+  /** Oriented zoning: every ground point of the stroke, resampled every 0.5 tiles. */
+  paintPoint?(p: { x: number; z: number }, first: boolean): void;
   /** True when the current tool paints; false means one-finger drag pans. */
   paintsWithPrimary(): boolean;
   /** Mouse moved with no button held. */
@@ -34,6 +36,19 @@ export function lineTiles(a: Tile, b: Tile): Tile[] {
   return out;
 }
 
+/** Points on a ground stroke, including both endpoints, no more than `step` tiles apart. */
+export function strokePoints(a: { x: number; z: number }, b: { x: number; z: number }, step = 0.5): { x: number; z: number }[] {
+  const dist = Math.hypot(b.x - a.x, b.z - a.z);
+  if (dist <= 1e-9) return [{ x: a.x, z: a.z }];
+  const n = Math.max(1, Math.ceil(dist / step));
+  const out: { x: number; z: number }[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
+  }
+  return out;
+}
+
 /**
  * Mouse: left = tool, right = pan, middle = rotate, wheel = zoom, WASD/arrows pan, Q/E rotate.
  * Touch: one finger = tool (or pan with the hand tool), two fingers = pan + pinch + twist.
@@ -44,6 +59,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   const pointers = new Map<number, { x: number; y: number }>();
   let mode: "none" | "paint" | "pan" | "rotate" | "gesture" = "none";
   let last: Tile | null = null;
+  let lastPoint: { x: number; z: number } | null = null;
   let prev = { x: 0, y: 0 };
   let downAt = { x: 0, y: 0, t: 0 };
   let travelled = 0;
@@ -60,6 +76,14 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   };
 
   const paintAt = (cx: number, cy: number) => {
+    if (hooks.paintPoint) {
+      const p = r.pickPoint(cx, cy);
+      if (!p) return;
+      const first = lastPoint === null;
+      for (const q of lastPoint ? strokePoints(lastPoint, p) : [p]) hooks.paintPoint(q, first);
+      lastPoint = p;
+      return;
+    }
     const t = r.pick(cx, cy);
     if (!t) return;
     const first = last === null;
@@ -77,6 +101,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     if (pointers.size >= 2) {
       mode = "gesture";
       last = null;
+      lastPoint = null;
       gesture = measure();
       return;
     }
@@ -87,7 +112,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
       } else if (e.button === 2) mode = "pan";
       else if (e.button === 1) mode = "rotate";
     } else if (hooks.paintsWithPrimary()) {
-      mode = "paint"; last = null; paintAt(e.clientX, e.clientY);
+      mode = "paint"; last = null; lastPoint = null; paintAt(e.clientX, e.clientY);
     } else mode = "pan";
   };
 
@@ -119,7 +144,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     }
     pointers.delete(e.pointerId);
     if (pointers.size < 2) gesture = null;
-    if (pointers.size === 0) { mode = "none"; last = null; }
+    if (pointers.size === 0) { mode = "none"; last = null; lastPoint = null; }
     else if (mode === "gesture") {
       // Remaining finger shouldn't suddenly paint; wait for a fresh touch.
       mode = "none";
@@ -130,7 +155,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   const cancel = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) gesture = null;
-    if (pointers.size === 0) { mode = "none"; last = null; }
+    if (pointers.size === 0) { mode = "none"; last = null; lastPoint = null; }
     else if (mode === "gesture") mode = "none";
   };
 

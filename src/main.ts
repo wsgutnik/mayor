@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, CityState, isFacilityTool, newCity, placeRoad, planRoad, step, syncLots, ToolId } from "./sim/sim";
+import { applyTool, applyZoneAt, bulldozeAt, CityState, getZoneBlocks, isFacilityTool, newCity, placeRoad, planRoad, step, syncLots, ToolId } from "./sim/sim";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
 import { Inspector } from "./ui/inspector";
@@ -11,7 +11,8 @@ import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
-import { Pt, ROAD_NAME, RoadType, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { Pt, ROAD_NAME, RoadType, ZONE, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { diamondRamps, summarizeCrossings } from "./sim/crossings";
 import { addSegment } from "./sim/roads";
 import { setLang, tr, trReason, getLang } from "./i18n";
@@ -342,9 +343,39 @@ function onTap(cx: number, cy: number): void {
 }
 
 let lastToast = "";
+const ZONE_BY_TOOL = { res: ZONE.RES, com: ZONE.COM, ind: ZONE.IND } as const;
+let lastPaintCell = "";
+
+/** Oriented zoning paints cells under the pointer at ground-point precision (diagonal and curved streets). */
+function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
+  const oriented = state.world.zoning === "oriented";
+  const zone = (ZONE_BY_TOOL as Record<string, number | undefined>)[tool];
+  if (first) lastPaintCell = "";
+  if (oriented && (zone !== undefined || tool === "bulldoze")) {
+    const set = getZoneBlocks(state.world);
+    const c = nearestCell(set, p.x, p.z, 0.75);
+    const key = c ? `${c.seg}:${c.side}:${c.block}:${c.row}:${c.col}` : `t${Math.floor(p.x)},${Math.floor(p.z)}`;
+    if (key === lastPaintCell) return;
+    lastPaintCell = key;
+    const res = tool === "bulldoze" ? bulldozeAt(state, p.x, p.z) : applyZoneAt(state, zone as 1 | 2 | 3, p.x, p.z, { radius: 0 });
+    if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
+    if (res.ok) lastToast = "";
+    return;
+  }
+  const t = { x: Math.floor(p.x), y: Math.floor(p.z) };
+  const key = `t${t.x},${t.y}`;
+  if (!first && key === lastPaintCell) return;
+  lastPaintCell = key;
+  if (isFacilityTool(tool) && !first) return;
+  const res = applyTool(state, tool, t.x, t.y, roadType);
+  if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
+  if (res.ok) lastToast = "";
+}
+
 bindInput(renderer, {
   paintsWithPrimary: () => tool !== "pan" && !placing(),
   tap: (cx, cy) => onTap(cx, cy),
+  paintPoint: (p, first) => paintGroundPoint(p, first),
   paint: (tile, first) => {
     // Facilities are expensive: place one per click, never along a drag.
     if (isFacilityTool(tool) && !first) return;
@@ -365,6 +396,12 @@ bindInput(renderer, {
         const t = { x: Math.floor(raw.x), y: Math.floor(raw.z) };
         renderer.setHover(t, toolColor("road"));
       }
+      return;
+    }
+    if (state.world.zoning === "oriented" && ((ZONE_BY_TOOL as Record<string, number | undefined>)[tool] !== undefined || tool === "bulldoze")) {
+      const c = renderer.pickCell(cx, cy);
+      const b = c ? (getZoneBlocks(state.world).blocks.get(`${c.seg}:${c.side}:${c.block}`)) : undefined;
+      renderer.setHoverCell(c && b ? cellPose(b, c.row, c.col) : null, toolColor(tool));
       return;
     }
     const t = renderer.pick(cx, cy);
