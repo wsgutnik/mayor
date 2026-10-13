@@ -102,6 +102,8 @@ export interface HudHooks {
   onFinishRoad(): void;
   onTool(t: ToolId): void;
   onSpeed(s: number): void;
+  onUndo(): void;
+  onRedo(): void;
   onTax(rate: number): void;
   onOverlay(layer: OverlayLayer): void;
 }
@@ -150,6 +152,8 @@ export class Hud {
   private groupBtns = new Map<string, HTMLElement>();
   private flyouts = new Map<string, HTMLElement>();
   private speedBtns: HTMLElement[] = [];
+  private undoBtn!: HTMLButtonElement;
+  private redoBtn!: HTMLButtonElement;
   private toast!: HTMLElement;
   private toastTimer = 0;
   private readout!: HTMLElement;
@@ -225,6 +229,18 @@ export class Hud {
       speed.appendChild(b);
       this.speedBtns.push(b);
     });
+    const undo = el("button", "speed-btn undo-btn", "↩");
+    undo.title = tr("Undo");
+    undo.setAttribute("aria-label", tr("Undo"));
+    undo.addEventListener("click", () => this.hooks.onUndo());
+    speed.appendChild(undo);
+    this.undoBtn = undo;
+    const redo = el("button", "speed-btn undo-btn", "↪");
+    redo.title = tr("Redo");
+    redo.setAttribute("aria-label", tr("Redo"));
+    redo.addEventListener("click", () => this.hooks.onRedo());
+    speed.appendChild(redo);
+    this.redoBtn = redo;
     const menu = el("button", "speed-btn menu-btn", `<img class="ic-img sm" src="/ui/kit/ico-engrenagem.png" alt="">`);
     menu.title = tr("Menu: save, load, new city");
     menu.setAttribute("aria-label", tr("Menu: save, load, new city"));
@@ -550,6 +566,12 @@ export class Hud {
   setSpeed(s: number): void {
     const order = [0, 1, 2, 4];
     this.speedBtns.forEach((b, i) => b.classList.toggle("active", order[i] === s));
+  }
+
+  /** Enable/disable the Undo/Redo buttons after every history change. */
+  setUndoRedo(canUndo: boolean, canRedo: boolean): void {
+    this.undoBtn.disabled = !canUndo;
+    this.redoBtn.disabled = !canRedo;
   }
 
   /** Highlight the active infoview (also used by the U keyboard shortcut). */

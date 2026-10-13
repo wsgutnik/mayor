@@ -1,6 +1,8 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, bulldozeAt, CityState, getZoneBlocks, isFacilityTool, newCity, placeRoad, planRoad, step, syncLots, ToolId } from "./sim/sim";
+import { applyTool, applyZoneAt, bulldozeAt, CityState, getZoneBlocks, isFacilityTool, newCity, placeRoad, planRoad, step, syncLots, ToolId, ToolResult } from "./sim/sim";
+import { History } from "./sim/history";
+import { deserialize, serialize } from "./sim/save";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
 import { Inspector } from "./ui/inspector";
@@ -25,6 +27,8 @@ let prefs: Prefs = loadPrefs();
 setLang(prefs.lang);
 applyUiPrefs(prefs);
 let state: CityState = newCity(1337);
+/** Snapshot history of player actions (undo/redo); the simulation itself is untouched. */
+const history = new History();
 const app = document.getElementById("app")!;
 const view = document.createElement("div");
 view.className = "view";
@@ -72,22 +76,65 @@ function makeHud(): Hud {
   onMenu: () => menu.toggle(),
   onCreateLine: () => {
     const kind = tool === "metroline" ? "metro" : "bus";
-    const res = createLine(state, kind, lineDraft);
+    const res = attempt(() => createLine(state, kind, lineDraft));
     if (res.ok) { hud.showToast(tr("Line created")); cancelDraft(); } else hud.showToast(trReason(res.reason));
   },
   onLineVehicles: (id, delta) => {
     const line = state.world.lines.find((l) => l.id === id);
     if (!line) return;
-    const res = setLineVehicles(state, id, line.vehicles + delta);
+    const res = attempt(() => setLineVehicles(state, id, line.vehicles + delta));
     if (!res.ok) hud.showToast(trReason(res.reason));
   },
-  onRemoveLine: (id) => removeLine(state, id),
+  onRemoveLine: (id) => {
+    if (!state.world.lines.some((l) => l.id === id)) return;
+    history.push(serialize(state));
+    removeLine(state, id);
+    refreshHistoryButtons();
+  },
+  onUndo: () => doUndo(),
+  onRedo: () => doRedo(),
   });
 }
 let hud = makeHud();
 hud.setTool(tool);
 hud.setSpeed(speed);
 hud.setTips(prefs.tips);
+refreshHistoryButtons();
+
+/**
+ * Run a one-shot player mutation with undo support: the pre-action snapshot is
+ * pushed first, and popped back off when the action reports failure.
+ */
+function attempt(run: () => ToolResult): ToolResult {
+  history.push(serialize(state));
+  const res = run();
+  if (!res.ok) history.pop();
+  refreshHistoryButtons();
+  return res;
+}
+
+function refreshHistoryButtons(): void {
+  hud.setUndoRedo(history.canUndo, history.canRedo);
+}
+
+function doUndo(): void {
+  const snap = history.undo(serialize(state));
+  if (snap === null) return;
+  restoreSnapshot(snap, tr("Undone"));
+}
+
+function doRedo(): void {
+  const snap = history.redo(serialize(state));
+  if (snap === null) return;
+  restoreSnapshot(snap, tr("Redone"));
+}
+
+/** Restore a history snapshot through the same path as loading a save. Money refunds: it is inside the snapshot. */
+function restoreSnapshot(snap: string, msg: string): void {
+  swapCity(deserialize(snap));
+  hud.showToast(msg);
+  refreshHistoryButtons();
+}
 
 /** Rebuild the HUD in the current language, keeping what the player had selected. */
 function rebuildHud(): void {
@@ -97,16 +144,26 @@ function rebuildHud(): void {
   cancelDraft();
   menu.raise();
   menu.refresh();
+  refreshHistoryButtons();
 }
 
 /** Replace the running city (load or new game); everything player-facing resets with it. */
 function useCity(next: CityState): void {
+  swapCity(next);
+  history.clear();
+  refreshHistoryButtons();
+}
+
+/** Swap the running city: renderer, traffic, drafts, selection and inspector all reset. Undo/redo reuse this so a restore looks exactly like a load. */
+function swapCity(next: CityState): void {
   state = next;
   state.world.zoning = prefs.zoning;   // the oriented model is opt-in until the cutover (docs/process/05-oriented-lots.md)
   traffic = newTraffic(state.world.size);
   renderer.setWorld(state.world);
   renderer.setTraffic(traffic);
   cancelDraft();
+  inspector.hide();
+  renderer.setHover(null);
   seenFires = state.fires;
   lastMonthSaved = Math.floor(state.day / 30);
 }
@@ -296,12 +353,14 @@ function stampInterchangeAt(cx: number, cy: number): void {
   const ramps = diamondRamps(cxp, czp, dirOf(hwSeg.pts), dirOf(crossSeg.pts));
   const cost = Math.round(ramps.reduce((a, r) => a + segmentLength(r), 0) * 22);
   if (state.money < cost) { hud.showToast(trReason("Not enough money")); return; }
+  history.push(serialize(state));
   for (const ramp of ramps) addSegment(w, 4, ramp);
   rebuildRoadRaster(w);
   state.money -= cost;
   state.monthExpenses += cost;
   w.coverageDirty = true;
   w.revision++;
+  refreshHistoryButtons();
   hud.showToast(tr("Interchange"));
 }
 
@@ -321,7 +380,7 @@ function onTap(cx: number, cy: number): void {
   if (tool === "roundabout") {
     const raw = renderer.pickPoint(cx, cy);
     if (!raw) return;
-    const res = applyTool(state, "roundabout", Math.floor(raw.x), Math.floor(raw.z));
+    const res = attempt(() => applyTool(state, "roundabout", Math.floor(raw.x), Math.floor(raw.z)));
     if (!res.ok) hud.showToast(trReason(res.reason));
     return;
   }
@@ -344,7 +403,7 @@ function onTap(cx: number, cy: number): void {
     return;
   }
   const seg = currentSegment()!;
-  const res = placeRoad(state, roadType, seg.pts, roadLevel);
+  const res = attempt(() => placeRoad(state, roadType, seg.pts, roadLevel));
   if (res.ok) {
     // Keep drawing from the end point, like a continuous road.
     draft = [p];
@@ -361,12 +420,30 @@ function onTap(cx: number, cy: number): void {
 let lastToast = "";
 const ZONE_BY_TOOL = { res: ZONE.RES, com: ZONE.COM, ind: ZONE.IND } as const;
 let lastPaintCell = "";
+let strokeActive = false;
+let strokeOk = false;
+
+/** A paint/drag stroke is ONE history entry: push on stroke start… */
+function strokeStart(): void {
+  history.push(serialize(state));
+  strokeActive = true;
+  strokeOk = false;
+  refreshHistoryButtons();
+}
+
+/** …and drop the entry when the whole stroke changed nothing. */
+function strokeEnd(): void {
+  if (!strokeActive) return;
+  strokeActive = false;
+  if (!strokeOk) history.pop();
+  refreshHistoryButtons();
+}
 
 /** Oriented zoning paints cells under the pointer at ground-point precision (diagonal and curved streets). */
 function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
   const oriented = state.world.zoning === "oriented";
   const zone = (ZONE_BY_TOOL as Record<string, number | undefined>)[tool];
-  if (first) lastPaintCell = "";
+  if (first) { lastPaintCell = ""; strokeStart(); }
   if (oriented && (zone !== undefined || tool === "bulldoze")) {
     const set = getZoneBlocks(state.world);
     const c = nearestCell(set, p.x, p.z, 0.75);
@@ -375,7 +452,7 @@ function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
     lastPaintCell = key;
     const res = tool === "bulldoze" ? bulldozeAt(state, p.x, p.z) : applyZoneAt(state, zone as 1 | 2 | 3, p.x, p.z, { radius: 0 });
     if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
-    if (res.ok) lastToast = "";
+    if (res.ok) { lastToast = ""; strokeOk = true; }
     return;
   }
   const t = { x: Math.floor(p.x), y: Math.floor(p.z) };
@@ -385,7 +462,7 @@ function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
   if (isFacilityTool(tool) && !first) return;
   const res = applyTool(state, tool, t.x, t.y, roadType);
   if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
-  if (res.ok) lastToast = "";
+  if (res.ok) { lastToast = ""; strokeOk = true; }
 }
 
 bindInput(renderer, {
@@ -393,12 +470,14 @@ bindInput(renderer, {
   tap: (cx, cy) => onTap(cx, cy),
   paintPoint: (p, first) => paintGroundPoint(p, first),
   paint: (tile, first) => {
+    if (first) strokeStart();
     // Facilities are expensive: place one per click, never along a drag.
     if (isFacilityTool(tool) && !first) return;
     const res = applyTool(state, tool, tile.x, tile.y, roadType);
     if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
-    if (res.ok) lastToast = "";
+    if (res.ok) { lastToast = ""; strokeOk = true; }
   },
+  strokeEnd: () => strokeEnd(),
   hover: (cx, cy) => {
     if (tool === "pan") { renderer.setHover(null); return; }
     if (lineTool()) { renderer.setHover(renderer.pick(cx, cy), toolColor(tool)); return; }
@@ -426,6 +505,11 @@ bindInput(renderer, {
 });
 
 window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && !isEditingText(e)) {
+    const k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey) { e.preventDefault(); doUndo(); return; }
+    if ((k === "z" && e.shiftKey) || k === "y") { e.preventDefault(); doRedo(); return; }
+  }
   if (e.key === "Escape") {
     if (menu.isOpen) menu.close();
     else if (inspector.isOpen) { inspector.hide(); renderer.setHover(null); }

@@ -59,6 +59,7 @@ const PT: Record<string, string> = {
   "Tap a {kind} {what}": "Toque em um {what}",
   // buttons
   "Finish road": "Terminar estrada", "Cancel": "Cancelar", "Create line": "Criar linha",
+  "Undo": "Desfazer", "Redo": "Refazer",
   // menu
   "Autosave": "Autosave", "Continue": "Continuar", "Slot {n}": "Slot {n}", "Empty": "Vazio",
   "Created at the start of each month": "Criado no início de cada mês",
@@ -96,6 +97,7 @@ const PT: Record<string, string> = {
   "Save file downloaded": "Arquivo de save baixado", "Saved to slot {n}": "Salvo no slot {n}",
   "New city, seed {n}": "Nova cidade, semente {n}",
   "Autosave found: open the menu to continue": "Autosave encontrado: abra o menu para continuar",
+  "Undone": "Desfeito", "Redone": "Refeito",
   "Fire! A building burned down. Build a fire station.": "Incêndio! Um prédio queimou. Construa um posto de bombeiros.",
   // sim reasons
   "Not enough money": "Dinheiro insuficiente", "Cannot build on water": "Não é possível construir na água",

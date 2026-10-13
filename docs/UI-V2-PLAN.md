@@ -19,7 +19,7 @@ documentation without running the game; this file records what was checked again
 | Cycle | Scope | Status |
 |---|---|---|
 | UI-1 | Scale and opacity prefs, collapsible and persistent panels with a "hide panels" toggle, informative road-build readout | Done (Muse spark): `uiScale`/`uiOpacity` prefs and Settings sliders, collapsible persistent panels + H key, road-build readout. Known: at scale 1.4 on 1024 px the toolbar scrolls horizontally (last button partly clipped); sliders apply on Apply, not live |
-| UI-2 | Road Builder V2: configurable snapping, parallel roads, replace/upgrade, Undo/Redo via a command log | Planned; needs sim work |
+| UI-2 | Road Builder V2: configurable snapping, parallel roads, replace/upgrade, Undo/Redo | Undo/Redo done (snapshot history of the save, 30 steps, Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y, HUD buttons; tax-rate changes are not recorded). Snapping, parallel roads and replace/upgrade planned; need sim work |
 | UI-3 | Zoning V2: fill / paint / marquee, densities, lot visualisation | Planned; needs sim work |
 | UI-4 | Inspector diagnostics ("why is this building not growing"), economy dashboard, service/traffic alerts | Planned; numbers must come from the real simulation |
 | UI-5 | iPad layout: bottom sheets, persistent build controls, compact/comfortable modes; onboarding, encyclopedia | Planned |

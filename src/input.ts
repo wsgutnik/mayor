@@ -10,6 +10,8 @@ export interface InputHooks {
   paintPoint?(p: { x: number; z: number }, first: boolean): void;
   /** True when the current tool paints; false means one-finger drag pans. */
   paintsWithPrimary(): boolean;
+  /** A paint stroke finished (pointer released, cancelled, or turned into a camera gesture). */
+  strokeEnd?(): void;
   /** Mouse moved with no button held. */
   hover(clientX: number, clientY: number): void;
   /** A press-and-release without dragging, when the primary tool does not paint. */
@@ -75,6 +77,14 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     };
   };
 
+  /** End the paint stroke in progress, if any (the markers are only set while painting). */
+  const endStroke = () => {
+    if (last === null && lastPoint === null) return;
+    last = null;
+    lastPoint = null;
+    hooks.strokeEnd?.();
+  };
+
   const paintAt = (cx: number, cy: number) => {
     if (hooks.paintPoint) {
       const p = r.pickPoint(cx, cy);
@@ -100,8 +110,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     // A second (or a stray third) contact turns the stroke into a camera gesture.
     if (pointers.size >= 2) {
       mode = "gesture";
-      last = null;
-      lastPoint = null;
+      endStroke();
       gesture = measure();
       return;
     }
@@ -144,7 +153,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     }
     pointers.delete(e.pointerId);
     if (pointers.size < 2) gesture = null;
-    if (pointers.size === 0) { mode = "none"; last = null; lastPoint = null; }
+    if (pointers.size === 0) { mode = "none"; endStroke(); }
     else if (mode === "gesture") {
       // Remaining finger shouldn't suddenly paint; wait for a fresh touch.
       mode = "none";
@@ -155,7 +164,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   const cancel = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) gesture = null;
-    if (pointers.size === 0) { mode = "none"; last = null; lastPoint = null; }
+    if (pointers.size === 0) { mode = "none"; endStroke(); }
     else if (mode === "gesture") mode = "none";
   };
 
