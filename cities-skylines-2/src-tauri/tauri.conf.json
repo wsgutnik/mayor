@@ -39,6 +39,11 @@
       "debugApplicationIdSuffix": ".debug"
     },
     "category": "Game",
-    "shortDescription": "City builder for Mac and Windows"
+    "shortDescription": "City builder for Mac and Windows",
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist"
+    }
   }
 }

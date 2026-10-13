@@ -52,6 +52,10 @@ lotes validados só no tile âncora ao sincronizar.
 
 CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cada merge e `npm run package` para o app. O workflow do GitHub Actions foi removido.
 
+## Distribuição Mac
+
+- Assinatura ad hoc coerente pronta (`npm run package:adhoc`); assinatura Developer ID e notarização prontas como script (`npm run package:signed`) mas **dependem de certificado e credenciais da Apple**, que não existem neste Mac (nenhuma identidade no chaveiro). Passo a passo em `docs/SIGNING.md`.
+
 ## Pendências de assets
 
 - Kit de subsolo em GLB (tubos, bombas, válvulas) e peças de lote (jardim, estacionamento, praça, calçada de esquina): o `muse-world` não terminou; o jogo usa geometria procedural.

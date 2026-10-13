@@ -13,6 +13,8 @@ npx vitest run        # testes (225+), têm de ficar verdes
 npm run build         # tipos + bundle
 npm run ci            # CI local: tipos, testes e build (sempre antes de mesclar ou empacotar)
 npm run package       # CI local + app desktop (Tauri); pacotes são sempre gerados localmente
+npm run package:adhoc # idem com assinatura ad hoc coerente (sem conta da Apple)
+npm run package:signed # Developer ID + notarização (ver docs/SIGNING.md; precisa de certificado e credenciais no chaveiro)
 npm run desktop:build # app de Mac (src-tauri/target/release/bundle)
 blender -b --factory-startup --python blender/build_all.py -- --out public/models --previews docs/img/models   # modelos GLB
 ```

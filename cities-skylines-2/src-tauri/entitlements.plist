@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    Hardened runtime is on (required for notarization). The game is a Tauri shell around WKWebView, which runs in
+    Apple's own out-of-process web content process, so the host app needs no JIT or unsigned-memory exceptions.
+    Add keys here only if a notarized build fails to launch, and say why next to the key.
+  -->
+</dict>
+</plist>

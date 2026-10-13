@@ -36,4 +36,4 @@ Pré-requisitos: Node 22, Rust (stable) e o WebView2 (já vem no Windows 11). Ge
 
 ## Mac (dmg pronto)
 
-O instalador mais recente fica nas Releases do repositório privado: https://github.com/wsgutnik/mayor/releases (arquivo `Mayor-*-aarch64.dmg`, Apple Silicon). Abra o dmg, arraste Mayor para Aplicativos e, na primeira abertura, use clique direito > Abrir (o app não é assinado). Gerado localmente com `npm run package`.
+O instalador mais recente fica nas Releases do repositório privado: https://github.com/wsgutnik/mayor/releases (arquivo `Mayor-*-aarch64.dmg`, Apple Silicon). Abra o dmg, arraste Mayor para Aplicativos e, na primeira abertura, use clique direito > Abrir (o app não é assinado). Gerado localmente com `npm run package`. Sobre o aviso de app não assinado e como notarizar: [SIGNING.md](SIGNING.md).

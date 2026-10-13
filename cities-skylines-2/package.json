@@ -13,7 +13,10 @@
     "desktop:build": "tauri build",
     "maps": "node scripts/convert-maps.mjs",
     "ci": "tsc --noEmit && vitest run && vite build",
-    "package": "npm run ci && tauri build"
+    "package": "npm run ci && tauri build",
+    "package:signed": "bash scripts/sign-mac.sh",
+    "package:adhoc": "bash scripts/sign-mac.sh --adhoc",
+    "verify:mac": "bash scripts/sign-mac.sh --verify"
   },
   "dependencies": {
     "three": "^0.186.1"
