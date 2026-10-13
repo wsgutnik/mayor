@@ -17,12 +17,18 @@ describe("quality tiers", () => {
 
   it("climbs in cost from low to high", () => {
     const tiers = ["low", "medium", "high"] as const;
+    const aniso = tiers.map((q) => QUALITY_PROFILE[q].aniso);
     const shadow = tiers.map((q) => QUALITY_PROFILE[q].shadow);
+    const tex = tiers.map((q) => QUALITY_PROFILE[q].tex === "hd" ? 1 : 0);
     const veg = tiers.map((q) => QUALITY_PROFILE[q].veg);
     const lod = tiers.map((q) => QUALITY_PROFILE[q].lodDist);
+    expect([...aniso].sort((a, b) => a - b)).toEqual(aniso);
     expect([...shadow].sort((a, b) => a - b)).toEqual(shadow);
+    expect([...tex].sort((a, b) => a - b)).toEqual(tex);
     expect([...veg].sort((a, b) => a - b)).toEqual(veg);
     expect([...lod].sort((a, b) => a - b)).toEqual(lod);
+    expect(QUALITY_PROFILE.low.padTex).toBe(false);
+    expect(QUALITY_PROFILE.high.padTex).toBe(true);
     expect(QUALITY_PROFILE.low.splat).toBe("off");
     expect(QUALITY_PROFILE.high.splat).toBe("hd");
   });
@@ -51,4 +57,3 @@ describe("zoning preference", () => {
     expect(w.olots).toBeUndefined();
   });
 });
-

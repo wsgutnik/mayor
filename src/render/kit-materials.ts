@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { LoadedModel } from "./glb-models";
+import type { TextureTier } from "../prefs";
 
 /**
  * The Blender GLBs carry geometry, UVs, ambient-occlusion vertex colours and material names; the textures
@@ -12,6 +13,9 @@ let patterns: Patterns | null = null;
 let patternsPromise: Promise<Patterns> | null = null;
 const textures = new Map<string, THREE.Texture>();
 const materials = new Map<string, THREE.MeshStandardMaterial>();
+let textureTier: TextureTier = "sd";
+let textureAniso = 4;
+let maxTextureAniso = 4;
 
 /** Load the pattern table once; resolves to an empty table when it is missing, so models still show. */
 export function loadPatterns(): Promise<Patterns> {
@@ -23,17 +27,51 @@ export function loadPatterns(): Promise<Patterns> {
   return patternsPromise;
 }
 
+export type TextureExists = (name: string) => boolean;
+
+/** Texture base name for a quality tier; `exists` is injectable for tests and manifests. */
+export function textureName(name: string, tier: TextureTier, exists: TextureExists = () => true): string {
+  if (tier !== "hd") return name;
+  const hd = `${name}_hd`;
+  return exists(hd) ? hd : name;
+}
+
+export function configureKitTextures(tier: TextureTier, aniso: number, maxAniso: number): void {
+  textureTier = tier;
+  textureAniso = aniso;
+  maxTextureAniso = maxAniso;
+  for (const t of textures.values()) t.anisotropy = Math.min(textureAniso, maxTextureAniso);
+}
+
 function texture(name: string): THREE.Texture | null {
   if (typeof document === "undefined") return null; // tests and other non-browser hosts
-  let t = textures.get(name);
+  const resolved = textureName(name, textureTier);
+  let t = textures.get(resolved);
   if (!t) {
-    t = new THREE.TextureLoader().load(`/textures/${name}.png`);
+    const prep = (tex: THREE.Texture) => {
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = Math.min(textureAniso, maxTextureAniso);
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      return tex;
+    };
+    const loader = new THREE.TextureLoader();
+    t = loader.load(`/textures/${resolved}.png`, undefined, undefined, () => {
+      if (resolved === name) return;
+      const target = t!;
+      loader.load(`/textures/${name}.png`, (fallback) => {
+        prep(fallback);
+        target.image = fallback.image;
+        target.needsUpdate = true;
+      });
+    });
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
+    t.anisotropy = Math.min(textureAniso, maxTextureAniso);
     t.generateMipmaps = true;
     t.minFilter = THREE.LinearMipmapLinearFilter;
-    textures.set(name, t);
+    textures.set(resolved, t);
   }
   return t;
 }

@@ -35,10 +35,10 @@ export interface RoadDetailMaps {
 
 let cached: RoadDetailMaps | null = null;
 
-function prep(tex: THREE.Texture, maxAniso: number): THREE.Texture {
+function prep(tex: THREE.Texture, maxAniso: number, aniso: number): THREE.Texture {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = Math.min(8, maxAniso);
+  tex.anisotropy = Math.min(aniso, maxAniso);
   return tex;
 }
 
@@ -71,9 +71,13 @@ export function averageOfTexture(tex: THREE.Texture): [number, number, number] {
  * (asphalt) or a neutral 1 px detail (kerb/sidewalk). Cached process-wide.
  */
 export function loadRoadDetailMaps(
-  fallbackAsphalt: THREE.Texture, maxAniso: number, onReady: (m: RoadDetailMaps) => void,
+  fallbackAsphalt: THREE.Texture, maxAniso: number, aniso: number, onReady: (m: RoadDetailMaps) => void,
 ): void {
-  if (cached) { onReady(cached); return; }
+  if (cached) {
+    for (const t of [cached.asphalt, cached.kerb, cached.sidewalk]) t.anisotropy = Math.min(aniso, maxAniso);
+    onReady(cached);
+    return;
+  }
   const loader = new THREE.TextureLoader();
   const files: [keyof Pick<RoadDetailMaps, "asphalt" | "kerb" | "sidewalk">, string][] = [
     ["asphalt", "/textures/asphalt_hd.png"],
@@ -98,7 +102,7 @@ export function loadRoadDetailMaps(
   for (const [key, url] of files) {
     loader.load(
       url,
-      (t) => done(key, prep(t, maxAniso)),
+      (t) => done(key, prep(t, maxAniso, aniso)),
       undefined,
       () => done(key, key === "asphalt" ? fallbackAsphalt : neutral),
     );
@@ -126,10 +130,15 @@ let atlasCache: RoadAtlasMaps | null = null;
  */
 export function loadRoadAtlas(
   maxAniso: number,
+  aniso: number,
   onReady: (m: RoadAtlasMaps) => void,
   onFallback: () => void,
 ): void {
-  if (atlasCache) { onReady(atlasCache); return; }
+  if (atlasCache) {
+    for (const t of Object.values(atlasCache)) t.anisotropy = Math.min(aniso, maxAniso);
+    onReady(atlasCache);
+    return;
+  }
   const loader = new THREE.TextureLoader();
   const files: [keyof RoadAtlasMaps, string][] = [
     ["street", "/textures/road/road_street.png"],
@@ -152,7 +161,7 @@ export function loadRoadAtlas(
     onReady(out);
   };
   for (const [key, url] of files) {
-    loader.load(url, (t) => { out[key] = prep(t, maxAniso); done(); }, undefined, () => { failed = true; done(); });
+    loader.load(url, (t) => { out[key] = prep(t, maxAniso, aniso); done(); }, undefined, () => { failed = true; done(); });
   }
 }
 

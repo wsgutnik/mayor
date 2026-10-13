@@ -2,6 +2,7 @@ import type { ZoningMode } from "./sim/zonecells";
 import { Lang, detectLang } from "./i18n";
 
 export type Quality = "low" | "medium" | "high";
+export type TextureTier = "sd" | "hd";
 
 export interface Prefs {
   lang: Lang;
@@ -25,7 +26,10 @@ export const QUALITY_PIXEL_CAP: Record<Quality, number> = { low: 1, medium: 1.5,
 /** What each quality tier buys: shadow map, terrain splat set, vegetation, LOD range. */
 export interface QualityProfile {
   pixelCap: number;
-  shadow: 0 | 1024 | 2048;
+  aniso: 2 | 4 | 8 | 16;
+  tex: TextureTier;
+  shadow: 0 | 1024 | 2048 | 4096;
+  padTex: boolean;
   /** Terrain splat: flat vertex colours, 512 px layers, or full 1024 px layers. */
   splat: "off" | "md" | "hd";
   /** Tree/prop scatter multiplier. */
@@ -35,9 +39,9 @@ export interface QualityProfile {
 }
 
 export const QUALITY_PROFILE: Record<Quality, QualityProfile> = {
-  low: { pixelCap: 1, shadow: 0, splat: "off", veg: 0.45, lodDist: 30 },
-  medium: { pixelCap: 1.5, shadow: 1024, splat: "md", veg: 0.75, lodDist: 45 },
-  high: { pixelCap: 2, shadow: 2048, splat: "hd", veg: 1, lodDist: 70 },
+  low: { pixelCap: 1, aniso: 2, tex: "sd", shadow: 0, padTex: false, splat: "off", veg: 0.45, lodDist: 30 },
+  medium: { pixelCap: 1.5, aniso: 4, tex: "sd", shadow: 1024, padTex: true, splat: "md", veg: 0.75, lodDist: 45 },
+  high: { pixelCap: 2, aniso: 8, tex: "hd", shadow: 2048, padTex: true, splat: "hd", veg: 1, lodDist: 70 },
 };
 
 /** Tier back from a pixel cap (mirrors QUALITY_PIXEL_CAP; the scene only gets the cap). */

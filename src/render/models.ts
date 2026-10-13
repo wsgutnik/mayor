@@ -272,20 +272,32 @@ export function buildModels(): ModelSet {
 }
 
 
-/** Window texture: a pale wall with one dark pane per UV cell, and the matching glow map. */
-export function makeWindowTextures(): { map: THREE.CanvasTexture; glow: THREE.CanvasTexture } {
+/** Window texture: a framed pane sheet and the matching glow map. */
+export function makeWindowTextures(anisotropy = 2): { map: THREE.CanvasTexture; glow: THREE.CanvasTexture } {
   const mk = (wall: string, pane: string) => {
     const c = document.createElement("canvas");
-    c.width = c.height = 64;
+    c.width = c.height = 256;
     const g = c.getContext("2d")!;
     g.fillStyle = wall;
-    g.fillRect(0, 0, 64, 64);
+    g.fillRect(0, 0, 256, 256);
+    g.fillStyle = "rgba(20,28,36,0.28)";
+    g.fillRect(48, 44, 160, 168);
+    g.fillStyle = "rgba(255,255,255,0.55)";
+    g.fillRect(54, 50, 148, 156);
     g.fillStyle = pane;
-    g.fillRect(14, 16, 36, 32);
+    g.fillRect(62, 58, 64, 140);
+    g.fillStyle = pane === "#ffffff" ? "#e8f0ff" : "#506b90";
+    g.fillRect(132, 58, 62, 140);
+    g.fillStyle = "rgba(255,255,255,0.45)";
+    g.fillRect(74, 68, 16, 110);
+    g.fillStyle = "rgba(55,45,30,0.32)";
+    g.fillRect(42, 212, 172, 12);
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 2;
+    t.anisotropy = anisotropy;
+    t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
     return t;
   };
   return { map: mk("#ffffff", "#3c5272"), glow: mk("#000000", "#ffffff") };

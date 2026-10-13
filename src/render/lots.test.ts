@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { depthShade, lotCentre, lotFrontTile, lotKerb, lotModelCells, lotYaw } from "./lots";
+import { depthShade, lotCentre, lotFrontTile, lotKerb, lotModelCells, lotYaw, orientedKerb, orientedModelCells, orientedPad } from "./lots";
 
 describe("lot layout", () => {
   it("yaws models to face the street", () => {
@@ -49,5 +49,18 @@ describe("lot layout", () => {
     expect(lotFrontTile({ x: 4, y: 8, w: 3, h: 2, facing: { dx: -1, dy: 0 } })).toEqual({ x: 3, y: 9 });
     expect(lotFrontTile({ x: 4, y: 8, w: 1, h: 1, facing: { dx: 0, dy: 0 } })).toBeNull();
   });
-});
 
+  it("rotates composed model cells for oriented lots", () => {
+    const cells = orientedModelCells({ cx: 10, cz: 20, yaw: Math.PI / 2, w: 2, d: 2 });
+    expect(cells).toHaveLength(4);
+    expect(cells[0].x).toBeCloseTo(9.5);
+    expect(cells[0].z).toBeCloseTo(20.5);
+    expect(cells[3].x).toBeCloseTo(10.5);
+    expect(cells[3].z).toBeCloseTo(19.5);
+  });
+
+  it("returns oriented kerb and pad transforms", () => {
+    expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 19, len: 3, yaw: 0 });
+    expect(orientedPad({ cx: 10, cz: 20, yaw: 0.5, w: 3, d: 2 })).toEqual({ x: 10, z: 20, sx: 3, sz: 2, yaw: 0.5 });
+  });
+});

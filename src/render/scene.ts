@@ -18,8 +18,10 @@ import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 import { UndergroundView } from "./underground";
 import { createRoadDetailMaterial, loadRoadAtlas, loadRoadDetailMaps, RoadDetail } from "./road-material";
 import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat } from "./terrain-splat";
+import { createPlotMaterial } from "./plot-material";
 import { LodSorter } from "./lod";
 import { QUALITY_PROFILE, qualityForPixelCap } from "../prefs";
+import { configureKitTextures } from "./kit-materials";
 import { nodeArms, signalNodes, signalPhase } from "../sim/roads";
 import { PROP_KINDS, PropKind, planProps } from "../sim/props";
 import { PROP_TINT, propGeometry } from "./props";
@@ -145,6 +147,8 @@ export class CityRenderer {
   private roadAtlasReady = false;
   private roadAtlasAllowed = true;
   private maxAniso = 4;
+  private profileAniso = QUALITY_PROFILE.high.aniso as number;
+  private plotTex: THREE.Texture | null = null;
   private lod = new LodSorter();
   private lodBox!: THREE.InstancedMesh;
   private lodDist = 70;
@@ -204,16 +208,20 @@ export class CityRenderer {
       const t = texLoader.load(`/textures/${file}.png`);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
-      t.anisotropy = 4;
+      t.anisotropy = Math.min(this.profileAniso, this.maxAniso);
+      t.generateMipmaps = true;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
       return t;
     };
+    this.maxAniso = this.renderer.capabilities.getMaxAnisotropy();
+    configureKitTextures(QUALITY_PROFILE.high.tex, this.profileAniso, this.maxAniso);
     this.grassTex = detail("grass");
     this.asphaltTex = detail("asphalt");
+    this.plotTex = detail("plot");
     this.splat = createTerrainSplatMaterial();
     this.roadDetail = createRoadDetailMaterial(this.asphaltTex);
-    this.maxAniso = this.renderer.capabilities.getMaxAnisotropy();
-    loadRoadDetailMaps(this.asphaltTex, this.maxAniso, (m) => this.roadDetail.setMaps(m));
-    loadRoadAtlas(this.maxAniso, (m) => {
+    loadRoadDetailMaps(this.asphaltTex, this.maxAniso, this.profileAniso, (m) => this.roadDetail.setMaps(m));
+    loadRoadAtlas(this.maxAniso, this.profileAniso, (m) => {
       this.roadDetail.setAtlas(m);
       this.roadAtlasReady = true;
       if (this.roadMesh) this.rebuildRoads();
@@ -266,7 +274,7 @@ export class CityRenderer {
     this.crossMesh.count = 0;
     this.crossMesh.frustumCulled = false;
     this.scene.add(this.crossMesh);
-    const tex = makeWindowTextures();
+    const tex = makeWindowTextures(Math.min(this.profileAniso, this.maxAniso));
     this.winMat = new THREE.MeshLambertMaterial({
       map: tex.map, vertexColors: true, emissive: new THREE.Color("#ffd98a"), emissiveMap: tex.glow, emissiveIntensity: 0,
     });
@@ -321,7 +329,12 @@ export class CityRenderer {
       own(m);
       return m;
     };
-    this.zones = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
+    this.zones = mk(createPlotMaterial({
+      texture: this.plotTex,
+      anisotropy: this.profileAniso,
+      maxAnisotropy: this.maxAniso,
+      enabled: QUALITY_PROFILE.high.padTex,
+    }));
     this.kerbs = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     // Amber diamonds over buildings missing power or water (red when both are out).
     this.warnMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ toneMapped: false }), cap);
@@ -1374,6 +1387,16 @@ export class CityRenderer {
     this.pixelCap = Math.min(window.devicePixelRatio || 1, cap);
     this.pixelRatio = Math.min(this.pixelRatio, this.pixelCap);
     const profile = QUALITY_PROFILE[qualityForPixelCap(cap)];
+    this.profileAniso = Math.min(profile.aniso, this.maxAniso);
+    configureKitTextures(profile.tex, this.profileAniso, this.maxAniso);
+    for (const t of [this.grassTex, this.asphaltTex, this.plotTex]) {
+      if (t) t.anisotropy = Math.min(profile.aniso, this.maxAniso);
+    }
+    const zoneMat = this.zones?.material;
+    if (zoneMat && !Array.isArray(zoneMat) && "map" in zoneMat) {
+      (zoneMat as THREE.MeshLambertMaterial).map = profile.padTex ? this.plotTex : null;
+      zoneMat.needsUpdate = true;
+    }
     // Road atlas follows the tier: the low tier keeps flat vertex colours.
     const atlasAllowed = qualityForPixelCap(cap) !== "low";
     if (atlasAllowed !== this.roadAtlasAllowed) {
@@ -1381,7 +1404,8 @@ export class CityRenderer {
       if (this.roadMesh) this.rebuildRoads();
     }
     // shadows by tier: off on low, a 1k map on medium, 2k on high
-    const res = profile.shadow;
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const res = profile.shadow === 4096 && (this.renderer.capabilities.maxTextureSize < 8192 || isiOS) ? 2048 : profile.shadow;
     this.sun.castShadow = res > 0;
     if (res > 0 && this.sun.shadow.mapSize.x !== res) {
       this.sun.shadow.mapSize.set(res, res);
@@ -1394,7 +1418,7 @@ export class CityRenderer {
       if (profile.splat === "off") this.splat.setEnabled(false);
       else {
         const tier = profile.splat;
-        loadSplatMaps(tier, this.grassTex, this.maxAniso, (m) => {
+        loadSplatMaps(tier, this.grassTex, this.maxAniso, this.profileAniso, (m) => {
           if (this.splatTier !== tier) return; // the tier moved on mid-load
           this.splat.setMaps(m);
           this.splat.setEnabled(true);
@@ -1425,9 +1449,12 @@ export class CityRenderer {
   }
 
   /** Last LOD pass counts plus live draw stats, for the perf readout. */
-  lodStats(): { lod: boolean; dist: number; total: number; near: number; boxed: number; culled: number; triangles: number; calls: number } {
+  lodStats(): { lod: boolean; dist: number; total: number; near: number; boxed: number; culled: number; triangles: number; calls: number; textures: number } {
     const info = this.renderer.info.render;
-    return { lod: this.lodEnabled, dist: this.lodDist, ...this.lodStatsCache, triangles: info.triangles, calls: info.calls };
+    return {
+      lod: this.lodEnabled, dist: this.lodDist, ...this.lodStatsCache,
+      triangles: info.triangles, calls: info.calls, textures: this.renderer.info.memory.textures,
+    };
   }
 
   /**
@@ -1481,6 +1508,13 @@ export class CityRenderer {
       this.lampMesh.count = this.lodEnabled ? r.kept : r.total;
       total += r.total;
       near += this.lampMesh.count;
+    }
+    for (const m of [this.zones, this.kerbs]) {
+      if (full(m) === 0) { m.count = 0; continue; }
+      const r = this.lod.partition(m, cx, cz, dist);
+      m.count = this.lodEnabled ? r.near : r.total;
+      total += r.total;
+      near += m.count;
     }
     this.lodStatsCache = { total, near, boxed: slots, culled: total - near - slots };
   }

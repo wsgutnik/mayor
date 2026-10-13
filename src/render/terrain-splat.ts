@@ -69,10 +69,10 @@ export interface SplatMaps {
 
 const cache = new Map<SplatTier, SplatMaps>();
 
-function prep(tex: THREE.Texture, maxAniso: number): THREE.Texture {
+function prep(tex: THREE.Texture, maxAniso: number, aniso: number): THREE.Texture {
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = Math.min(8, maxAniso);
+  tex.anisotropy = Math.min(aniso, maxAniso);
   return tex;
 }
 
@@ -99,10 +99,14 @@ function averageOfTexture(tex: THREE.Texture): [number, number, number] {
  * cached per tier. Calls `onReady` once with the full set.
  */
 export function loadSplatMaps(
-  tier: SplatTier, fallback: THREE.Texture, maxAniso: number, onReady: (m: SplatMaps) => void,
+  tier: SplatTier, fallback: THREE.Texture, maxAniso: number, aniso: number, onReady: (m: SplatMaps) => void,
 ): void {
   const hit = cache.get(tier);
-  if (hit) { onReady(hit); return; }
+  if (hit) {
+    for (const t of Object.values(hit.tex)) t.anisotropy = Math.min(aniso, maxAniso);
+    onReady(hit);
+    return;
+  }
   const loader = new THREE.TextureLoader();
   const tex = {} as Record<SplatLayer, THREE.Texture>;
   const avg = {} as Record<SplatLayer, [number, number, number]>;
@@ -119,7 +123,7 @@ export function loadSplatMaps(
   for (const layer of LAYERS) {
     loader.load(
       `/textures/${layer}_${tier}.png`,
-      (t) => done(layer, prep(t, maxAniso)),
+      (t) => done(layer, prep(t, maxAniso, aniso)),
       undefined,
       () => done(layer, fallback),
     );

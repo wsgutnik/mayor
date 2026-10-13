@@ -1,6 +1,7 @@
 import type { WorldLot } from "../sim/world";
 
 type Footprint = Pick<WorldLot, "x" | "y" | "w" | "h">;
+export interface LotFrame { cx: number; cz: number; yaw: number; w: number; d: number }
 
 /** Yaw (three.js rotation.y) so a model whose front is +z faces the lot's street. */
 export function lotYaw(lot: Pick<WorldLot, "facing">): number {
@@ -57,4 +58,31 @@ export function lotFrontTile(lot: Footprint & Pick<WorldLot, "facing">): { x: nu
 /** Brightness for an empty-lot pad by kerb depth (0..3): the front row is full, rear rows shade off. */
 export function depthShade(depth: number): number {
   return depth < 0 ? 0.55 : Math.max(0.6, 1 - depth * 0.13);
+}
+
+function rotateCell(f: LotFrame, ax: number, dz: number): { x: number; z: number } {
+  const s = Math.sin(f.yaw), c = Math.cos(f.yaw);
+  return { x: f.cx + ax * c + dz * s, z: f.cz - ax * s + dz * c };
+}
+
+/** Rotated world positions where composed 1x1 models sit. */
+export function orientedModelCells(f: LotFrame): { x: number; z: number }[] {
+  const cols = f.w <= 2 && f.d <= 2 ? f.w : 2;
+  const rows = f.w <= 2 && f.d <= 2 ? f.d : 2;
+  const out: { x: number; z: number }[] = [];
+  for (let z = 0; z < rows; z++) {
+    for (let x = 0; x < cols; x++) out.push(rotateCell(f, x - (cols - 1) / 2, z - (rows - 1) / 2));
+  }
+  return out;
+}
+
+/** Kerb strip along the front edge of an oriented lot. */
+export function orientedKerb(f: LotFrame): { x: number; z: number; len: number; yaw: number } {
+  const p = rotateCell(f, 0, -f.d / 2);
+  return { x: p.x, z: p.z, len: f.w, yaw: f.yaw };
+}
+
+/** Rotated pad instance transform for an oriented lot. */
+export function orientedPad(f: LotFrame): { x: number; z: number; sx: number; sz: number; yaw: number } {
+  return { x: f.cx, z: f.cz, sx: f.w, sz: f.d, yaw: f.yaw };
 }

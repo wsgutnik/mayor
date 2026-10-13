@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
@@ -6,6 +6,8 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeScene } from "./glb-models";
 
 const MODELS = "public/models";
+const TEXTURES = "public/textures";
+const HD_TEXTURE_LIMIT = 1_500_000;
 
 function load(path: string): Promise<THREE.Group> {
   const buf = readFileSync(path);
@@ -15,6 +17,10 @@ function load(path: string): Promise<THREE.Group> {
 
 const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 const files = (dir: string) => readdirSync(dir).filter((f) => f.endsWith(".glb")).map((f) => join(dir, f));
+const pngSize = (path: string) => {
+  const b = readFileSync(path);
+  return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+};
 
 describe("Blender kit models", () => {
   const buildings = files(MODELS);
@@ -86,5 +92,25 @@ describe("Blender kit models", () => {
       expect(size.y, name).toBeLessThanOrEqual(bounds[2] + 0.01);
       expect(box.min.y, name).toBeGreaterThanOrEqual(-0.01);
     }
+  });
+
+  it("has compact HD texture siblings and the plot/window sheets required by the renderer", () => {
+    const names = readdirSync(TEXTURES).filter((f) => f.endsWith(".png"));
+    const set = new Set(names);
+    const sd = names.filter((f) => !f.endsWith("_hd.png") && !f.endsWith("_md.png") && !f.includes("/"));
+    for (const name of sd) {
+      if (name === "window.png" || name === "window_glow.png") continue;
+      const hd = name.replace(/\.png$/, "_hd.png");
+      expect(set.has(hd), `${name} should have ${hd}`).toBe(true);
+    }
+    for (const name of names.filter((f) => f.endsWith("_hd.png"))) {
+      expect(statSync(join(TEXTURES, name)).size, name).toBeLessThanOrEqual(HD_TEXTURE_LIMIT);
+    }
+    expect(set.has("plot.png")).toBe(true);
+    expect(set.has("plot_hd.png")).toBe(true);
+    expect(pngSize(join(TEXTURES, "plot.png"))).toEqual({ w: 512, h: 512 });
+    expect(pngSize(join(TEXTURES, "plot_hd.png"))).toEqual({ w: 1024, h: 1024 });
+    expect(pngSize(join(TEXTURES, "window.png"))).toEqual({ w: 256, h: 256 });
+    expect(pngSize(join(TEXTURES, "window_glow.png"))).toEqual({ w: 256, h: 256 });
   });
 });
