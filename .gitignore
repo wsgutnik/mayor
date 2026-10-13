@@ -1,10 +1,14 @@
 node_modules/
 dist/
 .DS_Store
-# Referências de terceiros: usar localmente, não versionar
-cities-skylines-2/screenshots/
-
-# Raw extractions kept out of git
-cities-skylines-2/docs/img/brand/kit/
 __pycache__/
 *.pyc
+
+# Third-party reference screenshots: local study material, never versioned
+screenshots/
+
+# Raw extractions kept out of git
+docs/img/brand/kit/
+
+# Tauri build output
+src-tauri/target/
