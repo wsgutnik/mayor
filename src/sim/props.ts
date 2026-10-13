@@ -122,7 +122,7 @@ export function planProps(w: World, density = 1): PropPlacement[] {
       const dx = vx / l, dz = vz / l;
       if (base === 2 && acc >= 4) { // planter tree on the median every ~4 tiles
         acc = 0;
-        if (!nearNode(mx, mz, 1.4) && keep(mx, mz, 11)) out.push({ kind: "planter_tree", x: mx, z: mz, yaw: 0 });
+        if (!nearNode(mx, mz, 2.8) && keep(mx, mz, 11)) out.push({ kind: "planter_tree", x: mx, z: mz, yaw: 0 });
       } else if (acc >= 12) { // hydrant on alternating kerbs every ~12 tiles
         acc = 0;
         const side = (out.length % 2 === 0 ? 1 : -1);
