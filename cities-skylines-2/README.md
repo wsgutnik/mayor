@@ -3,7 +3,7 @@
 ![Mayor](public/ui/brand-banner.png)
 
 Clone jogável de city builder inspirado em Cities: Skylines II. Mac, Windows e iPad (PWA).
-Plano e marcos: [PLAN.md](PLAN.md).
+Plano e marcos: [PLAN.md](PLAN.md). Avisos de marca, licenças e materiais de terceiros: [NOTICE.md](NOTICE.md).
 
 ```bash
 npm install
