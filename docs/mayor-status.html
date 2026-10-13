@@ -230,10 +230,11 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-13",
-    headline: "M28: ativos 3D com fachadas traseiras, frota detalhada e referências v2; instaladores de Mac e iPad gerados.",
+    headline: "Interface V2 (ciclo 1) no ar; Undo/Redo em produção; instaladores de Mac e iPad atualizados.",
     summary: "O jogo está jogável e estável (pontes passam energia, subsolo iluminado). A frente atual é a qualidade visual dos 40 prédios: auditoria concluída, prédios de referência em produção. A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
+      { id: "UI1", name: "Interface V2 · ciclo 1", desc: "Escala e opacidade da interface, painéis recolhíveis e persistentes (tecla H), leitura de custo, extensão e inclinação ao desenhar estradas. Plano em docs/UI-V2-PLAN.md.", status: "done" },
       { id: "V1", name: "Auditoria visual (ciclo 1)", desc: "Inventário dos 40 prédios e 67 props, exportação estrita no Blender, manifesto, registro de variantes, prévias em dois ângulos. PR #1.", status: "done" },
       { id: "V2", name: "Prédios de referência (ciclo 2)", desc: "Casa inicial, torre premium, torre corporativa, prefeitura e fábrica pesada como variantes v2 com três LODs, manifesto verificado e resolvedor opt-in ?visualV2=1; os modelos de produção não foram substituídos.", status: "done" },
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
@@ -275,6 +276,14 @@ npm run dev</pre>
       { ok: false, text: "Em aberto da revisão de jogo: sombra preta sob ponte à noite e 'asas' nas rampas (sombra suavizada, falta confirmar), fitas de tubo retorcidas no subsolo (não reproduzido), tiras de meio-fio no meio da quadra e almofadas serrilhadas no zoneamento orientado, canteiro de avenida parando antes da esquina, nível de detalhe de carros e prédios" }
     ],
     log: [
+      { date: "2026-10-13", title: "UI-1 · escala, painéis e leitura de estrada", items: [
+        "Auditoria de UI/UX conferida contra o código: o painel de serviços já recolhia (afirmação parcialmente falsa); escala/opacidade e Undo/Redo de fato não existiam",
+        "Preferências uiScale (0,8–1,4) e uiOpacity (0,6–1) com sliders no menu; alvos de toque mantêm 44 px; o canvas 3D não escala",
+        "Painéis de demanda, indicadores, serviços e linhas recolhem e lembram o estado; tecla H esconde a pilha toda",
+        "Leitura flutuante ao desenhar estrada: custo, extensão, inclinação, elevação e o motivo quando inválida",
+        "Conhecido: com escala 1,4 em 1024 px a barra de ferramentas rola na horizontal; sliders aplicam ao confirmar",
+        "Instaladores regenerados (dmg ad hoc para Apple Silicon e PWA do iPad); 389 testes passando"
+      ] },
       { date: "2026-10-13", title: "M28 · fechamento dos ciclos 1 e 2 e instaladores", items: [
         "Main recebe: auditoria e testes (PR #1), referências v2 com LODs e portão de manifesto (PR #3), fachadas traseiras dos prédios 05 a 19 e frota com mais detalhe (Muse); orçamento por prédio sobe de 450 para 700 triângulos",
         "PRs #2 e #4 fechados como incorporados (resolvedor, correção do mergeScene e verificador aproveitados); fachadas traseiras de 22 a 40 ficaram para a próxima rodada",
