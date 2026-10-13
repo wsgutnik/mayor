@@ -11,6 +11,7 @@ import json
 import os
 import random
 import sys
+from mathutils import Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -65,7 +66,15 @@ def main():
                 lib.export_glb(obj, os.path.join(args.out, filename))
                 if args.previews:
                     preview.setup_scene(top=bounds[5])
-                    preview.render(os.path.join(args.previews, filename.replace(".glb", ".png")))
+                    stem = filename.replace(".glb", "")
+                    preview.render(os.path.join(args.previews, stem + "-front-right.png"))
+                    # Mirror the camera across the lot centre for a second
+                    # consistent angle; geometry and lighting stay unchanged.
+                    camera = preview.bpy.context.scene.camera
+                    camera.location.x = -camera.location.x
+                    target = Vector((0, 0, bounds[5] * 0.5))
+                    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+                    preview.render(os.path.join(args.previews, stem + "-front-left.png"))
             report["assets"].append(entry)
             print("V2_MODEL " + json.dumps(entry))
     for n in ids:
