@@ -1,12 +1,65 @@
+"""
+Model registry.
+
+`REGISTRY` maps a kit number (1-40) to (name, fn): the LAST registration wins, which is how `buildings_zz_hero.py`
+(imported last) replaces the simpler sample versions. Because that is easy to break by renaming a file, every
+registration is also recorded in `REGISTRATIONS`, and every replacement in `OVERRIDES`. `build_all.py --strict`
+fails when a replacement is not declared in `DECLARED_OVERRIDES` below.
+"""
+import inspect
+
 REGISTRY = {}
+#: Non-base variants, keyed (n, variant): never replace the production model; exported to <out>/variants/<variant>/NN.glb.
+VARIANTS = {}
+#: Every registration in import order: {"n", "name", "module", "variant", "version", "footprint"}.
+REGISTRATIONS = []
+#: Replacements: {"n", "replaced_module", "by_module"}.
+OVERRIDES = []
+
+#: Kit numbers whose simpler versions are intentionally replaced by `buildings_zz_hero.py`.
+DECLARED_OVERRIDES = {
+    1: "buildings_zz_hero", 2: "buildings_zz_hero", 3: "buildings_zz_hero", 4: "buildings_zz_hero",
+    11: "buildings_zz_hero", 12: "buildings_zz_hero", 13: "buildings_zz_hero",
+    24: "buildings_zz_hero", 30: "buildings_zz_hero", 36: "buildings_zz_hero", 37: "buildings_zz_hero",
+    38: "buildings_zz_hero",
+}
 
 
-def building(n, name):
-    """Register a modelling function for kit number n (1-40). The function receives a fresh lib.Model."""
+def _caller_module():
+    frame = inspect.stack()[2]
+    return inspect.getmodule(frame[0]).__name__ if inspect.getmodule(frame[0]) else "?"
+
+
+def building(n, name, variant="base", version=1, footprint=(1, 1)):
+    """Register a modelling function for kit number n (1-40). The function receives a fresh lib.Model.
+
+    variant is "base" for the production model. Any other variant (e.g. "v2") never replaces it: it is exported
+    to variants/<variant>/NN.glb for A/B comparison. footprint is the number of tiles
+    (width, depth) the model is designed for, 1x1 for every shipped model today.
+    """
+    if not 1 <= n <= 40:
+        raise ValueError(f"kit number out of range: {n}")
+
     def deco(fn):
+        module = fn.__module__
+        if variant != "base":
+            REGISTRATIONS.append({"n": n, "name": name, "module": module, "variant": variant, "version": version,
+                                  "footprint": list(footprint)})
+            VARIANTS[(n, variant)] = (name, fn, version, tuple(footprint))
+            return fn
+        if n in REGISTRY:
+            previous = next(r for r in reversed(REGISTRATIONS) if r["n"] == n)
+            OVERRIDES.append({"n": n, "replaced_module": previous["module"], "by_module": module})
+        REGISTRATIONS.append({"n": n, "name": name, "module": module, "variant": variant, "version": version,
+                              "footprint": list(footprint)})
         REGISTRY[n] = (name, fn)
         return fn
     return deco
+
+
+def undeclared_overrides():
+    """Replacements that DECLARED_OVERRIDES does not account for."""
+    return [o for o in OVERRIDES if DECLARED_OVERRIDES.get(o["n"]) != o["by_module"]]
 
 
 PROPS = {}
