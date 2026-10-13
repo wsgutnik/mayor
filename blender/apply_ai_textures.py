@@ -21,7 +21,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIRS = [os.path.join(HERE, "textures"), os.path.join(HERE, "..", "public", "textures")]
 LIMIT = 1_500_000
-KEEP_COLOUR = {"roof_tile": 0.35, "brick": 0.3, "wood": 0.3}   # default 0.15
+KEEP_COLOUR = {"roof_tile": 0.35, "brick": 0.3, "wood": 0.3, "plot": 1.0}   # default 0.15
 
 
 def seam_ratio(a, axis):
@@ -65,14 +65,30 @@ def process(name, src):
     return a
 
 
+def existing_size(name):
+    for d in OUT_DIRS:
+        p = os.path.join(d, f"{name}_hd.png")
+        if os.path.exists(p):
+            return Image.open(p).size[0]
+    return 1024
+
+
 def save(a, name):
-    size = a.shape[0]
+    """Keep the replaced texture's resolution (tests and the renderer expect it); store near-grey ones as 8-bit grey."""
+    size = existing_size(name)
+    grey = float((a.max(2) - a.min(2)).mean()) < 0.03
     while True:
         im = Image.fromarray((a * 255 + 0.5).astype(np.uint8))
+        if grey:
+            im = im.convert("L")
         if size != a.shape[0]:
             im = im.resize((size, size), Image.LANCZOS)
         tmp = os.path.join(OUT_DIRS[0], f"{name}_hd.png")
         im.save(tmp, optimize=True)
+        if os.path.getsize(tmp) > LIMIT and im.mode == "RGB":
+            # Tinted terrain textures are low-chroma: a 256-colour palette is visually lossless and 3x smaller.
+            im = im.quantize(256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+            im.save(tmp, optimize=True)
         if os.path.getsize(tmp) <= LIMIT or size <= 512:
             break
         size = int(size * 0.75)
