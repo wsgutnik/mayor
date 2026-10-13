@@ -13,7 +13,15 @@ Updated on 2026-10-13. Live status with screenshots: status artifact (source in 
 
 
 
-## State
+## Visual upgrade — Cycle 2B (stacked draft; not merged)
+
+- Added a standalone structural GLB verifier and deterministic SHA256 asset manifest generator for exactly 5 reference buildings × 3 LODs (15 GLBs).
+- Python verifier tests: **7 passed locally using synthetic GLB fixtures** (not actual Blender exports).
+- Experimental reference loading now requires a valid packaged manifest; absent, incomplete or invalid assets revert to existing production models.
+- V2 Blender exporter now prepares two consistent preview angles per LOD (30 PNGs expected after export).
+- Pending: run actual Blender exporter, inspect 30 PNGs, validate exported materials/textures/bounds, copy validated binaries into preview assets, run full npm CI, test Mac and iPad.
+- See [docs/VISUAL-V2-VALIDATION.md](docs/VISUAL-V2-VALIDATION.md). The Cycle 2B PR is stacked on Cycle 2A; neither is merged.
+
 
 | Milestone | State | Notes |
 |---|---|---|
