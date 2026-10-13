@@ -1082,6 +1082,7 @@ export class CityRenderer {
    * Drives light, sky, fog and window glow.
    */
   setAtmosphere(tod: number, raining: boolean): void {
+    this.lastAtmo = [tod, raining];
     const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
     const elev = Math.sin((tod - 0.25) * Math.PI * 2);
     const day = clamp01(elev * 1.3 + 0.25);
@@ -1089,7 +1090,8 @@ export class CityRenderer {
     const sky = new THREE.Color("#0a1224").lerp(new THREE.Color("#a9c8e8"), day);
     sky.lerp(new THREE.Color("#f0a070"), dusk * 0.45);
     if (raining) sky.lerp(new THREE.Color("#6f7d8c"), 0.55);
-    (this.scene.background as THREE.Color).copy(sky);
+    // The underground view sits on a lit soil-brown backdrop whatever the hour.
+    (this.scene.background as THREE.Color).copy(this.overlayLayer === UNDERGROUND_LAYER ? sky.lerp(new THREE.Color("#5a4330"), 0.85) : sky);
     this.dayLevel = day * (raining ? 0.6 : 1);
     this.skyCol.copy(sky);
     const fog = this.scene.fog as THREE.FogExp2;
@@ -1101,9 +1103,11 @@ export class CityRenderer {
     // Night keeps a readable moonlit floor (cool, soft) instead of near black; the underground view is always lit.
     const night = 1 - day;
     const under = this.overlayLayer === UNDERGROUND_LAYER;
-    this.sun.intensity = under ? 1.1 : (0.15 + 1.7 * day + 0.32 * night) * (raining ? 0.55 : 1);
-    this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6).lerp(new THREE.Color("#9db8ff"), night * 0.7);
-    this.hemi.intensity = under ? 1.2 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
+    this.sun.intensity = under ? 1.6 : (0.15 + 1.7 * day + 0.32 * night) * (raining ? 0.55 : 1);
+    if (under) this.sun.color.set("#fff4de");
+    else this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6).lerp(new THREE.Color("#9db8ff"), night * 0.7);
+    if (under) this.renderer.toneMappingExposure = 1.05;
+    this.hemi.intensity = under ? 1.8 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
     this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
     this.nightGlow = this.winMat.emissiveIntensity;
     for (const g of this.glowMats) g.emissiveIntensity = this.nightGlow;
@@ -1252,7 +1256,11 @@ export class CityRenderer {
   }
 
   /** Ghost the surface over a dark soil backdrop so the pipe networks underneath read clearly. */
+  private lastAtmo: [number, boolean] = [0.5, false];
+
   private setUndergroundLook(on: boolean): void {
+    // Lighting and backdrop depend on the layer: refresh them now, not on the next clock tick.
+    this.setAtmosphere(this.lastAtmo[0], this.lastAtmo[1]);
     const fade = (m: THREE.Material | THREE.Material[], opacity: number) => {
       for (const mat of Array.isArray(m) ? m : [m]) {
         mat.transparent = on || mat.transparent && opacity < 1;
@@ -1263,7 +1271,7 @@ export class CityRenderer {
     };
     fade(this.terrain.material, on ? 0.6 : 1);
     // soil: brown earth while looking underneath, the normal tint otherwise
-    (this.terrain.material as THREE.MeshStandardMaterial).color.set(on ? "#7a5a3c" : "#ffffff");
+    (this.terrain.material as THREE.MeshStandardMaterial).color.set(on ? "#a07e58" : "#ffffff");
     fade(this.roadMesh.material, on ? 0.45 : 1);
     fade(this.lodBox.material, on ? 0.3 : 1);
     for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);

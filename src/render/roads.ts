@@ -25,7 +25,7 @@ const ZEBRA = "#f1f1ea";
 const CONCRETE = "#a8adb5";
 const PILLAR = "#8b9098";
 const PORTAL_DARK = "#0b0d12";
-const DECK_SHADOW = "#1b232b";
+const DECK_SHADOW = "#46555f";
 
 export interface StripSeg {
   type: RoadType;
@@ -434,7 +434,7 @@ function pillars(g: Geo, deck: DeckSampler, groundY: GroundY, w?: World, type?: 
 
 /** Dark ribbon under the deck (water or the road below), so the crossing reads from far away. */
 function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY, w?: World): void {
-  const hw = fullHalf(type) + 0.5;
+  const hw = fullHalf(type) + 0.2;
   const n = Math.max(1, Math.ceil(deck.length / 0.5));
   let prev: [number, number] | null = null;
   for (let i = 0; i <= n; i++) {
