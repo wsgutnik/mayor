@@ -230,10 +230,11 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-13",
-    headline: "Interface V2 (ciclo 1) no ar; Undo/Redo em produção; instaladores de Mac e iPad atualizados.",
+    headline: "M28 e Interface V2 (UI-1, UI-2, UI-3 parcial) no main; instaladores m29 gerados.",
     summary: "O jogo está jogável e estável (pontes passam energia, subsolo iluminado). A frente atual é a qualidade visual dos 40 prédios: auditoria concluída, prédios de referência em produção. A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
+      { id: "UI2", name: "Construtor de vias e zoneamento", desc: "Desfazer/Refazer, snapping de ângulo e comprimento, upgrade de via no lugar, via paralela, zoneamento por retângulo e preenchimento. Faltam densidades e visualização de lotes.", status: "active" },
       { id: "UI1", name: "Interface V2 · ciclo 1", desc: "Escala e opacidade da interface, painéis recolhíveis e persistentes (tecla H), leitura de custo, extensão e inclinação ao desenhar estradas. Plano em docs/UI-V2-PLAN.md.", status: "done" },
       { id: "V1", name: "Auditoria visual (ciclo 1)", desc: "Inventário dos 40 prédios e 67 props, exportação estrita no Blender, manifesto, registro de variantes, prévias em dois ângulos. PR #1.", status: "done" },
       { id: "V2", name: "Prédios de referência (ciclo 2)", desc: "Casa inicial, torre premium, torre corporativa, prefeitura e fábrica pesada como variantes v2 com três LODs, manifesto verificado e resolvedor opt-in ?visualV2=1; os modelos de produção não foram substituídos.", status: "done" },
@@ -263,7 +264,7 @@ npm run dev</pre>
       { id: "M23", name: "Pontes e túneis", desc: "Estradas cruzam água e colinas por ponte ou túnel, sem nivelar o terreno.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; 364 testes passando no main; instalador de Mac (ad hoc, 19 MB) e PWA do iPad (13 MB) gerados localmente" },
+      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; 460 testes passando no main; instalador de Mac (ad hoc, 20 MB) e PWA do iPad (13 MB) gerados localmente" },
       { ok: true, text: "Build do Blender com --strict falha de verdade (limite de triângulos, tile, números sem modelo, substituição não declarada)" },
       { ok: false, text: "Desempenho dos ativos novos não medido em Mac, Windows nem iPad; limites de LOD são hipóteses" },
       { ok: true, text: "339 testes passando, incluindo leitura de todos os GLB, limites do tile, orçamento de triângulos, zoneamento orientado e redes por camada" },
@@ -276,6 +277,14 @@ npm run dev</pre>
       { ok: false, text: "Em aberto da revisão de jogo: sombra preta sob ponte à noite e 'asas' nas rampas (sombra suavizada, falta confirmar), fitas de tubo retorcidas no subsolo (não reproduzido), tiras de meio-fio no meio da quadra e almofadas serrilhadas no zoneamento orientado, canteiro de avenida parando antes da esquina, nível de detalhe de carros e prédios" }
     ],
     log: [
+      { date: "2026-10-13", title: "Fechamento: fachadas traseiras, UI-2/UI-3 e instaladores m29", items: [
+        "Fachadas traseiras e laterais dos prédios 05–37, 39 e 40 (Codex, Muse); orçamento por prédio sobe para 700 triângulos (maior: 644); build do Blender estrito sem avisos",
+        "UI-2: Desfazer/Refazer por snapshots do save (30 passos), snapping configurável (Alt desliga), upgrade de via no lugar com custo e regras de rodovia, via paralela atômica",
+        "UI-3 (parte): zoneamento por retângulo e preenchimento, uma entrada de Desfazer cada; repetir o arrasto sobre a estrada deixou de dar erro enganoso",
+        "Interface: a dica fica acima do flyout aberto; a barra de ferramentas rola sem barra em escala alta",
+        "Documentação inteira atualizada (README, PROGRESS, PLAN, INSTALL, roadmap, arquitetura de ativos, plano de UI); worktrees e branches de agentes removidos",
+        "Instaladores m29: dmg ad hoc para Apple Silicon (20 MB) e PWA do iPad (13 MB); 460 testes passando"
+      ] },
       { date: "2026-10-13", title: "UI-1 · escala, painéis e leitura de estrada", items: [
         "Auditoria de UI/UX conferida contra o código: o painel de serviços já recolhia (afirmação parcialmente falsa); escala/opacidade e Undo/Redo de fato não existiam",
         "Preferências uiScale (0,8–1,4) e uiOpacity (0,6–1) com sliders no menu; alvos de toque mantêm 44 px; o canvas 3D não escala",
