@@ -1,0 +1,245 @@
+{
+ "schema": 1,
+ "assets": [
+  {
+   "catalogId": 1,
+   "name": "Casa Inicial",
+   "lod": 0,
+   "file": "01_lod0.glb",
+   "triangles": 1551,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.654
+   ]
+  },
+  {
+   "catalogId": 1,
+   "name": "Casa Inicial",
+   "lod": 1,
+   "file": "01_lod1.glb",
+   "triangles": 523,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.634
+   ]
+  },
+  {
+   "catalogId": 1,
+   "name": "Casa Inicial",
+   "lod": 2,
+   "file": "01_lod2.glb",
+   "triangles": 98,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.62
+   ]
+  },
+  {
+   "catalogId": 10,
+   "name": "Premium Tower",
+   "lod": 0,
+   "file": "10_lod0.glb",
+   "triangles": 2489,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.498,
+    -0.489,
+    0.48,
+    0.0,
+    2.555
+   ]
+  },
+  {
+   "catalogId": 10,
+   "name": "Premium Tower",
+   "lod": 1,
+   "file": "10_lod1.glb",
+   "triangles": 597,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.489,
+    0.48,
+    0.0,
+    2.555
+   ]
+  },
+  {
+   "catalogId": 10,
+   "name": "Premium Tower",
+   "lod": 2,
+   "file": "10_lod2.glb",
+   "triangles": 99,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.555
+   ]
+  },
+  {
+   "catalogId": 20,
+   "name": "Corporate Tower",
+   "lod": 0,
+   "file": "20_lod0.glb",
+   "triangles": 1907,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.55
+   ]
+  },
+  {
+   "catalogId": 20,
+   "name": "Corporate Tower",
+   "lod": 1,
+   "file": "20_lod1.glb",
+   "triangles": 477,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.55
+   ]
+  },
+  {
+   "catalogId": 20,
+   "name": "Corporate Tower",
+   "lod": 2,
+   "file": "20_lod2.glb",
+   "triangles": 40,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.36
+   ]
+  },
+  {
+   "catalogId": 21,
+   "name": "Prefeitura",
+   "lod": 0,
+   "file": "21_lod0.glb",
+   "triangles": 2434,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.487,
+    0.0,
+    1.172
+   ]
+  },
+  {
+   "catalogId": 21,
+   "name": "Prefeitura",
+   "lod": 1,
+   "file": "21_lod1.glb",
+   "triangles": 653,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.11
+   ]
+  },
+  {
+   "catalogId": 21,
+   "name": "Prefeitura",
+   "lod": 2,
+   "file": "21_lod2.glb",
+   "triangles": 214,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.995
+   ]
+  },
+  {
+   "catalogId": 38,
+   "name": "F\u00e1brica Pesada",
+   "lod": 0,
+   "file": "38_lod0.glb",
+   "triangles": 3426,
+   "insideTile": true,
+   "bounds": [
+    -0.482,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.965
+   ]
+  },
+  {
+   "catalogId": 38,
+   "name": "F\u00e1brica Pesada",
+   "lod": 1,
+   "file": "38_lod1.glb",
+   "triangles": 1351,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.95
+   ]
+  },
+  {
+   "catalogId": 38,
+   "name": "F\u00e1brica Pesada",
+   "lod": 2,
+   "file": "38_lod2.glb",
+   "triangles": 235,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.95
+   ]
+  }
+ ]
+}
