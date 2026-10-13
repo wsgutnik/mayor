@@ -53,7 +53,8 @@ Known gaps in the oriented path: neighbour-zone inheritance when painting single
 | `public/models/manifest.json` + tests (40/40, tile, ground contact) | Done |
 | Two-angle Blender previews of all 40 | Done (`--previews`); quality report in `docs/BUILDING-QUALITY-REPORT.md` |
 | Asset architecture V2, roadmap | Documented (`docs/ASSET-ARCHITECTURE-V2.md`, `docs/VISUAL-UPGRADE-ROADMAP.md`); not implemented in the renderer |
-| Five reference buildings (#01, #10, #20, #21, #38) | Cycle 2 branch `visual/v2-reference-buildings` (separate PR) |
+| Five reference buildings (#01, #10, #20, #21, #38) | Merged (PR #3): v2 variants with 3 LODs, opt-in `?visualV2=1`, manifest gate (`scripts/verify_v2_assets.py`); runtime LOD1/2 switching not done |
+| Rear/side facades #05–#19, detailed vehicles | Merged: base triangle budget now 700; #22–#40 rears still open |
 | Hardware performance (Mac/Windows/iPad) | **Not measured** |
 
 ## Who Did What

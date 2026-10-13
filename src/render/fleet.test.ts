@@ -12,7 +12,7 @@ function load(path: string): Promise<THREE.Group> {
 }
 const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
-const BUDGET: Record<string, number> = { car: 200, van: 220, truck: 260, semi: 300, bus: 260 };
+const BUDGET: Record<string, number> = { car: 400, van: 440, truck: 520, semi: 600, bus: 520 };
 const budgetOf = (n: string): number => BUDGET[n.split("_")[0]] ?? 260;
 
 describe("fleet props", () => {
@@ -23,7 +23,7 @@ describe("fleet props", () => {
       const m = mergeScene(await load(path));
       expect(m, path).not.toBeNull();
       const g = m!.geometry;
-      expect(tris(g), path).toBeLessThanOrEqual(name === "bus_articulated" ? 340 : budgetOf(name));
+      expect(tris(g), path).toBeLessThanOrEqual(name === "bus_articulated" ? 680 : budgetOf(name));
       g.computeBoundingBox();
       const b = g.boundingBox!;
       const len = b.max.x - b.min.x, wid = b.max.z - b.min.z, h = b.max.y - b.min.y;

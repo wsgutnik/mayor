@@ -23,7 +23,7 @@ const flag = (name, def) => {
 const jsonOut = flag("--json", "docs/asset-audit.json");
 const mdOut = flag("--md", "docs/asset-inventory.md");
 
-const TRI_LIMIT = Number(process.env.MAYOR_BUILDING_TRI_LIMIT || 450);
+const TRI_LIMIT = Number(process.env.MAYOR_BUILDING_TRI_LIMIT || 700);
 const BOUND = 0.51, HEIGHT_MAX = 2.7;
 const EXPECTED = Array.from({ length: 40 }, (_, i) => String(i + 1).padStart(2, "0") + ".glb");
 

@@ -24,7 +24,7 @@ import lib  # noqa: E402
 import preview  # noqa: E402
 from registry import REGISTRY, REGISTRATIONS, OVERRIDES, PROPS, VARIANTS, undeclared_overrides  # noqa: E402
 
-TRI_LIMIT = int(os.environ.get("MAYOR_BUILDING_TRI_LIMIT", "450"))
+TRI_LIMIT = int(os.environ.get("MAYOR_BUILDING_TRI_LIMIT", "700"))
 
 
 def parse():

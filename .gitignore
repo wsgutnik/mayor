@@ -12,3 +12,6 @@ docs/img/brand/kit/
 
 # Tauri build output
 src-tauri/target/
+
+# Intermediate variant exports (runtime copies live in public/models/v2)
+public/models/variants/

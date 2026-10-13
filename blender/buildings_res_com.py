@@ -63,43 +63,104 @@ def vila_geminada(m: Model):
     trees(m, [(-.40,.31,.8),(.40,.31,.8)])
 
 
+# --- rear detailing helpers (rear facades face +Y) ---
+def back_door(m, x, y_back, z, w=0.07, h=0.12, mat="metal_dark"):
+    """Service door on a rear wall."""
+    m.box(x, y_back + 0.004, z, w + 0.016, 0.008, h + 0.01, "white")
+    m.box(x, y_back + 0.007, z, w, 0.006, h, mat)
+
+
+def rear_balcony(m, x, y_back, z, w):
+    """Balcony slab hanging off a rear wall (mirror of balcony)."""
+    m.box(x, y_back + 0.05, z, w, .10, .025, "concrete", roof="concrete")
+    m.box(x, y_back + 0.097, z + .025, w, .012, .07, "glass_blue")
+
+
+def rear_pipes(m, cx, y_back, z0, h, w):
+    """Downpipes at both rear corners."""
+    for sx in (-1, 1):
+        m.box(cx + sx * (w / 2 - 0.03), y_back + 0.008, z0, 0.016, 0.014, h, "metal_dark")
+
+
+def roof_parapet(m, cx, cy, w, d, z, h=0.03, mat="wall_white"):
+    """Low parapet ring around a flat roof."""
+    t = 0.016
+    m.box(cx, cy - d / 2 + t / 2, z, w, t, h, mat)
+    m.box(cx, cy + d / 2 - t / 2, z, w, t, h, mat)
+    m.box(cx - w / 2 + t / 2, cy, z, t, d - 2 * t, h, mat)
+    m.box(cx + w / 2 - t / 2, cy, z, t, d - 2 * t, h, mat)
+
+
+def roof_vent(m, x, y, z):
+    """Exhaust vent pipe with a cap."""
+    m.cyl(x, y, z, 0.02, 0.09, "metal", seg=6)
+    m.box(x, y, z + 0.09, 0.055, 0.055, 0.015, "metal_dark")
+
+
 @building(5, "Pequeno Apartamento")
 def pequeno_apartamento(m: Model):
-    m.plot(); flat_block(m, 0, .06, .48, .40, .92, floors=4, cols=3)
+    m.plot(); flat_block(m, 0, .06, .48, .40, .92, floors=4, cols=3, sides="fbrl")
     m.box(.12, .06, .03, .12, .40, .92, "wall_wood")
     for z in (.20,.41,.62,.83): balcony(m, -.20, -.18, z, .18)
     m.box(0, -.15, .03, .16, .025, .18, "glass_dark")
+    m.box(-.17, .262, .03, .10, .02, .92, "glass_dark")  # rear stair-core glazing
+    for z in (.41,.83): rear_balcony(m, .12, .26, z, .14)
+    back_door(m, .02, .26, .03)
+    rear_pipes(m, 0, .26, .03, .92, .48)
+    roof_parapet(m, 0, .06, .48, .40, .95)
     roof_units(m, .95, [(-.10,.06),(.13,.10)])
+    roof_vent(m, .02, -.02, .95)
     trees(m, [(-.39,-.30,.9),(.38,.30,.9)])
 
 
 @building(6, "Condomínio Jardim")
 def condominio_jardim(m: Model):
-    m.plot(); flat_block(m, 0, .06, .62, .42, .72, floors=3, cols=4)
+    m.plot(); flat_block(m, 0, .06, .62, .42, .72, floors=3, cols=4, sides="fbrl")
     m.box(0, -.17, .03, .20, .04, .18, "glass_dark")
     for z in (.22,.43,.64):
         balcony(m, -.25, -.18, z, .15); balcony(m, .25, -.18, z, .15)
+    for z in (.22,.64): rear_balcony(m, 0, .27, z, .16)
+    back_door(m, -.2, .27, .03); back_door(m, .2, .27, .03)
+    rear_pipes(m, 0, .27, .03, .72, .62)
+    roof_parapet(m, 0, .06, .62, .42, .75)
     roof_units(m, .75, [(-.16,.05),(.14,.08)])
+    m.box(0, .38, .03, .44, .13, .005, "asphalt", roof="asphalt")  # rear parking pad
+    m.parked_car(-.11, .38, "sign_blue", "x"); m.parked_car(.11, .38, "white", "x")
     trees(m, [(-.39,-.29,1),(.39,-.28,1),(-.38,.32,.8),(.38,.32,.8)])
 
 
 @building(7, "Torre Compacta")
 def torre_compacta(m: Model):
-    m.plot(); flat_block(m, 0, .08, .38, .35, 1.25, floors=6, cols=3)
+    m.plot(); flat_block(m, 0, .08, .38, .35, 1.25, floors=6, cols=3, sides="fbrl")
     m.box(.10, .08, .03, .11, .35, 1.25, "wall_wood")
     for z in (.23,.43,.63,.83,1.03,1.23): balcony(m, -.18, -.13, z, .14)
     m.box(0, -.12, .03, .48, .18, .14, "wall_white", roof="roof_flat")
+    for x in (-.12, 0, .12):  # rear facade fins
+        m.box(x, .258, .03, .025, .02, 1.25, "wall_wood")
+    for z in (.33,.73,1.13): rear_balcony(m, .06, .255, z, .08)
+    back_door(m, -.06, .255, .03)
+    rear_pipes(m, 0, .255, .03, 1.25, .38)
+    roof_parapet(m, 0, .08, .38, .35, 1.28)
     roof_units(m, 1.28, [(0,.08)])
+    roof_vent(m, -.1, .14, 1.28)
     trees(m, [(-.35,-.31,.9),(.35,-.31,.9)])
 
 
 @building(8, "Residencial Varanda")
 def residencial_varanda(m: Model):
-    m.plot(); flat_block(m, 0, .05, .62, .42, .78, floors=4, cols=4)
+    m.plot(); flat_block(m, 0, .05, .62, .42, .78, floors=4, cols=4, sides="fbrl")
     m.box(0, .05, .03, .11, .42, .78, "wall_wood")
     for z in (.22,.40,.58,.76):
         balcony(m, -.23, -.18, z, .19); balcony(m, .23, -.18, z, .19)
+    rear_balcony(m, -.23, .26, .40, .19); rear_balcony(m, .23, .26, .58, .19)
     m.box(0,.05,.81,.48,.32,.08,"wall_white",roof="grass")
+    for px in (-.14,.14):  # pergola over the roof garden
+        m.box(px, -.02, .89, .02, .02, .10, "wall_wood")
+        m.box(px, .12, .89, .02, .02, .10, "wall_wood")
+    m.box(0, .05, .99, .34, .18, .015, "wall_wood", roof="wall_wood")
+    back_door(m, .18, .26, .03)
+    rear_pipes(m, 0, .26, .03, .78, .62)
+    roof_parapet(m, 0, .05, .62, .42, .81)
     trees(m, [(-.40,-.29,.9),(.40,.29,.9)])
 
 
@@ -107,10 +168,15 @@ def residencial_varanda(m: Model):
 def edificio_misto_local(m: Model):
     m.plot(lawn=False)
     m.box(0,.05,.03,.72,.46,.19,"wall_grey",roof="concrete")
-    m.windows(0,.05,.03,.72,.46,.19,1,cols=6,sides="f",lit=.8)
-    flat_block(m, 0,.08,.58,.37,.56,floors=3,cols=4)
+    m.windows(0,.05,.03,.72,.46,.19,1,cols=6,sides="fbrl",lit=.8)
+    flat_block(m, 0,.08,.58,.37,.56,floors=3,cols=4,sides="fbrl")
     sign(m,-.23,-.195,.12,.18,"sign_blue"); sign(m,0,-.195,.12,.18,"sign_orange"); sign(m,.23,-.195,.12,.18,"sign_green")
+    m.box(-.2,.282,.06,.14,.012,.06,"sign_blue")  # rear shop sign
+    back_door(m, .12, .28, .03); back_door(m, .28, .28, .03, mat="metal")
+    rear_pipes(m, 0, .265, .22, .56, .58)
+    roof_parapet(m, 0, .08, .58, .37, .78)
     roof_units(m,.78,[(-.14,.08),(.14,.08)])
+    roof_vent(m, .0, .16, .78)
     trees(m,[(-.40,.32,.8),(.40,.32,.8)])
 
 
@@ -120,6 +186,9 @@ def torre_premium(m: Model):
     m.glass_band(0,.07,.03,.20,.385,1.42,"glass_blue")
     m.box(.16,.07,.03,.08,.38,1.42,"wall_wood")
     for z in (.25,.45,.65,.85,1.05,1.25,1.43): balcony(m,-.22,-.15,z,.14)
+    m.windows(0,.07,.03,.48,.38,1.42,7,cols=4,sides="b",lit=.5,slabs=False)  # rear only (hero v2 separate)
+    back_door(m, -.08, .26, .03)
+    rear_pipes(m, 0, .26, .03, 1.42, .48)
     m.box(0,.07,1.45,.34,.28,.06,"grass",roof="grass")
     trees(m,[(-.38,-.30,.9),(.38,-.30,.9)])
 
@@ -159,7 +228,14 @@ def mercado_local(m: Model):
 @building(14, "Restaurante Urbano")
 def restaurante_urbano(m: Model):
     m.plot(); m.box(0,.08,.03,.58,.42,.38,"wall_wood",roof="roof_flat")
-    m.windows(0,.08,.03,.58,.42,.38,1,cols=4,sides="fr",lit=.9)
+    m.windows(0,.08,.03,.58,.42,.38,1,cols=4,sides="fbrl",lit=.9)
+    back_door(m, -.18, .29, .03)
+    m.box(.14,.36,.03,.22,.13,.025,"wall_wood",roof="wall_wood")  # rear terrace
+    m.box(.14,.422,.055,.22,.012,.07,"wall_wood")  # terrace railing
+    m.box(.035,.36,.055,.012,.13,.07,"wall_wood")
+    rear_pipes(m, 0, .29, .03, .38, .58)
+    roof_parapet(m, 0, .08, .58, .42, .41)
+    roof_vent(m, -.12, .14, .41)
     m.awning(.13,-.14,.28,.30,.13,"sign_red"); sign(m,.12,-.151,.32,.31,"black")
     m.box(-.20,-.22,.03,.24,.20,.025,"wall_wood")
     for x in (-.30,-.10): m.box(x,-.30,.03,.018,.018,.20,"wall_wood")
@@ -171,7 +247,13 @@ def restaurante_urbano(m: Model):
 @building(15, "Farmácia de Bairro")
 def farmacia_de_bairro(m: Model):
     m.plot(); m.box(0,.06,.03,.62,.42,.40,"wall_white",roof="roof_flat")
-    m.windows(0,.06,.03,.62,.42,.40,1,cols=5,sides="f",lit=.8)
+    m.windows(0,.06,.03,.62,.42,.40,1,cols=5,sides="fbrl",lit=.8)
+    back_door(m, .1, .27, .03)
+    m.box(-.15,.272,.28,.12,.012,.12,"white")  # rear cross sign
+    m.box(-.15,.279,.31,.04,.008,.06,"sign_red"); m.box(-.15,.279,.325,.08,.008,.025,"sign_red")
+    rear_pipes(m, 0, .27, .03, .40, .62)
+    roof_parapet(m, 0, .06, .62, .42, .43)
+    roof_vent(m, .12, .12, .43)
     sign(m,0,-.161,.31,.64,"sign_red")
     m.box(-.23,-.175,.42,.10,.02,.10,"white"); m.box(-.23,-.187,.445,.035,.012,.05,"sign_red"); m.box(-.23,-.187,.425,.07,.012,.018,"sign_red")
     m.box(.27,.06,.03,.10,.42,.40,"wall_red",roof="wall_red")
@@ -181,7 +263,12 @@ def farmacia_de_bairro(m: Model):
 
 @building(16, "Escritório Compacto")
 def escritorio_compacto(m: Model):
-    m.plot(); flat_block(m,0,.06,.52,.39,.72,floors=3,cols=4)
+    m.plot(); flat_block(m,0,.06,.52,.39,.72,floors=3,cols=4,sides="fbrl")
+    back_door(m, .14, .255, .03)
+    rear_pipes(m, 0, .255, .03, .72, .52)
+    roof_parapet(m, 0, .06, .52, .39, .75)
+    m.box(.14,.06,.75,.18,.15,.09,"wall_grey",roof="roof_dark")  # rooftop plant room
+    m.ac_unit(-.1, .06, .75)
     m.glass_band(0,.06,.03,.28,.395,.72,"glass_blue")
     m.box(-.20,.06,.03,.08,.39,.72,"wall_beige")
     m.box(0,-.16,.03,.26,.10,.12,"wall_white",roof="roof_flat")
@@ -192,7 +279,13 @@ def escritorio_compacto(m: Model):
 @building(17, "Banco Local")
 def banco_local(m: Model):
     m.plot(); m.box(0,.07,.03,.66,.44,.43,"wall_white",roof="roof_flat")
-    m.windows(0,.07,.03,.66,.44,.43,2,cols=4,sides="fr",lit=.5)
+    m.windows(0,.07,.03,.66,.44,.43,2,cols=4,sides="fbrl",lit=.5)
+    back_door(m, -.18, .29, .03)
+    m.box(.18,.35,.03,.16,.11,.20,"wall_grey",roof="roof_dark")  # rear vault annex
+    m.box(.18,.295,.08,.10,.012,.10,"metal_dark")  # vault door
+    rear_pipes(m, 0, .29, .03, .43, .66)
+    roof_parapet(m, 0, .07, .66, .44, .46)
+    roof_vent(m, -.08, .0, .46)
     m.box(0,-.18,.03,.30,.10,.34,"wall_white",roof="concrete")
     for x in (-.12,-.04,.04,.12): m.cyl(x,-.225,.03,.018,.31,"concrete",seg=6)
     sign(m,0,-.237,.34,.26,"glow_sign")
@@ -202,7 +295,14 @@ def banco_local(m: Model):
 
 @building(18, "Hotel Executivo")
 def hotel_executivo(m: Model):
-    m.plot(); flat_block(m,0,.08,.65,.43,.86,floors=4,cols=5)
+    m.plot(); flat_block(m,0,.08,.65,.43,.86,floors=4,cols=5,sides="fbrl")
+    back_door(m, -.2, .295, .03); back_door(m, .2, .295, .03)
+    m.box(0,.345,.16,.24,.09,.02,"concrete",roof="concrete")  # rear canopy
+    m.box(-.1,.38,.03,.02,.02,.13,"metal_dark"); m.box(.1,.38,.03,.02,.02,.13,"metal_dark")
+    rear_pipes(m, 0, .295, .03, .86, .65)
+    roof_parapet(m, 0, .08, .65, .43, .89)
+    m.box(0,.08,.95,.30,.04,.10,"glow_sign",roof="glow_sign")  # rooftop sign
+    m.box(-.12,.08,.89,.02,.02,.06,"metal_dark"); m.box(.12,.08,.89,.02,.02,.06,"metal_dark")
     m.box(0,-.17,.03,.42,.12,.18,"wall_white",roof="roof_flat")
     m.box(0,.08,.03,.12,.43,.86,"wall_wood")
     sign(m,0,-.145,.73,.18,"glow_sign")
@@ -213,7 +313,13 @@ def hotel_executivo(m: Model):
 @building(19, "Shopping de Bairro")
 def shopping_de_bairro(m: Model):
     m.plot(lawn=False); m.box(0,.08,.03,.82,.53,.34,"wall_white",roof="roof_flat")
-    m.windows(0,.08,.03,.82,.53,.34,1,cols=7,sides="fr",lit=.8)
+    m.windows(0,.08,.03,.82,.53,.34,1,cols=7,sides="fbrl",lit=.8)
+    m.box(-.2,.40,.03,.30,.11,.025,"concrete",roof="concrete")  # loading apron
+    m.box(-.26,.347,.03,.12,.012,.14,"metal"); m.box(-.12,.347,.03,.12,.012,.14,"metal")  # dock doors
+    back_door(m, .28, .345, .03)
+    rear_pipes(m, 0, .345, .03, .34, .82)
+    roof_parapet(m, 0, .08, .82, .53, .37)
+    roof_vent(m, .3, -.05, .37)
     sign(m,0,-.196,.27,.28,"sign_blue")
     sign(m,-.29,-.196,.23,.18,"sign_red"); sign(m,.29,-.196,.23,.18,"sign_orange")
     m.box(0,-.23,.03,.34,.12,.05,"paving",roof="paving")

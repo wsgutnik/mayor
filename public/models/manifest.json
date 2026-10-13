@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "triLimit": 450,
+ "triLimit": 700,
  "buildings": [
   {
    "n": 1,
@@ -96,7 +96,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 302,
+   "tris": 514,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -104,7 +104,7 @@
     -0.48,
     0.48,
     0.0,
-    1.005
+    1.055
    ]
   },
   {
@@ -117,7 +117,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 400,
+   "tris": 636,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -138,7 +138,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 364,
+   "tris": 644,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -146,7 +146,7 @@
     -0.48,
     0.48,
     0.0,
-    1.335
+    1.385
    ]
   },
   {
@@ -159,7 +159,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 370,
+   "tris": 602,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -167,7 +167,7 @@
     -0.48,
     0.48,
     0.0,
-    0.89
+    1.005
    ]
   },
   {
@@ -180,7 +180,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 220,
+   "tris": 432,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -188,20 +188,20 @@
     -0.48,
     0.48,
     0.0,
-    0.835
+    0.885
    ]
   },
   {
    "n": 10,
    "name": "Torre Premium",
-   "variant": "base",
+   "variant": "v2_lod2",
    "version": 1,
    "footprint": [
     1,
     1
    ],
-   "module": "buildings_res_com",
-   "tris": 408,
+   "module": "buildings_v2_b",
+   "tris": 504,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -222,7 +222,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 297,
+   "tris": 389,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -264,7 +264,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 302,
+   "tris": 404,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -285,7 +285,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 190,
+   "tris": 342,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -293,7 +293,7 @@
     -0.48,
     0.48,
     0.0,
-    0.465
+    0.515
    ]
   },
   {
@@ -306,7 +306,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 192,
+   "tris": 352,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -314,7 +314,7 @@
     -0.48,
     0.48,
     0.0,
-    0.52
+    0.535
    ]
   },
   {
@@ -327,7 +327,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 206,
+   "tris": 370,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -335,7 +335,7 @@
     -0.48,
     0.48,
     0.0,
-    0.805
+    0.84
    ]
   },
   {
@@ -348,7 +348,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 266,
+   "tris": 424,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -356,7 +356,7 @@
     -0.48,
     0.48,
     0.0,
-    0.515
+    0.565
    ]
   },
   {
@@ -369,7 +369,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 287,
+   "tris": 517,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -377,7 +377,7 @@
     -0.48,
     0.48,
     0.0,
-    0.945
+    1.05
    ]
   },
   {
@@ -390,7 +390,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 190,
+   "tris": 350,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -398,19 +398,19 @@
     -0.48,
     0.48,
     0.0,
-    0.425
+    0.475
    ]
   },
   {
    "n": 20,
    "name": "Torre Corporativa",
-   "variant": "base",
+   "variant": "v2_lod2",
    "version": 1,
    "footprint": [
     1,
     1
    ],
-   "module": "buildings_samples",
+   "module": "buildings_v2_b",
    "tris": 374,
    "inside_tile": true,
    "bounds": [
@@ -425,13 +425,13 @@
   {
    "n": 21,
    "name": "Prefeitura",
-   "variant": "base",
+   "variant": "v2_lod2",
    "version": 1,
    "footprint": [
     1,
     1
    ],
-   "module": "buildings_civic_ind",
+   "module": "buildings_v2_c",
    "tris": 240,
    "inside_tile": true,
    "bounds": [
@@ -843,10 +843,312 @@
    ]
   }
  ],
+ "variants": [
+  {
+   "n": 1,
+   "name": "Casa Inicial",
+   "variant": "v2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 1551,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.654
+   ]
+  },
+  {
+   "n": 1,
+   "name": "Casa Inicial",
+   "variant": "v2_lod1",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 523,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.634
+   ]
+  },
+  {
+   "n": 1,
+   "name": "Casa Inicial",
+   "variant": "v2_lod2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 98,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.62
+   ]
+  },
+  {
+   "n": 10,
+   "name": "Premium Tower",
+   "variant": "v2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 2489,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.498,
+    -0.489,
+    0.48,
+    0.0,
+    2.555
+   ]
+  },
+  {
+   "n": 10,
+   "name": "Premium Tower",
+   "variant": "v2_lod1",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 597,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.489,
+    0.48,
+    0.0,
+    2.555
+   ]
+  },
+  {
+   "n": 10,
+   "name": "Premium Tower",
+   "variant": "v2_lod2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 99,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.555
+   ]
+  },
+  {
+   "n": 20,
+   "name": "Corporate Tower",
+   "variant": "v2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 1907,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.55
+   ]
+  },
+  {
+   "n": 20,
+   "name": "Corporate Tower",
+   "variant": "v2_lod1",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 477,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.55
+   ]
+  },
+  {
+   "n": 20,
+   "name": "Corporate Tower",
+   "variant": "v2_lod2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 40,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    2.36
+   ]
+  },
+  {
+   "n": 21,
+   "name": "Prefeitura",
+   "variant": "v2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 2434,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.487,
+    0.0,
+    1.172
+   ]
+  },
+  {
+   "n": 21,
+   "name": "Prefeitura",
+   "variant": "v2_lod1",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 653,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.11
+   ]
+  },
+  {
+   "n": 21,
+   "name": "Prefeitura",
+   "variant": "v2_lod2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 214,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.995
+   ]
+  },
+  {
+   "n": 38,
+   "name": "F\u00e1brica Pesada",
+   "variant": "v2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 3426,
+   "inside_tile": true,
+   "bounds": [
+    -0.482,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.965
+   ]
+  },
+  {
+   "n": 38,
+   "name": "F\u00e1brica Pesada",
+   "variant": "v2_lod1",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 1351,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.95
+   ]
+  },
+  {
+   "n": 38,
+   "name": "F\u00e1brica Pesada",
+   "variant": "v2_lod2",
+   "version": 1,
+   "footprint": [
+    1,
+    1
+   ],
+   "tris": 235,
+   "inside_tile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.95
+   ]
+  }
+ ],
  "overrides": [
   {
    "n": 1,
-   "replaced_module": "buildings_samples",
+   "replaced_module": "buildings_v2_a",
    "by_module": "buildings_zz_hero"
   },
   {
@@ -891,7 +1193,7 @@
   },
   {
    "n": 38,
-   "replaced_module": "buildings_civic_ind",
+   "replaced_module": "buildings_v2_a",
    "by_module": "buildings_zz_hero"
   },
   {

@@ -96,6 +96,14 @@ def loja_conveniencia(m: Model):
     m.awning(-0.04, -0.12, 0.2, 0.66, 0.1, "sign_red")
     m.sign(-0.04, -0.12, 0.2, 0.34, 0.05, "glow_sign")
     m.door(0.14, -0.126, 0.03, 0.09, 0.12, "glass_dark")
+    m.windows(-0.04, 0.08, 0.03, 0.66, 0.36, 0.2, 1, cols=5, sides="brl", lit=0.6, slabs=False)
+    m.box(-0.2, 0.264, 0.03, 0.086, 0.008, 0.14, "white")  # rear service door
+    m.box(-0.2, 0.267, 0.03, 0.07, 0.006, 0.13, "metal_dark")
+    m.box(0.08, 0.262, 0.1, 0.09, 0.008, 0.06, "metal_dark")  # rear louver vents
+    m.box(0.2, 0.262, 0.1, 0.09, 0.008, 0.06, "metal_dark")
+    m.box(-0.34, 0.268, 0.03, 0.016, 0.014, 0.2, "metal_dark")  # downpipes
+    m.box(0.26, 0.268, 0.03, 0.016, 0.014, 0.2, "metal_dark")
+    m.box(0.3, 0.37, 0.03, 0.13, 0.08, 0.075, "metal_dark", roof="metal")  # dumpster
     m.ac_unit(0.1, 0.12, 0.24)
     m.ac_unit(-0.18, 0.1, 0.24)
     # forecourt and two parked cars
@@ -145,6 +153,15 @@ def mercado_local(m: Model):
         m.box(x, -0.14, 0.065, 0.06, 0.04, 0.012, "flower_red" if i % 2 else "leaf_c")
     m.box(0.3, 0.22, 0.03, 0.2, 0.1, 0.08, "wall_white", roof="wall_white")
     m.box(0.37, 0.22, 0.03, 0.06, 0.09, 0.06, "glass_dark")
+    m.windows(0.0, 0.1, 0.03, 0.7, 0.36, 0.22, 1, cols=5, sides="brl", lit=0.6, slabs=False)
+    m.box(-0.12, 0.36, 0.03, 0.26, 0.15, 0.025, "concrete", roof="concrete")  # loading bay
+    m.box(-0.12, 0.282, 0.03, 0.15, 0.012, 0.14, "metal")  # dock door
+    m.box(-0.2, 0.4, 0.055, 0.07, 0.06, 0.05, "wall_wood")  # crates on the bay
+    m.box(-0.04, 0.4, 0.055, 0.07, 0.06, 0.05, "wall_wood")
+    m.box(0.18, 0.284, 0.03, 0.086, 0.008, 0.14, "white")  # rear service door
+    m.box(0.18, 0.287, 0.03, 0.07, 0.006, 0.13, "metal_dark")
+    m.box(-0.32, 0.288, 0.03, 0.016, 0.014, 0.22, "metal_dark")  # downpipes
+    m.box(0.32, 0.288, 0.03, 0.016, 0.014, 0.22, "metal_dark")
     m.ac_unit(-0.2, 0.15, 0.27)
     m.ac_unit(0.2, 0.15, 0.27)
     m.tree(-0.42, -0.3, 1.0)
