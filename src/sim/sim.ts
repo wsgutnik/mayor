@@ -479,6 +479,7 @@ export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadTy
   const seg = segById(w, segmentId);
   if (!seg || ![1, 2, 3, 4, 5].includes(newType)) return bad("Unknown road");
   if (seg.type === newType) return { ok: true, tiles: [...seg.tiles], newTiles: 0, cost: 0 };
+  if (seg.fixed) return bad("Cannot remove the highway entry");
   if (seg.roundabout) return bad("Cannot upgrade a roundabout");
   const elev = segElevation(seg);
   const { tiles, outOfBounds } = rasterizeRoad(w, newType, seg.pts);
@@ -608,7 +609,8 @@ export function findUpgradeTarget(w: World, x: number, z: number, newType: RoadT
   if (!inBounds(w, tx, ty)) return undefined;
   const tile = idx(w, tx, ty);
   if (!w.road[tile]) return undefined;
-  const cands = w.segments.filter((sg) => sg.type !== newType && sg.tiles.includes(tile));
+  // The fixed entry road and elevated/tunnel segments are never upgrade targets.
+  const cands = w.segments.filter((sg) => sg.type !== newType && !sg.fixed && segElevation(sg) === "ground" && sg.tiles.includes(tile));
   if (!cands.length) return undefined;
   let best = cands[0], bd = Infinity;
   for (const sg of cands) {

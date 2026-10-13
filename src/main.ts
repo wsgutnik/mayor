@@ -102,6 +102,11 @@ function makeHud(): Hud {
     saveRoadSnap(o);
     refreshDraftPoint();
   },
+  onUpgradeMode: (on) => {
+    upgradeMode = on;
+    if (!on) hud.hideRoadReadout();
+    refreshHint();
+  },
   onParallel: (o) => {
     parallelOpts = o;
     saveRoadParallel(o);
@@ -154,12 +159,14 @@ function refreshHistoryButtons(): void {
 }
 
 function doUndo(): void {
+  if (strokeActive) return; // never rewind history under a stroke that is still being painted
   const snap = history.undo(serialize(state));
   if (snap === null) return;
   restoreSnapshot(snap, tr("Undone"));
 }
 
 function doRedo(): void {
+  if (strokeActive) return;
   const snap = history.redo(serialize(state));
   if (snap === null) return;
   restoreSnapshot(snap, tr("Redone"));
@@ -483,8 +490,8 @@ function onTap(cx: number, cy: number): void {
   if (pendingInterchange) { stampInterchangeAt(cx, cy); return; }
   const raw = renderer.pickPoint(cx, cy);
   if (!raw) return;
-  if (draft.length === 0) {
-    // Roads tool, another class chosen, tap on tarmac: upgrade in place (Undoable).
+  if (draft.length === 0 && upgradeMode) {
+    // Upgrade toggle on: a tap on tarmac of another class converts it in place (Undoable).
     const target = findUpgradeTarget(state.world, raw.x, raw.z, roadType);
     if (target) {
       const res = attempt(() => upgradeRoad(state, target.id, roadType));
@@ -558,6 +565,8 @@ const isZoneLike = (t: ToolId): boolean =>
   (ZONE_BY_TOOL as Record<string, number | undefined>)[t] !== undefined || t === "bulldoze";
 let lastPaintCell = "";
 let strokeActive = false;
+/** Road flyout "Upgrade" toggle: taps on existing roads convert them instead of starting a draft. */
+let upgradeMode = false;
 let strokeOk = false;
 
 function zoneDisplayName(): string {
@@ -588,7 +597,14 @@ function strokeStart(): void {
 }
 
 /** …and drop the entry when the whole stroke changed nothing. */
-function strokeEnd(): void {
+function strokeEnd(cancelled = false): void {
+  if (cancelled && marqueeAnchor) {
+    // A second finger or a system cancel aborts the rectangle instead of applying it.
+    marqueeAnchor = null;
+    marqueeCurrent = null;
+    renderer.setZoneRect(null, null);
+    refreshZoneHint();
+  }
   // A marquee stroke previews while dragging and applies once on release: still one entry.
   if (strokeActive && marqueeAnchor && marqueeCurrent && isZoneLike(tool) && zoneMode === "marquee") {
     const tiles = rectangleTiles(marqueeAnchor, marqueeCurrent);
@@ -728,7 +744,7 @@ bindInput(renderer, {
       } else if (raw) {
         const t = { x: Math.floor(raw.x), y: Math.floor(raw.z) };
         renderer.setHover(t, toolColor("road"));
-        if (tool === "road" && !pendingInterchange) showUpgradeReadout(raw, cx, cy);
+        if (tool === "road" && !pendingInterchange && upgradeMode) showUpgradeReadout(raw, cx, cy);
       } else if (tool === "road" && !pendingInterchange) {
         hud.hideRoadReadout();
       }

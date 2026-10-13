@@ -25,11 +25,11 @@ Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with sc
 | M28 Visual assets | done | audit script and strict Blender export, manifest, base/variant registry, rear/side facades for the kit (#05-#37, #39, #40), per-building budget 700 triangles, detailed vehicles, five v2 reference buildings with 3 LODs behind `?visualV2=1` and a manifest gate |
 | Utilities over bridges | done | layer-aware flood: power, water and sewage cross bridges and tunnels at ramps |
 | UI-1 Interface | done | UI scale and panel opacity prefs, collapsible persistent panels (key H), road-build readout (cost, length, slope, level, reason) |
-| UI-2 Road builder | partial | Undo/Redo (snapshot history, 30 steps), snapping (angle, length, road snap, Alt bypass), upgrade a road in place, parallel road helper |
+| UI-2 Road builder | partial | Undo/Redo (snapshot history, 30 steps), snapping (angle, length, road snap, Alt bypass), upgrade a road in place (explicit toggle), parallel road helper |
 | UI-3 Zoning tools | partial | Marquee and Fill (classic and oriented, one undo entry each) |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 460 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 461 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 

@@ -290,3 +290,18 @@ describe("road upgrade", () => {
     expect(upgradeRoadByPath).toBe(upgradeRoad);
   });
 });
+
+describe("road upgrade guards", () => {
+  it("never upgrades the fixed highway entry and never picks it as a tap target", () => {
+    const s = newCity(1337, 128);
+    s.money = 1e6;
+    const entry = s.world.segments.find((sg) => sg.fixed)!;
+    expect(entry).toBeTruthy();
+    const plan = planRoadUpgrade(s, entry.id, entry.type === 4 ? 1 : 4);
+    expect(plan.ok).toBe(false);
+    expect(plan.reason).toBe("Cannot remove the highway entry");
+    expect(upgradeRoad(s, entry.id, entry.type === 4 ? 1 : 4).ok).toBe(false);
+    const mid = entry.pts[Math.floor(entry.pts.length / 2)];
+    expect(findUpgradeTarget(s.world, mid.x, mid.z, entry.type === 4 ? 1 : 4)).toBeUndefined();
+  });
+});

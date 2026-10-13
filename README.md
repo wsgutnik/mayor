@@ -95,7 +95,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 | UI-1 to UI-3 (part) | done | UI scale/opacity, collapsible panels, road-build readout, Undo/Redo, snapping, road upgrade, parallel roads, zoning Marquee and Fill |
 | M22 | pending | Pedestrians, polish, and validation on real Windows and iPad hardware |
 
-Tests: 460 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
+Tests: 461 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
 
 ## License and Trademarks
 

@@ -11,7 +11,8 @@ export interface InputHooks {
   /** True when the current tool paints; false means one-finger drag pans. */
   paintsWithPrimary(): boolean;
   /** A paint stroke finished (pointer released, cancelled, or turned into a camera gesture). */
-  strokeEnd?(): void;
+  /** `cancelled` is true when a second finger or a system cancel aborted the stroke: do not apply previews. */
+  strokeEnd?(cancelled?: boolean): void;
   /** Mouse moved with no button held. */
   hover(clientX: number, clientY: number): void;
   /** A press-and-release without dragging, when the primary tool does not paint. */
@@ -78,11 +79,11 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   };
 
   /** End the paint stroke in progress, if any (the markers are only set while painting). */
-  const endStroke = () => {
+  const endStroke = (cancelled = false) => {
     if (last === null && lastPoint === null) return;
     last = null;
     lastPoint = null;
-    hooks.strokeEnd?.();
+    hooks.strokeEnd?.(cancelled);
   };
 
   const paintAt = (cx: number, cy: number) => {
@@ -110,7 +111,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
     // A second (or a stray third) contact turns the stroke into a camera gesture.
     if (pointers.size >= 2) {
       mode = "gesture";
-      endStroke();
+      endStroke(true);
       gesture = measure();
       return;
     }
@@ -164,7 +165,7 @@ export function bindInput(r: CityRenderer, hooks: InputHooks): () => void {
   const cancel = (e: PointerEvent) => {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) gesture = null;
-    if (pointers.size === 0) { mode = "none"; endStroke(); }
+    if (pointers.size === 0) { mode = "none"; endStroke(true); }
     else if (mode === "gesture") mode = "none";
   };
 

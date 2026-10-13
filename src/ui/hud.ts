@@ -113,6 +113,8 @@ export interface HudHooks {
   onSnap?(opts: RoadSnapOptions): void;
   /** Parallel-road options changed (toggle / gap / side). */
   onParallel?(opts: RoadParallelOptions): void;
+  /** The road flyout's Upgrade toggle changed: taps on existing roads convert them while it is on. */
+  onUpgradeMode?(on: boolean): void;
   onTool(t: ToolId): void;
   /** Zoning shape changed (paint brush / marquee rectangle / fill); applies to res/com/ind and bulldoze. */
   onZoneMode?(mode: ZoneMode): void;
@@ -441,6 +443,7 @@ export class Hud {
     flyRoad.appendChild(trevo);
     flyRoad.appendChild(this.buildSnapGroup());
     flyRoad.appendChild(this.buildParallelGroup());
+    flyRoad.appendChild(this.buildUpgradeGroup());
     const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
       this.hooks.onTool("road");
       this.setTool("road");
@@ -556,6 +559,26 @@ export class Hud {
     this.snapRoadsBtn = roads;
     roadsRow.appendChild(roads);
     this.setSnap(this.snap, false);
+    return group;
+  }
+
+  /** Upgrade toggle: off by default so a tap on an existing road starts a draft (branching) as before. */
+  private buildUpgradeGroup(): HTMLElement {
+    const group = el("div", "snap-group");
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", tr("Upgrade road"));
+    group.appendChild(el("span", "snap-title", tr("Upgrade road")));
+    const b = el("button", "tool snap-btn", `<span>${tr("Off")}</span>`);
+    b.title = tr("Tap a road to change its class");
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      const on = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", String(on));
+      b.classList.toggle("active", on);
+      b.querySelector("span")!.textContent = on ? tr("On") : tr("Off");
+      this.hooks.onUpgradeMode?.(on);
+    });
+    group.appendChild(b);
     return group;
   }
 
