@@ -45,6 +45,14 @@ export function mergeScene(root: THREE.Object3D): LoadedModel | null {
       }
       g.setAttribute("color", new THREE.BufferAttribute(rgb, 3));
     }
+    // glTF permits non-indexed multi-material meshes. Groups on those meshes
+    // refer to vertex ranges. Normalize to indexed geometry before splitting,
+    // otherwise each material receives the entire model instead of its faces.
+    if (!g.index) {
+      const index = count > 65535 ? new Uint32Array(count) : new Uint16Array(count);
+      for (let i = 0; i < count; i++) index[i] = i;
+      g.setIndex(new THREE.BufferAttribute(index, 1));
+    }
     const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     // A multi-material mesh keeps its draw groups; otherwise the whole geometry takes its single material.
     if (g.groups.length && mats.length > 1) {
