@@ -4,7 +4,7 @@ import { createLine, setLineVehicles } from "./transit";
 import { deserialize, serialize, SaveError, SAVE_VERSION, migrateV1Cells } from "./save";
 import { isRaining, RAIN_SPEED_FACTOR } from "./weather";
 import { newTraffic, tickTraffic } from "./traffic";
-import { FAC, ROAD, cidx } from "./world";
+import { FAC, ROAD, cidx, idx } from "./world";
 import type { ZoneBlockSet } from "./zoneblocks";
 
 function builtCity(): CityState {
@@ -99,6 +99,40 @@ describe("save and load", () => {
     const back = deserialize(serialize(s));
     expect(back.world.facility[cidx(back.world, 16, ey - 6)]).toBe(FAC.CITYHALL);
     expect(back.world.facility[cidx(back.world, 18, ey - 6)]).toBe(FAC.SUBSTATION);
+  });
+
+  it("serializes facility anchors and loads old saves without them", () => {
+    const s = newCity(31);
+    const w = s.world;
+    const ey = w.entry.y;
+    for (let y = ey - 4; y <= ey + 4; y++) for (let x = 0; x <= 20; x++) w.heights[cidx(w, x, y)] = 0.35;
+    s.money = 1e6;
+    for (let x = 3; x <= 16; x++) applyTool(s, "road", x, ey);
+    expect(applyTool(s, "hospital", 12, ey + 2).ok).toBe(true);
+    const json = serialize(s);
+    const raw = JSON.parse(json);
+    expect(raw.facilityAnchors).toContainEqual({ x: 12, y: ey + 2, kind: FAC.HOSPITAL, w: 2, h: 2 });
+    const back = deserialize(json);
+    expect(back.world.facilityAnchors).toEqual(s.world.facilityAnchors);
+    delete raw.facilityAnchors;
+    const old = deserialize(JSON.stringify(raw));
+    expect(old.world.facility[idx(old.world, 12, ey + 2)]).toBe(FAC.HOSPITAL);
+    expect(old.world.facilityAnchors).toEqual([]);
+  });
+
+  it("rejects damaged facility anchors", () => {
+    const s = newCity(32);
+    const w = s.world;
+    const ey = w.entry.y;
+    for (let y = ey - 4; y <= ey + 4; y++) for (let x = 0; x <= 20; x++) w.heights[cidx(w, x, y)] = 0.35;
+    s.money = 1e6;
+    for (let x = 3; x <= 16; x++) applyTool(s, "road", x, ey);
+    expect(applyTool(s, "hospital", 12, ey + 2).ok).toBe(true);
+    const raw = JSON.parse(serialize(s));
+    const broken = { ...raw, facilityAnchors: [{ x: 12, y: ey + 2, kind: FAC.HOSPITAL, w: 2, h: 2 }, { x: 13, y: ey + 2, kind: FAC.HOSPITAL, w: 2, h: 2 }] };
+    expect(() => deserialize(JSON.stringify(broken))).toThrow(SaveError);
+    raw.facilityAnchors[0].kind = FAC.CITYHALL;
+    expect(() => deserialize(JSON.stringify(raw))).toThrow(SaveError);
   });
 
   it("rejects duplicate segment ids, bad base64 and non-finite heights, and keeps id counters above stored ids", () => {

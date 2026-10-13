@@ -3,6 +3,7 @@ import type { CityState } from "../sim/sim";
 import {
   ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
   RoadType, Pt, inBounds, heightAt, Biome, blocksBuilding, isTunnelTile,
+  facilityAnchorAt, facilityFootprint,
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
@@ -195,7 +196,10 @@ export class CityRenderer {
   private sized: THREE.Object3D[] = [];
   /** Kit models from Blender (public/models/NN.glb), loaded once and shared across map swaps. */
   private glb = new Map<number, LoadedModel | null>();
+  private glbX2 = new Map<number, LoadedModel | null>();
   private glbPending = new Set<number>();
+  private glbX2Pending = new Set<number>();
+  private fX2Loaded = new Set<FacilityKind>();
   private glowMats = new Set<THREE.MeshStandardMaterial>();
   private nightGlow = 0;
   private models!: ReturnType<typeof buildModels>;
@@ -551,7 +555,39 @@ export class CityRenderer {
       const [z, l, i] = key.split("-").map(Number);
       want(zoneEntries(z, l)[i]?.n, mesh);
     }
-    for (const [kind, mesh] of this.fMeshes) want(facilityEntry(kind as never)?.n, mesh);
+    const facilityWanted: [FacilityKind, number, THREE.InstancedMesh][] = [];
+    for (const [kind, mesh] of this.fMeshes) {
+      const n = facilityEntry(kind as FacilityKind)?.n;
+      if (n !== undefined) facilityWanted.push([kind as FacilityKind, n, mesh]);
+      if (facilityFootprint(kind as FacilityKind) === 1) want(n, mesh);
+    }
+    for (const [kind, n, mesh] of facilityWanted) {
+      if (facilityFootprint(kind) !== 2) continue;
+      const apply = (model: LoadedModel, x2: boolean) => {
+        if (!this.sized.includes(mesh)) return;
+        mesh.geometry = model.geometry;
+        mesh.material = model.materials;
+        if (x2) this.fX2Loaded.add(kind);
+        for (const g of model.glow) {
+          this.glowMats.add(g);
+          g.emissiveIntensity = this.nightGlow;
+        }
+        this.seenRevision = -1;
+      };
+      if (this.glbX2.has(n)) {
+        const hit = this.glbX2.get(n);
+        if (hit) apply(hit, true);
+        else want(n, mesh);
+      } else if (!this.glbX2Pending.has(n)) {
+        this.glbX2Pending.add(n);
+        loadGlb(`/models/x2/${String(n).padStart(2, "0")}.glb`).then((model) => {
+          this.glbX2.set(n, model);
+          this.glbX2Pending.delete(n);
+          if (model) apply(model, true);
+          else this.applyGlbModels();
+        });
+      }
+    }
     for (const [n, meshes] of wanted) {
       const apply = (model: LoadedModel) => {
         for (const m of meshes) {
@@ -657,9 +693,18 @@ export class CityRenderer {
         const i = idx(w, x, y);
         const h = tileHeight(w, x, y);
         if (w.facility[i]) {
-          if (w.facility[i] === 1) smoke.push({ x: x + 0.7, y: h + 0.85, z: y + 0.72, strength: 1 });
-          const mesh = this.fMeshes.get(w.facility[i] as FacilityKind);
-          if (mesh) this.placeModel(mesh, counts, x, y, h, 1, tint.setScalar(1));
+          const kind = w.facility[i] as FacilityKind;
+          const anchor = facilityAnchorAt(w, i);
+          if (anchor && (anchor.x !== x || anchor.y !== y)) continue;
+          if (kind === 1) smoke.push({ x: anchor ? anchor.x + 1.2 : x + 0.7, y: h + 0.85, z: anchor ? anchor.y + 1.2 : y + 0.72, strength: 1 });
+          const mesh = this.fMeshes.get(kind);
+          if (mesh) {
+            const scale = anchor && !this.fX2Loaded.has(kind) ? 1.8 : 1;
+            const px = anchor ? anchor.x + anchor.w / 2 : x + 0.5;
+            const pz = anchor ? anchor.y + anchor.h / 2 : y + 0.5;
+            const ph = anchor ? heightAt(w, px, pz) : h;
+            this.placeModel(mesh, counts, px, pz, ph, scale, 1, tint.setScalar(1), x, y);
+          }
         } else if (blocksBuilding(w, i)) {
           // Drawn as ribbons (see buildRoadGeometry). Tunnels fall through: ground above keeps its trees.
         } else if (!w.zone[i]) {
@@ -937,13 +982,13 @@ export class CityRenderer {
     return Math.floor(hash(x + 5, y + 9) * 4) * (Math.PI / 2);
   }
 
-  private placeModel(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, x: number, y: number, h: number, scaleY: number, tint: THREE.Color): void {
+  private placeModel(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, x: number, y: number, h: number, scaleXZ: number, scaleY: number, tint: THREE.Color, faceX = Math.floor(x), faceY = Math.floor(y)): void {
     const n = counts.get(mesh) ?? 0;
     if (n >= mesh.instanceMatrix.count) return;
     const d = this.dummy;
-    d.position.set(x + 0.5, h + 0.04, y + 0.5);
-    d.rotation.set(0, this.facing(x, y), 0);
-    d.scale.set(1, scaleY, 1);
+    d.position.set(x, h + 0.04, y);
+    d.rotation.set(0, this.facing(faceX, faceY), 0);
+    d.scale.set(scaleXZ, scaleY, scaleXZ);
     d.updateMatrix();
     mesh.setMatrixAt(n, d.matrix);
     mesh.setColorAt(n, tint);

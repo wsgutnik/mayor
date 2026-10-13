@@ -5,9 +5,10 @@ import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
   isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, RoadSegment, Pt, baseRoadType, curvePoints, isOneWayType, rasterizeRoad,
-  rebuildRoadRaster, segElevation, segmentLength, levelTiles,
+  rebuildRoadRaster, segElevation, segmentLength, levelTiles, facilityFootprint, facilityAnchorAt,
   Elevation,
 } from "./world";
+import { FACILITY_LINK_RADIUS } from "./networks";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
 import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
 import { addSegment, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt } from "./roads";
@@ -34,6 +35,7 @@ const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   museum: FAC.MUSEUM, cityhall: FAC.CITYHALL, substation: FAC.SUBSTATION,
 };
 export const isFacilityTool = (t: ToolId): t is FacilityTool => t in FACILITY_OF_TOOL;
+export const facilityToolFootprint = (t: FacilityTool): 1 | 2 => facilityFootprint(FACILITY_OF_TOOL[t]);
 
 export const COST: Record<Exclude<ToolId, "pan">, number> = {
   road: 20, res: 4, com: 4, ind: 4, bulldoze: 5,
@@ -932,9 +934,42 @@ function facilityUpkeep(w: World): number {
   let total = 0;
   for (let i = 0; i < w.facility.length; i++) {
     const f = w.facility[i];
+    const a = f ? facilityAnchorAt(w, i) : undefined;
+    if (a && idx(w, a.x, a.y) !== i) continue;
     if (f) total += FACILITY_INFO[f as FacilityKind].upkeep;
   }
   return total;
+}
+
+function footprintTiles(w: World, x: number, y: number, size: 1 | 2): number[] {
+  const out: number[] = [];
+  for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) out.push(idx(w, x + dx, y + dy));
+  return out;
+}
+
+function footprintTouchesLinkedRoad(w: World, x: number, y: number, size: 1 | 2): boolean {
+  if (w.connectivityDirty) updateConnectivity(w);
+  for (let fy = y; fy < y + size; fy++) for (let fx = x; fx < x + size; fx++) {
+    for (let dy = -FACILITY_LINK_RADIUS; dy <= FACILITY_LINK_RADIUS; dy++) for (let dx = -FACILITY_LINK_RADIUS; dx <= FACILITY_LINK_RADIUS; dx++) {
+      const rx = fx + dx, ry = fy + dy;
+      if (!inBounds(w, rx, ry)) continue;
+      const r = idx(w, rx, ry);
+      if (w.connected[r] && w.roadSurface[r] && Math.max(Math.abs(dx), Math.abs(dy)) <= FACILITY_LINK_RADIUS) return true;
+    }
+  }
+  return false;
+}
+
+function clearFacilityAt(w: World, tile: number): void {
+  const a = facilityAnchorAt(w, tile);
+  if (a) {
+    if (a.kind === FAC.METRO) for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) removeStopAt(w, idx(w, x, y));
+    for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) w.facility[idx(w, x, y)] = 0;
+    w.facilityAnchors = (w.facilityAnchors ?? []).filter((b) => b !== a);
+  } else {
+    if (w.facility[tile] === FAC.METRO) removeStopAt(w, tile);
+    w.facility[tile] = 0;
+  }
 }
 
 /** Apply a tool to one tile. All world mutation from the player goes through here. */
@@ -961,7 +996,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       w.revision++;
       return { ok: true };
     }
-    if (w.facility[i] === FAC.METRO) removeStopAt(w, i);
+    const hadFacility = !!w.facility[i];
     // Remember it: the raster rebuild below clears the tile, and lots/frontage must still be invalidated.
     const hadRoad = !!w.road[i];
     let removedElevated = false;
@@ -990,7 +1025,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (!removedElevated) {
       w.zone[i] = 0;
       w.level[i] = 0;
-      w.facility[i] = 0;
+      if (hadFacility) clearFacilityAt(w, i);
     }
     if (w.coverageDirty) updateCoverage(w);
     w.revision++;
@@ -1002,16 +1037,28 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   if (isFacilityTool(tool)) {
     const type = FACILITY_OF_TOOL[tool];
     const info = FACILITY_INFO[type];
-    if (blocksBuilding(w, i)) return { ok: false, reason: "Tile is a road" };
-    if (w.zone[i]) return { ok: false, reason: "Tile is zoned" };
-    if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
+    const fp = facilityFootprint(type);
+    if (x + fp > w.size || y + fp > w.size) return { ok: false, reason: "Facility footprint is outside the map" };
+    const tiles = footprintTiles(w, x, y, fp);
+    for (const t of tiles) {
+      const tx = t % w.size, ty = (t / w.size) | 0;
+      if (!isLand(w, tx, ty)) return { ok: false, reason: "Cannot build on water" };
+      if (blocksBuilding(w, t)) return { ok: false, reason: "Tile is a road" };
+      if (w.zone[t]) return { ok: false, reason: "Tile is zoned" };
+      if (w.facility[t]) return { ok: false, reason: "Tile is occupied" };
+    }
     if (type === FAC.CITYHALL && w.facility.includes(FAC.CITYHALL)) return { ok: false, reason: "There is already a city hall" };
-    if (info.nearWater && !nearWater(w, x, y, 3)) {
+    if (info.nearWater && !tiles.some((t) => nearWater(w, t % w.size, (t / w.size) | 0, 3))) {
       return { ok: false, reason: `${info.name} must be within 3 tiles of water` };
     }
+    if (!footprintTouchesLinkedRoad(w, x, y, fp)) return { ok: false, reason: "Facility must be within 5 tiles of a connected road" };
     if (s.money < cost) return { ok: false, reason: "Not enough money" };
-    flattenTile(w, x, y);
-    w.facility[i] = type;
+    for (const t of tiles) {
+      const tx = t % w.size, ty = (t / w.size) | 0;
+      flattenTile(w, tx, ty);
+      w.facility[t] = type;
+    }
+    if (fp > 1) (w.facilityAnchors ??= []).push({ x, y, kind: type, w: fp, h: fp });
     if (type === FAC.METRO) registerMetroStation(w, i);
     w.coverageDirty = true;
     dirtyObstacles(w);
@@ -1210,6 +1257,8 @@ function recount(s: CityState): void {
   for (let i = 0; i < w.facility.length; i++) {
     const f = w.facility[i];
     if (!f || f > FAC.LANDFILL) continue;
+    const a = facilityAnchorAt(w, i);
+    if (a && idx(w, a.x, a.y) !== i) continue;
     const info = FACILITY_INFO[f as FacilityKind];
     const key: UtilityKey = f === FAC.POWER ? "power" : f === FAC.WATER ? "water" : f === FAC.SEWAGE ? "sewage" : "garbage";
     util[key].supply += info.capacity;

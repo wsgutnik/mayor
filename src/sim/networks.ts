@@ -1,4 +1,4 @@
-import { COVER, FAC, FACILITY_INFO, FacilityKind, RoadLayer, World, idx, inBounds, layerClass } from "./world";
+import { COVER, FAC, FACILITY_INFO, FacilityKind, RoadLayer, World, facilityAnchorAt, idx, inBounds, layerClass } from "./world";
 import { findFrontage } from "./blocks";
 
 /** Bits in World.nets: which utility floods reached each road tile. */
@@ -53,7 +53,7 @@ export function demandOf(zone: number, level: number): number {
 }
 
 /** Nearest road tile to (fx, fy) within FACILITY_LINK_RADIUS, or -1. Ties go to the lowest index. */
-export function nearestRoadTile(w: World, fx: number, fy: number): number {
+export function nearestRoadTile(w: World, fx: number, fy: number, requireConnected = false): number {
   const r = FACILITY_LINK_RADIUS;
   let best = -1, bd = Infinity;
   for (let dy = -r; dy <= r; dy++) {
@@ -62,6 +62,7 @@ export function nearestRoadTile(w: World, fx: number, fy: number): number {
       if (!inBounds(w, nx, ny)) continue;
       const t = idx(w, nx, ny);
       if (!w.roadSurface[t]) continue;
+      if (requireConnected && !w.connected[t]) continue;
       const d = Math.max(Math.abs(dx), Math.abs(dy));
       if (d < bd || (d === bd && t < best)) { bd = d; best = t; }
     }
@@ -75,6 +76,11 @@ export interface FacilityLink {
   net: NetKind;
 }
 
+function nearestRoadEntry(w: World, fx: number, fy: number): number {
+  const connected = nearestRoadTile(w, fx, fy, true);
+  return connected >= 0 ? connected : nearestRoadTile(w, fx, fy);
+}
+
 /** Every utility facility standing close enough to a road, with its network entry tile. */
 export function facilityLinks(w: World): FacilityLink[] {
   const out: FacilityLink[] = [];
@@ -84,9 +90,11 @@ export function facilityLinks(w: World): FacilityLink[] {
       const i = idx(w, x, y);
       const f = w.facility[i] as FacilityKind;
       if (!f) continue;
+      const anchor = facilityAnchorAt(w, i);
+      if (anchor && (anchor.x !== x || anchor.y !== y)) continue;
       for (const def of defs) {
         if (!def.sources.includes(f)) continue;
-        const entry = nearestRoadTile(w, x, y);
+        const entry = anchor ? nearestRoadEntry(w, anchor.x + 1, anchor.y + 1) : nearestRoadEntry(w, x, y);
         if (entry >= 0) out.push({ facility: i, entry, net: def.kind });
       }
     }
@@ -206,6 +214,10 @@ export function updateNetworkCoverage(w: World): void {
         w.cover[t] |= def.coverBit;
       }
     }
-    for (const l of mine) w.cover[l.facility] |= def.coverBit;
+    for (const l of mine) {
+      w.cover[l.facility] |= def.coverBit;
+      const a = facilityAnchorAt(w, l.facility);
+      if (a) for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) w.cover[idx(w, x, y)] |= def.coverBit;
+    }
   }
 }

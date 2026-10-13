@@ -1,7 +1,7 @@
 import { makeRng } from "./rng";
 import type { OrientedLot, ZoneBlockSet, ZoningMode } from "./zonecells";
 import type { RoadNode } from "./roads";
-import { updateNetworkCoverage } from "./networks";
+import { updateNetworkCoverage, facilityLinks } from "./networks";
 
 export const ZONE = { NONE: 0, RES: 1, COM: 2, IND: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
@@ -30,13 +30,15 @@ export const UNDERGROUND_LAYER = 16384;
 
 interface FacilityInfo {
   name: string; cost: number; upkeep: number; radius: number;
+  /** Tile footprint width/depth. Omitted means a 1x1 building. */
+  footprint?: 1 | 2;
   /** Units supplied; 0 for civic services, which cover without a capacity limit. */
   capacity: number; bit: number; nearWater: boolean;
 }
 
 export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
-  [FAC.POWER]: { name: "Power plant", cost: 800, upkeep: 60, radius: 14, capacity: 120, bit: COVER.POWER, nearWater: false },
-  [FAC.WATER]: { name: "Water pump", cost: 500, upkeep: 40, radius: 10, capacity: 90, bit: COVER.WATER, nearWater: true },
+  [FAC.POWER]: { name: "Power plant", cost: 800, upkeep: 60, radius: 14, footprint: 2, capacity: 120, bit: COVER.POWER, nearWater: false },
+  [FAC.WATER]: { name: "Water pump", cost: 500, upkeep: 40, radius: 10, footprint: 2, capacity: 90, bit: COVER.WATER, nearWater: true },
   [FAC.SEWAGE]: { name: "Sewage outlet", cost: 400, upkeep: 40, radius: 10, capacity: 90, bit: COVER.SEWAGE, nearWater: true },
   [FAC.LANDFILL]: { name: "Landfill", cost: 300, upkeep: 30, radius: 12, capacity: 80, bit: COVER.GARBAGE, nearWater: false },
   [FAC.POLICE]: { name: "Police station", cost: 600, upkeep: 50, radius: 12, capacity: 0, bit: COVER.POLICE, nearWater: false },
@@ -44,17 +46,28 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.CLINIC]: { name: "Clinic", cost: 700, upkeep: 60, radius: 12, capacity: 0, bit: COVER.HEALTH, nearWater: false },
   [FAC.SCHOOL]: { name: "School", cost: 900, upkeep: 70, radius: 14, capacity: 0, bit: COVER.EDU, nearWater: false },
   [FAC.PARK]: { name: "Park", cost: 150, upkeep: 10, radius: 8, capacity: 0, bit: COVER.PARK, nearWater: false },
-  [FAC.METRO]: { name: "Metro station", cost: 1200, upkeep: 60, radius: 9, capacity: 0, bit: COVER.TRANSIT, nearWater: false },
-  [FAC.HOSPITAL]: { name: "General hospital", cost: 1800, upkeep: 130, radius: 18, capacity: 0, bit: COVER.HEALTH, nearWater: false },
-  [FAC.HIGHSCHOOL]: { name: "Secondary school", cost: 1400, upkeep: 100, radius: 20, capacity: 0, bit: COVER.EDU, nearWater: false },
+  [FAC.METRO]: { name: "Metro station", cost: 1200, upkeep: 60, radius: 9, footprint: 2, capacity: 0, bit: COVER.TRANSIT, nearWater: false },
+  [FAC.HOSPITAL]: { name: "General hospital", cost: 1800, upkeep: 130, radius: 18, footprint: 2, capacity: 0, bit: COVER.HEALTH, nearWater: false },
+  [FAC.HIGHSCHOOL]: { name: "Secondary school", cost: 1400, upkeep: 100, radius: 20, footprint: 2, capacity: 0, bit: COVER.EDU, nearWater: false },
   [FAC.LIBRARY]: { name: "Public library", cost: 700, upkeep: 40, radius: 12, capacity: 0, bit: COVER.CULTURE, nearWater: false },
   [FAC.COMMUNITY]: { name: "Community centre", cost: 500, upkeep: 30, radius: 10, capacity: 0, bit: COVER.CULTURE, nearWater: false },
   [FAC.MUSEUM]: { name: "City museum", cost: 1500, upkeep: 90, radius: 16, capacity: 0, bit: COVER.CULTURE, nearWater: false },
   /** Effect is city-wide (happiness and tax), so its own radius is zero. */
-  [FAC.CITYHALL]: { name: "City hall", cost: 2500, upkeep: 150, radius: 0, capacity: 0, bit: 0, nearWater: false },
+  [FAC.CITYHALL]: { name: "City hall", cost: 2500, upkeep: 150, radius: 0, footprint: 2, capacity: 0, bit: 0, nearWater: false },
   /** Extends the power network without adding supply. */
   [FAC.SUBSTATION]: { name: "Substation", cost: 300, upkeep: 20, radius: 14, capacity: 0, bit: COVER.POWER, nearWater: false },
 };
+
+export interface FacilityAnchor { x: number; y: number; kind: FacilityKind; w: number; h: number }
+
+export const facilityFootprint = (kind: FacilityKind): 1 | 2 => FACILITY_INFO[kind].footprint ?? 1;
+
+export function facilityAnchorAt(w: World, tile: number): FacilityAnchor | undefined {
+  const anchors = w.facilityAnchors;
+  if (!anchors?.length) return undefined;
+  const x = tile % w.size, y = (tile / w.size) | 0;
+  return anchors.find((a) => x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h);
+}
 
 /** Walking reach of a bus stop, in tiles. */
 export const BUS_STOP_RADIUS = 6;
@@ -198,6 +211,8 @@ export interface World {
   obstacleRevision: number;
   /** Facility type per tile (FAC.*). */
   facility: Uint8Array;
+  /** Top-left anchors for multi-tile facilities. 1x1 facilities remain tile-only. */
+  facilityAnchors?: FacilityAnchor[];
   /** Bitmask of COVER.* services reaching each tile. */
   cover: Uint16Array;
   /** Bitmask of NET.* floods reaching each road tile (see networks.ts); 0 elsewhere. */
@@ -324,6 +339,7 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     nextOLotId: 1,
     obstacleRevision: 1,
     facility: new Uint8Array(size * size),
+    facilityAnchors: [],
     cover: new Uint16Array(size * size),
     nets: new Uint8Array(size * size),
     landValue: new Uint8Array(size * size),
@@ -443,6 +459,7 @@ export function updateCoverage(w: World): void {
   w.cover.fill(0);
   w.nets.fill(0);
   w.coverageDirty = false;
+  if (w.connectivityDirty) updateConnectivity(w);
   for (const stop of w.stops) {
     if (stop.kind !== "bus") continue;
     const sx = stop.tile % w.size, sy = (stop.tile / w.size) | 0;
@@ -456,22 +473,33 @@ export function updateCoverage(w: World): void {
     }
   }
   updateNetworkCoverage(w);
+  const linkedUtilityTiles = new Set(facilityLinks(w).map((l) => l.facility));
   for (let y = 0; y < w.size; y++) {
     for (let x = 0; x < w.size; x++) {
-      const f = w.facility[idx(w, x, y)] as FacilityType;
+      const i = idx(w, x, y);
+      const f = w.facility[i] as FacilityType;
       if (!f) continue;
       // Power, water and sewage cover through the road network, not by radius.
       if (f === FAC.POWER || f === FAC.WATER || f === FAC.SEWAGE || f === FAC.SUBSTATION) continue;
+      const anchor = facilityAnchorAt(w, i);
+      if (anchor && (anchor.x !== x || anchor.y !== y)) continue;
       const info = FACILITY_INFO[f as FacilityKind];
       const r = info.radius;
+      const cx = anchor ? anchor.x + anchor.w / 2 : x;
+      const cy = anchor ? anchor.y + anchor.h / 2 : y;
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (dx * dx + dy * dy > r * r) continue;
-          const nx = x + dx, ny = y + dy;
+          const nx = Math.floor(cx + dx), ny = Math.floor(cy + dy);
           if (inBounds(w, nx, ny)) w.cover[idx(w, nx, ny)] |= info.bit;
         }
       }
+      if (anchor) for (let ay = anchor.y; ay < anchor.y + anchor.h; ay++) for (let ax = anchor.x; ax < anchor.x + anchor.w; ax++) w.cover[idx(w, ax, ay)] |= info.bit;
     }
+  }
+  for (const i of linkedUtilityTiles) {
+    const a = facilityAnchorAt(w, i);
+    if (a) for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) w.cover[idx(w, x, y)] |= w.cover[i];
   }
 }
 

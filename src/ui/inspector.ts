@@ -30,6 +30,7 @@ export class Inspector {
   private chipsEl: HTMLElement;
   private facRows: HTMLElement;
   private upkeepVal: HTMLElement;
+  private footprintVal: HTMLElement;
   private radiusRow: HTMLElement;
   private radiusVal: HTMLElement;
   private closeBtn: HTMLButtonElement;
@@ -121,6 +122,15 @@ export class Inspector {
     this.upkeepVal.className = "insp-val";
     upkeepRow.appendChild(upkeepLabel);
     upkeepRow.appendChild(this.upkeepVal);
+    const footprintRow = document.createElement("div");
+    footprintRow.className = "insp-row";
+    const footprintLabel = document.createElement("span");
+    footprintLabel.className = "insp-lbl";
+    footprintLabel.dataset.k = "footprint-label";
+    this.footprintVal = document.createElement("span");
+    this.footprintVal.className = "insp-val";
+    footprintRow.appendChild(footprintLabel);
+    footprintRow.appendChild(this.footprintVal);
     const radiusRow = this.radiusRow = document.createElement("div");
     radiusRow.className = "insp-row";
     const radiusLabel = document.createElement("span");
@@ -131,6 +141,7 @@ export class Inspector {
     radiusRow.appendChild(radiusLabel);
     radiusRow.appendChild(this.radiusVal);
     this.facRows.appendChild(upkeepRow);
+    this.facRows.appendChild(footprintRow);
     this.facRows.appendChild(radiusRow);
     root.appendChild(this.facRows);
 
@@ -195,8 +206,10 @@ export class Inspector {
     this.facRows.hidden = !isFac;
     if (isFac) {
       this.root.querySelector<HTMLElement>('[data-k="upkeep-label"]')!.textContent = tr("Upkeep");
+      this.root.querySelector<HTMLElement>('[data-k="footprint-label"]')!.textContent = tr("Footprint");
       this.root.querySelector<HTMLElement>('[data-k="radius-label"]')!.textContent = tr("Radius");
       this.upkeepVal.textContent = `$${info.upkeep}/${tr("mo")}`;
+      this.footprintVal.textContent = `${info.footprint}x${info.footprint}`;
       // Networked utilities (usina, bomba, esgoto, subestação) show no radius.
       this.radiusRow.hidden = info.radius === 0;
       this.radiusVal.textContent = `${info.radius} ${tr("tiles")}`;

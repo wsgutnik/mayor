@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { deserialize, serialize } from "./save";
 import { applyTool, newCity, step, countRoads } from "./sim";
 import { ZONE, COVER, FAC, idx, isLand, cidx, updateCoverage } from "./world";
 
@@ -14,13 +15,13 @@ function carvePond(s: City, x: number, y: number) {
 function addUtilities(s: City) {
   const ey = s.world.entry.y;
   // Make the neighbourhood dry and flat regardless of seed, then dig a pond south of it.
-  for (let y = ey - 6; y <= ey + 5; y++)
+  for (let y = ey - 6; y <= ey + 8; y++)
     for (let x = 0; x <= 14; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
-  carvePond(s, 6, ey + 6);
+  carvePond(s, 6, ey + 7);
   expect(applyTool(s, "power", 5, ey + 2).ok).toBe(true);
   expect(applyTool(s, "water", 6, ey + 4).ok).toBe(true);
-  expect(applyTool(s, "sewage", 7, ey + 4).ok).toBe(true);
-  expect(applyTool(s, "landfill", 8, ey + 2).ok).toBe(true);
+  expect(applyTool(s, "sewage", 5, ey + 4).ok).toBe(true);
+  expect(applyTool(s, "landfill", 7, ey + 2).ok).toBe(true);
 }
 
 /** Build a straight road east from the entry and zone both sides. */
@@ -152,7 +153,7 @@ describe("utilities", () => {
     const ey = s.world.entry.y;
     const r = applyTool(s, "water", 5, ey + 2);
     expect(r.ok).toBe(false);
-    carvePond(s, 5, ey + 5);
+    carvePond(s, 5, ey + 6);
     expect(applyTool(s, "water", 5, ey + 3).ok).toBe(true);
   });
 
@@ -210,6 +211,68 @@ describe("utilities", () => {
     for (let d = 0; d < 30; d++) step(s);
     expect(s.lastMonth.expenses).toBeCloseTo(60);
   });
+
+  it("places 2x2 service buildings from the clicked top-left tile and charges once", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    for (let y = ey - 4; y <= ey + 6; y++) for (let x = 0; x <= 12; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    for (let x = 3; x <= 8; x++) applyTool(s, "road", x, ey);
+    const before = s.money;
+    expect(applyTool(s, "hospital", 5, ey + 2).ok).toBe(true);
+    for (const [x, y] of [[5, ey + 2], [6, ey + 2], [5, ey + 3], [6, ey + 3]]) {
+      expect(s.world.facility[idx(s.world, x, y)]).toBe(FAC.HOSPITAL);
+    }
+    expect(s.world.facilityAnchors).toEqual([{ x: 5, y: ey + 2, kind: FAC.HOSPITAL, w: 2, h: 2 }]);
+    expect(s.money).toBe(before - 1800);
+  });
+
+  it("refuses 2x2 facilities when any footprint tile is blocked or unlinked", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    for (let y = ey - 4; y <= ey + 10; y++) for (let x = 0; x <= 30; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    applyTool(s, "road", 6, ey + 3);
+    expect(applyTool(s, "hospital", 5, ey + 2)).toEqual({ ok: false, reason: "Tile is a road" });
+    expect(applyTool(s, "hospital", 24, ey + 8)).toEqual({ ok: false, reason: "Facility must be within 5 tiles of a connected road" });
+  });
+
+  it("bulldozing any tile of a 2x2 facility removes the whole footprint", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    for (let y = ey - 4; y <= ey + 6; y++) for (let x = 0; x <= 12; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    expect(applyTool(s, "power", 5, ey + 2).ok).toBe(true);
+    expect(applyTool(s, "bulldoze", 6, ey + 3).ok).toBe(true);
+    for (const [x, y] of [[5, ey + 2], [6, ey + 2], [5, ey + 3], [6, ey + 3]]) {
+      expect(s.world.facility[idx(s.world, x, y)]).toBe(FAC.NONE);
+    }
+    expect(s.world.facilityAnchors).toEqual([]);
+  });
+
+  it("measures 2x2 service coverage from the footprint centre", () => {
+    const s = newCity();
+    const ey = s.world.entry.y;
+    for (let y = ey - 4; y <= ey + 6; y++) for (let x = 0; x <= 30; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    expect(applyTool(s, "hospital", 5, ey + 2).ok).toBe(true);
+    updateCoverage(s.world);
+    expect(s.world.cover[idx(s.world, 24, ey + 3)] & COVER.HEALTH).toBeTruthy();
+    expect(s.world.cover[idx(s.world, 24, ey + 2)] & COVER.HEALTH).toBeFalsy();
+  });
+
+  it("round-trips 2x2 facilities through saves and remains deterministic", () => {
+    const a = newCity(23), b = newCity(23);
+    for (const s of [a, b]) {
+      const ey = s.world.entry.y;
+      for (let y = ey - 4; y <= ey + 8; y++) for (let x = 0; x <= 18; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+      s.money = 1e6;
+      for (let x = 3; x <= 12; x++) applyTool(s, "road", x, ey);
+      expect(applyTool(s, "hospital", 5, ey + 2).ok).toBe(true);
+      expect(applyTool(s, "cityhall", 9, ey + 2).ok).toBe(true);
+    }
+    const back = deserialize(serialize(a));
+    expect(back.world.facilityAnchors).toEqual(a.world.facilityAnchors);
+    for (let d = 0; d < 60; d++) { step(a); step(b); step(back); }
+    expect(Array.from(a.world.cover)).toEqual(Array.from(b.world.cover));
+    expect(Array.from(back.world.facility)).toEqual(Array.from(a.world.facility));
+  });
 });
 
 describe("civic services", () => {
@@ -222,13 +285,14 @@ describe("civic services", () => {
     return s;
   }
 
-  it("places civic buildings anywhere on land, one per tile", () => {
+  it("places civic buildings on linked land, one per tile", () => {
     const s = newCity();
     const ey = s.world.entry.y;
+    for (let y = ey - 4; y <= ey + 6; y++) for (let x = 0; x <= 12; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
     for (const t of ["police", "fire", "clinic", "school", "park"] as const) {
-      expect(applyTool(s, t, 4 + ["police", "fire", "clinic", "school", "park"].indexOf(t), ey + 3).ok).toBe(true);
+      expect(applyTool(s, t, 3 + ["police", "fire", "clinic", "school", "park"].indexOf(t), ey + 3).ok).toBe(true);
     }
-    expect(applyTool(s, "park", 4, ey + 3).ok).toBe(false);
+    expect(applyTool(s, "park", 3, ey + 3).ok).toBe(false);
   });
 
   it("burns down uncovered buildings over time, and a fire station prevents it", () => {
@@ -463,6 +527,7 @@ describe("kit facilities", () => {
 
   it("places the new facilities and covers by their own radius", () => {
     const { s, ey } = flatCity();
+    for (let x = 3; x <= 22; x++) applyTool(s, "road", x, ey);
     for (const [t, x] of [["hospital", 6], ["highschool", 9], ["library", 12], ["community", 15], ["museum", 18], ["substation", 21]] as const) {
       expect(applyTool(s, t, x, ey + 3).ok).toBe(true);
     }

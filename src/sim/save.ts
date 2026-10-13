@@ -5,7 +5,10 @@ import { lotPose } from "./orientedlots";
 import { rasterizeMirror } from "./mirror";
 import { buildZoneBlocks, cellIndex, nearestCell, type MigrationReport, type ZoneBlockSet } from "./zoneblocks";
 import type { OrientedLot, Side } from "./zonecells";
-import { BIOMES, FAC, Biome, generateWorld, rebuildRoadRaster, RoadSegment, Roundabout, Stop, TransitLine, WorldLot } from "./world";
+import {
+  BIOMES, FAC, Biome, FacilityAnchor, FacilityKind, facilityFootprint, generateWorld, idx, inBounds,
+  rebuildRoadRaster, RoadSegment, Roundabout, Stop, TransitLine, World, WorldLot,
+} from "./world";
 
 export const SAVE_VERSION = 2;
 
@@ -28,6 +31,7 @@ interface SaveFileV1 {
   zone: string;
   level: string;
   facility: string;
+  facilityAnchors?: FacilityAnchor[];
   segments: RoadSegment[];
   /** Roundabout islands; absent in saves from before the roundabout tool. */
   roundabouts?: Roundabout[];
@@ -115,6 +119,7 @@ export function serialize(s: CityState): string {
     zone: toB64(w.zone),
     level: toB64(w.level),
     facility: toB64(w.facility),
+    ...(w.facilityAnchors?.length ? { facilityAnchors: w.facilityAnchors } : {}),
     segments: w.segments,
     roundabouts: w.roundabouts,
     stops: w.stops,
@@ -268,6 +273,29 @@ function validateStructure(f: SaveFile, n: number): void {
   else validateV1Lots(f as SaveFileV1, n);
 }
 
+function validateFacilityAnchors(w: World): void {
+  const bad = () => { throw new SaveError("The save file is damaged"); };
+  const anchors = w.facilityAnchors ?? [];
+  if (!Array.isArray(anchors)) bad();
+  const taken = new Uint8Array(w.size * w.size);
+  const anchorKeys = new Set<string>();
+  for (const a of anchors) {
+    if (!a || !Number.isInteger(a.x) || !Number.isInteger(a.y) || !Number.isInteger(a.w) || !Number.isInteger(a.h)) bad();
+    if (!Number.isInteger(a.kind) || a.kind <= FAC.NONE || a.kind > FAC.SUBSTATION) bad();
+    const fp = facilityFootprint(a.kind as FacilityKind);
+    if (a.w !== fp || a.h !== fp || fp === 1) bad();
+    if (!inBounds(w, a.x, a.y) || a.x + a.w > w.size || a.y + a.h > w.size) bad();
+    const key = `${a.x}:${a.y}`;
+    if (anchorKeys.has(key)) bad();
+    anchorKeys.add(key);
+    for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) {
+      const i = idx(w, x, y);
+      if (taken[i] || w.facility[i] !== a.kind) bad();
+      taken[i] = 1;
+    }
+  }
+}
+
 function copySavedCells(f: SaveFileV2, set: ZoneBlockSet): void {
   for (const c of f.cells) {
     const b = set.blocks.get(`${c.seg}:${c.side}:${c.block}`);
@@ -348,6 +376,9 @@ export function deserialize(json: string): CityState {
   if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 3) || w.facility.some((v) => v > FAC.SUBSTATION)) {
     throw new SaveError("The save file is damaged");
   }
+  if (f.facilityAnchors !== undefined && !Array.isArray(f.facilityAnchors)) throw new SaveError("The save file is damaged");
+  w.facilityAnchors = (f.facilityAnchors ?? []).map((a) => ({ x: a.x, y: a.y, kind: a.kind, w: a.w, h: a.h }));
+  validateFacilityAnchors(w);
   w.segments = f.segments;
   w.roundabouts = f.roundabouts ?? [];
   w.stops = f.stops;

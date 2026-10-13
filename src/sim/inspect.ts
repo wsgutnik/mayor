@@ -1,6 +1,6 @@
 import { CityState, CAPACITY, syncLots } from "./sim";
 import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
-import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, idx, inBounds } from "./world";
+import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, facilityFootprint, idx, inBounds } from "./world";
 
 /** Utilities served through the road network have no radius to report. */
 const NETWORKED = new Set<FacilityKind>([FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.SUBSTATION]);
@@ -30,6 +30,8 @@ export interface TileInfo {
   upkeep: number;
   /** Radius in tiles for facilities, 0 otherwise. */
   radius: number;
+  /** Facility footprint in tiles, formatted by the UI as NxN. */
+  footprint: 1 | 2;
 }
 
 const ROAD_PT: Record<number, string> = { 1: "Rua", 2: "Avenida", 3: "Autoestrada" };
@@ -49,6 +51,7 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
       culture: !!(c & COVER.CULTURE), transit: !!(c & COVER.TRANSIT),
     },
     upkeep: 0, radius: 0,
+    footprint: 1,
   };
   const fromEntry = (e: CatalogEntry): Partial<TileInfo> => ({
     name: e.name, nameEn: e.nameEn, category: e.category, use: e.use, useEn: e.useEn, thumbnail: thumbnailOf(e.n),
@@ -60,7 +63,7 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
     const e = facilityEntry(fac);
     return {
       ...base, kind: "facility", ...(e ? fromEntry(e) : { name: info.name, nameEn: info.name }),
-      upkeep: info.upkeep, radius: NETWORKED.has(fac) ? 0 : info.radius,
+      upkeep: info.upkeep, radius: NETWORKED.has(fac) ? 0 : info.radius, footprint: facilityFootprint(fac),
     };
   }
   if (w.road[i]) {

@@ -180,6 +180,7 @@ describe("vehicles on lines", () => {
   it("metro stations create stops, and trains cross land without roads", () => {
     const { s, ey } = town();
     expect(applyTool(s, "metro", 8, ey - 6).ok).toBe(true);
+    expect(placeRoad(s, ROAD.STREET, [{ x: 22.5, z: ey + 0.5 }, { x: 22.5, z: ey - 5.5 }]).ok).toBe(true);
     expect(applyTool(s, "metro", 22, ey - 9).ok).toBe(true);
     const ids = s.world.stops.filter((x) => x.kind === "metro").map((x) => x.id);
     expect(ids).toHaveLength(2);

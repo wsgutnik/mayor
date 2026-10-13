@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
+import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
 import { History } from "./sim/history";
 import { deserialize, serialize } from "./sim/save";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
@@ -748,6 +748,12 @@ bindInput(renderer, {
       } else if (tool === "road" && !pendingInterchange) {
         hud.hideRoadReadout();
       }
+      return;
+    }
+    if (isFacilityTool(tool)) {
+      const t = renderer.pick(cx, cy);
+      const fp = facilityToolFootprint(tool);
+      renderer.setZoneRect(t, t ? { x: t.x + fp - 1, y: t.y + fp - 1 } : null, toolColor(tool));
       return;
     }
     if (isZoneLike(tool) && zoneMode === "fill") updateFillHint(cx, cy);

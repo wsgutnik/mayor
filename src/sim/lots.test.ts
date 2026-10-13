@@ -15,12 +15,12 @@ function flatCity(seed = 11, size = 32) {
 /** Utilities covering the whole strip (x 4..19), plus a fire station against test fires. */
 function utilities(s: CityState) {
   const ey = s.world.entry.y;
-  for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) s.world.heights[cidx(s.world, 10 + dx, ey + 6 + dy)] = -1;
-  expect(applyTool(s, "power", 11, ey + 2).ok).toBe(true);
-  expect(applyTool(s, "water", 11, ey + 4).ok).toBe(true);
-  expect(applyTool(s, "sewage", 12, ey + 4).ok).toBe(true);
-  expect(applyTool(s, "landfill", 13, ey + 2).ok).toBe(true);
-  expect(applyTool(s, "fire", 14, ey + 2).ok).toBe(true);
+  for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) s.world.heights[cidx(s.world, 6 + dx, ey + 7 + dy)] = -1;
+  expect(applyTool(s, "power", 5, ey + 2).ok).toBe(true);
+  expect(applyTool(s, "water", 6, ey + 4).ok).toBe(true);
+  expect(applyTool(s, "sewage", 5, ey + 4).ok).toBe(true);
+  expect(applyTool(s, "landfill", 7, ey + 2).ok).toBe(true);
+  expect(applyTool(s, "fire", 7, ey + 3).ok).toBe(true);
 }
 
 /** Street with two zoned rows on its north side; returns the strip bounds. */
