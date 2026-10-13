@@ -9,6 +9,7 @@ import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
 import { lotFrontTile, lotInstances } from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
+import { buildingModelCandidates, firstLoadableModel, visualV2PreviewEnabled } from "./visual-v2";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
@@ -558,8 +559,9 @@ export class CityRenderer {
         if (hit) apply(hit);
       } else if (!this.glbPending.has(n)) {
         this.glbPending.add(n);
-        const url = `/models/${String(n).padStart(2, "0")}.glb`;
-        loadGlb(url).then((model) => {
+        // Visual V2 preview is opt-in; missing variants fall back to the original GLB.
+        const candidates = buildingModelCandidates(n, visualV2PreviewEnabled());
+        firstLoadableModel(candidates, loadGlb).then((model) => {
           this.glb.set(n, model);
           this.glbPending.delete(n);
           // Re-run so whichever world is current gets the model, even after a map swap.
