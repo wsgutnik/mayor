@@ -1,3 +1,4 @@
+import { ROAD } from "./world";
 import type { World, ZoneType } from "./world";
 import type { OrientedLot, ZoneBlock, ZoneBlockSet } from "./zonecells";
 import { CELL_DEPTH } from "./zonecells";
@@ -165,6 +166,22 @@ export function planOrientedLots(set: ZoneBlockSet, opts: PlanOpts): OrientedLot
   return lots.sort((a, b) => a.id - b.id);
 }
 
+/**
+ * A front cell is served when a connected street or avenue tile touches its tile (8 neighbours: on a diagonal street the
+ * kerb tile is often only diagonally adjacent to the cell centre's tile). Highways carry traffic but serve no lots.
+ */
+function touchesConnectedRoad(w: World, x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= w.size || ny >= w.size) continue;
+      const j = ny * w.size + nx;
+      if (w.connected[j] && w.roadSurface[j] && w.roadSurface[j] !== ROAD.HIGHWAY) return true;
+    }
+  }
+  return false;
+}
+
 export function lotsReady(w: World, set: ZoneBlockSet, lots: readonly OrientedLot[]): Set<number> {
   const ready = new Set<number>();
   for (const lot of lots) {
@@ -176,7 +193,7 @@ export function lotsReady(w: World, set: ZoneBlockSet, lots: readonly OrientedLo
       const o = row * 4;
       const tileX = Math.floor(b.frame[o]);
       const tileY = Math.floor(b.frame[o + 1]);
-      if (tileX < 0 || tileY < 0 || tileX >= w.size || tileY >= w.size || !w.connected[tileY * w.size + tileX]) ok = false;
+      if (tileX < 0 || tileY < 0 || tileX >= w.size || tileY >= w.size || !touchesConnectedRoad(w, tileX, tileY)) ok = false;
     }
     if (ok) ready.add(lot.id);
   }
