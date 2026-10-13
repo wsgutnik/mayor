@@ -26,3 +26,10 @@ by any open license.
 ## Libraries
 
 Three.js (MIT), Tauri (MIT or Apache-2.0), Vite, and Vitest (MIT). See `package.json` and `src-tauri/Cargo.toml`.
+
+## AI-generated texture swatches (2026-10-13)
+
+`blender/textures/*_hd.png` and `public/textures/*_hd.png` for plaster, brick, concrete, roof tile, wood, metal, paving
+and gravel were derived from swatches generated with Higgsfield (GPT Image 2.5) on the project owner's account, then
+made seamless, desaturated and brightness-matched by `blender/apply_ai_textures.py`. They contain no third-party
+artwork by design (prompts describe generic materials).
