@@ -116,6 +116,15 @@
   .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
   .src a { overflow-wrap: anywhere; font-size: 13px; }
   .intro { color: var(--muted); max-width: 70ch; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .kpi b { display: block; font: 800 24px var(--font-display); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .kpi span { color: var(--muted); font-size: 13px; }
+  .sheets { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  #atab td, #atab th { font-size: 13px; }
+  #atab td:nth-child(5), #atab td:nth-child(6) { min-width: 200px; }
+  .pri { font: 600 12px var(--font-mono); padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+  .pri.A { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 </style>
 
 <main class="wrap">
@@ -127,6 +136,7 @@
     <button role="tab" id="t-plano" aria-selected="false" data-go="plano">Plano</button>
     <button role="tab" id="t-lacunas" aria-selected="false" data-go="lacunas">Lacunas</button>
     <button role="tab" id="t-pesquisa" aria-selected="false" data-go="pesquisa">Pesquisa</button>
+    <button role="tab" id="t-ativos" aria-selected="false" data-go="ativos">Ativos 3D</button>
   </nav>
 
   <div data-tab="status" class="stack" style="gap:40px">
@@ -196,6 +206,23 @@ npm run dev</pre>
   </div>
   <div data-tab="plano" class="stack" hidden><h2>Plano de execução</h2><p class="intro" id="planintro"></p><div class="stack" id="plan"></div></div>
   <div data-tab="lacunas" class="stack" hidden><h2>Lacunas frente ao Cities: Skylines</h2><p class="intro">Cada item compara o que a referência faz com o que o Mayor faz hoje, lido no código.</p><div class="stack" id="gaps"></div></div>
+  <div data-tab="ativos" class="stack" hidden>
+    <h2>Auditoria dos ativos 3D</h2>
+    <p class="intro">Ciclo 1 (PR #1): inventário e testes dos 40 prédios. Ciclo 2: prédios de referência como variantes <span class="mono">v2</span>, sem substituir os de produção. Nada aqui é medição em hardware.</p>
+    <div class="kpis" id="kpis"></div>
+    <h3>Os 40 prédios, vistos de dois ângulos</h3>
+    <p class="intro">Cada par é a vista frontal e a traseira, com a mesma luz e o mesmo enquadramento. A traseira quase sempre é uma parede lisa: é o defeito mais visível ao girar a câmera.</p>
+    <div class="sheets">
+      <figure class="shot"><img src="img/assets-sheet-1.jpg" alt="Prédios 01 a 10 em dois ângulos"><figcaption>01 a 10 · residencial</figcaption></figure>
+      <figure class="shot"><img src="img/assets-sheet-2.jpg" alt="Prédios 11 a 20 em dois ângulos"><figcaption>11 a 20 · comercial</figcaption></figure>
+      <figure class="shot"><img src="img/assets-sheet-3.jpg" alt="Prédios 21 a 30 em dois ângulos"><figcaption>21 a 30 · cívico, saúde, educação e segurança</figcaption></figure>
+      <figure class="shot"><img src="img/assets-sheet-4.jpg" alt="Prédios 31 a 40 em dois ângulos"><figcaption>31 a 40 · transporte, utilidades e indústria</figcaption></figure>
+    </div>
+    <h3>Referências v2: base, PR #2 e variante ao lado</h3>
+    <figure class="shot"><img src="img/v2-pr2-comparison.jpg" alt="Casa inicial, torre premium, torre corporativa, prefeitura e fábrica pesada: produção, PR #2 nível 0 e nível 1"><figcaption>Colunas: produção · PR #2 LOD0 · PR #2 LOD1. Linhas: 01, 10, 20, 21, 38. O PR #2 acerta a casa (garagem) e perde silos, tanque e gramado na fábrica e na prefeitura.</figcaption></figure>
+    <h3>Tabela de qualidade</h3>
+    <div class="box scroll"><table id="atab"><thead><tr><th>ID</th><th>Prédio</th><th>Tris</th><th>Prio.</th><th>Observado</th><th>Ação</th></tr></thead><tbody></tbody></table></div>
+  </div>
   <div data-tab="pesquisa" class="stack" hidden><h2>Pesquisa</h2><p class="intro">Manual oficial (archive.org), wikis de edição de ativos e fóruns. Fontes que não abriram estão em docs/process/01-research.md.</p><div class="stack" id="refs"></div></div>
 </main>
 
@@ -203,10 +230,12 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-13",
-    headline: "M16 a M21 e M23 a M27 concluídos; revisão de pontes, subsolo e detalhe em andamento.",
-    summary: "A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
+    headline: "Jogo estável; ciclo de qualidade visual dos ativos 3D em andamento.",
+    summary: "O jogo está jogável e estável (pontes passam energia, subsolo iluminado). A frente atual é a qualidade visual dos 40 prédios: auditoria concluída, prédios de referência em produção. A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
+      { id: "V1", name: "Auditoria visual (ciclo 1)", desc: "Inventário dos 40 prédios e 67 props, exportação estrita no Blender, manifesto, registro de variantes, prévias em dois ângulos. PR #1.", status: "done" },
+      { id: "V2", name: "Prédios de referência (ciclo 2)", desc: "Casa inicial, torre premium, torre corporativa, prefeitura e fábrica pesada como variantes v2 com três LODs; resolvedor opt-in ?visualV2=1. Em produção por Muse; nada substitui os modelos atuais.", status: "active" },
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
       { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "done" },
@@ -233,6 +262,9 @@ npm run dev</pre>
       { id: "M23", name: "Pontes e túneis", desc: "Estradas cruzam água e colinas por ponte ou túnel, sem nivelar o terreno.", status: "done" }
     ],
     checks: [
+      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; 344 testes passando na branch do PR #1" },
+      { ok: true, text: "Build do Blender com --strict falha de verdade (limite de triângulos, tile, números sem modelo, substituição não declarada)" },
+      { ok: false, text: "Desempenho dos ativos novos não medido em Mac, Windows nem iPad; limites de LOD são hipóteses" },
       { ok: true, text: "339 testes passando, incluindo leitura de todos os GLB, limites do tile, orçamento de triângulos, zoneamento orientado e redes por camada" },
       { ok: true, text: "Checagem de tipos e build de produção sem erros (npm run ci, local)" },
       { ok: true, text: "Energia, água e esgoto atravessam pontes e túneis (fluxo por camada); vista Subsolo iluminada também à noite" },
@@ -243,6 +275,15 @@ npm run dev</pre>
       { ok: false, text: "Em aberto da revisão de jogo: sombra preta sob ponte à noite e 'asas' nas rampas (sombra suavizada, falta confirmar), fitas de tubo retorcidas no subsolo (não reproduzido), tiras de meio-fio no meio da quadra e almofadas serrilhadas no zoneamento orientado, canteiro de avenida parando antes da esquina, nível de detalhe de carros e prédios" }
     ],
     log: [
+      { date: "2026-10-13", title: "Qualidade visual dos ativos · ciclos 1 e 2", items: [
+        "Bug confirmado: o script de auditoria do PR #1 quebrava ao rodar (variável de laço fora de escopo). Corrigido e ampliado: vértices, normais, texturas, triângulos degenerados, geometria duplicada, prontidão de LOD e classificação de props",
+        "build_all.py --strict: falha com prédio fora do tile, acima do limite, número 1–40 sem modelo ou substituição não declarada; manifest.json com variante, versão e footprint",
+        "Registro com base e variantes: variantes vão para variants/<nome>/NN.glb e nunca substituem o modelo de produção; 12 substituições do buildings_zz_hero.py agora declaradas",
+        "Prévias de todos os 40 prédios em dois ângulos; achado principal: fachadas traseiras e laterais lisas e silhuetas repetidas (relatório com prioridade por prédio)",
+        "PR #2 (outro agente) revisado: infraestrutura de runtime aproveitada (resolvedor opt-in, correção de mergeScene para malhas sem índice); modelos de referência dele não superam os atuais e não foram adotados",
+        "Muse spark: referências v2, fachadas traseiras (#05–#40) e detalhe de veículos em worktrees separados; Codex sem cota até 00:05",
+        "Documentos: VISUAL-ASSET-AUDIT, BUILDING-QUALITY-REPORT, ASSET-ARCHITECTURE-V2, VISUAL-UPGRADE-ROADMAP"
+      ] },
       { date: "2026-10-12", title: "Revisão de jogo · pontes, subsolo e detalhe", items: [
         "Causa raiz da energia que não passava por ponte: o fluxo das redes só andava por tiles de solo; agora é por camada (solo, tabuleiro, túnel) com troca só nas rampas, como o tráfego. Água e esgoto seguem a mesma regra; dois testes antigos que exigiam a parada na margem foram atualizados",
         "Subsolo escuro à noite: luzes e fundo só eram recalculados no próximo tique do relógio; agora atualizam ao alternar a vista, com luz de dia, fundo de terra e solo mais claro",
@@ -435,6 +476,8 @@ npm run dev</pre>
     ]
   };
 
+  const BUILDINGS = [{"id": 1, "name": "Starter House", "cat": "R1", "tris": 403, "mats": 17, "issue": "Good silhouette; rear facade is a blank wall; roof flat-shaded, no eaves; small yard", "pri": "A", "action": "Hero v2 (in progress): garage, driveway, eaves, 4-6 style variants"}, {"id": 2, "name": "Family House", "cat": "R1", "tris": 403, "mats": 19, "issue": "Rear wall with only a few windows; hip roof without eaves; reads as #01 recoloured", "pri": "A", "action": "Style variants (roof/wall/plot), rear windows, driveway"}, {"id": 3, "name": "Modern Townhouse", "cat": "R2", "tris": 307, "mats": 19, "issue": "Strong front, flat grey rear; no rooftop terrace; shares footprint idiom with #04", "pri": "B", "action": "Rear window pass, terrace, planter"}, {"id": 4, "name": "Semi-detached Villa", "cat": "R2", "tris": 359, "mats": 17, "issue": "Two halves nearly identical; party wall reads as a stripe; blank rear", "pri": "B", "action": "Mirror-variation of halves, entry porches, gates"}, {"id": 5, "name": "Small Apartment", "cat": "R3", "tris": 302, "mats": 15, "issue": "Slab with blank rear; balconies only on the front; low roof detail", "pri": "A", "action": "Rear/side windows, stair core, roof equipment, entrance canopy"}, {"id": 6, "name": "Garden Condominium", "cat": "R3", "tris": 400, "mats": 14, "issue": "Rear blank; 'garden' is a few trees; no courtyard", "pri": "B", "action": "Courtyard + paths + parking pad; rear balconies"}, {"id": 7, "name": "Compact Tower", "cat": "R4", "tris": 364, "mats": 15, "issue": "Thin slab, rear is a dark stripe; repeats #05/#06/#08 silhouette", "pri": "A", "action": "Silhouette change (setbacks), facade fins, LOD1/2 shaped like the tower"}, {"id": 8, "name": "Balcony Residence", "cat": "R3", "tris": 370, "mats": 14, "issue": "Green roof is a flat slab; rear blank; balconies uniform", "pri": "B", "action": "Roof garden pergola, varied balcony rhythm"}, {"id": 9, "name": "Local Mixed-use Building", "cat": "R4", "tris": 220, "mats": 15, "issue": "Mixed-use box with floating rooftop units; ground-floor shops flat decals; rear blank", "pri": "A", "action": "Shopfront recess, signage, side windows, parapet"}, {"id": 10, "name": "Premium Tower", "cat": "R5", "tris": 408, "mats": 14, "issue": "Slim slab; balcony rail only on one face; green roof flat; reads thin in scale", "pri": "A", "action": "Hero v2 (in progress): podium, penthouse, balconies, varied facade"}, {"id": 11, "name": "Convenience Store", "cat": "C1", "tris": 297, "mats": 19, "issue": "Flat box with sign; parking pad ok; rear blank; repeats #13/#19 shape", "pri": "A", "action": "Glazed front, canopy, pump-less forecourt, rear service door"}, {"id": 12, "name": "Corner Café", "cat": "C1", "tris": 431, "mats": 19, "issue": "Best-detailed commercial; rear is a blank dark box; tables/umbrellas are good", "pri": "B", "action": "Rear/side windows; keep"}, {"id": 13, "name": "Local Market", "cat": "C2", "tris": 302, "mats": 18, "issue": "Box with green awning; reads as #11 recoloured; no loading dock", "pri": "A", "action": "Loading bay, crate stack, roof signage, silhouette change"}, {"id": 14, "name": "Urban Restaurant", "cat": "C2", "tris": 190, "mats": 12, "issue": "Timber facade good; rear blank; night glow ok", "pri": "B", "action": "Rear windows, terrace railing"}, {"id": 15, "name": "Neighbourhood Pharmacy", "cat": "C1", "tris": 192, "mats": 14, "issue": "Red band reads as stripe; floating canopy corner; rear blank", "pri": "A", "action": "Cross sign, entrance recess, parking"}, {"id": 16, "name": "Compact Office", "cat": "C2", "tris": 206, "mats": 14, "issue": "Glass strip good; rear/sides plain; same silhouette as #18", "pri": "B", "action": "Curtain-wall variation, rooftop plant"}, {"id": 17, "name": "Local Bank", "cat": "C2", "tris": 266, "mats": 14, "issue": "Columns read well; rear plain; roof flat", "pri": "B", "action": "Pediment, steps, vault detail"}, {"id": 18, "name": "Executive Hotel", "cat": "C3", "tris": 287, "mats": 14, "issue": "Brown stripe on the rear; plain; identical bulk to #16", "pri": "B", "action": "Marquee, rooftop sign, balcony rhythm"}, {"id": 19, "name": "Neighbourhood Mall", "cat": "C3", "tris": 190, "mats": 12, "issue": "Flat wide box; signs are flat decals; no parking/plaza despite description", "pri": "B", "action": "Plaza, entrances, parking, roof units"}, {"id": 20, "name": "Corporate Tower", "cat": "C4", "tris": 374, "mats": 14, "issue": "Narrow tower (2.07 tall) with sparse rear glow; base small; lacks lobby", "pri": "A", "action": "Hero v2 (in progress): curtain wall, lobby, crown"}, {"id": 21, "name": "City Hall", "cat": "S3", "tris": 240, "mats": 14, "issue": "Reads civic but small and boxy; no plaza; tower is a cube", "pri": "A", "action": "Hero v2 (in progress): portico, plaza, clock tower"}, {"id": 22, "name": "Public Library", "cat": "S2", "tris": 208, "mats": 13, "issue": "Brick corners good; roof glass odd; rear plain", "pri": "B", "action": "Entrance, reading garden, roof detail"}, {"id": 23, "name": "Community Centre", "cat": "S2", "tris": 200, "mats": 15, "issue": "Asymmetric; rear/side plain; low presence", "pri": "B", "action": "Scale/plaza, accessibility ramp, canopy"}, {"id": 24, "name": "Police Station", "cat": "S3", "tris": 431, "mats": 18, "issue": "Blue front good; rear plain; no garage presence", "pri": "B", "action": "Garage doors, patrol cars, flagpole detail"}, {"id": 25, "name": "City Museum", "cat": "S3", "tris": 254, "mats": 16, "issue": "Good pediment/atrium; rear plain; no plaza", "pri": "B", "action": "Plaza, steps, banners"}, {"id": 26, "name": "Clinic", "cat": "S2", "tris": 218, "mats": 15, "issue": "Cross sign good; rear a grey box; small", "pri": "B", "action": "Ambulance bay, canopy, rear windows"}, {"id": 27, "name": "General Hospital", "cat": "S4", "tris": 298, "mats": 12, "issue": "Footprint inside one tile reads small for a hospital; rear blocky; no ambulance zone", "pri": "A", "action": "Multi-tile footprint (2x2) candidate, helipad, ambulance bay"}, {"id": 28, "name": "Primary School", "cat": "S2", "tris": 214, "mats": 16, "issue": "Gate readable; no playground; rear plain", "pri": "B", "action": "Playground, court, fence"}, {"id": 29, "name": "Secondary School", "cat": "S3", "tris": 200, "mats": 14, "issue": "Three volumes ok; no sports field; rear plain", "pri": "B", "action": "Sports court, annex variation"}, {"id": 30, "name": "Fire Station", "cat": "S3", "tris": 333, "mats": 15, "issue": "Tower and doors read well; rear plain; trucks small", "pri": "A", "action": "Truck apron, hose tower detail, roller doors"}, {"id": 31, "name": "Bus Station", "cat": "T2", "tris": 444, "mats": 22, "issue": "Canopy good; bays flat; rear blank", "pri": "B", "action": "Bays, platform numbers, shelter"}, {"id": 32, "name": "Train Station", "cat": "T3", "tris": 440, "mats": 25, "issue": "Good silhouette; rear plain; track absent", "pri": "B", "action": "Platforms, footbridge, rails"}, {"id": 33, "name": "Cargo Terminal", "cat": "T3", "tris": 438, "mats": 24, "issue": "Busy yard good; container rear plain; no dock detail", "pri": "B", "action": "Dock doors, semis, crane"}, {"id": 34, "name": "Water Treatment Plant", "cat": "U3", "tris": 363, "mats": 12, "issue": "Tank and tower read; pipes thin; rear plain", "pri": "B", "action": "Tanks, pipework, fence, clarifier pools"}, {"id": 35, "name": "Electrical Substation", "cat": "U2", "tris": 337, "mats": 11, "issue": "Pylons read; transformers boxes; rear similar", "pri": "B", "action": "Insulators, busbars, fence"}, {"id": 36, "name": "Logistics Warehouse", "cat": "I1", "tris": 347, "mats": 15, "issue": "Good shed + docks; rear plain; trailers small", "pri": "A", "action": "Dock doors, roof ribs, trailers"}, {"id": 37, "name": "Light Factory", "cat": "I2", "tris": 349, "mats": 17, "issue": "Sawtooth + chimney good; rear fine", "pri": "A", "action": "Pipes, vents, parking"}, {"id": 38, "name": "Heavy Factory", "cat": "I4", "tris": 432, "mats": 13, "issue": "Silos/chimneys good; rear plain; yard small", "pri": "A", "action": "Hero v2 (in progress): pipes, tanks, service road, loading"}, {"id": 39, "name": "Recycling Centre", "cat": "U3", "tris": 167, "mats": 14, "issue": "Container yard readable; roof plain; green saturated", "pri": "B", "action": "Sorting line, conveyor, bales"}, {"id": 40, "name": "Thermal Power Plant", "cat": "U4", "tris": 262, "mats": 13, "issue": "Cooling towers readable; thin stack; plant buildings plain", "pri": "B", "action": "Boiler hall, pipe racks, coal yard"}];
+  const AUDIT = {"buildingsFound": 40, "propsFound": 67, "propsByClass": {"vehicle": 32, "boat": 3, "vegetation": 7, "agent": 5, "street-furniture": 20}, "totalBuildingTriangles": 12446, "totalBuildingVertices": 24296, "totalBuildingBytes": 1902700, "maxBuildingTriangles": 444, "buildingsWithLodNodes": 0, "buildingsWithTextures": 0, "errors": 0, "warnings": 0};
   const $ = (id) => document.getElementById(id);
   const LABEL = { done: "Concluído", active: "Em andamento", todo: "Pendente" };
   const fmtDate = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
@@ -484,6 +527,15 @@ npm run dev</pre>
   $("complaints").innerHTML = PROCESS.user_complaints.map((c) =>
     '<article class="card"><h3>' + esc(c.complaint) + "</h3><p><span class=\"k\">Lacunas</span> " + c.gap_ids.map((g) => '<span class="tag">' + esc(g) + "</span>").join(" ") +
     " <span class=\"k\">Marcos</span> " + c.plan_ids.map((g) => '<span class="tag">' + esc(g) + "</span>").join(" ") + "</p></article>").join("");
+  $("kpis").innerHTML = [
+    [AUDIT.buildingsFound + " de 40", "prédios com GLB válido"],
+    [AUDIT.propsFound, "props, veículos e plantas"],
+    [AUDIT.maxBuildingTriangles + " tris", "maior prédio (limite 450)"],
+    [AUDIT.errors + " / " + AUDIT.warnings, "erros / avisos da auditoria"],
+  ].map((k) => '<div class="kpi"><b>' + esc(k[0]) + "</b><span>" + esc(k[1]) + "</span></div>").join("");
+  document.querySelector("#atab tbody").innerHTML = BUILDINGS.map((b) =>
+    "<tr><td class=mono>" + String(b.id).padStart(2, "0") + "</td><td>" + esc(b.name) + ' <span class="label">' + esc(b.cat) + "</span></td><td class=mono>" + b.tris +
+    '</td><td><span class="pri ' + b.pri + '">' + b.pri + "</span></td><td>" + esc(b.issue) + "</td><td>" + esc(b.action) + "</td></tr>").join("");
   const goTab = (name) => {
     document.querySelectorAll("[data-tab]").forEach((el) => { el.hidden = el.dataset.tab !== name; });
     document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.go === name)));
@@ -491,5 +543,5 @@ npm run dev</pre>
   };
   document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => goTab(b.dataset.go)));
   const first = (location.hash || "").slice(1);
-  if (["status", "reclamacoes", "plano", "lacunas", "pesquisa"].includes(first)) goTab(first);
+  if (["status", "reclamacoes", "plano", "lacunas", "pesquisa", "ativos"].includes(first)) goTab(first);
 </script>
