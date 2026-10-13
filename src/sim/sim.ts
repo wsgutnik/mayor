@@ -13,6 +13,10 @@ import { addSegment, rebuildNodes, removeSegment, stampRoundabout, toggleOneWayA
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
+import { rasterizeMirror } from "./mirror";
+import { lotsReady, planOrientedLots } from "./orientedlots";
+import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
+import type { CellRef, OrientedLot } from "./zonecells";
 export { ZONE_DEPTH } from "./blocks";
 
 export type FacilityTool =
@@ -389,15 +393,22 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[], level: RoadLe
     if (piece.elevation !== "tunnel") clearTiles.push(...piece.tiles);
   }
   levelTiles(w, groundTiles);
-  for (const i of clearTiles) {
-    w.zone[i] = 0;
-    w.level[i] = 0;
+  if (w.zoning === "tiles") {
+    for (const i of clearTiles) {
+      w.zone[i] = 0;
+      w.level[i] = 0;
+    }
   }
   // The graph snaps the ends to nearby nodes, splits T-junction sides and
   // crossings, and upgrades roads paved over along the same path. Shared piece
   // endpoints snap to the same node, so the elevated middle joins its approaches.
   for (const piece of pieces) addSegment(w, type, piece.pts, { elevation: piece.elevation });
   rebuildRoadRaster(w);
+  if (w.zoning === "oriented") {
+    w.obstacleRevision++;
+    w.lotsDirty = true;
+    refreshOrientedLots(s);
+  }
   // Utility networks run under the roads, so new tarmac can light new buildings.
   w.coverageDirty = true;
   updateCoverage(w);
@@ -416,6 +427,7 @@ export { ROAD_NAME };
 function dirtyRoads(w: World): void {
   w.roadRevision++;
   w.zoneRevision++;
+  w.obstacleRevision++;
   w.lotsDirty = true;
 }
 
@@ -423,6 +435,24 @@ function dirtyRoads(w: World): void {
 function dirtyZones(w: World): void {
   w.zoneRevision++;
   w.lotsDirty = true;
+}
+
+function dirtyObstacles(w: World): void {
+  w.obstacleRevision++;
+  dirtyZones(w);
+}
+
+function blockKey(ref: Pick<CellRef, "seg" | "side" | "block">): string {
+  return `${ref.seg}:${ref.side}:${ref.block}`;
+}
+
+export function getZoneBlocks(w: World): ZoneBlockSet {
+  const prev = w.cells as unknown as ZoneBlockSet | undefined;
+  if (prev && prev.graphRevision === w.graphRevision && (prev as { obstacleRevision?: number }).obstacleRevision === w.obstacleRevision) return prev;
+  const next = buildZoneBlocks(w, prev);
+  (next as { obstacleRevision?: number }).obstacleRevision = w.obstacleRevision;
+  w.cells = next as unknown as World["cells"];
+  return next;
 }
 
 /**
@@ -472,6 +502,36 @@ export function refreshLots(s: CityState): void {
     }
   }
   w.lots = lots;
+  w.lotsDirty = false;
+}
+
+export function setOLotLevel(w: World, lot: OrientedLot, level: number): void {
+  lot.level = level;
+  const set = getZoneBlocks(w);
+  const b = set.blocks.get(blockKey(lot));
+  if (!b) return;
+  for (let row = lot.row; row < lot.row + lot.w; row++) for (let col = lot.col; col < lot.col + lot.d; col++) {
+    const i = cellIndex(row, col);
+    b.level[i] = level;
+  }
+  rasterizeMirror(w, set, w.olots ?? []);
+}
+
+export function refreshOrientedLots(s: CityState): void {
+  const w = s.world;
+  const set = getZoneBlocks(w);
+  const keep = w.olots ?? [];
+  const lots = planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep });
+  const keptIds = new Set(keep.map((lot) => lot.id));
+  for (const lot of lots) if (!keptIds.has(lot.id) && lot.id < w.nextOLotId) {
+    const oldId = lot.id;
+    lot.id = w.nextOLotId++;
+    const b = set.blocks.get(blockKey(lot));
+    if (b) for (let i = 0; i < b.lot.length; i++) if (b.lot[i] === oldId) b.lot[i] = lot.id;
+  }
+  for (const lot of lots) w.nextOLotId = Math.max(w.nextOLotId, lot.id + 1);
+  w.olots = lots;
+  rasterizeMirror(w, set, lots);
   w.lotsDirty = false;
 }
 
@@ -535,7 +595,101 @@ function lotsOutOfSync(w: World): boolean {
 
 /** Rebuild lots when stale; cheap to call every frame and every step. */
 export function syncLots(s: CityState): void {
+  if (s.world.zoning === "oriented") {
+    if (s.world.lotsDirty || !s.world.olots) refreshOrientedLots(s);
+    return;
+  }
   if (s.world.lotsDirty || lotsOutOfSync(s.world)) refreshLots(s);
+}
+
+export interface ZoneBrush { radius: 0 | 1 | 2 }
+
+function refsAround(set: ZoneBlockSet, ref: CellRef, radius: number): CellRef[] {
+  const b = set.blocks.get(blockKey(ref));
+  if (!b) return [];
+  const p0 = cellPose(b, ref.row, ref.col);
+  const maxD2 = (radius + 0.5) ** 2;
+  const out: CellRef[] = [];
+  for (const block of set.blocks.values()) for (let row = 0; row < block.rows; row++) for (let col = 0; col < 4; col++) {
+    const i = cellIndex(row, col);
+    if (!block.valid[i]) continue;
+    const p = cellPose(block, row, col);
+    if ((p.x - p0.x) ** 2 + (p.z - p0.z) ** 2 <= maxD2) out.push({ seg: block.seg, side: block.side, block: block.block, row, col });
+  }
+  return out;
+}
+
+export function applyZoneAt(s: CityState, zone: ZoneType | 0, x: number, z: number, brush: ZoneBrush = { radius: 0 }): ToolResult {
+  const w = s.world;
+  const set = getZoneBlocks(w);
+  const picked = nearestCell(set, x, z, 0.75);
+  if (!picked) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
+  const refs = refsAround(set, picked, brush.radius);
+  const pending = refs.filter((ref) => {
+    const b = set.blocks.get(blockKey(ref));
+    return !!b && b.valid[cellIndex(ref.row, ref.col)] && b.zone[cellIndex(ref.row, ref.col)] !== zone;
+  });
+  const cost = zone ? COST.res * pending.length : 0;
+  if (cost && s.money < cost) return { ok: false, reason: "Not enough money" };
+  let changed = 0;
+  for (const ref of pending) {
+    const b = set.blocks.get(blockKey(ref));
+    if (!b) continue;
+    const i = cellIndex(ref.row, ref.col);
+    b.zone[i] = zone;
+    b.level[i] = 0;
+    changed++;
+    const p = cellPose(b, ref.row, ref.col);
+    levelTiles(w, [idx(w, Math.floor(p.x), Math.floor(p.z))]);
+  }
+  if (!changed) return { ok: true };
+  if (zone) { s.money -= cost; s.monthExpenses += cost; }
+  w.zoneRevision++;
+  w.lotsDirty = true;
+  w.coverageDirty = true;
+  w.revision++;
+  refreshOrientedLots(s);
+  return { ok: true };
+}
+
+export function bulldozeAt(s: CityState, x: number, z: number): ToolResult {
+  const w = s.world;
+  const tx = Math.floor(x), ty = Math.floor(z);
+  if (!inBounds(w, tx, ty)) return { ok: false, reason: "Outside the map" };
+  const tile = idx(w, tx, ty);
+  if (w.road[tile] || w.facility[tile]) {
+    const mode = w.zoning;
+    w.zoning = "tiles";
+    const result = applyTool(s, "bulldoze", tx, ty);
+    w.zoning = mode;
+    if (result.ok) {
+      w.obstacleRevision++;
+      w.lotsDirty = true;
+      refreshOrientedLots(s);
+    }
+    return result;
+  }
+  const set = getZoneBlocks(w);
+  const ref = nearestCell(set, x, z, 0.75);
+  if (!ref) return { ok: true };
+  const b = set.blocks.get(blockKey(ref));
+  if (!b) return { ok: true };
+  const i = cellIndex(ref.row, ref.col);
+  if (!b.zone[i] && b.lot[i] < 0) return { ok: true };
+  if (s.money < COST.bulldoze) return { ok: false, reason: "Not enough money" };
+  const lotId = b.lot[i];
+  const lot = lotId >= 0 ? (w.olots ?? []).find((l) => l.id === lotId) : undefined;
+  if (lot) setOLotLevel(w, lot, 0);
+  b.zone[i] = 0;
+  b.level[i] = 0;
+  s.money -= COST.bulldoze;
+  s.monthExpenses += COST.bulldoze;
+  w.zoneRevision++;
+  w.lotsDirty = true;
+  w.coverageDirty = true;
+  w.revision++;
+  refreshOrientedLots(s);
+  return { ok: true };
 }
 
 /** Set a lot's level and mirror it onto every footprint tile. */
@@ -595,6 +749,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   const isEntry = isEntryTile(w, x, y);
 
   if (tool === "bulldoze") {
+    if (w.zoning === "oriented" && !w.road[i] && !w.facility[i]) return bulldozeAt(s, x + 0.5, y + 0.5);
     if (isEntry) return { ok: false, reason: "Cannot remove the highway entry" };
     if (!w.road[i] && !w.zone[i] && !w.facility[i]) return { ok: true };
     if (s.money < cost) return { ok: false, reason: "Not enough money" };
@@ -659,7 +814,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     w.facility[i] = type;
     if (type === FAC.METRO) registerMetroStation(w, i);
     w.coverageDirty = true;
-    dirtyZones(w);
+    dirtyObstacles(w);
     updateCoverage(w);
     s.money -= cost;
     s.monthExpenses += cost;
@@ -673,6 +828,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     // Painting lays a one-tile segment of the chosen class.
     return placeRoad(s, roadType, [{ x: x + 0.5, z: y + 0.5 }, { x: x + 0.5, z: y + 0.5 }]);
   } else {
+    if (w.zoning === "oriented") return applyZoneAt(s, ZONE_OF_TOOL[tool], x + 0.5, y + 0.5, { radius: 0 });
     const z = ZONE_OF_TOOL[tool];
     if (blocksBuilding(w, i)) return { ok: false, reason: "Tile is a road" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
@@ -774,6 +930,13 @@ function recount(s: CityState): void {
   };
 }
 
+function lotFootprint(w: World, lot: WorldLot | OrientedLot): number[] {
+  if ("tiles" in lot) return lot.tiles;
+  const tiles: number[] = [];
+  for (let y = lot.y; y < lot.y + lot.h; y++) for (let x = lot.x; x < lot.x + lot.w; x++) tiles.push(idx(w, x, y));
+  return tiles;
+}
+
 /** Rebuild everything derived from the player's world (after loading a save). */
 export function refreshDerived(s: CityState): void {
   const w = s.world;
@@ -800,35 +963,37 @@ export function step(s: CityState): void {
 
   // Growth decides once per ready lot; the level is mirrored onto the whole footprint.
   syncLots(s);
-  const ready = new Set(lotsReadyToBuild(w, getBlocks(w), w.lots));
-  for (const lot of w.lots) {
+  const oriented = w.zoning === "oriented";
+  const readyIds: Set<number> = oriented
+    ? lotsReady(w, getZoneBlocks(w).blocks, w.olots ?? [])
+    : new Set((lotsReadyToBuild(w, getBlocks(w), w.lots) as WorldLot[]).map((l) => l.id));
+  const lots = oriented ? (w.olots ?? []) : w.lots;
+  for (const lot of lots) {
     const d = demandOf[lot.zone];
     const lvl = lot.level;
     // A building needs its services on every tile of its footprint.
     let power = true, water = true, sewage = true, garbage = true, edu = true, fire = true;
-    for (let y = lot.y; y < lot.y + lot.h; y++) {
-      for (let x = lot.x; x < lot.x + lot.w; x++) {
-        const c = w.cover[idx(w, x, y)];
-        power &&= (c & COVER.POWER) !== 0;
-        water &&= (c & COVER.WATER) !== 0;
-        sewage &&= (c & COVER.SEWAGE) !== 0;
-        garbage &&= (c & COVER.GARBAGE) !== 0;
-        edu &&= (c & COVER.EDU) !== 0;
-        fire &&= (c & COVER.FIRE) !== 0;
-      }
+    for (const tile of lotFootprint(w, lot)) {
+      const c = w.cover[tile];
+      power &&= (c & COVER.POWER) !== 0;
+      water &&= (c & COVER.WATER) !== 0;
+      sewage &&= (c & COVER.SEWAGE) !== 0;
+      garbage &&= (c & COVER.GARBAGE) !== 0;
+      edu &&= (c & COVER.EDU) !== 0;
+      fire &&= (c & COVER.FIRE) !== 0;
     }
-    const served = ready.has(lot) && power && water;
+    const served = readyIds.has(lot.id) && power && water;
     if (lvl === 0) {
-      if (served && d > 0 && rng() < 0.05 * d) { setLotLevel(w, lot, 1); changed = true; }
+      if (served && d > 0 && rng() < 0.05 * d) { oriented ? setOLotLevel(w, lot as OrientedLot, 1) : setLotLevel(w, lot as WorldLot, 1); changed = true; }
     } else if (!served) {
-      if (rng() < 0.05) { setLotLevel(w, lot, 0); changed = true; }
+      if (rng() < 0.05) { oriented ? setOLotLevel(w, lot as OrientedLot, 0) : setLotLevel(w, lot as WorldLot, 0); changed = true; }
     } else if (!fire && rng() < FIRE_CHANCE) {
-      setLotLevel(w, lot, 0); s.fires++; changed = true;
+      oriented ? setOLotLevel(w, lot as OrientedLot, 0) : setLotLevel(w, lot as WorldLot, 0); s.fires++; changed = true;
     } else {
       // Level 2 needs sewage; level 3 needs garbage collection and schools.
       const canUp = lvl === 1 ? sewage : garbage && edu;
-      if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) { setLotLevel(w, lot, lvl + 1); changed = true; }
-      else if (d < -0.3 && rng() < 0.01) { setLotLevel(w, lot, lvl - 1); changed = true; }
+      if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl + 1) : setLotLevel(w, lot as WorldLot, lvl + 1); changed = true; }
+      else if (d < -0.3 && rng() < 0.01) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl - 1) : setLotLevel(w, lot as WorldLot, lvl - 1); changed = true; }
     }
   }
   if (changed) {
