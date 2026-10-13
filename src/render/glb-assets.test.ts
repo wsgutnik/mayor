@@ -48,7 +48,7 @@ describe("Blender kit models", () => {
       expect(b.max.z, f).toBeLessThanOrEqual(0.51);
       expect(b.min.y, f).toBeGreaterThanOrEqual(-0.01);
       expect(b.max.y, f).toBeLessThan(2.7);
-      expect(tris(g), f).toBeLessThanOrEqual(700);
+      expect(tris(g), f).toBeLessThanOrEqual(1400);
       expect(m!.materials.length, f).toBeGreaterThan(0);
     }
   });

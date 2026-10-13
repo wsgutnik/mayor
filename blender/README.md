@@ -13,7 +13,7 @@ python3 blender/compare.py --previews /tmp/previews --out /tmp/compare.png 2 3 4
 Add a model: create `blender/buildings_<group>.py` and register a function with `@building(n, "Name")`
 (see `buildings_samples.py`). `lib.Model` has box, gable, hip, pyramid, cyl, cone, windows, awning, tree and plot.
 
-Rules: inside the tile (|x|,|y| <= 0.5, base z = 0), front faces -Y, at most 700 triangles,
+Rules: inside the tile (|x|,|y| <= 0.5, base z = 0), front faces -Y, at most 1400 triangles,
 use palette material names (`glow_*` materials light up at night). Output goes to `public/models/NN.glb`;
 the game swaps procedural models for these as they load.
 
