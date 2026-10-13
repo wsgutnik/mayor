@@ -340,3 +340,8 @@ body {
 .rr-l { color: var(--muted); }
 .rr-v { font-variant-numeric: tabular-nums; font-weight: 600; }
 .rr-row.bad .rr-v { color: var(--bad); }
+
+/* UI-2: with a large UI scale the toolbar scrolls; keep the last tool reachable and hide the scrollbar. */
+.toolbar { scrollbar-width: none; scroll-snap-type: x proximity; }
+.toolbar::-webkit-scrollbar { display: none; }
+.toolbar .tool { scroll-snap-align: center; flex: 0 0 auto; }

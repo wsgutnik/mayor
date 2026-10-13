@@ -1099,6 +1099,7 @@ function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: numb
     return out;
   }
   const frontage = tool === "bulldoze" ? null : getFrontage(w);
+  let already = 0;
   for (const t of tiles) {
     if (!inBounds(w, t.x, t.y)) { fail("Outside the map"); continue; }
     const i = idx(w, t.x, t.y);
@@ -1110,10 +1111,12 @@ function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: numb
     if (!isLand(w, t.x, t.y)) { fail("Cannot build on water"); continue; }
     if (blocksBuilding(w, i)) { fail("Tile is a road"); continue; }
     if (w.facility[i]) { fail("Tile is occupied"); continue; }
-    if (w.zone[i] === ZONE_OF_TOOL[tool]) continue;
+    if (w.zone[i] === ZONE_OF_TOOL[tool]) { already++; continue; }
     if (frontage!.road[i] < 0) { fail("Zones must be within 4 tiles of a road"); continue; }
     out.tiles.push(i);
   }
+  // Part of the rectangle is already this zone: nothing to do is not an error worth a "Tile is a road" toast.
+  if (!out.tiles.length && already > 0) out.hardReason = undefined;
   return out;
 }
 

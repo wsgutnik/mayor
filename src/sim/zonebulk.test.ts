@@ -25,6 +25,19 @@ describe("zone bulk (marquee/fill back end)", () => {
     for (const t of tiles) expect(s.world.zone[idx(s.world, t.x, t.y)]).toBe(ZONE.RES);
   });
 
+  it("re-dragging a rectangle that overlaps the road is a quiet no-op, not a 'Tile is a road' error", () => {
+    const s = newCity();
+    const ey = roadRow(s);
+    const first = rectangleTiles({ x: 3, y: ey - 2 }, { x: 6, y: ey - 1 });
+    expect(applyZoneBulk(s, "res", first).ok).toBe(true);
+    const wide = rectangleTiles({ x: 3, y: ey - 2 }, { x: 6, y: ey });   // adds the road row
+    expect(previewZoneBulk(s, "res", wide)).toEqual({ count: 0, cost: 0 });
+    expect(applyZoneBulk(s, "res", wide)).toEqual({ ok: true });
+    // A rectangle that is ONLY road still explains itself.
+    const road = rectangleTiles({ x: 3, y: ey }, { x: 6, y: ey });
+    expect(applyZoneBulk(s, "res", road)).toEqual({ ok: false, reason: "Tile is a road" });
+  });
+
   it("skips same-zone tiles for free and overwrites other zones", () => {
     const s = newCity();
     const ey = roadRow(s);

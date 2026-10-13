@@ -659,10 +659,20 @@ export class Hud {
     const open = f.classList.contains("open");
     this.closeFlyouts();
     if (!open) f.classList.add("open");
+    this.placeHint();
   }
 
   private closeFlyouts(): void {
     this.flyouts.forEach((f) => f.classList.remove("open"));
+    this.placeHint();
+  }
+
+  /** Keep the tool hint above an open flyout (the road flyout is several rows tall) instead of under it. */
+  private placeHint(): void {
+    let top = 0;
+    this.flyouts.forEach((f) => { if (f.classList.contains("open")) top = Math.max(top, f.offsetHeight); });
+    // Flyout bottom sits 96px up; the default hint position (196px) already clears a one-row flyout.
+    this.hint.style.bottom = top > 90 ? `calc(${96 + top + 10}px + var(--safe-bottom))` : "";
   }
 
   setRoadChoice(type: RoadType, mode: RoadMode, notify = true): void {
