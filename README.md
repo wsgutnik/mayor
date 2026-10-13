@@ -72,6 +72,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 
 - [PLAN.md](PLAN.md): roadmap and architecture notes.
 - [PROGRESS.md](PROGRESS.md): live milestone status and known limitations.
+- [docs/GROWTH-PLAN.md](docs/GROWTH-PLAN.md): prioritised growth roadmap (by Muse wonder), horizons, bets and open product decisions.
 - [docs/UI-V2-PLAN.md](docs/UI-V2-PLAN.md): UI audit verified against the code and the UI cycles.
 - [docs/ASSET-ARCHITECTURE-V2.md](docs/ASSET-ARCHITECTURE-V2.md), [docs/VISUAL-UPGRADE-ROADMAP.md](docs/VISUAL-UPGRADE-ROADMAP.md), [docs/BUILDING-QUALITY-REPORT.md](docs/BUILDING-QUALITY-REPORT.md), [docs/VISUAL-ASSET-AUDIT.md](docs/VISUAL-ASSET-AUDIT.md): asset pipeline, audit and roadmap.
 - [docs/INSTALL.md](docs/INSTALL.md): iPad, Mac, and Windows installation notes.
