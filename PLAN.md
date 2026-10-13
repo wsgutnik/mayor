@@ -49,6 +49,7 @@ CS2 is a game made by roughly 100 people over years. Goal: a **playable core** t
 | M25 | ✅ Detection and texture | Automatic crossing rules, preview, interchange; texture-based Blender roads |
 | M24 | ✅ Level separation | Overpass and underpass without a node, layer-specific traffic |
 | M23 | ✅ Bridges and tunnels | Segment elevation, water and hill spans, deck, pillars, portals |
+| M27 | in progress | Oriented zoning: street-aligned blocks and lots behind the `zoning` preference; contracts, blocks, lot planner, resolution and HD textures merged; mirror and sim wiring in progress |
 
 ## Architecture
 

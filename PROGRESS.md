@@ -20,8 +20,9 @@ Updated on 2026-10-12. Live status with screenshots: status artifact (source in 
 | M26 CS1 zoning-grid rules | partial | winner by distance and oldest segment, slope limit, row cut behind obstacle; per-segment blocks not done |
 | M25 Crossing detection and textured roads | done | automatic highway rules, marker preview, interchange; Blender/Python road atlas |
 | M24 Level separation | done | overpass and underpass without a node, Ground / Elevated / Underground buttons and E key, traffic by layer |
+| M27 Oriented zoning | in progress | behind the `zoning` preference: P0 contracts and menu toggle, P1 zone blocks, P2 oriented lot planner, P7 resolution upgrade, P8 HD textures merged; P3 mirror and sim wiring in progress; P4 save v2, P5 oriented rendering, P6 interaction, P9 cutover pending |
 
-Tests: 299 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 328 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Who Did What
 
