@@ -48,7 +48,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 ## Como os agentes são disparados
 
 - Cada agente trabalha em um git worktree próprio (`git worktree add /tmp/mayor-wt/<nome> -b agent/<nome>`), com `node_modules` ligado por link simbólico.
-- Muse: `muse exec --model muse-wonder-1.0 --contributor-mode on --workspace <worktree> --prompt-file <arquivo.md>`.
+- Muse: `muse exec --model muse-spark-1.3 --contributor-mode on --workspace <worktree> --prompt-file <arquivo.md>` para a maior parte do trabalho; `muse-wonder-1.0` só para planejamento e gestão (consome muita cota; com 429, usar Codex).
 - Codex: `codex exec -s workspace-write -C <worktree> -o <saída> - < prompt.md` (revisão: `-s read-only`).
 - Prompts e logs ficam em `/tmp/mayor-agents/`. O resultado entra por patch (`git diff` do worktree) aplicado com `--3way`.
 - Muse e Codex não rodam testes de navegador; a conferência visual é do lead (`window.__city` no dev server).
