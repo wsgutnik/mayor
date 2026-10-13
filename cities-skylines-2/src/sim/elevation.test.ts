@@ -194,9 +194,16 @@ describe("tunnels", () => {
     const path = findPath(s.world, new Uint16Array(s.world.size * s.world.size), idx(s.world, 3, ey), idx(s.world, 24, ey));
     expect(path).not.toBeNull();
     // Zones and lots sit above the bore, and pipes ignore it.
-    expect(applyTool(s, "res", 11, ey).ok).toBe(true);
+    // (cells high on the hill are refused by the CS1 slope rule; the first gentle cell beside the portal is not)
+    let zx = -1, zy = -1;
+    for (let x = 1; x <= 20 && zx < 0; x++) {
+      for (const dy of [0, 1, -1, 2, -2]) if (zx < 0 && applyTool(s, "res", x, ey + dy).ok) { zx = x; zy = ey + dy; }
+    }
+    expect(zx).toBeGreaterThan(0);
     refreshLots(s);
-    expect(s.world.lots.some((l) => 11 >= l.x && 11 < l.x + l.w && ey >= l.y && ey < l.y + l.h)).toBe(true);
+    expect(s.world.lots.some((l) => zx >= l.x && zx < l.x + l.w && zy >= l.y && zy < l.y + l.h)).toBe(true);
+    // the plateau cells directly over the bore are too steep for the road's frontage, like CS1's slope rule
+    expect(applyTool(s, "res", 13, ey + 1).ok).toBe(false);
     const dist = floodRoads(s.world, [idx(s.world, 3, ey)]);
     expect(dist[idx(s.world, 24, ey)]).toBe(-1);
     expect(applyTool(s, "busstop", 13, ey)).toEqual({ ok: false, reason: "Bus stops go on a road" });

@@ -124,4 +124,33 @@ describe("zone blocks", () => {
     runs.sort((a, b) => a - b);
     expect(runs[3]).toBeLessThan(15);
   });
+
+  it("rejects steep cells and cuts a row off behind an invalid cell (CS1 zone block rules)", () => {
+    const w = blank(32);
+    roadLine(w, 0, 10, 31, 10);
+    const s = w.size + 1;
+    // a cliff two rows from the kerb: cells at y >= 12 stand 3 units higher
+    for (let y = 12; y <= s - 1; y++) for (let x = 0; x < s; x++) w.heights[y * s + x] = 3;
+    const f = findFrontage(w);
+    expect(f.road[idx(w, 8, 11)]).toBeGreaterThanOrEqual(0);       // row 1 below the kerb is fine
+    expect(f.road[idx(w, 8, 12)]).toBe(-1);                         // the cliff cell is invalid
+    expect(f.road[idx(w, 8, 13)]).toBe(-1);                         // and everything behind it
+  });
+
+  it("gives a contested cell to the nearer road, and to the older segment on a tie", () => {
+    const w = blank(32);
+    // two parallel streets four tiles apart: the cells midway tie (distance 2 from each)
+    roadLine(w, 0, 8, 31, 8);
+    roadLine(w, 0, 12, 31, 12);
+    const tilesOf = (y: number): number[] => Array.from({ length: 32 }, (_, x) => idx(w, x, y));
+    const seg = (id: number, y: number) => ({ id, type: 1, pts: [{ x: 0.5, z: y + 0.5 }, { x: 31.5, z: y + 0.5 }], tiles: tilesOf(y), a: 0, b: 0 });
+    // the LOWER street is the older one (id 2): it must win the tie even though its tiles have larger indices
+    w.segments.push(seg(9, 8) as never, seg(2, 12) as never);
+    const f = findFrontage(w);
+    expect(f.road[idx(w, 5, 9)]).toBe(idx(w, 5, 8));                // distance 1 from the upper street
+    expect(f.road[idx(w, 5, 11)]).toBe(idx(w, 5, 12));              // distance 1 from the lower street
+    const mid = f.road[idx(w, 5, 10)];                               // tie: the older (id 2) street, the lower one
+    expect(mid).toBe(idx(w, 5, 12));
+  });
 });
+

@@ -1,7 +1,9 @@
-import { ROAD, World, ZoneType, blocksBuilding, idx, isLand } from "./world";
+import { ROAD, World, ZoneType, blocksBuilding, idx, isLand, segElevation, tileHeight } from "./world";
 
 /** Maximum number of cells between a kerb and the back of its zoning strip. */
 export const ZONE_DEPTH = 4;
+/** A zone cell is invalid when its ground differs from the road's by more than this (CS1 rejects steep cells). */
+export const ZONE_SLOPE_LIMIT = 1.0;
 
 export interface Facing { dx: -1 | 0 | 1; dy: -1 | 0 | 1 }
 
@@ -51,17 +53,34 @@ function roadFacing(w: World, rx: number, ry: number, x: number, y: number): Fac
   return { dx: vx < 0 ? -1 : 1, dy: 0 };
 }
 
-/** Find the deterministic nearest zoneable (street/avenue) road for every non-road tile. */
+/** Oldest ground segment that owns each road tile (0 = none): the CS1 tie-break when two roads claim a cell. */
+function segmentOfTile(w: World): Int32Array {
+  const owner = new Int32Array(w.size * w.size);
+  for (const seg of w.segments) {
+    if (segElevation(seg) !== "ground") continue;
+    for (const t of seg.tiles) if (t >= 0 && t < owner.length && (owner[t] === 0 || seg.id < owner[t])) owner[t] = seg.id;
+  }
+  return owner;
+}
+
+/**
+ * Find the deterministic nearest zoneable (street/avenue) road for every non-road tile, with the rules of the CS1
+ * zone block: the nearer road wins a contested cell (tie: the older segment, then the larger class), a cell whose
+ * ground is more than ZONE_SLOPE_LIMIT away from its road's is invalid, and a cell is invalid when the cell between it
+ * and its road is (a row is cut off behind an obstacle).
+ */
 export function findFrontage(w: World): FrontageMap {
   const n = w.size * w.size;
   const road = new Int32Array(n); road.fill(-1);
   const distance = new Int8Array(n); distance.fill(127);
   const dxOut = new Int8Array(n), dyOut = new Int8Array(n), corner = new Uint8Array(n);
+  const owner = segmentOfTile(w);
   // Expanding only from road cells is substantially cheaper than asking every
   // map cell to inspect its full diamond (roads are normally the sparse set).
   for (let ry = 0; ry < w.size; ry++) for (let rx = 0; rx < w.size; rx++) {
     const ri = idx(w, rx, ry), cls = w.roadSurface[ri];
     if (!cls || cls === ROAD.HIGHWAY) continue;
+    const hRoad = tileHeight(w, rx, ry);
     for (let oy = -ZONE_DEPTH; oy <= ZONE_DEPTH; oy++) {
       const span = ZONE_DEPTH - Math.abs(oy);
       for (let ox = -span; ox <= span; ox++) {
@@ -71,15 +90,34 @@ export function findFrontage(w: World): FrontageMap {
         if (x < 0 || y < 0 || x >= w.size || y >= w.size) continue;
         const out = idx(w, x, y);
         if (blocksBuilding(w, out)) continue;
+        if (Math.abs(tileHeight(w, x, y) - hRoad) > ZONE_SLOPE_LIMIT) continue;
         const f = roadFacing(w, rx, ry, x, y), oldDist = distance[out] + 1, oldRoad = road[out];
         if (d < oldDist) corner[out] = 0;
         else if (d === oldDist && (f.dx !== dxOut[out] || f.dy !== dyOut[out])) corner[out] = 1;
-        const oldClass = oldRoad < 0 ? -1 : w.roadSurface[oldRoad];
-        if (d < oldDist || (d === oldDist && (cls > oldClass || (cls === oldClass && ri < oldRoad)))) {
+        let wins = d < oldDist;
+        if (!wins && d === oldDist) {
+          const so = owner[ri] || 1e9, oo = oldRoad >= 0 ? owner[oldRoad] || 1e9 : 1e9;
+          const oldClass = oldRoad < 0 ? -1 : w.roadSurface[oldRoad];
+          wins = so < oo || (so === oo && (cls > oldClass || (cls === oldClass && ri < oldRoad)));
+        }
+        if (wins) {
           road[out] = ri; distance[out] = d - 1; dxOut[out] = f.dx; dyOut[out] = f.dy;
         }
       }
     }
+  }
+  // A row is cut off behind an invalid cell: every cell farther than the kerb needs a valid cell between it and its road.
+  const order: number[] = [];
+  for (let i = 0; i < n; i++) if (road[i] >= 0 && distance[i] > 0) order.push(i);
+  order.sort((a, b) => distance[b] - distance[a]);                 // clear the farthest first so a cleared cell never re-validates
+  for (const i of order) {
+    if (road[i] < 0) continue;
+    const x = i % w.size, y = (i / w.size) | 0;
+    const px = x + dxOut[i], py = y + dyOut[i];                    // the cell one step toward the road
+    if (px < 0 || py < 0 || px >= w.size || py >= w.size) continue;
+    const p = idx(w, px, py);
+    if (w.roadSurface[p]) continue;                                  // the road itself
+    if (road[p] < 0 || distance[p] !== distance[i] - 1) { road[i] = -1; distance[i] = 127; }
   }
   for (let i = 0; i < n; i++) if (road[i] < 0) distance[i] = -1;
   return { road, distance, dx: dxOut, dy: dyOut, corner };

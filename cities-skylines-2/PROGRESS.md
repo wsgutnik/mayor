@@ -17,10 +17,11 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | Frota de veículos | feito | 23 variantes paramétricas: carros (táxi, polícia, minivan, picape…), vans, caminhões (baú, lixo, utilitário, betoneira, prancha, tanque), semis (baú, contêiner), ônibus (urbano, articulado, escolar, dois andares, rodoviário, mini) |
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
+| M26 Regras da grade de zona do CS1 | parcial | vencedor por distância e segmento mais antigo, limite de declive, fileira cortada atrás de obstáculo; blocos por segmento não feitos |
 | M25 Detecção de cruzamentos e estradas em textura | feito | regras automáticas para rodovias, prévia com marcadores, trevo; atlas de estrada em Blender/python |
 | M24 Separação de níveis | feito | viaduto e passagem inferior sem nó, botões Solo / Elevado / Subterrâneo e tecla E, tráfego por camada |
 
-Testes: 297 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 299 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
@@ -37,6 +38,8 @@ Abertos: buscas lineares no grafo de estradas (O(S²) na reconstrução), verifi
 lotes validados só no tile âncora ao sincronizar.
 
 ## Limitações conhecidas
+
+- O Muse parou por cota esgotada (renova em 2026-10-13 04:17 UTC); a parte de blocos por segmento do M26 fica para depois.
 
 
 - Separação de níveis só pelos botões Elevado/Subterrâneo; sem detecção automática de cruzamento.
@@ -58,7 +61,7 @@ CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cad
 
 ## Pesquisa aplicável (docs/process/04-*)
 
-- Grade de zona do CS1: um bloco 8×4 células por lado de segmento no referencial do segmento, em vez de grade do mundo; resolução determinística de cantos (célula mais próxima da via vence). Ainda não implementado (candidato a M26).
+- Grade de zona do CS1: implementado em parte (M26): célula mais próxima da via vence, empate para o segmento mais antigo, célula inválida acima do limite de declive (1,0), fileira cortada atrás de célula inválida. Falta o bloco por segmento de até 8 tiles no referencial do segmento (exige zona fora da grade de tiles).
 - Decisão de cruzamento por diferença de altura interpolada (≥ 6 m separa) e declive máximo de 12,5 %: hoje o Mayor decide por nível escolhido e por rodovia.
 - Marcações em SDF e KTX2/ASTC: hoje PNG; possível ganho de memória.
 
