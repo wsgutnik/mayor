@@ -9,7 +9,8 @@ import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
 import { lotFrontTile, lotInstances } from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
-import { buildingModelCandidates, firstLoadableModel, visualV2PreviewEnabled } from "./visual-v2";
+import { visualV2PreviewEnabled } from "./visual-v2";
+import { loadManifestGatedModel } from "./visual-v2-manifest";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
@@ -559,9 +560,9 @@ export class CityRenderer {
         if (hit) apply(hit);
       } else if (!this.glbPending.has(n)) {
         this.glbPending.add(n);
-        // Visual V2 preview is opt-in; missing variants fall back to the original GLB.
-        const candidates = buildingModelCandidates(n, visualV2PreviewEnabled());
-        firstLoadableModel(candidates, loadGlb).then((model) => {
+        // Only previews with a verified manifest can replace production GLBs.
+        // Failed or missing V2 assets fall back to the existing model.
+        loadManifestGatedModel(n, visualV2PreviewEnabled(), loadGlb).then((model) => {
           this.glb.set(n, model);
           this.glbPending.delete(n);
           // Re-run so whichever world is current gets the model, even after a map swap.
