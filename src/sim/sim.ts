@@ -4,12 +4,13 @@ import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, update
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
   isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
-  ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, Pt, isOneWayType, rasterizeRoad, rebuildRoadRaster, segmentLength, levelTiles,
+  ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, RoadSegment, Pt, baseRoadType, curvePoints, isOneWayType, rasterizeRoad,
+  rebuildRoadRaster, segElevation, segmentLength, levelTiles,
   Elevation,
 } from "./world";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
 import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
-import { addSegment, rebuildNodes, removeSegment, stampRoundabout, toggleOneWayAt } from "./roads";
+import { addSegment, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt } from "./roads";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
@@ -420,6 +421,171 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[], level: RoadLe
 }
 
 export { ROAD_NAME };
+
+// ------------------------------------------------------------ road upgrade (UI-2)
+
+/** Price and validity of replacing one segment's class in place. */
+export interface RoadUpgradePlan {
+  ok: boolean;
+  reason?: string;
+  /** Tiles the segment would occupy at the new class. */
+  tiles: number[];
+  /** Tiles whose class (and price) rises. */
+  newTiles: number;
+  /** Cost difference at the segment's elevation (0 for downgrades). */
+  cost: number;
+}
+
+/**
+ * Price changing segment `segmentId` to `newType` without touching anything.
+ * Geometry, nodes and elevation never change; widening onto buildings, lots or
+ * water is refused, as is stranding lots or side streets behind a new highway.
+ */
+export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadType): RoadUpgradePlan {
+  const w = s.world;
+  const bad = (reason: string): RoadUpgradePlan => ({ ok: false, reason, tiles: [], newTiles: 0, cost: 0 });
+  const seg = segById(w, segmentId);
+  if (!seg || ![1, 2, 3, 4, 5].includes(newType)) return bad("Unknown road");
+  if (seg.type === newType) return { ok: true, tiles: [...seg.tiles], newTiles: 0, cost: 0 };
+  if (seg.roundabout) return bad("Cannot upgrade a roundabout");
+  const elev = segElevation(seg);
+  const { tiles, outOfBounds } = rasterizeRoad(w, newType, seg.pts);
+  if (outOfBounds) return bad("Outside the map");
+  const old = new Set(seg.tiles);
+  const added = tiles.filter((t) => !old.has(t));
+  if (elev !== "tunnel") {
+    // Same ground rules as planWithSpan, except zones are refused instead of
+    // cleared: an upgrade must never crush lots. Tunnels leave the surface alone.
+    for (const t of added) {
+      const x = t % w.size, y = (t / w.size) | 0;
+      if (elev === "ground" && !isLand(w, x, y)) return bad("Road would cross water");
+      if (w.facility[t]) return bad("Road would cross a building");
+      if (w.zone[t] || w.level[t]) return bad("Road would crush lots");
+    }
+  }
+  const newBase = baseRoadType(newType), oldBase = baseRoadType(seg.type);
+  if (elev === "ground" && (newBase === 3) !== (oldBase === 3)) {
+    // Highways meet only highways at grade (same rule classifyCrossings
+    // enforces for new roads): with the new type in place, no endpoint node
+    // may mix highway and street arms. Covers upgrades to highway and
+    // downgrades that would leave a highway ending in a street.
+    for (const nodeId of [seg.a, seg.b]) {
+      const node = nodeById(w, nodeId);
+      if (!node) continue;
+      let hw = newBase === 3, other = newBase !== 3;
+      for (const sid of node.segs) {
+        if (sid === seg.id) continue;
+        const o = segById(w, sid);
+        if (!o || segElevation(o) !== "ground") continue;
+        if (baseRoadType(o.type) === 3) hw = true; else other = true;
+      }
+      if (hw && other) return bad(INTERCHANGE_REASON);
+    }
+    if (newBase === 3) {
+      // A highway serves no lots: any zoned or built tile touching the new
+      // footprint would be stranded (every served strip starts at the kerb).
+      const touch = new Set(tiles);
+      for (const t of tiles) {
+        const x = t % w.size, y = (t / w.size) | 0;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const nx = x + dx, ny = y + dy;
+          if (inBounds(w, nx, ny)) touch.add(idx(w, nx, ny));
+        }
+      }
+      for (const t of touch) {
+        if (w.zone[t] || w.level[t]) return bad("Highway would strand lots");
+      }
+    }
+  }
+  // Per-tile price step, like planWithSpan but as a difference: new asphalt at
+  // full price, widened-over road at the class step, downgrades free.
+  const mult = elev === "bridge" ? BRIDGE_COST_MULT : elev === "tunnel" ? TUNNEL_COST_MULT : 1;
+  let cost = 0, newTiles = 0;
+  for (const t of tiles) {
+    const cur = elev === "bridge" ? w.roadDeck[t] : elev === "tunnel" ? w.roadTunnel[t] : w.road[t];
+    const step = ROAD_COST[newType] - (cur ? ROAD_COST[cur as RoadType] : 0);
+    if (step > 0) { cost += step * mult; newTiles++; }
+  }
+  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles, newTiles, cost };
+  return { ok: true, tiles, newTiles, cost };
+}
+
+/**
+ * Replace a road's class in place: the centreline and node graph stay, the
+ * type (and one-way flags) change. Refreshes raster, connectivity, coverage,
+ * lots and revisions exactly like placeRoad, so saves and zoning stay valid.
+ */
+export function upgradeRoad(s: CityState, segmentId: number, newType: RoadType): ToolResult {
+  const plan = planRoadUpgrade(s, segmentId, newType);
+  if (!plan.ok) return { ok: false, reason: plan.reason! };
+  const w = s.world;
+  const seg = segById(w, segmentId)!;
+  if (seg.type === newType) return { ok: true };
+  const elev = segElevation(seg);
+  const wasOneWayType = isOneWayType(seg.type);
+  const oldTiles = new Set(seg.tiles);
+  seg.type = newType;
+  if (isOneWayType(newType)) {
+    seg.oneWay = true;
+    seg.dir = seg.dir ?? 1;
+  } else if (wasOneWayType) {
+    delete seg.oneWay;
+    delete seg.dir;
+  }
+  seg.tiles = plan.tiles;
+  // The class feeds the signal and zone-block caches, so the graph revision moves too.
+  w.graphRevision = (w.graphRevision ?? 0) + 1;
+  // Fresh asphalt is levelled, exactly like a new ground road; decks and tunnels never touch the terrain.
+  if (elev === "ground") levelTiles(w, plan.tiles.filter((t) => !oldTiles.has(t)));
+  rebuildRoadRaster(w);
+  // Same result the lazy refresh in step() would compute, but immediate reads stay exact.
+  updateConnectivity(w);
+  if (elev === "ground" && baseRoadType(newType) === 3) {
+    // Bus stops need a street or avenue: like bulldoze, drop the stops the
+    // upgrade leaves on pure highway (junction tiles shared with a street keep theirs).
+    const kept = new Set<number>();
+    for (const o of w.segments) {
+      if (o.id === seg.id || segElevation(o) !== "ground" || baseRoadType(o.type) === 3) continue;
+      for (const t of o.tiles) kept.add(t);
+    }
+    const now = new Set(plan.tiles);
+    for (const stop of [...w.stops]) {
+      if (stop.kind === "bus" && now.has(stop.tile) && !kept.has(stop.tile)) removeStopAt(w, stop.tile);
+    }
+  }
+  if (w.zoning === "oriented") {
+    w.obstacleRevision++;
+    w.lotsDirty = true;
+    refreshOrientedLots(s);
+  }
+  w.coverageDirty = true;
+  updateCoverage(w);
+  s.money -= plan.cost;
+  s.monthExpenses += plan.cost;
+  dirtyRoads(w);
+  w.revision++;
+  return { ok: true };
+}
+
+/**
+ * The segment under a ground point that a tap would offer to upgrade: the
+ * nearest centreline covering the tile, when its class differs. Pure.
+ */
+export function findUpgradeTarget(w: World, x: number, z: number, newType: RoadType): RoadSegment | undefined {
+  const tx = Math.floor(x), ty = Math.floor(z);
+  if (!inBounds(w, tx, ty)) return undefined;
+  const tile = idx(w, tx, ty);
+  if (!w.road[tile]) return undefined;
+  const cands = w.segments.filter((sg) => sg.type !== newType && sg.tiles.includes(tile));
+  if (!cands.length) return undefined;
+  let best = cands[0], bd = Infinity;
+  for (const sg of cands) {
+    let d = Infinity;
+    for (const p of curvePoints(sg.pts, 0.25)) d = Math.min(d, (p.x - x) ** 2 + (p.z - z) ** 2);
+    if (d < bd - 1e-9 || (Math.abs(d - bd) <= 1e-9 && sg.id < best.id)) { bd = d; best = sg; }
+  }
+  return best;
+}
 
 // ------------------------------------------------------------ lots (M17)
 

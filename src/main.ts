@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, bulldozeAt, CityState, getZoneBlocks, isFacilityTool, newCity, placeRoad, planRoad, step, syncLots, ToolId, ToolResult } from "./sim/sim";
+import { applyTool, applyZoneAt, bulldozeAt, CityState, findUpgradeTarget, getZoneBlocks, isFacilityTool, newCity, placeRoad, planRoad, planRoadUpgrade, step, syncLots, ToolId, ToolResult, upgradeRoad } from "./sim/sim";
 import { History } from "./sim/history";
 import { deserialize, serialize } from "./sim/save";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
@@ -15,6 +15,7 @@ import { bindInput } from "./input";
 import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
 import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
+import { exitAngle, loadRoadSnap, saveRoadSnap, snapPoint, snapToRoadTile, type RoadSnapOptions } from "./ui/road-snap";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { diamondRamps, summarizeCrossings } from "./sim/crossings";
 import { addSegment } from "./sim/roads";
@@ -49,6 +50,14 @@ let roadLevel: RoadLevel = "ground";
 let pendingInterchange = false;
 /** Points already placed for the road being drawn (start, and the bend in curve mode). */
 let draft: Pt[] = [];
+/** Road-draft snap options (angle / length / road), persisted across sessions. */
+let snapOpts: RoadSnapOptions = loadRoadSnap();
+/** Exit direction of the last committed segment: angle snap measures from it while drawing continues. */
+let lastSegDir: number | null = null;
+/** Alt/Option held: all road snapping is temporarily off. */
+let altDown = false;
+/** Last pointer position over the canvas while drafting, for re-snapping without a new event. */
+let lastHover: { x: number; y: number } | null = null;
 /** Stop ids picked so far for the transit line being built. */
 let lineDraft: number[] = [];
 let cursor: Pt | null = null;
@@ -73,6 +82,11 @@ function makeHud(): Hud {
     hud.setHint(tr("Tap a bridge crossing to stamp an interchange"));
   },
   onFinishRoad: () => cancelDraft(),
+  onSnap: (o) => {
+    snapOpts = o;
+    saveRoadSnap(o);
+    refreshDraftPoint();
+  },
   onMenu: () => menu.toggle(),
   onCreateLine: () => {
     const kind = tool === "metroline" ? "metro" : "bus";
@@ -98,6 +112,7 @@ function makeHud(): Hud {
 let hud = makeHud();
 hud.setTool(tool);
 hud.setSpeed(speed);
+hud.setSnap(snapOpts, false);
 hud.setTips(prefs.tips);
 refreshHistoryButtons();
 
@@ -140,7 +155,7 @@ function restoreSnapshot(snap: string, msg: string): void {
 function rebuildHud(): void {
   hud.destroy();
   hud = makeHud();
-  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, tips: prefs.tips });
+  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, snap: snapOpts, tips: prefs.tips });
   cancelDraft();
   menu.raise();
   menu.refresh();
@@ -230,6 +245,8 @@ function cancelDraft(): void {
   draft = [];
   lineDraft = [];
   cursor = null;
+  lastSegDir = null;
+  lastHover = null;
   renderer.setRoadPreview(null);
   renderer.setStopMarks([]);
   hud.showFinish(false);
@@ -278,11 +295,30 @@ function refreshHint(): void {
   else hud.setHint(tr("{name}: tap the end point", { name }));
 }
 
-/** Snap to the centre of an existing road tile so new roads connect cleanly. */
-function snap(p: Pt): Pt {
-  const x = Math.floor(p.x), y = Math.floor(p.z);
-  if (state.world.road[y * state.world.size + x]) return { x: x + 0.5, z: y + 0.5 };
-  return p;
+/**
+ * Resolve a raw pick into the draft point: angle/length snap around the last
+ * placed point (measured from the previous segment, else the map axes), then
+ * road snap so connecting to existing roads still wins. Alt/Option bypasses all.
+ */
+function resolveDraftPoint(raw: Pt): Pt {
+  if (altDown) return raw;
+  const anchor = draft.length ? draft[draft.length - 1] : null;
+  const p = snapPoint(anchor, raw, snapOpts, lastSegDir);
+  if (!snapOpts.roads) return p;
+  const w = state.world;
+  return snapToRoadTile(
+    (x, y) => x >= 0 && y >= 0 && x < w.size && y < w.size && !!w.road[y * w.size + x],
+    p,
+  );
+}
+
+/** Re-resolve the draft end from the last pointer position (snap or Alt changed mid-draft). */
+function refreshDraftPoint(): void {
+  if (!draft.length || !lastHover) return;
+  const raw = renderer.pickPoint(lastHover.x, lastHover.y);
+  if (!raw) return;
+  cursor = resolveDraftPoint(raw);
+  updatePreview(lastHover);
 }
 
 function currentSegment(): { pts: Pt[] } | null {
@@ -320,6 +356,28 @@ function updatePreview(at?: { x: number; y: number }): void {
   const crossHint = parts.length ? ` · ${parts.join(", ")}` : "";
   const gradeHint = roadLevel !== "ground" && n.junction > 0 ? ` · ${tr("Crossing at grade")}` : "";
   hud.setHint(tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost }) + spanHint + crossHint + gradeHint);
+}
+
+/** Hovering tarmac with another class chosen previews the in-place upgrade: cost and result. */
+function showUpgradeReadout(raw: Pt, cx: number, cy: number): void {
+  const target = findUpgradeTarget(state.world, raw.x, raw.z, roadType);
+  if (!target) { hud.hideRoadReadout(); refreshHint(); return; }
+  const plan = planRoadUpgrade(state, target.id, roadType);
+  const elev = target.elevation ?? "ground";
+  hud.showRoadReadout(
+    formatRoadReadout({
+      cost: plan.cost,
+      lengthTiles: segmentLength(target.pts),
+      maxSlopePct: maxSlopePercent(target.pts, (x, z) => heightAt(state.world, x, z)),
+      mode: elev === "bridge" ? "bridge" : elev === "tunnel" ? "tunnel" : "ground",
+      ok: plan.ok,
+      reason: plan.reason,
+    }, { tr, trReason }),
+    cx, cy,
+  );
+  hud.setHint(plan.ok
+    ? tr("Tap to upgrade to {name} (${cost})", { name: tr(ROAD_NAME[roadType]), cost: Math.round(plan.cost) })
+    : trReason(plan.reason!));
 }
 
 /** Stamp diamond ramps where a deck crosses a ground road (the Trevo button's tap). */
@@ -387,7 +445,19 @@ function onTap(cx: number, cy: number): void {
   if (pendingInterchange) { stampInterchangeAt(cx, cy); return; }
   const raw = renderer.pickPoint(cx, cy);
   if (!raw) return;
-  const p = snap(raw);
+  if (draft.length === 0) {
+    // Roads tool, another class chosen, tap on tarmac: upgrade in place (Undoable).
+    const target = findUpgradeTarget(state.world, raw.x, raw.z, roadType);
+    if (target) {
+      const res = attempt(() => upgradeRoad(state, target.id, roadType));
+      hud.hideRoadReadout();
+      if (res.ok) { refreshHint(); return; }
+      hud.showToast(trReason(res.reason));
+      // Fall through: start a draft from the tap so connecting still works.
+    }
+  }
+  lastHover = { x: cx, y: cy };
+  const p = resolveDraftPoint(raw);
   cursor = p;
   if (draft.length === 0) {
     draft = [p];
@@ -406,6 +476,7 @@ function onTap(cx: number, cy: number): void {
   const res = attempt(() => placeRoad(state, roadType, seg.pts, roadLevel));
   if (res.ok) {
     // Keep drawing from the end point, like a continuous road.
+    lastSegDir = exitAngle(seg.pts);
     draft = [p];
     cursor = null;
     renderer.setRoadPreview(null);
@@ -484,12 +555,16 @@ bindInput(renderer, {
     if (placing()) {
       const raw = renderer.pickPoint(cx, cy);
       if (draft.length) {
-        cursor = raw ? snap(raw) : null;
+        lastHover = { x: cx, y: cy };
+        cursor = raw ? resolveDraftPoint(raw) : null;
         // In curve mode the preview only becomes a curve once the bend is placed.
         updatePreview({ x: cx, y: cy });
       } else if (raw) {
         const t = { x: Math.floor(raw.x), y: Math.floor(raw.z) };
         renderer.setHover(t, toolColor("road"));
+        if (tool === "road" && !pendingInterchange) showUpgradeReadout(raw, cx, cy);
+      } else if (tool === "road" && !pendingInterchange) {
+        hud.hideRoadReadout();
       }
       return;
     }
@@ -523,6 +598,17 @@ window.addEventListener("keydown", (e) => {
   } else if ((e.key === "h" || e.key === "H") && !e.repeat && !isEditingText(e)) {
     hud.togglePanelsHidden();
   }
+});
+
+/** Alt/Option held temporarily disables all road snapping; the preview follows live. */
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Alt" && !e.repeat && !altDown) { altDown = true; refreshDraftPoint(); }
+});
+window.addEventListener("keyup", (e) => {
+  if (e.key === "Alt" && altDown) { altDown = false; refreshDraftPoint(); }
+});
+window.addEventListener("blur", () => {
+  if (altDown) { altDown = false; refreshDraftPoint(); }
 });
 
 /** True while the player is typing (menu seed, save name): H must not hide panels then. */

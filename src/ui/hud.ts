@@ -5,6 +5,7 @@ import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
 import { PanelId, PanelState, loadPanelState, savePanelState, setPanelsHidden, togglePanelCollapsed } from "./panel-state";
 import type { RoadReadoutRow } from "./road-readout";
+import { DEFAULT_ROAD_SNAP, type AngleSnap, type LengthSnap, type RoadSnapOptions } from "./road-snap";
 
 export type RoadMode = "paint" | "line" | "curve";
 export type RoadLevel = "ground" | "elevated" | "tunnel";
@@ -100,6 +101,8 @@ export interface HudHooks {
   onLineVehicles(id: number, delta: number): void;
   onRemoveLine(id: number): void;
   onFinishRoad(): void;
+  /** Road-draft snap options changed (angle / length / road toggles). */
+  onSnap?(opts: RoadSnapOptions): void;
   onTool(t: ToolId): void;
   onSpeed(s: number): void;
   onUndo(): void;
@@ -177,6 +180,10 @@ export class Hud {
   private roadType: RoadType = 1;
   private roadMode: RoadMode = "line";
   private roadLevel: RoadLevel = "ground";
+  private snap: RoadSnapOptions = { ...DEFAULT_ROAD_SNAP };
+  private snapAngleBtns = new Map<AngleSnap, HTMLButtonElement>();
+  private snapLengthBtns = new Map<LengthSnap, HTMLButtonElement>();
+  private snapRoadsBtn: HTMLButtonElement | null = null;
   private svc = new Map<UtilityKey, { fill: HTMLElement; val: HTMLElement }>();
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private ind = new Map<string, { fill: HTMLElement; val: HTMLElement }>();
@@ -384,7 +391,7 @@ export class Hud {
     bar.appendChild(this.toolButton(T.pan));
 
     // Roads: class and drawing mode
-    const flyRoad = el("div", "panel fly");
+    const flyRoad = el("div", "panel fly snap-wrap");
     for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
       const glyph = t === 1 ? "─" : t === 2 ? "═" : t === 3 ? "≡" : t === 4 ? "→" : "⇒";
       const b = el("button", "tool", `<span class="ic">${glyph}</span><span>${tr(ROAD_NAME[t])}</span><small>$${ROAD_COST[t]}/${tr("tile")}</small>`);
@@ -414,6 +421,7 @@ export class Hud {
     trevo.title = tr("Tap a bridge crossing to stamp an interchange");
     trevo.addEventListener("click", () => { this.hooks.onInterchange?.(); this.closeFlyouts(); });
     flyRoad.appendChild(trevo);
+    flyRoad.appendChild(this.buildSnapGroup());
     const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
       this.hooks.onTool("road");
       this.setTool("road");
@@ -480,6 +488,49 @@ export class Hud {
     this.root.appendChild(this.hint);
   }
 
+  /** Compact snap toggles (angle / length / road) on their own flyout row. */
+  private buildSnapGroup(): HTMLElement {
+    const group = el("div", "snap-group");
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", tr("Snap"));
+    group.appendChild(el("span", "snap-title", tr("Snap")));
+    const row = (label: string) => {
+      const r = el("div", "snap-row");
+      r.setAttribute("role", "group");
+      r.setAttribute("aria-label", label);
+      r.appendChild(el("span", "snap-lbl", label));
+      group.appendChild(r);
+      return r;
+    };
+    const angleRow = row(tr("Angle"));
+    for (const a of [0, 15, 45] as AngleSnap[]) {
+      const b = el("button", "tool snap-btn", `<span>${a === 0 ? tr("Off") : `${a}°`}</span>`);
+      b.title = a === 0 ? tr("Off") : `${tr("Angle")} ${a}°`;
+      b.setAttribute("aria-pressed", String(a === this.snap.angle));
+      b.addEventListener("click", () => this.setSnap({ ...this.snap, angle: a }));
+      this.snapAngleBtns.set(a, b);
+      angleRow.appendChild(b);
+    }
+    const lenRow = row(tr("Length"));
+    for (const v of [0, 1, 2, 4] as LengthSnap[]) {
+      const b = el("button", "tool snap-btn", `<span>${v === 0 ? tr("Off") : v}</span>`);
+      b.title = v === 0 ? tr("Off") : `${v} ${tr("tiles")}`;
+      b.setAttribute("aria-pressed", String(v === this.snap.length));
+      b.addEventListener("click", () => this.setSnap({ ...this.snap, length: v }));
+      this.snapLengthBtns.set(v, b);
+      lenRow.appendChild(b);
+    }
+    const roadsRow = row(tr("Road snap"));
+    const roads = el("button", "tool snap-btn", `<span>${tr("Road snap")}</span>`);
+    roads.title = tr("Road snap");
+    roads.setAttribute("aria-pressed", String(this.snap.roads));
+    roads.addEventListener("click", () => this.setSnap({ ...this.snap, roads: !this.snap.roads }));
+    this.snapRoadsBtn = roads;
+    roadsRow.appendChild(roads);
+    this.setSnap(this.snap, false);
+    return group;
+  }
+
   private buildBudget(): void {
     this.budget = el("div", "panel budget");
     this.budget.innerHTML = `
@@ -501,7 +552,8 @@ export class Hud {
   // ------------------------------------------------------------------ state
 
   /** Restore the controls after the HUD was rebuilt (language change). */
-  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; tips: boolean }): void {
+  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; snap: RoadSnapOptions; tips: boolean }): void {
+    this.setSnap(opts.snap, false);
     this.setRoadChoice(opts.roadType, opts.roadMode, false);
     if (opts.roadLevel) this.setRoadLevel(opts.roadLevel, false);
     this.setTool(opts.tool);
@@ -544,6 +596,26 @@ export class Hud {
   }
 
   getRoadLevel(): RoadLevel { return this.roadLevel; }
+
+  /** Apply snap options to the toggle buttons (exactly one pressed per group). */
+  setSnap(opts: RoadSnapOptions, notify = true): void {
+    this.snap = { ...opts };
+    this.snapAngleBtns.forEach((b, a) => {
+      const on = a === opts.angle;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    this.snapLengthBtns.forEach((b, v) => {
+      const on = v === opts.length;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    if (this.snapRoadsBtn) {
+      this.snapRoadsBtn.classList.toggle("active", opts.roads);
+      this.snapRoadsBtn.setAttribute("aria-pressed", String(opts.roads));
+    }
+    if (notify) this.hooks.onSnap?.({ ...this.snap });
+  }
 
   /** Cycle Solo → Elevado → Subterrâneo (key E). */
   cycleRoadLevel(): RoadLevel {
