@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, bulldozeAt, CityState, findUpgradeTarget, getZoneBlocks, isFacilityTool, newCity, placeRoad, planRoad, planRoadUpgrade, step, syncLots, ToolId, ToolResult, upgradeRoad } from "./sim/sim";
+import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
 import { History } from "./sim/history";
 import { deserialize, serialize } from "./sim/save";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
@@ -16,7 +16,9 @@ import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
 import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
 import { exitAngle, loadRoadSnap, saveRoadSnap, snapPoint, snapToRoadTile, type RoadSnapOptions } from "./ui/road-snap";
+import { loadRoadParallel, offsetPolyline, saveRoadParallel, type RoadParallelOptions } from "./ui/road-parallel";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
+import { floodFill, rectangleTiles, ZONE_FILL_CAP, type ZoneMode, type ZoneTile } from "./ui/zone-tools";
 import { diamondRamps, summarizeCrossings } from "./sim/crossings";
 import { addSegment } from "./sim/roads";
 import { setLang, tr, trReason, getLang } from "./i18n";
@@ -40,6 +42,11 @@ let traffic: TrafficState = newTraffic(state.world.size);
 renderer.setTraffic(traffic);
 renderer.setQualityCap(QUALITY_PIXEL_CAP[prefs.quality]);
 let tool: ToolId = "road";
+/** Zoning shape for res/com/ind and bulldoze (zone submenu). */
+let zoneMode: ZoneMode = "paint";
+/** Marquee drag corners while a marquee stroke is active. */
+let marqueeAnchor: ZoneTile | null = null;
+let marqueeCurrent: ZoneTile | null = null;
 let overlay: OverlayLayer = 0;
 let speed = 1;
 let roadType: RoadType = 1;
@@ -52,6 +59,8 @@ let pendingInterchange = false;
 let draft: Pt[] = [];
 /** Road-draft snap options (angle / length / road), persisted across sessions. */
 let snapOpts: RoadSnapOptions = loadRoadSnap();
+/** Parallel-road options (toggle / gap / side), persisted across sessions. */
+let parallelOpts: RoadParallelOptions = loadRoadParallel();
 /** Exit direction of the last committed segment: angle snap measures from it while drawing continues. */
 let lastSegDir: number | null = null;
 /** Alt/Option held: all road snapping is temporarily off. */
@@ -69,6 +78,12 @@ function makeHud(): Hud {
     if (t === "pan") renderer.setHover(null); else inspector.hide();
     if (t !== "road") cancelDraft();
     refreshHint();
+    refreshZoneHint();
+  },
+  onZoneMode: (m) => {
+    zoneMode = m;
+    cancelDraft();
+    refreshZoneHint();
   },
   onSpeed: (s) => { speed = s; hud.setSpeed(s); },
   onTax: (r) => { state.taxRate = r; },
@@ -85,6 +100,11 @@ function makeHud(): Hud {
   onSnap: (o) => {
     snapOpts = o;
     saveRoadSnap(o);
+    refreshDraftPoint();
+  },
+  onParallel: (o) => {
+    parallelOpts = o;
+    saveRoadParallel(o);
     refreshDraftPoint();
   },
   onMenu: () => menu.toggle(),
@@ -113,6 +133,7 @@ let hud = makeHud();
 hud.setTool(tool);
 hud.setSpeed(speed);
 hud.setSnap(snapOpts, false);
+hud.setParallel(parallelOpts, false);
 hud.setTips(prefs.tips);
 refreshHistoryButtons();
 
@@ -155,7 +176,7 @@ function restoreSnapshot(snap: string, msg: string): void {
 function rebuildHud(): void {
   hud.destroy();
   hud = makeHud();
-  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, snap: snapOpts, tips: prefs.tips });
+  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, snap: snapOpts, parallel: parallelOpts, tips: prefs.tips, zoneMode });
   cancelDraft();
   menu.raise();
   menu.refresh();
@@ -247,6 +268,9 @@ function cancelDraft(): void {
   cursor = null;
   lastSegDir = null;
   lastHover = null;
+  marqueeAnchor = null;
+  marqueeCurrent = null;
+  renderer.setZoneRect(null, null);
   renderer.setRoadPreview(null);
   renderer.setStopMarks([]);
   hud.showFinish(false);
@@ -332,8 +356,16 @@ function updatePreview(at?: { x: number; y: number }): void {
   if (!seg) { renderer.setRoadPreview(null); hud.hideRoadReadout(); return; }
   // Before the bend point is set in curve mode, show the straight guide.
   const plan = planRoad(state, roadType, seg.pts, roadLevel);
+  // Parallel twin: same class, offset sideways, with its own plan and validity colour.
+  const twinPts = parallelOpts.enabled ? offsetPolyline(seg.pts, parallelOpts.gap, parallelOpts.side) : null;
+  const twinPlan = twinPts ? planRoad(state, roadType, twinPts, roadLevel) : null;
+  // Each leg only checks its own price; the pair must afford both together.
+  const pairBroke = plan.ok && !!twinPlan?.ok && state.money < plan.cost + twinPlan.cost;
+  const twinOk = !!twinPlan?.ok && !pairBroke;
+  const twinReason = pairBroke ? "Not enough money" : twinPlan?.reason;
   const marks = (plan.crossings ?? []).filter((c) => !c.atEnd || c.kind === "blocked");
-  renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks);
+  renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks,
+    twinPts ? { pts: twinPts, valid: twinOk } : null);
   const len = segmentLength(seg.pts);
   if (!at || len < 0.5) {
     hud.hideRoadReadout();
@@ -341,13 +373,17 @@ function updatePreview(at?: { x: number; y: number }): void {
     const slope = maxSlopePercent(seg.pts, (x, z) => heightAt(state.world, x, z));
     const mode = resolveReadoutMode(plan.span, roadLevel, plan.ok);
     hud.showRoadReadout(
-      formatRoadReadout({ cost: plan.cost, lengthTiles: len, maxSlopePct: slope, mode, ok: plan.ok, reason: plan.reason }, { tr, trReason }),
+      formatRoadReadout({
+        cost: plan.cost, lengthTiles: len, maxSlopePct: slope, mode, ok: plan.ok, reason: plan.reason,
+        ...(twinPlan ? { parallel: { cost: twinPlan.cost, ok: twinOk, ...(twinReason ? { reason: twinReason } : {}) } } : {}),
+      }, { tr, trReason }),
       at.x, at.y,
     );
   }
   const name = tr(ROAD_NAME[roadType]);
   const spanHint = plan.span === "bridge" ? ` · ${tr("Bridge")}` : plan.span === "tunnel" ? ` · ${tr("Tunnel")}` : "";
   if (!plan.ok) { hud.setHint(`${name}: ${trReason(plan.reason!)}`); return; }
+  if (twinPlan && !twinOk) { hud.setHint(`${tr("Parallel")}: ${trReason(twinReason!)}`); return; }
   const n = summarizeCrossings(marks);
   const parts: string[] = [];
   if (n.overpass) parts.push(tr(n.overpass === 1 ? "{n} viaduct" : "{n} viaducts", { n: n.overpass }));
@@ -355,7 +391,9 @@ function updatePreview(at?: { x: number; y: number }): void {
   if (n.junction) parts.push(tr(n.junction === 1 ? "{n} crossing" : "{n} crossings", { n: n.junction }));
   const crossHint = parts.length ? ` · ${parts.join(", ")}` : "";
   const gradeHint = roadLevel !== "ground" && n.junction > 0 ? ` · ${tr("Crossing at grade")}` : "";
-  hud.setHint(tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost }) + spanHint + crossHint + gradeHint);
+  const pairTiles = plan.newTiles + (twinPlan?.newTiles ?? 0);
+  const pairCost = plan.cost + (twinPlan?.cost ?? 0);
+  hud.setHint(tr("{name}: {n} tiles, ${cost}", { name, n: pairTiles, cost: pairCost }) + spanHint + crossHint + gradeHint);
 }
 
 /** Hovering tarmac with another class chosen previews the in-place upgrade: cost and result. */
@@ -473,7 +511,32 @@ function onTap(cx: number, cy: number): void {
     return;
   }
   const seg = currentSegment()!;
-  const res = attempt(() => placeRoad(state, roadType, seg.pts, roadLevel));
+  // Parallel twin, committed atomically with the player's road: both legs are
+  // validated first, so one tap (and one undo) always covers exactly the pair.
+  const twinPts = parallelOpts.enabled ? offsetPolyline(seg.pts, parallelOpts.gap, parallelOpts.side) : null;
+  if (twinPts) {
+    const gate = planRoadPair(state, roadType, seg.pts, twinPts, roadLevel);
+    if (!gate.ok) {
+      hud.showToast(trReason(gate.reason!));
+      updatePreview({ x: cx, y: cy });
+      return;
+    }
+    // Rehearse on a clone: placing the first leg must not strand the second
+    // (a cusped curve could otherwise leave half a pair behind).
+    const trial = deserialize(serialize(state));
+    const first = placeRoad(trial, roadType, seg.pts, roadLevel);
+    const second = first.ok ? placeRoad(trial, roadType, twinPts, roadLevel) : first;
+    if (!second.ok) {
+      hud.showToast(trReason(second.reason));
+      updatePreview({ x: cx, y: cy });
+      return;
+    }
+  }
+  const res = attempt(() => {
+    const r1 = placeRoad(state, roadType, seg.pts, roadLevel);
+    if (!r1.ok || !twinPts) return r1;
+    return placeRoad(state, roadType, twinPts, roadLevel);
+  });
   if (res.ok) {
     // Keep drawing from the end point, like a continuous road.
     lastSegDir = exitAngle(seg.pts);
@@ -490,9 +553,31 @@ function onTap(cx: number, cy: number): void {
 
 let lastToast = "";
 const ZONE_BY_TOOL = { res: ZONE.RES, com: ZONE.COM, ind: ZONE.IND } as const;
+/** Tools the zoning shapes (paint/marquee/fill) apply to. */
+const isZoneLike = (t: ToolId): boolean =>
+  (ZONE_BY_TOOL as Record<string, number | undefined>)[t] !== undefined || t === "bulldoze";
 let lastPaintCell = "";
 let strokeActive = false;
 let strokeOk = false;
+
+function zoneDisplayName(): string {
+  if (tool === "res") return tr("Residential");
+  if (tool === "com") return tr("Commercial");
+  if (tool === "ind") return tr("Industrial");
+  return tr("Bulldoze");
+}
+
+/** Hint for the current zoning shape; with a count it reports the last fill/marquee result. */
+function refreshZoneHint(count?: number, cost?: number): void {
+  if (!isZoneLike(tool)) return;
+  if (count !== undefined && cost !== undefined) {
+    hud.setHint(tr("{name}: {n} tiles, ${cost}", { name: zoneDisplayName(), n: count, cost }));
+    return;
+  }
+  if (zoneMode === "marquee") hud.setHint(tr(tool === "bulldoze" ? "Drag to clear a rectangle" : "Drag to zone a rectangle"));
+  else if (zoneMode === "fill") hud.setHint(tr(tool === "bulldoze" ? "Tap to clear the connected zones" : "Tap to fill the connected area"));
+  else hud.setTool(tool);
+}
 
 /** A paint/drag stroke is ONE history entry: push on stroke start… */
 function strokeStart(): void {
@@ -504,14 +589,95 @@ function strokeStart(): void {
 
 /** …and drop the entry when the whole stroke changed nothing. */
 function strokeEnd(): void {
+  // A marquee stroke previews while dragging and applies once on release: still one entry.
+  if (strokeActive && marqueeAnchor && marqueeCurrent && isZoneLike(tool) && zoneMode === "marquee") {
+    const tiles = rectangleTiles(marqueeAnchor, marqueeCurrent);
+    const preview = previewZoneBulk(state, tool as ZoneBulkTool, tiles);
+    const res = applyZoneBulk(state, tool as ZoneBulkTool, tiles);
+    if (!res.ok) hud.showToast(trReason(res.reason));
+    else if (preview.count > 0) {
+      lastToast = "";
+      strokeOk = true;
+      refreshZoneHint(preview.count, preview.cost);
+    }
+    marqueeAnchor = null;
+    marqueeCurrent = null;
+    renderer.setZoneRect(null, null);
+    if (!res.ok || preview.count === 0) refreshZoneHint();
+  }
   if (!strokeActive) return;
   strokeActive = false;
   if (!strokeOk) history.pop();
   refreshHistoryButtons();
 }
 
+/** Marquee drag: the anchor is set on press, the rectangle follows the pointer without mutating. */
+function paintMarquee(p: { x: number; z: number }, first: boolean): void {
+  const t = { x: Math.floor(p.x), y: Math.floor(p.z) };
+  if (first) {
+    marqueeAnchor = t;
+    marqueeCurrent = t;
+    strokeStart();
+  } else if (marqueeAnchor) {
+    marqueeCurrent = t;
+  } else {
+    marqueeAnchor = t;
+    marqueeCurrent = t;
+  }
+  updateMarqueePreview();
+}
+
+function updateMarqueePreview(): void {
+  if (!marqueeAnchor || !marqueeCurrent) return;
+  const preview = previewZoneBulk(state, tool as ZoneBulkTool, rectangleTiles(marqueeAnchor, marqueeCurrent));
+  renderer.setZoneRect(marqueeAnchor, marqueeCurrent, toolColor(tool));
+  hud.setHint(preview.count === 0 && preview.reason
+    ? trReason(preview.reason)
+    : tr("{name}: {n} tiles, ${cost}", { name: zoneDisplayName(), n: preview.count, cost: preview.cost }));
+}
+
+/** Fill tap: one connected region, one undo entry; the hint keeps the count and cost. */
+function doZoneFill(t: ZoneTile): void {
+  const bulkTool = tool as ZoneBulkTool;
+  const w = state.world;
+  const region = floodFill(t, (q) => isFillOpenTile(w, bulkTool, q.x, q.y), ZONE_FILL_CAP);
+  // An empty region still names its tile so the refusal says why (road, water, …).
+  const tiles = region.length ? region : [t];
+  const preview = previewZoneBulk(state, bulkTool, tiles);
+  if (preview.count === 0) {
+    if (preview.reason) hud.showToast(trReason(preview.reason));
+    return;
+  }
+  const res = attempt(() => applyZoneBulk(state, bulkTool, tiles));
+  if (!res.ok) hud.showToast(trReason(res.reason));
+  else refreshZoneHint(preview.count, preview.cost);
+}
+
+/** Fill hover (desktop): live count and cost in the hint, nothing applied. */
+function updateFillHint(cx: number, cy: number): void {
+  const t = renderer.pick(cx, cy);
+  if (!t) return;
+  const bulkTool = tool as ZoneBulkTool;
+  const w = state.world;
+  const region = floodFill(t, (q) => isFillOpenTile(w, bulkTool, q.x, q.y), ZONE_FILL_CAP);
+  const tiles = region.length ? region : [t];
+  const preview = previewZoneBulk(state, bulkTool, tiles);
+  hud.setHint(preview.count === 0 && preview.reason
+    ? trReason(preview.reason)
+    : tr("{name}: {n} tiles, ${cost}", { name: zoneDisplayName(), n: preview.count, cost: preview.cost }));
+}
+
 /** Oriented zoning paints cells under the pointer at ground-point precision (diagonal and curved streets). */
 function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
+  if (isZoneLike(tool) && zoneMode === "marquee") {
+    paintMarquee(p, first);
+    return;
+  }
+  if (isZoneLike(tool) && zoneMode === "fill") {
+    // One region per tap, like facilities: dragging must not refill every tile.
+    if (first) doZoneFill({ x: Math.floor(p.x), y: Math.floor(p.z) });
+    return;
+  }
   const oriented = state.world.zoning === "oriented";
   const zone = (ZONE_BY_TOOL as Record<string, number | undefined>)[tool];
   if (first) { lastPaintCell = ""; strokeStart(); }
@@ -568,6 +734,7 @@ bindInput(renderer, {
       }
       return;
     }
+    if (isZoneLike(tool) && zoneMode === "fill") updateFillHint(cx, cy);
     if (state.world.zoning === "oriented" && ((ZONE_BY_TOOL as Record<string, number | undefined>)[tool] !== undefined || tool === "bulldoze")) {
       const c = renderer.pickCell(cx, cy);
       const b = c ? (getZoneBlocks(state.world).blocks.get(`${c.seg}:${c.side}:${c.block}`)) : undefined;

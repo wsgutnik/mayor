@@ -293,7 +293,7 @@ describe("civic services", () => {
   }, 60_000);
 });
 
-import { placeRoad, planRoad, ROAD_NAME } from "./sim";
+import { placeRoad, planRoad, planRoadPair, ROAD_NAME } from "./sim";
 import { ROAD, ROAD_COST, rasterizeRoad } from "./world";
 
 describe("free-form roads", () => {
@@ -486,5 +486,66 @@ describe("kit facilities", () => {
     step(s);
     expect(s.happiness).toBeGreaterThanOrEqual(before);
     expect(s.happiness - before).toBeGreaterThan(0);
+  });
+});
+
+describe("planRoadPair (parallel roads)", () => {
+  /** Flat dry city with rich treasury; two side-by-side streets east of the entry. */
+  const pairCity = () => {
+    const s = newCity(7);
+    const ey = s.world.entry.y;
+    for (let y = ey - 10; y <= ey + 10; y++)
+      for (let x = 0; x <= 40; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+    s.money = 1e7;
+    const main = [{ x: 4.5, z: ey + 0.5 }, { x: 20.5, z: ey + 0.5 }];
+    const twin = [{ x: 4.5, z: ey + 2.5 }, { x: 20.5, z: ey + 2.5 }];
+    return { s, main, twin };
+  };
+
+  it("prices both legs together when each plans cleanly", () => {
+    const { s, main, twin } = pairCity();
+    const pair = planRoadPair(s, ROAD.STREET, main, twin);
+    expect(pair.ok).toBe(true);
+    const a = planRoad(s, ROAD.STREET, main);
+    const b = planRoad(s, ROAD.STREET, twin);
+    expect(pair.cost).toBe(a.cost + b.cost);
+    expect(pair.newTiles).toBe(a.newTiles + b.newTiles);
+    expect(placeRoad(s, ROAD.STREET, main).ok).toBe(true);
+    expect(placeRoad(s, ROAD.STREET, twin).ok).toBe(true);
+  });
+
+  it("refuses both when the twin crosses water, leaving nothing placed", () => {
+    const { s, main, twin } = pairCity();
+    const ey = s.world.entry.y;
+    // A pond under the twin's far end (its middle would just become a bridge).
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]])
+      s.world.heights[cidx(s.world, 20 + dx, ey + 2 + dy)] = -1;
+    const pair = planRoadPair(s, ROAD.STREET, main, twin);
+    expect(pair.ok).toBe(false);
+    expect(pair.reason).toBe("Road would cross water");
+    const roadsBefore = countRoads(s.world);
+    // The gate says no, so the caller places nothing.
+    expect(countRoads(s.world)).toBe(roadsBefore);
+  });
+
+  it("refuses both when the treasury covers each leg but not the pair", () => {
+    const { s, main, twin } = pairCity();
+    const a = planRoad(s, ROAD.STREET, main);
+    const b = planRoad(s, ROAD.STREET, twin);
+    expect(a.ok).toBe(true);
+    expect(b.ok).toBe(true);
+    s.money = a.cost + b.cost - 1;
+    expect(planRoad(s, ROAD.STREET, main).ok).toBe(true);
+    expect(planRoad(s, ROAD.STREET, twin).ok).toBe(true);
+    const pair = planRoadPair(s, ROAD.STREET, main, twin);
+    expect(pair).toMatchObject({ ok: false, reason: "Not enough money" });
+    expect(pair.cost).toBe(a.cost + b.cost);
+  });
+
+  it("reports the main leg's failure first", () => {
+    const { s, main, twin } = pairCity();
+    expect(planRoadPair(s, ROAD.STREET, [{ x: -50, z: -50 }, { x: -40, z: -40 }], twin))
+      .toMatchObject({ ok: false, reason: "Outside the map" });
+    void main;
   });
 });

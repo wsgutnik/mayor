@@ -17,7 +17,8 @@ import {
 import { rasterizeMirror } from "./mirror";
 import { lotsReady, planOrientedLots } from "./orientedlots";
 import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
-import type { CellRef, OrientedLot } from "./zonecells";
+import { CELL_DEPTH } from "./zonecells";
+import type { CellRef, OrientedLot, ZoneBlock } from "./zonecells";
 export { ZONE_DEPTH } from "./blocks";
 
 export type FacilityTool =
@@ -421,6 +422,37 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[], level: RoadLe
 }
 
 export { ROAD_NAME };
+
+// ------------------------------------------------------------ parallel roads (UI-2)
+
+/** Combined validation of a road and its parallel twin, priced together. */
+export interface RoadPairPlan {
+  ok: boolean;
+  reason?: string;
+  /** Combined price of both roads (0 when either road is invalid on its own). */
+  cost: number;
+  /** Combined new tiles of both roads. */
+  newTiles: number;
+}
+
+/**
+ * Validate a road pair atomically: both legs must plan cleanly on their own,
+ * and the treasury must cover the COMBINED price (each `planRoad` only checks
+ * its own leg). The caller then places both inside one history entry, so one
+ * undo reverts both; when this says no, nothing is placed and the reason names
+ * the failing leg's problem.
+ */
+export function planRoadPair(
+  s: CityState, type: RoadType, pts: Pt[], paraPts: Pt[], level: RoadLevelInput = "ground",
+): RoadPairPlan {
+  const a = planRoad(s, type, pts, level);
+  if (!a.ok) return { ok: false, reason: a.reason, cost: 0, newTiles: 0 };
+  const b = planRoad(s, type, paraPts, level);
+  if (!b.ok) return { ok: false, reason: b.reason, cost: 0, newTiles: 0 };
+  const cost = a.cost + b.cost;
+  if (s.money < cost) return { ok: false, reason: "Not enough money", cost, newTiles: a.newTiles + b.newTiles };
+  return { ok: true, cost, newTiles: a.newTiles + b.newTiles };
+}
 
 // ------------------------------------------------------------ road upgrade (UI-2)
 
@@ -1011,6 +1043,150 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   s.money -= cost;
   s.monthExpenses += cost;
   w.revision++;
+  return { ok: true };
+}
+
+export type ZoneBulkTool = "res" | "com" | "ind" | "bulldoze";
+
+export interface ZoneBulkPreview { count: number; cost: number; reason?: string }
+
+interface BulkCell { b: ZoneBlock; i: number }
+
+/**
+ * Tiles the Fill tool may spread over. Same validity the brush uses: dry land,
+ * no road or facility, within 4 lots of a road, and unzoned or already the
+ * target zone (a different zone bounds the region). Bulldoze spreads over
+ * zoned tiles only. Works in both modes: the tile mirror reflects oriented cells.
+ */
+export function isFillOpenTile(w: World, tool: ZoneBulkTool, x: number, y: number): boolean {
+  if (!inBounds(w, x, y)) return false;
+  const i = idx(w, x, y);
+  if (!isLand(w, x, y) || blocksBuilding(w, i) || w.facility[i]) return false;
+  if (tool === "bulldoze") return w.zone[i] !== 0;
+  if (w.zone[i] !== 0 && w.zone[i] !== ZONE_OF_TOOL[tool]) return false;
+  return getFrontage(w).road[i] >= 0;
+}
+
+function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: number; y: number }[]): {
+  tiles: number[]; cells: BulkCell[]; hardReason?: string;
+} {
+  const out = { tiles: [] as number[], cells: [] as BulkCell[], hardReason: undefined as string | undefined };
+  const fail = (reason: string): void => { out.hardReason ??= reason; };
+  if (w.zoning === "oriented") {
+    const wanted = new Set<number>();
+    for (const t of tiles) {
+      if (!inBounds(w, t.x, t.y)) { fail("Outside the map"); continue; }
+      wanted.add(idx(w, t.x, t.y));
+    }
+    // One pass over the cells: nearestCell per tile would be quadratic on big maps.
+    let mapped = 0;
+    for (const b of getZoneBlocks(w).blocks.values()) {
+      for (let row = 0; row < b.rows; row++) for (let col = 0; col < CELL_DEPTH; col++) {
+        const i = cellIndex(row, col);
+        if (!b.valid[i]) continue;
+        const p = cellPose(b, row, col);
+        const tx = Math.floor(p.x), ty = Math.floor(p.z);
+        if (!inBounds(w, tx, ty) || !wanted.has(idx(w, tx, ty))) continue;
+        mapped++;
+        if (tool === "bulldoze") {
+          if (b.zone[i] || b.lot[i] >= 0) out.cells.push({ b, i });
+        } else if (b.zone[i] !== ZONE_OF_TOOL[tool]) {
+          out.cells.push({ b, i });
+        }
+      }
+    }
+    if (!mapped) fail("Zones must be within 4 tiles of a road");
+    return out;
+  }
+  const frontage = tool === "bulldoze" ? null : getFrontage(w);
+  for (const t of tiles) {
+    if (!inBounds(w, t.x, t.y)) { fail("Outside the map"); continue; }
+    const i = idx(w, t.x, t.y);
+    if (tool === "bulldoze") {
+      // Zone-only: roads and facilities survive a bulk clear.
+      if (w.zone[i]) out.tiles.push(i);
+      continue;
+    }
+    if (!isLand(w, t.x, t.y)) { fail("Cannot build on water"); continue; }
+    if (blocksBuilding(w, i)) { fail("Tile is a road"); continue; }
+    if (w.facility[i]) { fail("Tile is occupied"); continue; }
+    if (w.zone[i] === ZONE_OF_TOOL[tool]) continue;
+    if (frontage!.road[i] < 0) { fail("Zones must be within 4 tiles of a road"); continue; }
+    out.tiles.push(i);
+  }
+  return out;
+}
+
+/** Count and price a bulk zone operation without changing anything. */
+export function previewZoneBulk(s: CityState, tool: ZoneBulkTool, tiles: readonly { x: number; y: number }[]): ZoneBulkPreview {
+  const c = collectZoneBulk(s.world, tool, tiles);
+  const n = s.world.zoning === "oriented" ? c.cells.length : c.tiles.length;
+  if (n === 0) return { count: 0, cost: 0, reason: c.hardReason };
+  const cost = n * (tool === "bulldoze" ? COST.bulldoze : COST[tool]);
+  if (s.money < cost) return { count: n, cost, reason: "Not enough money" };
+  return { count: n, cost };
+}
+
+/**
+ * Zone (or zone-clear) many tiles at once: the Marquee and Fill tools.
+ * Same rules as the brush (applyZoneAt/bulldozeAt in oriented mode, the
+ * applyTool zone branch in classic mode) but one money check and one lot
+ * refresh for the whole set, so the caller wraps it in a single undo entry.
+ */
+export function applyZoneBulk(s: CityState, tool: ZoneBulkTool, tiles: readonly { x: number; y: number }[]): ToolResult {
+  const w = s.world;
+  const c = collectZoneBulk(w, tool, tiles);
+  const oriented = w.zoning === "oriented";
+  const n = oriented ? c.cells.length : c.tiles.length;
+  if (n === 0) return c.hardReason ? { ok: false, reason: c.hardReason } : { ok: true };
+  const unit = tool === "bulldoze" ? COST.bulldoze : COST[tool];
+  const cost = n * unit;
+  if (s.money < cost) return { ok: false, reason: "Not enough money" };
+  if (!oriented) {
+    if (tool === "bulldoze") {
+      for (const i of c.tiles) { w.zone[i] = 0; w.level[i] = 0; }
+    } else {
+      const z = ZONE_OF_TOOL[tool];
+      for (const i of c.tiles) {
+        flattenTile(w, i % w.size, (i / w.size) | 0);
+        w.zone[i] = z;
+        w.level[i] = 0;
+      }
+    }
+    dirtyZones(w);
+    w.coverageDirty = true;
+    if (tool === "bulldoze") updateCoverage(w);
+  } else if (tool === "bulldoze") {
+    const zeroed = new Set<number>();
+    for (const { b, i } of c.cells) {
+      const lotId = b.lot[i];
+      if (lotId >= 0 && !zeroed.has(lotId)) {
+        zeroed.add(lotId);
+        const lot = (w.olots ?? []).find((l) => l.id === lotId);
+        if (lot) setOLotLevel(w, lot, 0);
+      }
+      b.zone[i] = 0;
+      b.level[i] = 0;
+    }
+    w.zoneRevision++;
+    w.lotsDirty = true;
+    w.coverageDirty = true;
+  } else {
+    const z = ZONE_OF_TOOL[tool];
+    for (const { b, i } of c.cells) {
+      b.zone[i] = z;
+      b.level[i] = 0;
+      const p = cellPose(b, (i / CELL_DEPTH) | 0, i % CELL_DEPTH);
+      levelTiles(w, [idx(w, Math.floor(p.x), Math.floor(p.z))]);
+    }
+    w.zoneRevision++;
+    w.lotsDirty = true;
+    w.coverageDirty = true;
+  }
+  s.money -= cost;
+  s.monthExpenses += cost;
+  w.revision++;
+  if (oriented) refreshOrientedLots(s);
   return { ok: true };
 }
 

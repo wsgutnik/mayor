@@ -17,6 +17,11 @@ export interface RoadReadoutI18n {
 export interface RoadReadoutInput {
   /** Price from `planRoad` — never recomputed here. */
   cost: number;
+  /**
+   * The parallel twin's own price and validity, when the Parallel option is on.
+   * The Cost row then shows the combined total; a second row breaks the twin out.
+   */
+  parallel?: { cost: number; ok: boolean; reason?: string };
   /** Centreline length from `segmentLength`, in tiles. */
   lengthTiles: number;
   /** Steepest grade along the path, in percent (see `maxSlopePercent`). */
@@ -66,8 +71,17 @@ const MODE_KEY: Record<RoadReadoutMode, string> = { ground: "Ground", bridge: "B
 /** One compact row per stat, plus the translated plan reason when invalid. */
 export function formatRoadReadout(d: RoadReadoutInput, i18n: RoadReadoutI18n): RoadReadoutRow[] {
   const { tr, trReason } = i18n;
+  const total = d.cost + (d.parallel?.cost ?? 0);
   const rows: RoadReadoutRow[] = [
-    { label: tr("Cost"), value: `$${Math.round(d.cost).toLocaleString("en-US")}` },
+    { label: tr("Cost"), value: `$${Math.round(total).toLocaleString("en-US")}` },
+    ...(d.parallel ? [{
+      label: tr("Parallel"),
+      ...(d.parallel.ok
+        ? { value: `$${Math.round(d.parallel.cost).toLocaleString("en-US")}` }
+        : d.parallel.reason
+          ? { value: trReason(d.parallel.reason), bad: true as const }
+          : { value: "–", bad: true as const }),
+    }] : []),
     {
       label: tr("Length"),
       value: `${Math.round(d.lengthTiles)} ${tr("tiles")} · ${Math.round(d.lengthTiles * METERS_PER_TILE)} m`,

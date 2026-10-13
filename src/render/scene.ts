@@ -168,6 +168,8 @@ export class CityRenderer {
   private lastFrame = 0;
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
+  /** Ghost of the parallel twin (UI-2); same strip, its own validity colour. */
+  private previewMesh2!: THREE.Mesh;
   /** Crossing markers on the road ghost (junction yellow, grade-separated blue, blocked red). */
   private crossMesh!: THREE.InstancedMesh;
   private zones!: THREE.InstancedMesh;
@@ -272,6 +274,13 @@ export class CityRenderer {
     this.previewMesh.frustumCulled = false;
     this.previewMesh.visible = false;
     this.scene.add(this.previewMesh);
+    this.previewMesh2 = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    this.previewMesh2.frustumCulled = false;
+    this.previewMesh2.visible = false;
+    this.scene.add(this.previewMesh2);
     this.crossMesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(0.42, 0.3, 0.42),
       new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.9, depthWrite: false }), 64);
@@ -1196,16 +1205,28 @@ export class CityRenderer {
     d.rotation.set(0, 0, 0);
   }
 
-  /** Ghost of a road being drawn; null clears it. Crossing markers reuse one instanced mesh. */
+  /**
+   * Ghost of a road being drawn; null clears it. Crossing markers reuse one instanced mesh.
+   * `second` draws the parallel twin (same road class) with its own validity colour.
+   */
   setRoadPreview(seg: { type: RoadType; pts: Pt[] } | null, valid = true,
-    crossings: { x: number; z: number; kind: "junction" | "overpass" | "underpass" | "blocked" }[] = []): void {
+    crossings: { x: number; z: number; kind: "junction" | "overpass" | "underpass" | "blocked" }[] = [],
+    second?: { pts: Pt[]; valid: boolean } | null): void {
     this.previewMesh.visible = !!seg;
+    this.previewMesh2.visible = !!seg && !!second;
     if (!seg) { this.crossMesh.count = 0; this.crossMesh.instanceMatrix.needsUpdate = true; return; }
     this.previewMesh.geometry.dispose();
     // Clamped above the waterline so a bridge draft stays visible over the gap.
     this.previewMesh.geometry = buildStripGeometry([seg], (x, z) => Math.max(this.groundY(x, z), 0.12),
       new THREE.Color(valid ? "#7fe08a" : "#ff6b60"));
     this.previewMesh.position.y = 0.05;
+    if (second) {
+      this.previewMesh2.geometry.dispose();
+      this.previewMesh2.geometry = buildStripGeometry([{ type: seg.type, pts: second.pts }],
+        (x, z) => Math.max(this.groundY(x, z), 0.12),
+        new THREE.Color(second.valid ? "#7fe08a" : "#ff6b60"));
+      this.previewMesh2.position.y = 0.05;
+    }
     const m = this.crossMesh, d = this.dummy, col = new THREE.Color();
     let n = 0;
     for (const c of crossings) {
@@ -1385,6 +1406,20 @@ export class CityRenderer {
     this.hover.position.set(pose.x, heightAt(this.world, pose.x, pose.z) + 0.1, pose.z);
     this.hover.rotation.set(0, pose.yaw, 0);
     this.hover.scale.set(1, 1, 1);
+    (this.hover.material as THREE.MeshBasicMaterial).color.set(color);
+    this.hover.visible = true;
+  }
+
+  /** Tile-aligned rectangle highlight for the zone marquee; null clears it. Reuses the hover mesh. */
+  setZoneRect(a: { x: number; y: number } | null, b: { x: number; y: number } | null, color = "#ffffff"): void {
+    if (!a || !b) { this.hover.visible = false; return; }
+    const x0 = Math.max(0, Math.min(a.x, b.x)), x1 = Math.min(this.world.size - 1, Math.max(a.x, b.x));
+    const y0 = Math.max(0, Math.min(a.y, b.y)), y1 = Math.min(this.world.size - 1, Math.max(a.y, b.y));
+    let h = tileHeight(this.world, (x0 + x1) >> 1, (y0 + y1) >> 1);
+    for (const yy of [y0, y1]) for (const xx of [x0, x1]) h = Math.max(h, tileHeight(this.world, xx, yy));
+    this.hover.position.set((x0 + x1 + 1) / 2, h + 0.1, (y0 + y1 + 1) / 2);
+    this.hover.rotation.set(0, 0, 0);
+    this.hover.scale.set(x1 - x0 + 1, 1, y1 - y0 + 1);
     (this.hover.material as THREE.MeshBasicMaterial).color.set(color);
     this.hover.visible = true;
   }

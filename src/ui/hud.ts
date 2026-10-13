@@ -6,6 +6,8 @@ import { lineName, monthName, tr } from "../i18n";
 import { PanelId, PanelState, loadPanelState, savePanelState, setPanelsHidden, togglePanelCollapsed } from "./panel-state";
 import type { RoadReadoutRow } from "./road-readout";
 import { DEFAULT_ROAD_SNAP, type AngleSnap, type LengthSnap, type RoadSnapOptions } from "./road-snap";
+import type { ZoneMode } from "./zone-tools";
+import { DEFAULT_ROAD_PARALLEL, type ParallelGap, type ParallelSide, type RoadParallelOptions } from "./road-parallel";
 
 export type RoadMode = "paint" | "line" | "curve";
 export type RoadLevel = "ground" | "elevated" | "tunnel";
@@ -46,6 +48,12 @@ const T: Record<string, ToolDef> = {
 };
 
 const ZONE_TOOLS = ["res", "com", "ind"];
+
+const ZONE_MODES: { mode: ZoneMode; label: string; glyph: string }[] = [
+  { mode: "paint", label: "Paint", glyph: "🖌" },
+  { mode: "marquee", label: "Marquee", glyph: "⛶" },
+  { mode: "fill", label: "Fill", glyph: "🪣" },
+];
 const SERVICE_TOOLS = [
   "power", "substation", "water", "sewage", "landfill", "police", "fire", "clinic", "hospital", "school", "highschool",
   "park", "library", "community", "museum", "cityhall",
@@ -103,7 +111,11 @@ export interface HudHooks {
   onFinishRoad(): void;
   /** Road-draft snap options changed (angle / length / road toggles). */
   onSnap?(opts: RoadSnapOptions): void;
+  /** Parallel-road options changed (toggle / gap / side). */
+  onParallel?(opts: RoadParallelOptions): void;
   onTool(t: ToolId): void;
+  /** Zoning shape changed (paint brush / marquee rectangle / fill); applies to res/com/ind and bulldoze. */
+  onZoneMode?(mode: ZoneMode): void;
   onSpeed(s: number): void;
   onUndo(): void;
   onRedo(): void;
@@ -177,6 +189,8 @@ export class Hud {
   private roadTypeBtns = new Map<RoadType, HTMLElement>();
   private roadModeBtns = new Map<RoadMode, HTMLElement>();
   private roadLevelBtns = new Map<RoadLevel, HTMLElement>();
+  private zoneModeBtns = new Map<ZoneMode, HTMLElement>();
+  private zoneMode: ZoneMode = "paint";
   private roadType: RoadType = 1;
   private roadMode: RoadMode = "line";
   private roadLevel: RoadLevel = "ground";
@@ -184,6 +198,10 @@ export class Hud {
   private snapAngleBtns = new Map<AngleSnap, HTMLButtonElement>();
   private snapLengthBtns = new Map<LengthSnap, HTMLButtonElement>();
   private snapRoadsBtn: HTMLButtonElement | null = null;
+  private parallel: RoadParallelOptions = { ...DEFAULT_ROAD_PARALLEL };
+  private parallelToggleBtn: HTMLButtonElement | null = null;
+  private parallelGapBtns = new Map<ParallelGap, HTMLButtonElement>();
+  private parallelSideBtns = new Map<ParallelSide, HTMLButtonElement>();
   private svc = new Map<UtilityKey, { fill: HTMLElement; val: HTMLElement }>();
   private civ = new Map<CivicKey, { fill: HTMLElement; val: HTMLElement }>();
   private ind = new Map<string, { fill: HTMLElement; val: HTMLElement }>();
@@ -422,6 +440,7 @@ export class Hud {
     trevo.addEventListener("click", () => { this.hooks.onInterchange?.(); this.closeFlyouts(); });
     flyRoad.appendChild(trevo);
     flyRoad.appendChild(this.buildSnapGroup());
+    flyRoad.appendChild(this.buildParallelGroup());
     const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
       this.hooks.onTool("road");
       this.setTool("road");
@@ -432,8 +451,17 @@ export class Hud {
     this.setRoadChoice(1, "line", false);
     this.setRoadLevel("ground", false);
 
-    const flyZones = el("div", "panel fly");
+    const flyZones = el("div", "panel fly wrap");
     for (const id of ZONE_TOOLS) flyZones.appendChild(this.toolButton(T[id]));
+    flyZones.appendChild(el("span", "sep"));
+    for (const m of ZONE_MODES) {
+      const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(m.label)}</span>`);
+      b.title = tr(m.label);
+      b.addEventListener("click", () => this.setZoneMode(m.mode));
+      this.zoneModeBtns.set(m.mode, b);
+      flyZones.appendChild(b);
+    }
+    this.setZoneMode("paint", false);
     bar.appendChild(this.group("zones", "Zones", { img: "kit/ico-zonas" }, flyZones));
 
     const flyServices = el("div", "panel fly wrap");
@@ -531,6 +559,52 @@ export class Hud {
     return group;
   }
 
+  /** Compact parallel-road controls (toggle / gap / side) next to the snap group. */
+  private buildParallelGroup(): HTMLElement {
+    const group = el("div", "snap-group");
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", tr("Parallel"));
+    group.appendChild(el("span", "snap-title", tr("Parallel")));
+    const row = (label: string) => {
+      const r = el("div", "snap-row");
+      r.setAttribute("role", "group");
+      r.setAttribute("aria-label", label);
+      r.appendChild(el("span", "snap-lbl", label));
+      group.appendChild(r);
+      return r;
+    };
+    const toggleRow = row(tr("Parallel"));
+    const toggle = el("button", "tool snap-btn", `<span>${tr("Off")}</span>`);
+    toggle.title = tr("Parallel");
+    toggle.setAttribute("aria-pressed", String(this.parallel.enabled));
+    toggle.addEventListener("click", () => this.setParallel({ ...this.parallel, enabled: !this.parallel.enabled }));
+    this.parallelToggleBtn = toggle;
+    toggleRow.appendChild(toggle);
+    const gapRow = row(tr("Gap"));
+    for (const g of [1, 2, 3] as ParallelGap[]) {
+      const b = el("button", "tool snap-btn", `<span>${g}</span>`);
+      b.title = `${g} ${tr("tiles")}`;
+      b.setAttribute("aria-pressed", String(g === this.parallel.gap));
+      b.setAttribute("aria-label", `${tr("Gap")} ${g}`);
+      b.addEventListener("click", () => this.setParallel({ ...this.parallel, gap: g }));
+      this.parallelGapBtns.set(g, b);
+      gapRow.appendChild(b);
+    }
+    const sideRow = row(tr("Side"));
+    for (const [side, glyph] of [["left", "◀"], ["right", "▶"]] as [ParallelSide, string][]) {
+      const label = side === "left" ? tr("Left") : tr("Right");
+      const b = el("button", "tool snap-btn", `<span aria-hidden="true">${glyph}</span>`);
+      b.title = label;
+      b.setAttribute("aria-label", label);
+      b.setAttribute("aria-pressed", String(side === this.parallel.side));
+      b.addEventListener("click", () => this.setParallel({ ...this.parallel, side }));
+      this.parallelSideBtns.set(side, b);
+      sideRow.appendChild(b);
+    }
+    this.setParallel(this.parallel, false);
+    return group;
+  }
+
   private buildBudget(): void {
     this.budget = el("div", "panel budget");
     this.budget.innerHTML = `
@@ -551,11 +625,22 @@ export class Hud {
 
   // ------------------------------------------------------------------ state
 
+  /** Highlight the active zoning shape (paint brush / marquee / fill). */
+  setZoneMode(mode: ZoneMode, notify = true): void {
+    this.zoneMode = mode;
+    this.zoneModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
+    if (notify) this.hooks.onZoneMode?.(mode);
+  }
+
+  getZoneMode(): ZoneMode { return this.zoneMode; }
+
   /** Restore the controls after the HUD was rebuilt (language change). */
-  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; snap: RoadSnapOptions; tips: boolean }): void {
+  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; snap: RoadSnapOptions; parallel?: RoadParallelOptions; tips: boolean; zoneMode?: ZoneMode }): void {
     this.setSnap(opts.snap, false);
+    if (opts.parallel) this.setParallel(opts.parallel, false);
     this.setRoadChoice(opts.roadType, opts.roadMode, false);
     if (opts.roadLevel) this.setRoadLevel(opts.roadLevel, false);
+    if (opts.zoneMode) this.setZoneMode(opts.zoneMode, false);
     this.setTool(opts.tool);
     this.setSpeed(opts.speed);
     this.setTips(opts.tips);
@@ -615,6 +700,27 @@ export class Hud {
       this.snapRoadsBtn.setAttribute("aria-pressed", String(opts.roads));
     }
     if (notify) this.hooks.onSnap?.({ ...this.snap });
+  }
+
+  /** Apply parallel options to the toggle buttons (pressed state mirrors the choice). */
+  setParallel(opts: RoadParallelOptions, notify = true): void {
+    this.parallel = { ...opts };
+    if (this.parallelToggleBtn) {
+      this.parallelToggleBtn.querySelector("span")!.textContent = opts.enabled ? tr("On") : tr("Off");
+      this.parallelToggleBtn.classList.toggle("active", opts.enabled);
+      this.parallelToggleBtn.setAttribute("aria-pressed", String(opts.enabled));
+    }
+    this.parallelGapBtns.forEach((b, g) => {
+      const on = g === opts.gap;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    this.parallelSideBtns.forEach((b, s) => {
+      const on = s === opts.side;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    if (notify) this.hooks.onParallel?.({ ...this.parallel });
   }
 
   /** Cycle Solo → Elevado → Subterrâneo (key E). */

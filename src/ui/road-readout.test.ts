@@ -95,6 +95,28 @@ describe("formatRoadReadout", () => {
     expect(formatRoadReadout({ ...base, ok: false }, stub)).toHaveLength(4);
   });
 
+  it("combines both legs' prices and breaks the twin out when parallel", () => {
+    const rows = formatRoadReadout({ ...base, cost: 1000, parallel: { cost: 640, ok: true } }, stub);
+    expect(rows[0]).toEqual({ label: "T:Cost", value: "$1,640" });
+    expect(rows[1]).toEqual({ label: "T:Parallel", value: "$640" });
+    expect(rows).toHaveLength(5);
+  });
+
+  it("shows the twin's failure reason on its own row", () => {
+    const rows = formatRoadReadout(
+      { ...base, ok: false, reason: "Not enough money", parallel: { cost: 640, ok: false, reason: "Not enough money" } },
+      stub,
+    );
+    expect(rows[0].value).toBe("$1,874");
+    expect(rows[1]).toEqual({ label: "T:Parallel", value: "R:Not enough money", bad: true });
+    expect(rows[rows.length - 1]).toEqual({ label: "", value: "R:Not enough money", bad: true });
+  });
+
+  it("marks the twin bad without inventing a reason when none is given", () => {
+    const rows = formatRoadReadout({ ...base, parallel: { cost: 0, ok: false } }, stub);
+    expect(rows[1]).toEqual({ label: "T:Parallel", value: "–", bad: true });
+  });
+
   it("localizes labels and reasons through the real i18n", () => {
     setLang("pt");
     const pt = formatRoadReadout({ ...base, mode: "bridge", ok: false, reason: "Not enough money" }, { tr, trReason });
