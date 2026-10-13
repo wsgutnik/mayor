@@ -230,12 +230,12 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-13",
-    headline: "Jogo estável; ciclo de qualidade visual dos ativos 3D em andamento.",
+    headline: "M28: ativos 3D com fachadas traseiras, frota detalhada e referências v2; instaladores de Mac e iPad gerados.",
     summary: "O jogo está jogável e estável (pontes passam energia, subsolo iluminado). A frente atual é a qualidade visual dos 40 prédios: auditoria concluída, prédios de referência em produção. A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
       { id: "V1", name: "Auditoria visual (ciclo 1)", desc: "Inventário dos 40 prédios e 67 props, exportação estrita no Blender, manifesto, registro de variantes, prévias em dois ângulos. PR #1.", status: "done" },
-      { id: "V2", name: "Prédios de referência (ciclo 2)", desc: "Casa inicial, torre premium, torre corporativa, prefeitura e fábrica pesada como variantes v2 com três LODs; resolvedor opt-in ?visualV2=1. Em produção por Muse; nada substitui os modelos atuais.", status: "active" },
+      { id: "V2", name: "Prédios de referência (ciclo 2)", desc: "Casa inicial, torre premium, torre corporativa, prefeitura e fábrica pesada como variantes v2 com três LODs, manifesto verificado e resolvedor opt-in ?visualV2=1; os modelos de produção não foram substituídos.", status: "done" },
       { id: "M1", name: "Núcleo jogável", desc: "Terreno, câmera mouse e toque, estradas, zonas R/C/I, bulldoze, demanda, impostos, HUD.", status: "done" },
       { id: "M2", name: "Serviços básicos", desc: "Energia, água, esgoto e lixo, com cobertura por raio e infoviews.", status: "done" },
       { id: "M3", name: "Serviços cívicos", desc: "Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo.", status: "done" },
@@ -262,7 +262,7 @@ npm run dev</pre>
       { id: "M23", name: "Pontes e túneis", desc: "Estradas cruzam água e colinas por ponte ou túnel, sem nivelar o terreno.", status: "done" }
     ],
     checks: [
-      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; 344 testes passando na branch do PR #1" },
+      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; 364 testes passando no main; instalador de Mac (ad hoc, 19 MB) e PWA do iPad (13 MB) gerados localmente" },
       { ok: true, text: "Build do Blender com --strict falha de verdade (limite de triângulos, tile, números sem modelo, substituição não declarada)" },
       { ok: false, text: "Desempenho dos ativos novos não medido em Mac, Windows nem iPad; limites de LOD são hipóteses" },
       { ok: true, text: "339 testes passando, incluindo leitura de todos os GLB, limites do tile, orçamento de triângulos, zoneamento orientado e redes por camada" },
@@ -275,6 +275,12 @@ npm run dev</pre>
       { ok: false, text: "Em aberto da revisão de jogo: sombra preta sob ponte à noite e 'asas' nas rampas (sombra suavizada, falta confirmar), fitas de tubo retorcidas no subsolo (não reproduzido), tiras de meio-fio no meio da quadra e almofadas serrilhadas no zoneamento orientado, canteiro de avenida parando antes da esquina, nível de detalhe de carros e prédios" }
     ],
     log: [
+      { date: "2026-10-13", title: "M28 · fechamento dos ciclos 1 e 2 e instaladores", items: [
+        "Main recebe: auditoria e testes (PR #1), referências v2 com LODs e portão de manifesto (PR #3), fachadas traseiras dos prédios 05 a 19 e frota com mais detalhe (Muse); orçamento por prédio sobe de 450 para 700 triângulos",
+        "PRs #2 e #4 fechados como incorporados (resolvedor, correção do mergeScene e verificador aproveitados); fachadas traseiras de 22 a 40 ficaram para a próxima rodada",
+        "Instaladores: dmg para Mac Apple Silicon assinado ad hoc (sem notarização: abrir com botão direito) e pacote PWA para iPad (precisa de HTTPS para instalar)",
+        "Testes: 364 passando"
+      ] },
       { date: "2026-10-13", title: "Qualidade visual dos ativos · ciclos 1 e 2", items: [
         "Bug confirmado: o script de auditoria do PR #1 quebrava ao rodar (variável de laço fora de escopo). Corrigido e ampliado: vértices, normais, texturas, triângulos degenerados, geometria duplicada, prontidão de LOD e classificação de props",
         "build_all.py --strict: falha com prédio fora do tile, acima do limite, número 1–40 sem modelo ou substituição não declarada; manifest.json com variante, versão e footprint",
