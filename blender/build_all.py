@@ -107,6 +107,7 @@ def main():
                          "bounds": [round(b, 3) for b in bounds]})
         print("MODEL " + json.dumps({"n": n, "name": name, "tris": tris, "inside_tile": ok,
                                       "bounds": [round(b, 3) for b in bounds]}))
+    v2_report = []
     # Non-base variants (A/B candidates) are exported beside, never over, the production models.
     variant_manifest = []
     for (n, variant), (name, fn, version, footprint) in sorted(VARIANTS.items()):
@@ -126,11 +127,24 @@ def main():
             preview.render(os.path.join(opts["previews"], f"{n:02d}_{variant}.png"))
             preview.setup_scene(top=bounds[5], azimuth_deg=145)
             preview.render(os.path.join(opts["previews"], f"{n:02d}_{variant}_b.png"))
+        # Runtime convention (src/render/visual-v2.ts): models/v2/NN_lod{0,1,2}.glb.
+        lod = {"v2": 0, "v2_lod1": 1, "v2_lod2": 2}.get(variant)
+        if lod is not None:
+            import shutil
+            rt = os.path.join(opts["out"], "v2")
+            os.makedirs(rt, exist_ok=True)
+            shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(rt, f"{n:02d}_lod{lod}.glb"))
+            # scripts/verify_v2_assets.py reads this report next to the runtime GLBs.
+            v2_report.append({"catalogId": n, "name": name, "lod": lod, "file": f"{n:02d}_lod{lod}.glb", "triangles": tris,
+                              "insideTile": ok, "bounds": [round(b, 3) for b in bounds]})
         variant_manifest.append({"n": n, "name": name, "variant": variant, "version": version, "footprint": list(footprint),
                                  "tris": tris, "inside_tile": ok, "bounds": [round(b, 3) for b in bounds]})
         print("VARIANT " + json.dumps(variant_manifest[-1]))
         if not ok:
             problems.append(f"variant {variant} #{n:02d} {name} leaves its tile or height limit")
+    if v2_report:
+        with open(os.path.join(opts["out"], "v2", "build-report.json"), "w") as fh:
+            json.dump({"schema": 1, "assets": sorted(v2_report, key=lambda a: (a["catalogId"], a["lod"]))}, fh, indent=1)
     if opts["only"] is None or "props" in sys.argv:
         pdir = os.path.join(opts["out"], "props")
         os.makedirs(pdir, exist_ok=True)
