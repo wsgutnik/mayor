@@ -126,6 +126,13 @@ def main():
             preview.render(os.path.join(opts["previews"], f"{n:02d}_{variant}.png"))
             preview.setup_scene(top=bounds[5], azimuth_deg=145)
             preview.render(os.path.join(opts["previews"], f"{n:02d}_{variant}_b.png"))
+        # Runtime convention (src/render/visual-v2.ts): models/v2/NN_lod{0,1,2}.glb.
+        lod = {"v2": 0, "v2_lod1": 1, "v2_lod2": 2}.get(variant)
+        if lod is not None:
+            import shutil
+            rt = os.path.join(opts["out"], "v2")
+            os.makedirs(rt, exist_ok=True)
+            shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(rt, f"{n:02d}_lod{lod}.glb"))
         variant_manifest.append({"n": n, "name": name, "variant": variant, "version": version, "footprint": list(footprint),
                                  "tris": tris, "inside_tile": ok, "bounds": [round(b, 3) for b in bounds]})
         print("VARIANT " + json.dumps(variant_manifest[-1]))
