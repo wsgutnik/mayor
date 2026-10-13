@@ -21,6 +21,18 @@ e a **notarização** da Apple. Isso exige uma conta paga e não dá para gerar 
    ```
    Nada disso vai para o git: a senha fica só no chaveiro.
 
+## Atalho com o script de certificado (feito localmente)
+
+```bash
+scripts/mac-cert-setup.sh csr "Seu Nome" voce@exemplo.com   # gera a chave privada e o CSR em ~/.mayor-signing
+# envie ~/.mayor-signing/mayor.csr em developer.apple.com > Certificates > + > Developer ID Application
+scripts/mac-cert-setup.sh import ~/Downloads/developerID_application.cer   # junta chave e certificado e instala no chaveiro
+scripts/mac-cert-setup.sh notary TEAMID1234 voce@exemplo.com                 # pede a senha específica de app e guarda no chaveiro
+```
+
+Só o titular da conta (Account Holder) consegue criar o certificado Developer ID. A chave fica em `~/.mayor-signing`
+(modo 700), fora do repositório.
+
 ## Gerar o pacote assinado e notarizado
 
 ```bash
