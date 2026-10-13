@@ -204,7 +204,7 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M16 a M21 e M23 concluídos. Faltam polimento e validação em Windows e iPad.",
+    headline: "M16 a M21, M23, M24 e M25 concluídos. Faltam polimento e validação em Windows e iPad.",
     summary: "A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
@@ -241,6 +241,14 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M24 e M25 · níveis, detecção e estradas em textura", items: [
+        "M24: Solo, Elevado e Subterrâneo nos botões de estrada (tecla E); viaduto e passagem inferior cruzam outra via sem criar nó, com rampas de 3 tiles e tráfego por camada (Muse)",
+        "M25: detecção automática — rodovia nunca cruza no nível (vira viaduto ou passagem), terminar de lado em rodovia é recusado, cruzamento sem espaço para rampa cai para cruzamento no nível, prévia com marcadores amarelo, azul e vermelho, botão Trevo (Muse)",
+        "Estradas em textura feita em Blender/python: uma tira por trecho com faixas, bordas, canteiro e calçada em 512 por 1024 px; zebras, barras de retenção e setas texturizadas; cerca de 3 vezes menos vértices por avenida (Muse)",
+        "Pesquisa (Fable): algoritmo da grade de zona do CS1, regra de cruzamento por diferença de altura (6 m), render por textura e fluxo Blender para Three.js (docs/process/04-*)",
+        "Correções: lâmpadas de semáforo flutuando fora do poste e barras de meio-fio fora da via",
+        "DMG publicado como release local no GitHub (v0.1.0-m25); 297 testes passando"
+      ] },
       { date: "2026-10-12", title: "Frota de veículos e correções do jogo", items: [
         "23 variantes de veículo: 11 carros (táxi, polícia, minivan, picape, compacto, elétrico…), vans e 8 caminhões e semis (baú, lixo, utilitário, betoneira, prancha, tanque, contêiner), 6 ônibus (urbano, articulado, escolar, dois andares, rodoviário, mini); escolhidos por id, 130 a 260 triângulos cada",
         "A conversão automática do pacote de transporte perdeu rodas e janelas; as formas foram refeitas por parâmetros em Blender seguindo as proporções do pacote",
