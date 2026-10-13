@@ -2,94 +2,94 @@
 
 ![Mayor](public/ui/brand-banner.png)
 
-Clone jogável de city builder inspirado em Cities: Skylines II. Mac, Windows e iPad (PWA).
-Plano e marcos: [PLAN.md](PLAN.md). Avisos de marca, licenças e materiais de terceiros: [NOTICE.md](NOTICE.md).
+Mayor is an original city builder inspired by Cities: Skylines. It runs on Mac and Windows through Tauri, and on iPad as a PWA. The game ships in pt-BR by default with an English option.
+
+Mayor focuses on the playable city-building loop: terrain, roads, zoning, lots, utilities, traffic, transit, water, saves, and local packaging. It is not a feature-parity clone of Cities: Skylines II; it is its own small, inspectable city builder built with TypeScript, Three.js, Vite, and a pure TypeScript simulation.
+
+## Features
+
+| Area | What is in the game |
+|---|---|
+| Roads and junctions | Line and Curve road drawing, streets/avenues/highways, node-based junctions, curbs, crosswalks, stop lines, one-way streets, roundabouts, traffic-light phases, bridges, tunnels, overpasses, underpasses, and automatic highway crossing rules |
+| Zoning and lots | R/C/I zoning up to 4 lots from a road, persistent lots facing the street, 1×1 to 2×2 compound lots, empty-lot rendering, and lot validation for old saves |
+| Utilities and underground view | Water, sewage, and power flow through the road network with capacity limits; facilities connect to the nearest road; Underground view (`U`) shows pipes, valves, and flow |
+| Traffic and transit | A* traffic for residents and trucks, congestion, buses, metro stations, circular bus lines, fares, transit share, and line management |
+| Water and terrain | Heightmap terrain, selectable map types, official Map Kit maps, continuous water shoreline, wave normals, sky reflection, sun glint, foam, and quality tiers |
+| Art pipeline | Scripted Blender models exported as GLB, instanced buildings/props/vehicles/boats, shared textures, road texture atlas, previews, and asset tests |
+| Saves | Three local save slots, monthly autosave, import/export, structural save validation, and compatibility migration for older saves |
+| Packaging | Offline PWA with service worker, Tauri desktop builds, local Mac packaging, ad hoc signing, and optional Developer ID notarization scripts |
+
+## Quick Start
 
 ```bash
 npm install
-npm run dev     # http://localhost:5173 (também na rede local, para abrir no iPad)
-npm test        # regras da simulação
-npm run build   # tipos + bundle em dist/
+npm run dev     # http://localhost:5173 (also on the local network for iPad testing)
+npm test        # simulation rules
+npm run build   # types + bundle in dist/
 ```
 
-- M11: modelos 3D procedurais (casas, blocos, torres de vidro, galpões, fábricas) e instalações; janelas por textura que acendem à noite; prédios viram para a rua.
+Useful local checks:
 
-- M12: mapas oficiais do Map Kit (Baía Metropolitana, Vale Verde, Arquipélago Azul, Planície Central), baixados para 128×128 por
-  `npm run maps` (decodifica o PNG de 16 bits, calcula a entrada de cada mapa) e escolhidos no menu. O motor aceita mapas de qualquer
-  tamanho e entrada em qualquer borda.
+```bash
+npx tsc --noEmit
+npx vitest run
+npm run ci
+```
 
-- M13: Kit de Prédios Básicos (40 prédios). Catálogo com nomes e categorias do kit (R1-R5, C1-C4, I1-I4, serviços e utilidades),
-  um modelo 3D por prédio, sete instalações novas (hospital, escola secundária, biblioteca, centro comunitário, museu, prefeitura,
-  subestação) e cartão de inspeção ao tocar num prédio com a ferramenta Mover, com a miniatura do kit.
+Build Blender assets:
 
-- M14: Blender. Modelos feitos por script (`blender/`, `blender -b ... build_all.py`) e exportados em GLB para `public/models/`:
-  prédios do kit, nove espécies de plantas, sete veículos, três barcos, poste e banco. O jogo carrega os GLB com instancing e acende
-  faróis e janelas à noite. Água com profundidade, ondulação, espuma e correnteza (campo de fluxo derivado do relevo), barcos à deriva.
+```bash
+blender -b --factory-startup --python blender/build_all.py -- --out public/models --previews docs/img/models
+```
 
-- M15: Detalhe. Texturas compartilhadas (tijolo, telha, concreto, asfalto, grama) com oclusão ambiente nos vértices, meio-fio e faixas
-  nas ruas, faixas de pedestres e linhas de retenção nos cruzamentos, nuvens e fumaça de chaminé, e doze prédios do kit redesenhados
-  (varandas, degraus, cercas, carros estacionados, silos, torre de mangueiras).
+## Controls
 
-
-- M15: detalhe. Texturas compartilhadas e oclusão ambiente nos modelos, nuvens e fumaça, doze prédios redesenhados.
-- M16: rede viária com nós. Grafo de estradas (`src/sim/roads.ts`): fim com fim, T e cruzamentos viram nós; esquinas com meio-fio
-  arredondado, faixas de pedestres e linhas de retenção (`src/render/roads.ts`); dados de semáforo por fase. Estradas só por Linha ou Curva.
-- M17: quadras e lotes (`src/sim/blocks.ts`). Zonas só até 4 lotes de uma estrada; lotes persistidos e voltados para a rua, um prédio por lote
-  (1×1 a 2×2 compostos), lotes vazios desenhados com meio-fio e sombreamento por profundidade.
-- M18: redes de água, esgoto e energia (`src/sim/networks.ts`). Instalações se ligam à estrada mais próxima (até 5 tiles); o serviço
-  corre pelas ruas e atende por capacidade, do mais próximo ao mais distante. Vista Subsolo (`U`) mostra tubos, válvulas e fluxo;
-  prédios sem serviço ganham um aviso.
-- M19: água com margem contínua pelo relevo, normais por onda, reflexo do céu, brilho do sol, espuma só na costa e três níveis de qualidade.
-- M23: pontes e túneis (`src/sim/elevation.ts`). O planejador marca vãos sobre água (até 12/20 tiles) e trechos em colina como ponte
-  (custo 3×) ou túnel (4×); tabuleiro, pilares e portais no mesmo mesh; zonas e lotes ignoram tabuleiros, e o terreno acima de um túnel fica livre.
-- M20: render. Terreno com mistura de grama, areia, rocha e terra por altura e inclinação (texturas HD), asfalto, meio-fio e calçada
-  texturizados, sombras suaves do sol que seguem a câmera, tone mapping, LOD por distância e três níveis de qualidade (baixa, média, alta).
-- M21: vias e sinalização. Rua e avenida de mão única (setas), ferramenta de rotatória, semáforos com fases e tráfego que para no vermelho,
-  e props de calçada (postes, placas, hidrantes, lixeiras, pedestres, abrigos) por densidade de qualidade.
-- Frota: 11 modelos de carro (táxi, minivan, picape…), 10 de caminhão e semi-reboque e 9 de ônibus (articulado, de dois andares, escolar, rodoviário), escolhidos por veículo; polícia, lixo e utilitário já existem como props para uso futuro.
-- M24: separação de níveis. Nível Solo, Elevado (viaduto) ou Subterrâneo (passagem inferior) nos botões de estrada (tecla `E`); uma estrada elevada ou em túnel cruza outra sem criar nó, com rampas de 3 tiles; o tráfego de cada camada só se encontra pelas rampas.
-- Detecção automática de cruzamentos (`src/sim/crossings.ts`): uma via que cruza uma rodovia vira viaduto ou passagem sozinha; terminar de lado numa rodovia é recusado ("Rodovias precisam de um trevo"); cruzamento sem espaço para rampa cai para cruzamento no nível; a prévia lista cruzamentos, viadutos e passagens com marcadores; botão Trevo para rampas em diamante.
-- Estradas em textura (`blender/make_road_atlas.py` → `public/textures/road/`): cada trecho é uma tira com faixas, bordas, canteiro e calçada em textura de 512×1024; zebras, barras de retenção e setas de mão única são quads texturizados; cai para cor de vértice na qualidade baixa. Cerca de 3 vezes menos vértices por avenida.
-- Kit de prédios completo: estação de ônibus, estação de trem (usada nas estações de metrô) e terminal de carga (31 a 33).
-
-Documentação do processo, pesquisa e plano: [docs/process/](docs/process/). Progresso detalhado: [PROGRESS.md](PROGRESS.md). Guia para agentes: [AGENTS.md](AGENTS.md).
-
-## Controles
-
-| | Mouse | Toque |
+| Action | Mouse | Touch |
 |---|---|---|
-| Usar ferramenta | botão esquerdo (zonas: arrastar pinta; estradas: clique início e fim, ou início, curva e fim) | um dedo (estradas: toque) |
-| Cancelar estrada | Esc | botão Finish road |
-| Mover câmera | botão direito, WASD/setas | ferramenta Move, ou dois dedos |
-| Girar | botão do meio, Q/E | dois dedos (torcer) |
-| Zoom | roda | pinça |
-| Vista Subsolo | `U` (ou Mapas → Subsolo) | Mapas → Subsolo |
+| Use tool | left button (zones: drag to paint; roads: click start and end, or start, curve, and end) | one finger (roads: tap) |
+| Cancel road | Esc | Finish road button |
+| Move camera | right button, WASD/arrows | Move tool, or two fingers |
+| Rotate | middle button, Q/E | two fingers (twist) |
+| Zoom | wheel | pinch |
+| Underground view | `U` (or Maps → Underground) | Maps → Underground |
+
+## Project Layout
+
+| Path | Purpose |
+|---|---|
+| `src/sim/` | Pure simulation logic: world state, rules, road graph, lots, utilities, traffic, transit, saves, and tests |
+| `src/render/` | Three.js renderer: terrain, roads, lots, water, underground view, GLB models, materials, picking, and camera |
+| `src/ui/` | DOM/CSS HUD, menus, inspector, panels, and localized UI strings through `src/i18n.ts` |
+| `blender/` | Procedural model and texture pipeline, preview generation, and GLB export scripts |
+| `public/` | Runtime assets: models, textures, maps, icons, service worker, and manifest |
+| `third_party/` | CC0 sources and project-internal art packs used as conversion sources |
+| `docs/` | Install/signing docs, process research, review notes, status artifact, and reference images |
+
+## Documentation
+
+- [PLAN.md](PLAN.md): roadmap and architecture notes.
+- [PROGRESS.md](PROGRESS.md): live milestone status and known limitations.
+- [docs/INSTALL.md](docs/INSTALL.md): iPad, Mac, and Windows installation notes.
+- [docs/SIGNING.md](docs/SIGNING.md): Mac signing and notarization.
+- [docs/process/01-research.md](docs/process/01-research.md), [02-gaps.md](docs/process/02-gaps.md), [03-plan.md](docs/process/03-plan.md), [04-grids-crossings-drawing.md](docs/process/04-grids-crossings-drawing.md): research, gaps, and implementation planning.
+- [NOTICE.md](NOTICE.md): licensing, trademarks, and third-party material notices.
+- [third_party/README.md](third_party/README.md): source asset inventory.
 
 ## Status
 
-- M1: terreno, estradas, zonas R/C/I, bulldoze, crescimento por demanda, impostos e orçamento.
-- M2: usina, bomba d'água, esgoto e aterro com cobertura por raio, infoviews e painel de serviços.
-  Prédios novos precisam de energia e água; nível 2 pede esgoto, nível 3 pede coleta de lixo.
-- M3: polícia, bombeiros, clínica, escola e parque; incêndios, felicidade e mapa de valor do solo.
-  Sem estação de bombeiros um prédio pode pegar fogo; nível 3 exige escola; valor do solo escala a arrecadação.
-- M4: estradas livres. Toque ou clique início e fim (Linha) ou início, curva e fim (Curva); o modo Pintar foi removido das estradas (M16).
-  Rua, avenida e rodovia (a rodovia liga mas não serve lotes); snapping em estradas existentes.
-  A simulação continua em grade: cada via é rasterizada em tiles, então zonas, cobertura e conectividade seguem iguais.
-- M5: tráfego. Carros de moradores (casa para emprego) e caminhões (indústria para comércio) percorrem a rede
-  com A* sensível a congestionamento; cada classe de via tem velocidade e capacidade; infoview de tráfego;
-  congestionamento reduz felicidade.
-- M6: transporte público. Paradas de ônibus (em ruas e avenidas) e estações de metrô (em qualquer terreno livre);
-  linhas circulares criadas tocando as paradas em ordem; ônibus usam as vias e entram no tráfego, trens vão em linha reta.
-  Passageiros pagam tarifa, tiram carros da rua, elevam o valor do solo e a felicidade. Painel de linhas com veículos e remoção.
-- M7: menu (☰) com 3 slots de save, autosave mensal, nova cidade por seed; ciclo dia e noite com janelas acesas;
-  chuva (determinística por dia e seed) que deixa o trânsito 15% mais lento. Saves ficam em localStorage (~90 KB).
-- M8: empacotamento. PWA com service worker (offline), ícones e manifest; app de Mac com Tauri (`npm run desktop:build`,
-  `.app` de 10 MB e `.dmg` de 3 MB); exportar e importar saves por arquivo; resolução adaptativa e reconstrução da cena
-  limitada a uma vez a cada 80 ms para aliviar GPUs mais fracas. Instruções para iPad e Windows em [docs/INSTALL.md](docs/INSTALL.md).
-- M9: identidade visual a partir da folha de marca. Banner e ícone do app, ícones do HUD recortados da folha,
-  barra de ferramentas reagrupada (Estradas, Zonas, Serviços, Transporte, Demolir, Mapas, Economia),
-  painel de indicadores (Popularidade, Orçamento, Meio ambiente, Tráfego), preferências (idioma pt-BR/en,
-  qualidade gráfica, dicas, autosave, dia/noite) e interface traduzida.
-- M10: kit visual (PDF). Ícones coloridos do kit na barra, no HUD e nos mapas; tiles isométricos nas zonas;
-  seletor de terreno ao criar cidade (Planície, Floresta, Rio, Litoral, Montanha, Deserto) com árvores e cores próprias;
-  preferências em abas (Geral, Gráficos, Jogabilidade, Controles) com Restaurar padrões e Aplicar; ícone do app em alta resolução.
+| Milestone | Status | Summary |
+|---|---|---|
+| M1-M8 | done | Playable core, civic services, freeform roads, traffic, transit, saves, PWA, and Tauri packaging |
+| M9-M15 | done | Visual identity, UI kit, 3D models, Map Kit maps, building kit, Blender pipeline, water v1, textures, AO, crossings, clouds, smoke |
+| M16-M18 | done | Node road network, junction geometry, blocks and lots, road-flow utilities, and Underground view |
+| M19-M21 | done | Continuous shoreline water, lighting/material/LOD quality tiers, one-way roads, roundabouts, traffic lights, and sidewalk props |
+| M23-M25 | done | Bridges and tunnels, level separation, automatic crossing detection, interchange preview, diamond ramps, and texture-based roads |
+| Vehicle fleet | done | 23 parametric vehicle variants: cars, vans, trucks, semis, and buses |
+| M26 | partial | CS1-style zoning-grid rules partly implemented; per-segment zone blocks remain future work |
+| M22 | pending | Pedestrians, polish, and validation on real Windows and iPad hardware |
+
+Tests: 299 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
+
+## License and Trademarks
+
+Mayor is original work inspired by city-builder conventions. It is not affiliated with, sponsored by, or endorsed by Paradox Interactive or Colossal Order. Cities: Skylines and Cities: Skylines II names belong to their owners. See [NOTICE.md](NOTICE.md) for the current code-license status, third-party materials, and trademark notice.

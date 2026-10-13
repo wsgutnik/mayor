@@ -2,10 +2,10 @@
 
 ## Existing game (verified read-only in GitHub on Oct 12, 2026)
 
-- `cities-skylines-2/src/sim/world.ts`: `RoadSegment`, rasterization, three classes (street/avenue/highway), up to 3 grid tiles wide. Road class raster is the source of collision, access, connectivity, and simplified traffic.
-- `cities-skylines-2/src/render/scene.ts`: ribbon-geometry roads, rebuilt on any changed `world.revision` along with terrain/buildings; no imported road GLBs, no rendered bridges/overpasses.
-- `cities-skylines-2/src/sim/sim.ts`: `planRoad` rejects paths over water; bulldozing a road deletes full intersecting stored segments. Changes need tests.
-- `cities-skylines-2/src/sim/traffic.ts`: A* pathfinding uses 4-neighbour tile graph, not directional lane graph. Speed by road class; network junction rules are not expressed.
+- `src/sim/world.ts`: `RoadSegment`, rasterization, three classes (street/avenue/highway), up to 3 grid tiles wide. Road class raster is the source of collision, access, connectivity, and simplified traffic.
+- `src/render/scene.ts`: ribbon-geometry roads, rebuilt on any changed `world.revision` along with terrain/buildings; no imported road GLBs, no rendered bridges/overpasses.
+- `src/sim/sim.ts`: `planRoad` rejects paths over water; bulldozing a road deletes full intersecting stored segments. Changes need tests.
+- `src/sim/traffic.ts`: A* pathfinding uses 4-neighbour tile graph, not directional lane graph. Speed by road class; network junction rules are not expressed.
 
 **Keep the proven legacy simulation while replacing the surface visuals and networking incrementally.** Do not drop in a GLB and assume the traffic or grade separation is solved.
 
@@ -62,7 +62,7 @@ interface LaneLink { fromLaneId: string; toLaneId: string; cost: number; allowed
 ## Suggested repository destinations
 
 ```
-cities-skylines-2/
+
   art/roads/blender/                  # source .blend (generated on local Blender)
   art/roads/catalog/manifest.json
   public/models/roads/*.glb         # asset runtime preview; subset after optimising

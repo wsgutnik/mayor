@@ -1,0 +1,154 @@
+{
+  "spec": "docs/process/05-oriented-lots.md",
+  "updated": "2026-10-12",
+  "baseline": { "commit": "6f8be1a", "tests": 307, "check": "npx tsc --noEmit && npx vitest run" },
+  "flag": { "pref": "zoning", "values": ["tiles", "oriented"], "default_until": "P9", "default_before": "tiles", "default_after": "oriented" },
+  "owners": {
+    "codex": "gpt-5.5; runs tsc and vitest; no Blender, no browser",
+    "muse": "Blender/art; quota-limited; every muse phase has a codex fallback",
+    "lead": "merge with git apply --3way, npm run ci, visual checks via window.__city"
+  },
+  "phases": [
+    {
+      "id": "P0", "name": "Contracts and flag", "owner": "lead", "minutes": 30,
+      "depends_on": [], "parallel_with": [],
+      "goal": "Shared types (zonecells.ts) and the zoning preference so every other phase compiles against one contract.",
+      "owns": ["src/sim/zonecells.ts", "src/prefs.ts", "src/ui/menu.ts", "src/i18n.ts", "src/sim/world.ts", "src/main.ts", "src/prefs.test.ts"],
+      "api": ["Side", "CellRef", "ZoneBlock", "CellPose", "OrientedLot", "CELL_DEPTH", "BLOCK_MAX_ROWS", "CELL_SLOPE_LIMIT", "Prefs.zoning", "World.zoning", "World.cells?", "World.olots?", "World.nextOLotId", "World.obstacleRevision"],
+      "acceptance": ["prefs round-trip zoning", "newCity().world.zoning === 'tiles'", "all 307 tests green"],
+      "rollback": "pure additions; revert the commit"
+    },
+    {
+      "id": "P1", "name": "Zone blocks core", "owner": "codex", "minutes": 60,
+      "depends_on": ["P0"], "parallel_with": ["P2", "P7", "P8"],
+      "goal": "Segment-frame blocks: geometry, validity mask, overlap/share resolution, migration by nearest cell (spec §1.2-1.6).",
+      "owns": ["src/sim/zoneblocks.ts", "src/sim/zoneblocks.test.ts"],
+      "api": ["buildZoneBlocks(w, prev?)", "blocksForSegment(w, seg)", "cellPose(b, row, col)", "cellCorners(b, row, col, out)", "cellIndex(row, col)", "migrateCells(prev, next)", "nearestCell(set, x, z, radius)"],
+      "acceptance": [
+        "axis-aligned street: cell centres equal today's getFrontage tiles",
+        "12 rows -> blocks 6/6; 20 rows -> 7/7/6",
+        "45-degree street: 4 valid columns both sides, no centre on a road tile",
+        "T-junction: cells over the junction invalid; corner cell to the older segment",
+        "parallel streets 6 apart: no sharing; 4 apart: nearer road wins",
+        "slope limit and row cut-off (port blocks.test.ts:128)",
+        "split a zoned street with addSegment: zero dropped cells, levels kept",
+        "2000 segments on 128x128 under 15 ms",
+        "deterministic for equal world"
+      ],
+      "rollback": "unused until P3"
+    },
+    {
+      "id": "P2", "name": "Oriented lot planner", "owner": "codex", "minutes": 60,
+      "depends_on": ["P0"], "parallel_with": ["P1", "P7", "P8"],
+      "goal": "Plan rotated lots over cells with a persistence pass; lot pose/facing; pure render helpers (spec §2.2-2.5).",
+      "owns": ["src/sim/orientedlots.ts", "src/sim/orientedlots.test.ts", "src/render/lots.ts (additive: orientedModelCells, orientedKerb, orientedPad)", "src/render/lots.test.ts"],
+      "api": ["planOrientedLots(set, {rng, keep})", "lotsReady(w, set, lots)", "lotPose(b, lot)", "lotCorners(b, lot, out)", "lotContains(lot, b, x, z)", "orientedModelCells(frame)", "orientedKerb(frame)", "orientedPad(frame)"],
+      "acceptance": [
+        "8x4 commercial level>=2 block -> two 4x4 lots; residential level 0 -> 2x2/2x1/1x1",
+        "keep: 2x2 level-3 lot re-emitted with the same id",
+        "no lot spans rows with yaw spread > 6 degrees",
+        "yaw faces the road (pinned against lotYaw on an axis-aligned fixture)",
+        "orientedModelCells(2x2) = four rotated cell centres",
+        "deterministic"
+      ],
+      "rollback": "unused until P3/P5"
+    },
+    {
+      "id": "P3", "name": "Mirror and sim wiring", "owner": "codex", "minutes": 60,
+      "depends_on": ["P1", "P2"], "parallel_with": ["P7", "P8"],
+      "goal": "Rasterise cells/lots onto w.zone/w.level/w.lotAt/w.lots and branch sim.ts on w.zoning (spec §3, §4.2-4.3).",
+      "owns": ["src/sim/mirror.ts", "src/sim/mirror.test.ts", "src/sim/sim.ts (refreshOrientedLots, syncLots branch, applyZoneAt, bulldozeAt, applyTool dispatch, placeRoad clear branch, step footprint loop, setOLotLevel)", "src/sim/world.ts (derived fields only if missing)"],
+      "api": ["rasterizeMirror(w, set, lots)", "cellAt(w, tile)", "getZoneBlocks(w)", "applyZoneAt(s, zone, x, z, brush)", "bulldozeAt(s, x, z)", "refreshOrientedLots(s)"],
+      "acceptance": [
+        "oriented diagonal street grows buildings; population matches the tile-mode equivalent axis-aligned city",
+        "rasterizeMirror idempotent",
+        "bulldoze a cell: lot level -> 0, only that cell unzoned",
+        "road across a zoned block drops only the cells under it",
+        "flag off: all existing tests pass"
+      ],
+      "rollback": "every change is behind w.zoning === 'oriented'"
+    },
+    {
+      "id": "P4", "name": "Save v2 and migration", "owner": "codex", "minutes": 45,
+      "depends_on": ["P3"], "parallel_with": ["P5", "P6", "P7", "P8"],
+      "goal": "SAVE_VERSION 2 with cells and lots by address, v1 -> cells migration, v2 -> tiles fallback, validation (spec §5).",
+      "owns": ["src/sim/save.ts", "src/sim/save.test.ts"],
+      "api": ["SAVE_VERSION = 2", "deserialize(json) accepting v1 and v2", "migrateV1Cells(w)"],
+      "acceptance": [
+        "oriented city round-trips bit-exact and simulates identically for 60 days",
+        "v1 fixture loads oriented with population within 2% and zero dropped cells on axis-aligned roads",
+        "v2 file opens with the flag off",
+        "damaged cells/lots -> SaveError",
+        "id counters above stored ids",
+        "size within the localStorage budget test"
+      ],
+      "rollback": "writer emits v1 when the flag is off"
+    },
+    {
+      "id": "P5", "name": "Oriented rendering", "owner": "codex", "visual_check": "lead", "minutes": 60,
+      "depends_on": ["P2", "P3"], "parallel_with": ["P4", "P6", "P7", "P8"],
+      "goal": "Rotated pads, kerbs and buildings for w.olots; hover cell; pickCell (spec §2.5, §4.4).",
+      "owns": ["src/render/scene.ts (only: lot block of rebuild() scene.ts:667-729, placeLotCell, setHoverCell, pickCell)", "src/render/lots.ts consumers"],
+      "api": ["CityRenderer.setHoverCell(pose, color)", "CityRenderer.pickCell(clientX, clientY)", "lotInstances(w, lot) (pure, testable)"],
+      "acceptance": [
+        "render/lots.test.ts for new helpers",
+        "instance counts for 500 oriented lots equal the tile path on the same axis-aligned city",
+        "lead: diagonal, curved and T-junction streets show no pad on asphalt and buildings face the kerb"
+      ],
+      "rollback": "branch on w.zoning in rebuild()"
+    },
+    {
+      "id": "P6", "name": "Interaction", "owner": "codex", "minutes": 60,
+      "depends_on": ["P3", "P5"], "parallel_with": ["P4", "P7", "P8"],
+      "goal": "World-space zone strokes, brush, bulldoze by cell, hover, inspect by cell, ghost blocks in the road preview (spec §4).",
+      "owns": ["src/input.ts", "src/input.test.ts", "src/main.ts", "src/sim/inspect.ts", "src/sim/inspect.test.ts", "src/ui/hud.ts (brush buttons, optional)", "src/i18n.ts (new keys)"],
+      "api": ["InputHooks.paintPoint?(p, first)", "describeAt(s, x, z)", "ZoneBrush"],
+      "acceptance": [
+        "stroke resampling emits points every <= 0.5 tiles",
+        "describeAt on a 45-degree street reports the lot's area and headcount",
+        "manual: painting along a diagonal street fills consecutive cells"
+      ],
+      "rollback": "hooks fall back to paint(tile) when paintPoint is absent"
+    },
+    {
+      "id": "P7", "name": "Resolution upgrade (code)", "owner": "codex", "minutes": 60,
+      "depends_on": ["P0"], "parallel_with": ["P1", "P2", "P3", "P4", "P5", "P6", "P8"],
+      "goal": "Quality profile fields (aniso, tex tier, shadow 4096 desktop), HD kit textures by tier, 256 px window texture, plot material with world-space UVs, lot LOD, texture memory in lodStats (spec §6.1 R1-R5, R8).",
+      "owns": ["src/prefs.ts (QualityProfile fields; rebase on P0)", "src/prefs.test.ts", "src/render/kit-materials.ts", "src/render/models.ts (makeWindowTextures)", "src/render/plot-material.ts", "src/render/terrain-splat.ts (aniso param)", "src/render/road-material.ts (aniso param)", "src/render/scene.ts (only: constructor texture loader scene.ts:202-220, setQualityCap, updateLod)"],
+      "api": ["QualityProfile.aniso/tex/shadow/padTex", "textureName(name, tier)", "createPlotMaterial()", "lodStats().textureMemory"],
+      "acceptance": [
+        "prefs.test.ts monotonic aniso/shadow/tex",
+        "textureName falls back to SD when the HD file is absent",
+        "lead on iPad: medium <= 64 MB textures, >= 30 fps on the 96x96 demo"
+      ],
+      "rollback": "tiers default to today's values"
+    },
+    {
+      "id": "P8", "name": "HD textures (art)", "owner": "muse", "fallback_owner": "codex (python3 blender/make_textures.py; no Blender needed)", "minutes": 45,
+      "depends_on": [], "parallel_with": ["P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7"],
+      "goal": "512 px _hd variants of the kit patterns, 256 px window + glow, plot.png/plot_hd.png (spec §6.2).",
+      "owns": ["blender/make_textures.py", "blender/textures/*.png", "public/textures/*.png (copied)", "src/render/glb-assets.test.ts (additions only)"],
+      "api": ["files: <name>_hd.png, plot.png, plot_hd.png, window.png 256x256, window_glow.png 256x256"],
+      "acceptance": ["every SD texture has an _hd sibling <= 1.5 MB", "plot textures exist", "window texture 256x256 with matching glow"],
+      "rollback": "P7 falls back to SD files when _hd is missing"
+    },
+    {
+      "id": "P9", "name": "Cutover and cleanup", "owner": "lead", "minutes": 60,
+      "depends_on": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8"], "parallel_with": [],
+      "goal": "Default zoning 'oriented'; convert tile-poking tests to applyZoneAt; docs and status artifact; follow-ups for later readers (traffic per lot, networks via cells).",
+      "owns": ["src/prefs.ts (default)", "src/sim/sim.test.ts", "src/sim/lots.test.ts", "README.md", "PROGRESS.md", "docs/mayor-status.html"],
+      "api": [],
+      "acceptance": ["npm run ci green", "autosave from the previous release opens", "iPad smoke test"],
+      "rollback": "flip the default back to 'tiles'"
+    }
+  ],
+  "tile_readers_to_migrate_later": [
+    { "file": "src/sim/networks.ts", "lines": "162-190", "note": "demand candidates by frontage.road[tile]; prefer w.frontTile written by the mirror (Q5)" },
+    { "file": "src/sim/traffic.ts", "lines": "300-303", "note": "homes/shops/factories per tile -> per lot" },
+    { "file": "src/sim/sim.ts", "lines": "715-734", "note": "recount per tile; fine via mirror, under-counts shared tiles on diagonals (Q4)" },
+    { "file": "src/sim/world.ts", "lines": "482-489", "note": "land value industry penalty per tile; fine via mirror" },
+    { "file": "src/sim/transit.ts", "lines": "139-142", "note": "riders per tile; fine via mirror" },
+    { "file": "src/render/scene.ts", "lines": "638, 776", "note": "tree scatter and warning diamonds stay on the mirror" },
+    { "file": "src/sim/props.ts", "lines": "55", "note": "lotAt keeps props off lots; fine via mirror" }
+  ]
+}

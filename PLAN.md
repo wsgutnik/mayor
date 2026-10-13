@@ -1,79 +1,74 @@
-# Mayor — plano (city builder inspirado em Cities: Skylines II; Mac, Windows, iPad)
+# Mayor — Plan (city builder inspired by Cities: Skylines II; Mac, Windows, iPad)
 
-Referência visual: `screenshots/` (local, fora do git). Fontes em `SOURCES.md`.
+Visual reference: `screenshots/` (local, outside git). Sources in `SOURCES.md`.
 
-## Decisão de stack
+## Stack Decision
 
-**TypeScript + Three.js (WebGL) + Vite**, simulação em TS puro e testável.
+**TypeScript + Three.js (WebGL) + Vite**, with a pure, testable TypeScript simulation.
 
-| Plataforma | Entrega |
+| Platform | Delivery |
 |---|---|
-| iPad | PWA (Add to Home Screen, fullscreen) → depois Capacitor/App Store se quiser |
-| Mac | Tauri (Rust já instalado) ou o próprio navegador |
-| Windows | Tauri (build .msi/.exe; precisa compilar no Windows ou CI) |
+| iPad | PWA (Add to Home Screen, fullscreen) → later Capacitor/App Store if desired |
+| Mac | Tauri (Rust already installed) or the browser itself |
+| Windows | Tauri (`.msi`/`.exe` build; needs Windows or CI to compile) |
 
-Por quê: uma base de código só, roda nas 3 plataformas, toque + mouse, e dá para
-verificar visualmente aqui no browser embutido. Godot/Unity exigiriam editor e
-export por plataforma. Custo: teto de performance menor que engine nativa
-(milhares de prédios OK; centenas de milhares de agentes, não).
+Why: one codebase, runs on all three platforms, touch + mouse, and can be visually checked here in the embedded browser.
+Godot/Unity would require an editor and per-platform exports. Cost: a lower performance ceiling than a native engine
+(thousands of buildings are OK; hundreds of thousands of agents are not).
 
-## Escopo honesto
+## Honest Scope
 
-CS2 é um jogo de ~100 pessoas e anos de trabalho. Meta: **núcleo jogável** que
-reproduz o loop (terreno → estradas → zonas → cidade cresce → economia) e a
-linguagem visual da UI. Não é paridade de features.
+CS2 is a game made by roughly 100 people over years. Goal: a **playable core** that reproduces the loop (terrain → roads → zones → city grows → economy) and the visual language of the UI. It is not feature parity.
 
-## Marcos
+## Milestones
 
-| # | Marco | Entrega |
+| # | Milestone | Delivery |
 |---|---|---|
-| M1 | **Núcleo jogável** ✅ feito | Terreno, câmera mouse+toque, estradas, zonas R/C/I, bulldoze, crescimento, demanda RCI, orçamento/impostos, HUD, testes |
-| M2 | ✅ Serviços | Energia, água, esgoto, coleta de lixo; cobertura por raio; overlays de infoview |
-| M3 | ✅ Serviços cívicos | Polícia, bombeiros, saúde, educação, parques; felicidade e valor do solo |
-| M4 | ✅ Estradas livres | Curvas/Bézier, tipos de via, interseções, cruzamentos, terreno cortado |
-| M5 | ✅ Agentes | Cidadãos/veículos com pathfinding (A*/flow), tráfego, congestionamento |
-| M6 | ✅ Transporte público | Ônibus, metrô, linhas e paradas |
-| M7 | ✅ Persistência e meta | Salvar/carregar, mapas, conquistas leves, ciclo dia/noite, clima |
-| M8 | ✅ Empacotamento (Mac verificado; Windows e iPad por verificar) | PWA offline, Tauri Mac/Win, ícones, perf no iPad |
-| M9 | ✅ Identidade visual | Logo com coroa, ícones do HUD, painel de preferências (idioma, qualidade, autosave), indicadores |
-| M10 | ✅ Kit visual | Ícones e tiles do PDF, terrenos selecionáveis, árvores, preferências em abas |
-| M11 | ✅ Modelos 3D | Casas, torres, galpões e instalações procedurais, janelas acesas à noite |
-| M12 | ✅ Mapas oficiais | Heightmaps do Map Kit carregados no jogo, seletor no menu |
-| M13 | ✅ Kit de prédios | Catálogo de 40 prédios, modelos por entrada, sete instalações, inspetor |
-| M14 | ✅ Blender, natureza e água | Pipeline Blender para GLB, árvores, veículos, barcos, água com correnteza |
-| M15 | ✅ Detalhe | Texturas, AO, faixas de pedestres, nuvens, fumaça, prédios principais redesenhados |
-| M16 | ✅ Rede viária com nós | Grafo de nós, esquinas, zebras, dados de semáforo; estradas por Linha e Curva |
-| M17 | ✅ Quadras e lotes | Lotes persistidos voltados para a rua, um prédio por lote, zonas até 4 lotes da estrada |
-| M18 | ✅ Redes e subsolo | Água, esgoto e energia por fluxo nas ruas, vista Subsolo, avisos |
-| M19 | ✅ Água | Margem contínua, normais, reflexo, espuma, níveis de qualidade |
-| M20 | ✅ Render | Terreno em camadas, texturas HD, sombras, tone mapping, LOD, níveis de qualidade |
-| M21 | ✅ Vias e sinalização | Mão única, rotatória, semáforos com fases, props de calçada |
-| M22 | pendente | Pedestres, polimento, validação em Windows e iPad |
-| M25 | ✅ Detecção e textura | Regras automáticas de cruzamento, prévia, trevo; estradas em textura de Blender |
-| M24 | ✅ Separação de níveis | Viaduto e passagem inferior sem nó, tráfego por camada |
-| M23 | ✅ Pontes e túneis | Elevação por segmento, vãos sobre água e colinas, tabuleiro, pilares, portais |
+| M1 | **Playable core** ✅ done | Terrain, mouse+touch camera, roads, R/C/I zones, bulldoze, growth, RCI demand, budget/taxes, HUD, tests |
+| M2 | ✅ Services | Power, water, sewage, garbage collection; radius coverage; infoview overlays |
+| M3 | ✅ Civic services | Police, fire, health, education, parks; happiness and land value |
+| M4 | ✅ Freeform roads | Curves/Bézier, road types, intersections, crossings, cut terrain |
+| M5 | ✅ Agents | Citizens/vehicles with pathfinding (A*/flow), traffic, congestion |
+| M6 | ✅ Public transit | Buses, metro, lines, and stops |
+| M7 | ✅ Persistence and meta | Save/load, maps, light achievements, day/night cycle, weather |
+| M8 | ✅ Packaging (Mac verified; Windows and iPad pending verification) | Offline PWA, Tauri Mac/Win, icons, iPad performance |
+| M9 | ✅ Visual identity | Crown logo, HUD icons, preferences panel (language, quality, autosave), indicators |
+| M10 | ✅ Visual kit | PDF icons and tiles, selectable terrains, trees, tabbed preferences |
+| M11 | ✅ 3D models | Procedural houses, towers, sheds, facilities, lit windows at night |
+| M12 | ✅ Official maps | Map Kit heightmaps loaded in game, map selector in menu |
+| M13 | ✅ Building kit | Catalog of 40 buildings, model per entry, seven facilities, inspector |
+| M14 | ✅ Blender, nature, and water | Blender-to-GLB pipeline, trees, vehicles, boats, flowing water |
+| M15 | ✅ Detail | Textures, AO, crosswalks, clouds, smoke, redesigned primary buildings |
+| M16 | ✅ Node road network | Node graph, corners, crosswalks, traffic-light data; roads by Line and Curve |
+| M17 | ✅ Blocks and lots | Persistent street-facing lots, one building per lot, zones up to 4 lots from the road |
+| M18 | ✅ Networks and underground | Water, sewage, and power by road flow, Underground view, warnings |
+| M19 | ✅ Water | Continuous shoreline, normals, reflection, foam, quality tiers |
+| M20 | ✅ Rendering | Layered terrain, HD textures, shadows, tone mapping, LOD, quality tiers |
+| M21 | ✅ Roads and signals | One-way, roundabout, traffic lights with phases, sidewalk props |
+| M22 | pending | Pedestrians, polish, validation on Windows and iPad |
+| M25 | ✅ Detection and texture | Automatic crossing rules, preview, interchange; texture-based Blender roads |
+| M24 | ✅ Level separation | Overpass and underpass without a node, layer-specific traffic |
+| M23 | ✅ Bridges and tunnels | Segment elevation, water and hill spans, deck, pillars, portals |
 
-## Arquitetura
+## Architecture
 
+```text
+src/sim/      pure logic (no DOM/three): world, rules, tick  → vitest
+src/render/   three.js: terrain, instances, camera, picking
+src/ui/       DOM/CSS HUD (top bar, toolbar, RCI, budget)
+src/input.ts  mouse/keyboard/touch → intentions (pan, zoom, rotate, paint)
+src/main.ts   loop: input → sim (ticks by speed) → render → HUD
 ```
-src/sim/      lógica pura (sem DOM/three): mundo, regras, tick  → vitest
-src/render/   three.js: terreno, instâncias, câmera, picking
-src/ui/       HUD em DOM/CSS (barra superior, toolbar, RCI, orçamento)
-src/input.ts  mouse/teclado/toque → intenções (pan, zoom, rotate, paint)
-src/main.ts   loop: input → sim (ticks por velocidade) → render → HUD
-```
 
-Princípios: sim determinística (RNG com seed), render só lê estado e reconstrói
-quando `world.revision` muda, UI nunca altera o mundo direto — usa `applyTool`.
+Principles: deterministic simulation (seeded RNG), renderer only reads state and rebuilds when `world.revision` changes,
+UI never mutates the world directly and uses `applyTool`.
 
-## Verificação
+## Verification
 
-- `npm test`: regras da sim (conectividade, crescimento, economia, determinismo).
-- `npm run build`: tipos + bundle.
-- Browser: screenshots do jogo comparadas com `screenshots/` para o visual de UI.
+- `npm test`: simulation rules (connectivity, growth, economy, determinism).
+- `npm run build`: types + bundle.
+- Browser: game screenshots compared with `screenshots/` for UI visuals.
 
-## Ritual a cada etapa
+## Per-Milestone Ritual
 
-Ao fechar um marco: editar o objeto `DATA` em `docs/mayor-status.html` (status dos marcos,
-checks, log, screenshot em `docs/img/`) e republicar o mesmo arquivo no Artifact
-https://claude.ai/artifact/VdToX8pcS7bZcKx1m65Abu (passando `files` com as imagens).
+When closing a milestone: edit the `DATA` object in `docs/mayor-status.html` (milestone status, checks, log, screenshot in `docs/img/`) and republish the same file to the Artifact https://claude.ai/artifact/VdToX8pcS7bZcKx1m65Abu (passing `files` with the images).

@@ -1,18 +1,18 @@
-# Instalar o Mayor
+# Installing Mayor
 
 ## iPad (PWA)
 
-1. Publique a pasta `dist/` em qualquer hospedagem estática com **HTTPS** (Cloudflare Pages, Netlify, GitHub Pages).
-   `npm run build` gera `dist/`.
-2. No Safari do iPad, abra o endereço, toque em Compartilhar e em **Adicionar à Tela de Início**.
-3. Abra pelo ícone: roda em tela cheia e, depois da primeira abertura, funciona sem internet.
+1. Publish the `dist/` folder to any static host with **HTTPS** (Cloudflare Pages, Netlify, GitHub Pages).
+   `npm run build` generates `dist/`.
+2. In Safari on iPad, open the address, tap Share, then **Add to Home Screen**.
+3. Open from the icon: it runs fullscreen and, after the first launch, works without internet.
 
-Para testar sem hospedar: `npm run dev` e abra `http://<ip-do-mac>:5173` no Safari do iPad.
-Funciona, mas sem modo offline (service workers exigem HTTPS ou localhost).
+To test without hosting: run `npm run dev` and open `http://<mac-ip>:5173` in Safari on the iPad.
+This works, but without offline mode (service workers require HTTPS or localhost).
 
-Atualizações: ao publicar uma versão nova, aumente `VERSION` em `public/sw.js`.
+Updates: when publishing a new version, increment `VERSION` in `public/sw.js`.
 
-Salvamento: fica no armazenamento do Safari, que o iOS pode limpar. Use **Menu → Export** para guardar um arquivo.
+Saving: data stays in Safari storage, which iOS may clear. Use **Menu → Export** to keep a file.
 
 ## Mac
 
@@ -20,20 +20,24 @@ Salvamento: fica no armazenamento do Safari, que o iOS pode limpar. Use **Menu �
 npm run desktop:build
 ```
 
-Gera `src-tauri/target/release/bundle/macos/Mayor.app` e o `.dmg`.
-O app não é assinado nem notarizado: na primeira vez, abra com clique direito → Abrir.
+Generates `src-tauri/target/release/bundle/macos/Mayor.app` and the `.dmg`.
+The app is not signed or notarized: the first time, open it with right-click → Open.
 
 ## Windows
 
-Precisa de uma máquina Windows (o empacotamento é sempre local, sem GitHub Actions):
+Requires a Windows machine (packaging is always local, with no GitHub Actions):
 
 ```bash
 npm ci
 npm run desktop:build
 ```
 
-Pré-requisitos: Node 22, Rust (stable) e o WebView2 (já vem no Windows 11). Gera `.msi` e `.exe` em `src-tauri/target/release/bundle/`.
+Prerequisites: Node 22, Rust (stable), and WebView2 (already included with Windows 11). Generates `.msi` and `.exe` in
+`src-tauri/target/release/bundle/`.
 
-## Mac (dmg pronto)
+## Mac (ready-made dmg)
 
-O instalador mais recente fica nas Releases do repositório privado: https://github.com/wsgutnik/mayor/releases (arquivo `Mayor-*-aarch64.dmg`, Apple Silicon). Abra o dmg, arraste Mayor para Aplicativos e, na primeira abertura, use clique direito > Abrir (o app não é assinado). Gerado localmente com `npm run package`. Sobre o aviso de app não assinado e como notarizar: [SIGNING.md](SIGNING.md).
+The latest installer is in the private repository Releases: https://github.com/wsgutnik/mayor/releases
+(`Mayor-*-aarch64.dmg`, Apple Silicon). Open the dmg, drag Mayor to Applications, and on first launch use
+right-click > Open (the app is unsigned). Generated locally with `npm run package`. For the unsigned-app warning and
+how to notarize, see [SIGNING.md](SIGNING.md).

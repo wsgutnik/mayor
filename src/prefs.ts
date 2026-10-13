@@ -1,3 +1,4 @@
+import type { ZoningMode } from "./sim/zonecells";
 import { Lang, detectLang } from "./i18n";
 
 export type Quality = "low" | "medium" | "high";
@@ -8,12 +9,14 @@ export interface Prefs {
   tips: boolean;
   autosave: boolean;
   dayNight: boolean;
+  /** Zoning model: the classic tile grid, or street-aligned lots (docs/process/05-oriented-lots.md). */
+  zoning: ZoningMode;
 }
 
 const KEY = "mayor:prefs";
 
 export const defaultPrefs = (): Prefs => ({
-  lang: detectLang(), quality: "high", tips: true, autosave: true, dayNight: true,
+  lang: detectLang(), quality: "high", tips: true, autosave: true, dayNight: true, zoning: "tiles",
 });
 
 /** Highest device-pixel-ratio the renderer may use at each quality level. */
@@ -54,6 +57,7 @@ export function loadPrefs(): Prefs {
       tips: typeof p.tips === "boolean" ? p.tips : d.tips,
       autosave: typeof p.autosave === "boolean" ? p.autosave : d.autosave,
       dayNight: typeof p.dayNight === "boolean" ? p.dayNight : d.dayNight,
+      zoning: p.zoning === "oriented" || p.zoning === "tiles" ? p.zoning : d.zoning,
     };
   } catch {
     return defaultPrefs();

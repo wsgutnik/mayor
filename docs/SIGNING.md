@@ -1,70 +1,67 @@
-# Assinatura e notarização do Mayor no Mac
+# Signing and Notarizing Mayor on Mac
 
-Estado: o app é assinado **ad hoc** (sem identidade da Apple). Ele abre no Mac que o gerou, mas em outros Macs o
-Gatekeeper pede "Abrir mesmo assim". Para a instalação abrir sem aviso é preciso uma identidade **Developer ID Application**
-e a **notarização** da Apple. Isso exige uma conta paga e não dá para gerar sem ela.
+State: the app is signed **ad hoc** (without an Apple identity). It opens on the Mac that generated it, but on other Macs
+Gatekeeper asks the user to "Open Anyway". To open without that warning, the app needs a **Developer ID Application**
+identity and Apple **notarization**. That requires a paid account and cannot be generated without one.
 
-## O que é preciso (uma vez)
+## What Is Needed (Once)
 
-1. Conta no **Apple Developer Program** (US$ 99/ano), em https://developer.apple.com/programs/.
-2. No Xcode (Settings > Accounts > Manage Certificates) ou no portal, criar o certificado **Developer ID Application**.
-   Ele fica no Acesso às Chaves (login). Confira com:
+1. An **Apple Developer Program** account (US$99/year), at https://developer.apple.com/programs/.
+2. In Xcode (Settings > Accounts > Manage Certificates) or in the portal, create the **Developer ID Application** certificate.
+   It appears in Keychain Access (login). Check with:
    ```bash
    security find-identity -v -p codesigning
    ```
-   A linha tem a forma `"Developer ID Application: Seu Nome (TEAMID1234)"`.
-3. Guardar as credenciais de notarização no chaveiro (a senha é uma *senha específica de app* de
-   https://account.apple.com > Segurança):
+   The line looks like `"Developer ID Application: Your Name (TEAMID1234)"`.
+3. Store notarization credentials in the keychain (the password is an *app-specific password* from
+   https://account.apple.com > Security):
    ```bash
    xcrun notarytool store-credentials mayor-notary \
-     --apple-id voce@exemplo.com --team-id TEAMID1234 --password <senha-especifica-de-app>
+     --apple-id you@example.com --team-id TEAMID1234 --password <app-specific-password>
    ```
-   Nada disso vai para o git: a senha fica só no chaveiro.
+   None of this goes into git: the password stays only in the keychain.
 
-## Atalho com o script de certificado (feito localmente)
+## Shortcut with the Certificate Script (Done Locally)
 
 ```bash
-scripts/mac-cert-setup.sh csr "Seu Nome" voce@exemplo.com   # gera a chave privada e o CSR em ~/.mayor-signing
-# envie ~/.mayor-signing/mayor.csr em developer.apple.com > Certificates > + > Developer ID Application
-scripts/mac-cert-setup.sh import ~/Downloads/developerID_application.cer   # junta chave e certificado e instala no chaveiro
-scripts/mac-cert-setup.sh notary TEAMID1234 voce@exemplo.com                 # pede a senha específica de app e guarda no chaveiro
+scripts/mac-cert-setup.sh csr "Your Name" you@example.com   # generates the private key and CSR in ~/.mayor-signing
+# upload ~/.mayor-signing/mayor.csr at developer.apple.com > Certificates > + > Developer ID Application
+scripts/mac-cert-setup.sh import ~/Downloads/developerID_application.cer   # joins key and certificate and installs them in the keychain
+scripts/mac-cert-setup.sh notary TEAMID1234 you@example.com                 # asks for the app-specific password and stores it in the keychain
 ```
 
-Só o titular da conta (Account Holder) consegue criar o certificado Developer ID. A chave fica em `~/.mayor-signing`
-(modo 700), fora do repositório.
+Only the Account Holder can create the Developer ID certificate. The key stays in `~/.mayor-signing` (mode 700), outside the repository.
 
-## Gerar o pacote assinado e notarizado
+## Build the Signed and Notarized Package
 
 ```bash
-export APPLE_SIGNING_IDENTITY="Developer ID Application: Seu Nome (TEAMID1234)"
+export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name (TEAMID1234)"
 npm run package:signed
 ```
 
-O script (`scripts/sign-mac.sh`) roda `npm run ci`, constrói com o runtime reforçado e o `entitlements.plist`, envia o
-dmg para a Apple (`notarytool submit --wait`), grampeia o ticket (`stapler staple`) e verifica com `codesign` e `spctl`.
+The script (`scripts/sign-mac.sh`) runs `npm run ci`, builds with the hardened runtime and `entitlements.plist`, submits the dmg to Apple (`notarytool submit --wait`), staples the ticket (`stapler staple`), and verifies with `codesign` and `spctl`.
 
-Verificar a qualquer momento: `npm run verify:mac`. Esperado depois de notarizar:
-`spctl --assess` com `accepted source=Notarized Developer ID` e `stapler validate` com `The validate action worked!`.
+Verify at any time with: `npm run verify:mac`. Expected after notarization:
+`spctl --assess` with `accepted source=Notarized Developer ID` and `stapler validate` with `The validate action worked!`.
 
-## Sem conta paga (o que já está feito)
+## Without a Paid Account (What Is Already Done)
 
-`npm run package:adhoc` gera o app com assinatura ad hoc coerente (identificador `com.mayor.game`, runtime reforçado,
-recursos selados). Não tira o aviso do Gatekeeper em outros Macs. Para abrir:
+`npm run package:adhoc` creates the app with consistent ad hoc signing (identifier `com.mayor.game`, hardened runtime,
+sealed resources). It does not remove the Gatekeeper warning on other Macs. To open:
 
-- clique direito no app > **Abrir** > **Abrir**, ou
-- em Ajustes do Sistema > Privacidade e Segurança > **Abrir mesmo assim**, ou
-- `xattr -dr com.apple.quarantine /Applications/Mayor.app` (remove a quarentena do arquivo baixado).
+- right-click the app > **Open** > **Open**, or
+- System Settings > Privacy & Security > **Open Anyway**, or
+- `xattr -dr com.apple.quarantine /Applications/Mayor.app` (removes quarantine from the downloaded file).
 
-## Publicar o dmg
+## Publish the dmg
 
-Depois de notarizado:
+After notarization:
 ```bash
 gh release create vX.Y.Z src-tauri/target/release/bundle/dmg/Mayor_*.dmg --repo wsgutnik/mayor --prerelease
 ```
-(Sempre a partir do pacote local; sem GitHub Actions.)
+(Always from the local package; no GitHub Actions.)
 
-## Se o app notarizado não abrir
+## If the Notarized App Does Not Open
 
-O runtime reforçado bloqueia JIT e memória não assinada no processo do app. A web view (WKWebView) roda em processo da
-Apple, então normalmente nada é preciso. Se o log mostrar bloqueio, acrescente a chave necessária em
-`src-tauri/entitlements.plist` e anote o motivo ao lado.
+The hardened runtime blocks JIT and unsigned memory in the app process. The web view (WKWebView) runs in Apple's process,
+so normally nothing else is needed. If the log shows a block, add the required key to `src-tauri/entitlements.plist` and note the reason next to it.

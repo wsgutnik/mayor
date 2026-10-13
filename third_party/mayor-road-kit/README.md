@@ -33,7 +33,7 @@
 
 ## Recommended MAYOR repo integration
 
-Place the geometry under `cities-skylines-2/public/models/roads/` and `manifest.json` under `cities-skylines-2/public/models/roads/manifest.json`, then implement a Three.js GLTFLoader preview to assess scale. Keep the original Blender `.blend` under `cities-skylines-2/art/roads/blender/` and follow `docs/ROAD_NETWORK_ARCHITECTURE.md` for integration stages.
+Place the geometry under `public/models/roads/` and `manifest.json` under `public/models/roads/manifest.json`, then implement a Three.js GLTFLoader preview to assess scale. Keep the original Blender `.blend` under `art/roads/blender/` and follow `docs/ROAD_NETWORK_ARCHITECTURE.md` for integration stages.
 
 ## Contact sheets
 

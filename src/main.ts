@@ -99,6 +99,7 @@ function rebuildHud(): void {
 /** Replace the running city (load or new game); everything player-facing resets with it. */
 function useCity(next: CityState): void {
   state = next;
+  state.world.zoning = prefs.zoning;   // the oriented model is opt-in until the cutover (docs/process/05-oriented-lots.md)
   traffic = newTraffic(state.world.size);
   renderer.setWorld(state.world);
   renderer.setTraffic(traffic);

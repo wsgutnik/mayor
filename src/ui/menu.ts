@@ -198,7 +198,7 @@ export class Menu {
       graphics: `<div class="menu-row"><b>${tr("Graphics quality")}</b>${sel("pf-quality", [["low", tr("Low quality")], ["medium", tr("Medium quality")], ["high", tr("High quality")]], draft.quality)}</div>
         <div class="menu-row"><small id="pf-qdesc">${tr(qdesc[draft.quality])}</small></div>
         ${chk("pf-daynight", tr("Dynamic day/night"), draft.dayNight)}`,
-      gameplay: `${chk("pf-auto", tr("Save automatically"), draft.autosave)}${chk("pf-tips2", tr("Show tips"), draft.tips)}`,
+      gameplay: `${chk("pf-auto", tr("Save automatically"), draft.autosave)}${chk("pf-tips2", tr("Show tips"), draft.tips)}${chk("pf-zoning", tr("Street-aligned lots (experimental)"), draft.zoning === "oriented")}`,
       controls: `<table class="keys">
         <tr><td>${tr("Use tool")}</td><td>${tr("Left button / one finger")}</td></tr>
         <tr><td>${tr("Move camera")}</td><td>${tr("Right button, WASD / two fingers")}</td></tr>
@@ -227,6 +227,7 @@ export class Menu {
     bind("#pf-tips2", (e) => { draft.tips = (e as HTMLInputElement).checked; });
     bind("#pf-auto", (e) => { draft.autosave = (e as HTMLInputElement).checked; });
     bind("#pf-daynight", (e) => { draft.dayNight = (e as HTMLInputElement).checked; });
+    bind("#pf-zoning", (e) => { draft.zoning = (e as HTMLInputElement).checked ? "oriented" : "tiles"; });
     this.root.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) =>
       b.addEventListener("click", () => { this.prefTab = b.dataset.tab as typeof this.prefTab; this.render(); }));
     q("[data-apply]")!.addEventListener("click", () => { this.hooks.onPrefs({ ...draft }); this.draft = null; this.render(); });

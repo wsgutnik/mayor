@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { QUALITY_PIXEL_CAP, QUALITY_PROFILE, qualityForPixelCap } from "./prefs";
+import { QUALITY_PIXEL_CAP, QUALITY_PROFILE, defaultPrefs, loadPrefs, qualityForPixelCap, savePrefs } from "./prefs";
+import { generateWorld } from "./sim/world";
 
 describe("quality tiers", () => {
   it("maps pixel caps back to tiers", () => {
@@ -26,3 +27,28 @@ describe("quality tiers", () => {
     expect(QUALITY_PROFILE.high.splat).toBe("hd");
   });
 });
+
+describe("zoning preference", () => {
+  it("defaults to the classic tile grid and round-trips the oriented mode", () => {
+    const store = new Map<string, string>();
+    (globalThis as unknown as { localStorage: unknown }).localStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => { store.set(k, v); },
+    };
+    expect(defaultPrefs().zoning).toBe("tiles");
+    expect(loadPrefs().zoning).toBe("tiles");
+    savePrefs({ ...defaultPrefs(), zoning: "oriented" });
+    expect(loadPrefs().zoning).toBe("oriented");
+    store.set("mayor:prefs", JSON.stringify({ zoning: "diagonal" }));
+    expect(loadPrefs().zoning).toBe("tiles");
+  });
+
+  it("new worlds start in the classic mode with empty oriented state", () => {
+    const w = generateWorld(32, 3);
+    expect(w.zoning).toBe("tiles");
+    expect(w.nextOLotId).toBe(1);
+    expect(w.obstacleRevision).toBe(1);
+    expect(w.olots).toBeUndefined();
+  });
+});
+

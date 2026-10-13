@@ -1,28 +1,28 @@
-# Avisos
+# Notices
 
-**Mayor** é um jogo original, **inspirado** em Cities: Skylines e Cities: Skylines II. Não é afiliado, patrocinado nem
-endossado pela Paradox Interactive nem pela Colossal Order. Os nomes citados pertencem aos seus donos. Nenhum código,
-modelo, textura, som ou interface desses jogos está neste repositório; as imagens de referência de estudo ficam fora do
-git (`screenshots/` está no `.gitignore`).
+**Mayor** is an original game **inspired by** Cities: Skylines and Cities: Skylines II. It is not affiliated with,
+sponsored by, or endorsed by Paradox Interactive or Colossal Order. Referenced names belong to their owners. No code,
+model, texture, sound, or interface from those games is included in this repository; study reference images stay outside
+git (`screenshots/` is in `.gitignore`).
 
-## Licença do código
+## Code License
 
-Ainda não há licença escolhida. Enquanto não houver um arquivo `LICENSE`, todos os direitos ficam reservados ao autor:
-o código pode ser lido, mas não reutilizado.
+No license has been chosen yet. Until a `LICENSE` file exists, all rights are reserved by the author: the code may be
+read, but not reused.
 
-## Materiais de terceiros (domínio público, CC0)
+## Third-Party Materials (public domain, CC0)
 
-| Pasta | Origem | Licença |
+| Folder | Source | License |
 |---|---|---|
 | `third_party/kenney-city-kit-roads/` | Kenney, City Kit Roads 2.2, https://kenney.nl/assets/city-kit-roads | CC0 |
 | `third_party/polyhaven-asphalt_02/` | Poly Haven, asphalt_02, https://polyhaven.com/a/asphalt_02 | CC0 |
 
-## Materiais fornecidos pelo autor
+## Author-Provided Materials
 
-`third_party/mayor-*`, `docs/img/brand/`, `docs/maps-kit/` e `public/ui/` contêm kits de arte, mapas, modelos e
-ilustrações criados ou encomendados pelo autor para este projeto (alguns gerados com ferramentas de IA). Não estão
-cobertos por nenhuma licença aberta.
+`third_party/mayor-*`, `docs/img/brand/`, `docs/maps-kit/`, and `public/ui/` contain art kits, maps, models, and
+illustrations created or commissioned by the author for this project (some generated with AI tools). They are not covered
+by any open license.
 
-## Bibliotecas
+## Libraries
 
-Three.js (MIT), Tauri (MIT ou Apache-2.0), Vite e Vitest (MIT). Veja `package.json` e `src-tauri/Cargo.toml`.
+Three.js (MIT), Tauri (MIT or Apache-2.0), Vite, and Vitest (MIT). See `package.json` and `src-tauri/Cargo.toml`.

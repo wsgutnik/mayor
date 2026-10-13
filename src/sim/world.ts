@@ -1,4 +1,5 @@
 import { makeRng } from "./rng";
+import type { OrientedLot, ZoneBlockSet, ZoningMode } from "./zonecells";
 import type { RoadNode } from "./roads";
 import { updateNetworkCoverage } from "./networks";
 
@@ -186,6 +187,15 @@ export interface World {
   zoneRevision: number;
   /** Set by tools; the next sync rebuilds `lots` from the tile arrays. */
   lotsDirty: boolean;
+  /** Oriented zoning (docs/process/05-oriented-lots.md): authoritative when "oriented"; the tile arrays stay a mirror. */
+  zoning: ZoningMode;
+  /** Derived cache of zone blocks, rebuilt from segments + saved cell state. */
+  cells?: ZoneBlockSet;
+  /** Authoritative lots in the oriented mode. */
+  olots?: OrientedLot[];
+  nextOLotId: number;
+  /** Bumped by facility and bulldoze edits so cell validity can be recomputed. */
+  obstacleRevision: number;
   /** Facility type per tile (FAC.*). */
   facility: Uint8Array;
   /** Bitmask of COVER.* services reaching each tile. */
@@ -310,6 +320,9 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
     roadRevision: 1,
     zoneRevision: 1,
     lotsDirty: true,
+    zoning: "tiles",
+    nextOLotId: 1,
+    obstacleRevision: 1,
     facility: new Uint8Array(size * size),
     cover: new Uint16Array(size * size),
     nets: new Uint8Array(size * size),
