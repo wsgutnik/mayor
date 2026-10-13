@@ -1,6 +1,6 @@
 # PROGRESS — Mayor
 
-Updated on 2026-10-13. Live status with screenshots: status artifact (source in [docs/mayor-status.html](docs/mayor-status.html)).
+Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with screenshots: status artifact (source in [docs/mayor-status.html](docs/mayor-status.html)).
 
 ## State
 
@@ -22,9 +22,14 @@ Updated on 2026-10-13. Live status with screenshots: status artifact (source in 
 | Graph and signal performance | done | segment/node indices, per-tile signal lookup, full-footprint lot sync |
 | M26 CS1 zone-cell rules | done | nearer road wins, oldest segment on ties, slope limit, row cut behind obstacles |
 | M27 Oriented zoning | merged, off by default | segment-frame zone blocks, oriented lots with free yaw, tile mirror, save v2 with v1 migration, oriented rendering and ground-point painting; opt in with "Street-aligned lots (experimental)" in Preferences. P9 (make it the default) is pending a longer play-test |
+| M28 Visual assets | done | audit script and strict Blender export, manifest, base/variant registry, rear/side facades for the kit (#05-#37, #39, #40), per-building budget 700 triangles, detailed vehicles, five v2 reference buildings with 3 LODs behind `?visualV2=1` and a manifest gate |
+| Utilities over bridges | done | layer-aware flood: power, water and sewage cross bridges and tunnels at ramps |
+| UI-1 Interface | done | UI scale and panel opacity prefs, collapsible persistent panels (key H), road-build readout (cost, length, slope, level, reason) |
+| UI-2 Road builder | partial | Undo/Redo (snapshot history, 30 steps), snapping (angle, length, road snap, Alt bypass), upgrade a road in place, parallel road helper |
+| UI-3 Zoning tools | partial | Marquee and Fill (classic and oriented, one undo entry each) |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 339 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 460 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 
@@ -43,18 +48,17 @@ Tests: 339 passing (`npx vitest run`). Mac build verified; real Windows and iPad
 
 Known gaps in the oriented path: neighbour-zone inheritance when painting single cells (CS1 `G-INHERIT`) is not implemented; kerb strips in the middle of some blocks need a polish pass; growth is slow in sparse blocks because only front-row lots (column 0) are build candidates.
 
-## Visual asset upgrade (Cycle 1, PR #1)
+## Visual asset upgrade (M28)
 
 | Item | State |
 |---|---|
-| Audit script (`scripts/audit-visual-assets.mjs`) | Fixed (crashed on an undefined variable) and extended; 40 buildings + 67 props, 0 errors/warnings |
-| Strict Blender export (`--strict`, `MAYOR_BUILDING_TRI_LIMIT`) | Done; fails on tile/height/triangle/unregistered/undeclared override |
-| Registry: base/variant, version, footprint, declared overrides | Done; variants export to `variants/<variant>/NN.glb`, never replace base |
-| `public/models/manifest.json` + tests (40/40, tile, ground contact) | Done |
-| Two-angle Blender previews of all 40 | Done (`--previews`); quality report in `docs/BUILDING-QUALITY-REPORT.md` |
-| Asset architecture V2, roadmap | Documented (`docs/ASSET-ARCHITECTURE-V2.md`, `docs/VISUAL-UPGRADE-ROADMAP.md`); not implemented in the renderer |
-| Five reference buildings (#01, #10, #20, #21, #38) | Merged (PR #3): v2 variants with 3 LODs, opt-in `?visualV2=1`, manifest gate (`scripts/verify_v2_assets.py`); runtime LOD1/2 switching not done |
-| Rear/side facades #05–#37, #39, #40, detailed vehicles | Merged: base triangle budget now 700 (max 644); #38 is covered by its v2 reference, #20/#21 by v2 |
+| Audit script (`scripts/audit-visual-assets.mjs`) | Done: 40 buildings + 67 props, 0 errors, 0 warnings; writes `docs/asset-audit.json` and `docs/asset-inventory.md` |
+| Strict Blender export (`--strict`, `MAYOR_BUILDING_TRI_LIMIT`, default 700) | Done; fails on tile/height/triangle/unregistered/undeclared override |
+| Registry: base/variant, version, footprint, declared overrides | Done; variants export to `variants/<variant>/NN.glb` and `models/v2/NN_lod{0,1,2}.glb`, never replace base |
+| `public/models/manifest.json`, `public/models/v2/asset-manifest.json` + tests | Done (`scripts/verify_v2_assets.py --check`) |
+| Rear/side facades, detailed vehicles | Done for #05-#37, #39, #40; #20, #21, #38 also have v2 references |
+| v2 reference buildings (#01, #10, #20, #21, #38) | Merged, opt-in `?visualV2=1`; LOD1/LOD2 not switched at runtime yet |
+| Asset architecture V2, roadmap | Documented (`docs/ASSET-ARCHITECTURE-V2.md`, `docs/VISUAL-UPGRADE-ROADMAP.md`); PBR/KTX2/multi-tile not implemented |
 | Hardware performance (Mac/Windows/iPad) | **Not measured** |
 
 ## Who Did What
@@ -67,12 +71,14 @@ Known gaps in the oriented path: neighbour-zone inheritance when painting single
 
 ## Known Limitations
 
-- Muse and Codex hit their usage quotas on 2026-10-12 (Muse renews 2026-10-13 04:17 UTC, Codex 2026-10-13 00:05 local).
+- Agent quotas: Muse spark stalls on some prompts (no file changes after 30+ min); Codex gpt-5.5 works but cannot run Blender in its sandbox, so the lead builds and reviews.
 - Level separation is automatic only for highways; other crossings use the Elevated/Underground buttons.
 - Avenue median stops before the corner on tight curves.
-- Areas reachable only by bridge or tunnel need local power and water.
+- Utilities cross bridges and tunnels (layer-aware flood), but a deck never feeds the road it crosses over; only ramps link layers.
 - The utility network uses one pool per network ordered by proximity, not per-facility budgeting.
 - No pedestrians, no per-lane directional lanes; traffic is still on the tile grid.
+- Undo/Redo does not record tax-rate changes; upgrade-to-highway often needs de-zoning first; Marquee/Fill density and lot visualisation are not implemented.
+- UI: at scale 1.4 on a 1024 px viewport the toolbar scrolls horizontally; settings sliders apply on Apply, not live.
 - Floating striped patches on open terrain were seen in a user screenshot and could not be reproduced.
 
 ## Process
@@ -98,6 +104,8 @@ CI and packaging are local: `npm run ci` (types, tests, build) before each merge
 ## Next Steps
 
 1. P9: play-test oriented zoning on diagonal and curved streets, polish kerbs and growth, then make it the default.
-2. Per-lane traffic (reference: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, phases C and E).
-3. M22: moving pedestrians, polish, validation on Windows and iPad.
-4. Public web demo (Vercel + Stripe checkout): package prepared in `~/mayor-site`; waits for Vercel login and Stripe account choice.
+2. UI-2/UI-3 remainder: whole-road upgrade stroke, density and lot visualisation, inspector diagnostics, economy dashboard (numbers from the real sim).
+3. Assets: runtime LOD1/LOD2 for the v2 references, rear facades for the few remaining plain models, multi-tile footprints for #27/#21/#31-#33/#34/#40 (needs a save-version bump), then real Mac/iPad profiling.
+4. Per-lane traffic (reference: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, phases C and E).
+5. M22: moving pedestrians, polish, validation on Windows and iPad.
+6. Distribution: Developer ID certificate + notarization (`docs/SIGNING.md`); public web demo (Vercel + Stripe, package in `~/mayor-site`) waits on Vercel login and Stripe account choice.

@@ -25,3 +25,7 @@ reference buildings and selected civic landmarks. Current baseline (this repo): 
 
 - No hardware performance validation has been done for Cycle 2 assets.
 - PBR/normal-map/KTX2 are designed, not implemented; the current look is palette + shared pattern textures.
+
+## Status (2026-10-13)
+
+C1 inventory: done and merged. C2 visual language: five reference buildings merged as opt-in v2 variants with three LODs and a manifest gate; PBR materials, runtime LOD switching and hardware benchmarks are not done. C3 refinement: rear and side facades done for #05-#37, #39, #40 within a 700-triangle budget; district variants, multi-tile footprints and the remaining silhouette variety are open.

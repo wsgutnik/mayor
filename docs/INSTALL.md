@@ -38,6 +38,6 @@ Prerequisites: Node 22, Rust (stable), and WebView2 (already included with Windo
 ## Mac (ready-made dmg)
 
 The latest installer is in the private repository Releases: https://github.com/wsgutnik/mayor/releases
-(`Mayor-*-aarch64.dmg`, Apple Silicon). Open the dmg, drag Mayor to Applications, and on first launch use
+(`Mayor-*-aarch64.dmg`, Apple Silicon). Local builds land in `release-out/` (`npm run package:adhoc`, then copy the dmg and zip `dist/` for the iPad PWA); they are ad hoc signed and not notarized. Open the dmg, drag Mayor to Applications, and on first launch use
 right-click > Open (the app is unsigned). Generated locally with `npm run package`. For the unsigned-app warning and
 how to notarize, see [SIGNING.md](SIGNING.md).

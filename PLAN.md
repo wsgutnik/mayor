@@ -50,6 +50,11 @@ CS2 is a game made by roughly 100 people over years. Goal: a **playable core** t
 | M24 | ✅ Level separation | Overpass and underpass without a node, layer-specific traffic |
 | M23 | ✅ Bridges and tunnels | Segment elevation, water and hill spans, deck, pillars, portals |
 | M27 | ✅ merged, off by default | Oriented zoning: segment-frame blocks, oriented lots, tile mirror, save v2, oriented rendering and painting behind the `zoning` preference; cutover (P9) pending |
+| M28 | ✅ Visual assets | Audit and strict export, manifests, base/variant registry, rear facades, detailed fleet, v2 reference buildings with LODs (opt-in), 700-triangle budget |
+| UI-1 | ✅ Interface | UI scale/opacity, collapsible persistent panels, road-build readout |
+| UI-2 | ◐ Road builder | Undo/Redo, snapping, upgrade in place, parallel roads done; whole-road upgrade stroke pending |
+| UI-3 | ◐ Zoning tools | Marquee and Fill done; densities and lot visualisation pending |
+| UI-4 to UI-6 | pending | Inspector diagnostics and economy dashboard, iPad layout and onboarding, themes and districts (see `docs/UI-V2-PLAN.md`) |
 
 ## Architecture
 

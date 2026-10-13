@@ -1,6 +1,6 @@
 # Asset architecture V2 (design, Cycle 2 target)
 
-Status: **design + first increments**. Cycle 1 shipped the validation foundation (strict export, manifest, variant
+Status: **design + first increments implemented** (strict export, manifests, variant registry, opt-in v2 loader with manifest gate, v2 LOD0 in game). Cycle 1 shipped the validation foundation (strict export, manifest, variant
 registry). Nothing below changes the production renderer yet; each step is gated by a compatibility test.
 
 ## 1. Goals and non-goals
@@ -17,7 +17,7 @@ Original procedural geometry or CC0/licensed resources only; no proprietary Citi
 | Build | `blender/build_all.py`: one `NN.glb` per kit number, `registry.building`, procedural, palette materials with vertex colours + shared pattern textures supplied at load time (`public/models/patterns.json`) |
 | Load | `src/render/glb-models.ts` merges each GLB into one geometry with a material group per mesh (`mergeScene`), `kit-materials.ts` upgrades materials; a missing/corrupt file resolves `null` and the procedural model stays |
 | Draw | one `InstancedMesh` per (model, material group); `lod.ts` swaps far buildings for one shared 12-triangle box |
-| Budget | ≤450 triangles per building, footprint = one tile, all 40 models fill the 0.96 plot pad |
+| Budget | ≤700 triangles per building (base), footprint = one tile, all 40 models fill the 0.96 plot pad |
 
 ## 3. Asset model
 
@@ -83,8 +83,8 @@ done for water and roads; models are process-lifetime).
 ## 9. Compatibility plan (incremental, each step test-gated)
 
 1. ✅ Strict export, manifest, variant registry, two-angle previews, 40/40 tests (Cycle 1).
-2. Loader reads `manifest.json` (optional); with no manifest it behaves exactly as today.
-3. `?assets=v2` dev flag (and a pref) loads `variants/v2/NN.glb` where present, else base — A/B in the same city.
+2. ✅ Loader reads `models/v2/asset-manifest.json` (optional); with no valid manifest it behaves exactly as today.
+3. ✅ `?visualV2=1` loads `models/v2/NN_lod0.glb` where present, else base — A/B in the same city.
 4. LOD1/LOD2 buckets in `lod.ts`, fallback to the shared box.
 5. Atlas/PBR materials for the v2 family only; base untouched.
 6. Footprint field in catalog + planner support (classic and oriented), behind a save-version bump.

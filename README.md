@@ -52,6 +52,9 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 | Rotate | middle button, Q/E | two fingers (twist) |
 | Zoom | wheel | pinch |
 | Underground view | `U` (or Maps → Underground) | Maps → Underground |
+| Undo / Redo | `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` or `Ctrl+Y` | ↩ ↪ buttons in the top bar |
+| Hide HUD panels | `H` | Hide panels button |
+| Skip road snapping | hold `Alt`/`Option` while drawing | - |
 
 ## Project Layout
 
@@ -69,6 +72,8 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 
 - [PLAN.md](PLAN.md): roadmap and architecture notes.
 - [PROGRESS.md](PROGRESS.md): live milestone status and known limitations.
+- [docs/UI-V2-PLAN.md](docs/UI-V2-PLAN.md): UI audit verified against the code and the UI cycles.
+- [docs/ASSET-ARCHITECTURE-V2.md](docs/ASSET-ARCHITECTURE-V2.md), [docs/VISUAL-UPGRADE-ROADMAP.md](docs/VISUAL-UPGRADE-ROADMAP.md), [docs/BUILDING-QUALITY-REPORT.md](docs/BUILDING-QUALITY-REPORT.md), [docs/VISUAL-ASSET-AUDIT.md](docs/VISUAL-ASSET-AUDIT.md): asset pipeline, audit and roadmap.
 - [docs/INSTALL.md](docs/INSTALL.md): iPad, Mac, and Windows installation notes.
 - [docs/SIGNING.md](docs/SIGNING.md): Mac signing and notarization.
 - [docs/process/01-research.md](docs/process/01-research.md), [02-gaps.md](docs/process/02-gaps.md), [03-plan.md](docs/process/03-plan.md), [04-grids-crossings-drawing.md](docs/process/04-grids-crossings-drawing.md): research, gaps, and implementation planning.
@@ -85,10 +90,12 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 | M19-M21 | done | Continuous shoreline water, lighting/material/LOD quality tiers, one-way roads, roundabouts, traffic lights, and sidewalk props |
 | M23-M25 | done | Bridges and tunnels, level separation, automatic crossing detection, interchange preview, diamond ramps, and texture-based roads |
 | Vehicle fleet | done | 23 parametric vehicle variants: cars, vans, trucks, semis, and buses |
-| M26 | partial | CS1-style zoning-grid rules partly implemented; per-segment zone blocks remain future work |
+| M26-M27 | done | CS1-style zone-cell rules; oriented (street-aligned) zoning behind a preference |
+| M28 | done | Asset audit, strict Blender export, manifests, rear facades, detailed fleet, v2 reference buildings (opt-in `?visualV2=1`) |
+| UI-1 to UI-3 (part) | done | UI scale/opacity, collapsible panels, road-build readout, Undo/Redo, snapping, road upgrade, parallel roads, zoning Marquee and Fill |
 | M22 | pending | Pedestrians, polish, and validation on real Windows and iPad hardware |
 
-Tests: 299 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
+Tests: 460 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
 
 ## License and Trademarks
 
