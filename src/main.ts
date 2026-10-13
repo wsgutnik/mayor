@@ -11,17 +11,19 @@ import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
-import { Pt, ROAD_NAME, RoadType, ZONE, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { diamondRamps, summarizeCrossings } from "./sim/crossings";
 import { addSegment } from "./sim/roads";
 import { setLang, tr, trReason, getLang } from "./i18n";
 import { MapData, MapIndex } from "./sim/maps";
 import { newCityFromMap } from "./sim/map-world";
-import { Prefs, QUALITY_PIXEL_CAP, loadPrefs, savePrefs } from "./prefs";
+import { Prefs, QUALITY_PIXEL_CAP, applyUiPrefs, loadPrefs, savePrefs } from "./prefs";
 
 let prefs: Prefs = loadPrefs();
 setLang(prefs.lang);
+applyUiPrefs(prefs);
 let state: CityState = newCity(1337);
 const app = document.getElementById("app")!;
 const view = document.createElement("div");
@@ -145,6 +147,7 @@ const menu = new Menu(app, {
     prefs = p;
     savePrefs(p);
     setLang(p.lang);
+    applyUiPrefs(p);
     renderer.setQualityCap(QUALITY_PIXEL_CAP[p.quality]);
     hud.setTips(p.tips);
     if (langChanged) rebuildHud();
@@ -174,6 +177,7 @@ function cancelDraft(): void {
   renderer.setStopMarks([]);
   hud.showFinish(false);
   hud.showCreateLine(false);
+  hud.hideRoadReadout();
   refreshHint();
 }
 
@@ -230,13 +234,24 @@ function currentSegment(): { pts: Pt[] } | null {
   return { pts: roadMode === "curve" && draft.length === 2 ? [draft[0], draft[1], end] : [draft[0], end] };
 }
 
-function updatePreview(): void {
+function updatePreview(at?: { x: number; y: number }): void {
   const seg = currentSegment();
-  if (!seg) { renderer.setRoadPreview(null); return; }
+  if (!seg) { renderer.setRoadPreview(null); hud.hideRoadReadout(); return; }
   // Before the bend point is set in curve mode, show the straight guide.
   const plan = planRoad(state, roadType, seg.pts, roadLevel);
   const marks = (plan.crossings ?? []).filter((c) => !c.atEnd || c.kind === "blocked");
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks);
+  const len = segmentLength(seg.pts);
+  if (!at || len < 0.5) {
+    hud.hideRoadReadout();
+  } else {
+    const slope = maxSlopePercent(seg.pts, (x, z) => heightAt(state.world, x, z));
+    const mode = resolveReadoutMode(plan.span, roadLevel, plan.ok);
+    hud.showRoadReadout(
+      formatRoadReadout({ cost: plan.cost, lengthTiles: len, maxSlopePct: slope, mode, ok: plan.ok, reason: plan.reason }, { tr, trReason }),
+      at.x, at.y,
+    );
+  }
   const name = tr(ROAD_NAME[roadType]);
   const spanHint = plan.span === "bridge" ? ` · ${tr("Bridge")}` : plan.span === "tunnel" ? ` · ${tr("Tunnel")}` : "";
   if (!plan.ok) { hud.setHint(`${name}: ${trReason(plan.reason!)}`); return; }
@@ -319,7 +334,7 @@ function onTap(cx: number, cy: number): void {
     draft = [p];
     hud.showFinish(true);
     refreshHint();
-    updatePreview();
+    updatePreview({ x: cx, y: cy });
     return;
   }
   if (roadMode === "curve" && draft.length === 1) {
@@ -335,10 +350,11 @@ function onTap(cx: number, cy: number): void {
     draft = [p];
     cursor = null;
     renderer.setRoadPreview(null);
+    hud.hideRoadReadout();
     refreshHint();
   } else {
     hud.showToast(trReason(res.reason));
-    updatePreview();
+    updatePreview({ x: cx, y: cy });
   }
 }
 
@@ -391,7 +407,7 @@ bindInput(renderer, {
       if (draft.length) {
         cursor = raw ? snap(raw) : null;
         // In curve mode the preview only becomes a curve once the bend is placed.
-        updatePreview();
+        updatePreview({ x: cx, y: cy });
       } else if (raw) {
         const t = { x: Math.floor(raw.x), y: Math.floor(raw.z) };
         renderer.setHover(t, toolColor("road"));
@@ -420,8 +436,16 @@ window.addEventListener("keydown", (e) => {
     hud.setOverlay(overlay);
   } else if (e.key === "e" || e.key === "E") {
     if (tool === "road") { roadLevel = hud.cycleRoadLevel(); cancelDraft(); refreshHint(); }
+  } else if ((e.key === "h" || e.key === "H") && !e.repeat && !isEditingText(e)) {
+    hud.togglePanelsHidden();
   }
 });
+
+/** True while the player is typing (menu seed, save name): H must not hide panels then. */
+function isEditingText(e: KeyboardEvent): boolean {
+  const els = [e.target as HTMLElement | null, document.activeElement as HTMLElement | null];
+  return els.some((t) => !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable));
+}
 
 // Fixed-step sim: 2 days/second at 1x.
 let seenFires = 0;

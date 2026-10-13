@@ -3,6 +3,8 @@ import { MAX_LINE_VEHICLES } from "../sim/transit";
 import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
+import { PanelId, PanelState, loadPanelState, savePanelState, setPanelsHidden, togglePanelCollapsed } from "./panel-state";
+import type { RoadReadoutRow } from "./road-readout";
 
 export type RoadMode = "paint" | "line" | "curve";
 export type RoadLevel = "ground" | "elevated" | "tunnel";
@@ -150,12 +152,19 @@ export class Hud {
   private speedBtns: HTMLElement[] = [];
   private toast!: HTMLElement;
   private toastTimer = 0;
+  private readout!: HTMLElement;
   private budget!: HTMLElement;
   private hint!: HTMLElement;
   private finishBtn!: HTMLElement;
   private createBtn!: HTMLElement;
   private linesPanel!: HTMLElement;
+  private linesBody!: HTMLElement;
   private linesSig = "";
+  private panels: PanelState = loadPanelState();
+  private leftCol!: HTMLElement;
+  private panelToggles = new Map<PanelId, { panel: HTMLElement; btn: HTMLButtonElement; label: HTMLElement; text: string }>();
+  private stackHideBtn!: HTMLButtonElement;
+  private stackShowBtn!: HTMLButtonElement;
   private viewBtn!: HTMLElement;
   private layerBtns: HTMLElement[] = [];
   private roadTypeBtns = new Map<RoadType, HTMLElement>();
@@ -182,6 +191,9 @@ export class Hud {
     this.buildBudget();
     this.toast = el("div", "toast");
     this.root.appendChild(this.toast);
+    this.readout = el("div", "road-readout");
+    this.readout.hidden = true;
+    this.root.appendChild(this.readout);
   }
 
   destroy(): void {
@@ -224,16 +236,23 @@ export class Hud {
 
   private buildLeft(): void {
     const col = el("div", "left-col");
+    this.leftCol = col;
 
     const rci = el("div", "panel demand");
     rci.innerHTML = `
-      <div class="bar r"><i></i></div><div class="bar c"><i></i></div><div class="bar i"><i></i></div>
-      <div class="legend"><span>R</span><span>C</span><span>I</span></div>`;
+      <div class="demand-body"><div class="bar r"><i></i></div><div class="bar c"><i></i></div><div class="bar i"><i></i></div>
+      <div class="legend"><span>R</span><span>C</span><span>I</span></div></div>`;
     const [r, c, i] = Array.from(rci.querySelectorAll<HTMLElement>(".bar i"));
     this.bars = { r, c, i };
+    const rciBtn = el("button", "svc-head toggle demand-toggle", "<span></span>");
+    rciBtn.setAttribute("aria-label", tr("Demand"));
+    rci.appendChild(rciBtn);
+    this.collapsible("demand", rci, rciBtn, rciBtn.querySelector("span")!, "");
     col.appendChild(rci);
 
     const ind = el("div", "panel indicators");
+    const indBtn = el("button", "svc-head toggle", "<span></span>");
+    ind.appendChild(indBtn);
     for (const d of INDICATORS) {
       const row = el("div", "ind",
         `<img class="ic-img xs" src="/ui/${d.icon}.png" alt=""><span class="ind-l">${tr(d.label)}</span>` +
@@ -241,15 +260,11 @@ export class Hud {
       this.ind.set(d.key, { fill: row.querySelector("i")!, val: row.querySelector(".ind-v")! });
       ind.appendChild(row);
     }
+    this.collapsible("indicators", ind, indBtn, indBtn.querySelector("span")!, "Indicators");
     col.appendChild(ind);
 
     const p = el("div", "panel services");
-    const head = el("button", "svc-head toggle", `<span>${tr("Services")} ▾</span><b></b>`);
-    head.setAttribute("aria-expanded", "true");
-    head.addEventListener("click", () => {
-      p.classList.toggle("collapsed");
-      head.setAttribute("aria-expanded", String(!p.classList.contains("collapsed")));
-    });
+    const head = el("button", "svc-head toggle", "<span></span><b></b>");
     p.appendChild(head);
     for (const r2 of SERVICE_ROWS) p.appendChild(this.svcRow(r2.label, r2.color, "none", (f, v) => this.svc.set(r2.key, { fill: f, val: v })));
     for (const r2 of CIVIC_ROWS) p.appendChild(this.svcRow(r2.label, r2.color, "0%", (f, v) => this.civ.set(r2.key, { fill: f, val: v })));
@@ -257,8 +272,63 @@ export class Hud {
     const lv = el("div", "svc-head lv", `<span>${tr("Land value")}</span><b data-k="lv">0</b>`);
     this.lvEl = lv.querySelector('[data-k="lv"]')!;
     p.appendChild(lv);
+    this.collapsible("services", p, head, head.querySelector("span")!, "Services");
     col.appendChild(p);
+
+    this.stackHideBtn = el("button", "tool stack-hide", `<span class="ic">◂</span><span>${tr("Hide panels")}</span>`);
+    this.stackHideBtn.addEventListener("click", () => this.setPanelsHidden(true));
+    col.appendChild(this.stackHideBtn);
     this.root.appendChild(col);
+
+    this.stackShowBtn = el("button", "panel stack-show", `<span aria-hidden="true">▸</span>`);
+    this.stackShowBtn.title = tr("Show panels");
+    this.stackShowBtn.setAttribute("aria-label", tr("Show panels"));
+    this.stackShowBtn.addEventListener("click", () => this.setPanelsHidden(false));
+    this.root.appendChild(this.stackShowBtn);
+    this.applyPanelsHidden();
+  }
+
+  /** Wire one permanent panel to its collapse toggle, restoring and persisting state. */
+  private collapsible(id: PanelId, panel: HTMLElement, btn: HTMLButtonElement, label: HTMLElement, text: string): void {
+    this.panelToggles.set(id, { panel, btn, label, text });
+    btn.addEventListener("click", () => {
+      this.panels = togglePanelCollapsed(this.panels, id);
+      savePanelState(this.panels);
+      this.applyPanelCollapsed(id);
+    });
+    this.applyPanelCollapsed(id);
+  }
+
+  private applyPanelCollapsed(id: PanelId): void {
+    const t = this.panelToggles.get(id)!;
+    const collapsed = this.panels.collapsed[id];
+    t.panel.classList.toggle("collapsed", collapsed);
+    t.btn.setAttribute("aria-expanded", String(!collapsed));
+    const chevron = collapsed ? "▸" : "▾";
+    t.label.textContent = t.text ? `${tr(t.text)} ${chevron}` : chevron;
+  }
+
+  /** Hide or reveal the whole left stack to show the city; the choice persists. */
+  setPanelsHidden(hidden: boolean): void {
+    this.panels = setPanelsHidden(this.panels, hidden);
+    savePanelState(this.panels);
+    this.applyPanelsHidden();
+  }
+
+  /** Toggle the left stack (key H). Returns the new hidden state. */
+  togglePanelsHidden(): boolean {
+    this.setPanelsHidden(!this.panels.panelsHidden);
+    return this.panels.panelsHidden;
+  }
+
+  get panelsHidden(): boolean { return this.panels.panelsHidden; }
+
+  private applyPanelsHidden(): void {
+    const h = this.panels.panelsHidden;
+    this.leftCol.classList.toggle("hidden", h);
+    this.stackShowBtn.hidden = !h;
+    this.stackHideBtn.setAttribute("aria-expanded", String(!h));
+    this.stackShowBtn.setAttribute("aria-expanded", String(!h));
   }
 
   private svcRow(label: string, color: string, initial: string, bind: (fill: HTMLElement, val: HTMLElement) => void): HTMLElement {
@@ -383,6 +453,11 @@ export class Hud {
     this.root.appendChild(this.createBtn);
 
     this.linesPanel = el("div", "panel lines");
+    const linesBtn = el("button", "svc-head toggle", "<span></span>");
+    this.linesBody = el("div", "lines-body");
+    this.linesPanel.appendChild(linesBtn);
+    this.linesPanel.appendChild(this.linesBody);
+    this.collapsible("lines", this.linesPanel, linesBtn, linesBtn.querySelector("span")!, "Transit lines");
     this.root.appendChild(this.linesPanel);
 
     this.hint = el("div", "hint", "");
@@ -501,6 +576,32 @@ export class Hud {
     this.createBtn.hidden = !on;
   }
 
+  /** Floating road-build stats near the preview end; pointer-events none, never blocks the canvas. */
+  showRoadReadout(rows: RoadReadoutRow[], x: number, y: number): void {
+    this.readout.innerHTML = "";
+    for (const r of rows) {
+      const row = el("div", r.bad ? "rr-row bad" : "rr-row");
+      if (r.label) {
+        const l = el("span", "rr-l");
+        l.textContent = r.label;
+        row.appendChild(l);
+      }
+      const v = el("span", "rr-v");
+      v.textContent = r.value;
+      row.appendChild(v);
+      this.readout.appendChild(row);
+    }
+    this.readout.hidden = false;
+    const w = this.readout.offsetWidth || 220;
+    const h = this.readout.offsetHeight || 130;
+    this.readout.style.left = `${Math.max(8, Math.min(x + 16, window.innerWidth - w - 8))}px`;
+    this.readout.style.top = `${Math.max(8, Math.min(y + 16, window.innerHeight - h - 8))}px`;
+  }
+
+  hideRoadReadout(): void {
+    this.readout.hidden = true;
+  }
+
   showToast(msg: string): void {
     this.toast.textContent = msg;
     this.toast.classList.add("show");
@@ -514,7 +615,7 @@ export class Hud {
     if (sig === this.linesSig) return;
     this.linesSig = sig;
     this.linesPanel.classList.toggle("has", s.world.lines.length > 0);
-    this.linesPanel.innerHTML = "";
+    this.linesBody.innerHTML = "";
     for (const l of s.world.lines) {
       const row = el("div", "line-row",
         `<i style="background:${l.color}"></i><span class="ln">${lineName(l.name)}</span><span class="lm">${l.stops.length} ${tr("stops")}</span>` +
@@ -524,7 +625,7 @@ export class Hud {
       plus.disabled = l.vehicles >= MAX_LINE_VEHICLES;
       plus.addEventListener("click", () => this.hooks.onLineVehicles(l.id, 1));
       row.querySelector("[data-x]")!.addEventListener("click", () => this.hooks.onRemoveLine(l.id));
-      this.linesPanel.appendChild(row);
+      this.linesBody.appendChild(row);
     }
   }
 

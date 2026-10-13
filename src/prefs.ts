@@ -12,13 +12,49 @@ export interface Prefs {
   dayNight: boolean;
   /** Zoning model: the classic tile grid, or street-aligned lots (docs/process/05-oriented-lots.md). */
   zoning: ZoningMode;
+  /** HUD scale multiplier, 0.8–1.4 in steps of 0.1. The 3D canvas is never scaled. */
+  uiScale: number;
+  /** HUD panel background opacity, 0.6–1 in steps of 0.05. Text stays fully opaque. */
+  uiOpacity: number;
 }
 
 const KEY = "mayor:prefs";
 
+/** Slider range for the interface-scale setting. */
+export const UI_SCALE = { min: 0.8, max: 1.4, step: 0.1, def: 1 } as const;
+/** Slider range for the panel-opacity setting. */
+export const UI_OPACITY = { min: 0.6, max: 1, step: 0.05, def: 1 } as const;
+
 export const defaultPrefs = (): Prefs => ({
   lang: detectLang(), quality: "high", tips: true, autosave: true, dayNight: true, zoning: "tiles",
+  uiScale: UI_SCALE.def, uiOpacity: UI_OPACITY.def,
 });
+
+/** Clamp a stored value to the uiScale range and quantize it to the slider step. */
+export function clampUiScale(v: unknown): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : UI_SCALE.def;
+  return Math.round(Math.min(UI_SCALE.max, Math.max(UI_SCALE.min, n)) * 10) / 10;
+}
+
+/** Clamp a stored value to the uiOpacity range and quantize it to the slider step. */
+export function clampUiOpacity(v: unknown): number {
+  const n = typeof v === "number" && Number.isFinite(v) ? v : UI_OPACITY.def;
+  return Math.round(Math.min(UI_OPACITY.max, Math.max(UI_OPACITY.min, n)) * 20) / 20;
+}
+
+/** Minimal style host so tests can pass a fake instead of the document. */
+export interface UiPrefsRoot {
+  style: { setProperty(key: string, value: string): void };
+}
+
+/** Publish the prefs as CSS custom properties consumed by src/ui/style.css and touch.css. */
+export function applyUiPrefs(p: Prefs, root?: UiPrefsRoot | null): void {
+  const el: UiPrefsRoot | undefined =
+    root ?? (typeof document !== "undefined" ? document.documentElement : undefined);
+  if (!el) return;
+  el.style.setProperty("--ui-scale", String(clampUiScale(p.uiScale)));
+  el.style.setProperty("--ui-panel-alpha", String(clampUiOpacity(p.uiOpacity)));
+}
 
 /** Highest device-pixel-ratio the renderer may use at each quality level. */
 export const QUALITY_PIXEL_CAP: Record<Quality, number> = { low: 1, medium: 1.5, high: 2 };
@@ -62,6 +98,8 @@ export function loadPrefs(): Prefs {
       autosave: typeof p.autosave === "boolean" ? p.autosave : d.autosave,
       dayNight: typeof p.dayNight === "boolean" ? p.dayNight : d.dayNight,
       zoning: p.zoning === "oriented" || p.zoning === "tiles" ? p.zoning : d.zoning,
+      uiScale: p.uiScale === undefined ? d.uiScale : clampUiScale(p.uiScale),
+      uiOpacity: p.uiOpacity === undefined ? d.uiOpacity : clampUiOpacity(p.uiOpacity),
     };
   } catch {
     return defaultPrefs();

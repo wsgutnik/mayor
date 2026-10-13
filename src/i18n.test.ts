@@ -28,6 +28,15 @@ describe("i18n", () => {
     expect(trReason("Not enough money")).toBe("Not enough money");
   });
 
+  it("translates the interface-scale settings", () => {
+    setLang("pt");
+    expect(tr("Interface scale")).toBe("Escala da interface");
+    expect(tr("Panel opacity")).toBe("Opacidade dos painéis");
+    setLang("en");
+    expect(tr("Interface scale")).toBe("Interface scale");
+    expect(tr("Panel opacity")).toBe("Panel opacity");
+  });
+
   it("names months and lines per language", () => {
     setLang("pt");
     expect(monthName(1)).toBe("fev");

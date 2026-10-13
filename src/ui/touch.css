@@ -3,16 +3,18 @@
  * equal specificity; kept in its own file so feature work in style.css never conflicts with it.
  */
 :root {
-  --panel: rgba(16, 24, 38, 0.9);
+  --panel-rgb: 16 24 38;
+  --panel-base: 0.9;
   --muted: #b3c2d8;
 }
 
-/* Tap targets of at least 44 px on controls that were smaller. */
-.speed-btn { min-width: 44px; min-height: 44px; }
-.line-row { grid-template-columns: 10px 1fr auto auto 44px 18px 44px 44px; }
-.line-row button { min-width: 44px; min-height: 44px; }
-.menu button { min-height: 44px; }
-.tool { min-height: 52px; }
+/* Tap targets of at least 44 px on controls that were smaller (--ui-min-touch
+ * compensates for the uiScale zoom so this holds even at the 0.8 minimum). */
+.speed-btn { min-width: var(--ui-min-touch, 44px); min-height: var(--ui-min-touch, 44px); }
+.line-row { grid-template-columns: 10px 1fr auto auto var(--ui-min-touch, 44px) 18px var(--ui-min-touch, 44px) var(--ui-min-touch, 44px); }
+.line-row button { min-width: var(--ui-min-touch, 44px); min-height: var(--ui-min-touch, 44px); }
+.menu button { min-height: var(--ui-min-touch, 44px); }
+.tool { min-height: max(52px, var(--ui-min-touch, 44px)); }
 
 /* The services header is a real button now. */
 button.svc-head {

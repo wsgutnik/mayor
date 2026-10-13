@@ -8,6 +8,8 @@ const PT: Record<string, string> = {
   "Income (last month)": "Receita (mês passado)", "Expenses (last month)": "Despesas (mês passado)",
   "Tax rate": "Imposto", "cars": "carros", "none": "nenhum", "stops": "paradas", "tile": "trecho", "mo": "mês",
   "Popularity": "Popularidade", "Budget": "Orçamento", "Environment": "Meio ambiente",
+  "Demand": "Demanda", "Indicators": "Indicadores", "Transit lines": "Linhas de transporte",
+  "Hide panels": "Ocultar painéis", "Show panels": "Mostrar painéis",
   "Power": "Energia", "Water": "Água", "Sewage": "Esgoto", "Garbage": "Lixo",
   "Police": "Polícia", "Fire": "Bombeiros", "Health": "Saúde", "Education": "Educação", "Parks": "Parques", "Transit": "Transporte",
   // toolbar
@@ -87,6 +89,7 @@ const PT: Record<string, string> = {
   "Soft shadows · textured ground": "Sombras suaves · solo texturizado",
   "Sharp shadows · detailed ground · dense trees": "Sombras nítidas · solo detalhado · árvores densas",
   "Save automatically": "Salvar automaticamente", "Dynamic day/night": "Modo dia/noite dinâmico",
+  "Interface scale": "Escala da interface", "Panel opacity": "Opacidade dos painéis",
   "Restore defaults": "Restaurar padrões", "OK": "OK", "Resolution": "Resolução", "Auto": "Auto",
   // toasts
   "City loaded": "Cidade carregada", "Line created": "Linha criada", "City imported": "Cidade importada",
@@ -125,6 +128,8 @@ const PT: Record<string, string> = {
   "Play": "Jogar", "Size": "Tamanho", "tiles": "trechos",
   // inspector card
   "Residents": "Moradores", "Level": "Nível", "Upkeep": "Manutenção", "Radius": "Raio", "Close": "Fechar",
+  // road-build readout
+  "Cost": "Custo", "Length": "Comprimento", "Slope": "Inclinação",
 };
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
