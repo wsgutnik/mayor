@@ -1,6 +1,6 @@
 # MAYOR — Visual Asset Audit (Cycle 1)
 
-Status: implementation prepared for local verification. This document does **not** claim that Blender, tests, or the game were run.
+Status: **executed**. Results below come from runs on 2026-10-13 (macOS, Blender 5.2.2). Nothing here is a hardware benchmark.
 
 ## Scope
 
@@ -49,3 +49,35 @@ After validation, introduce a versioned asset manifest and scene-based visual re
 - Existing GLB and gameplay tests pass.
 - Visual review screenshots for five representative buildings in near/mid/far camera views.
 - No changes to simulation files or saved-city format in Cycle 1.
+
+
+## Results (Cycle 1 execution)
+
+| Check | Command | Result |
+|---|---|---|
+| Strict asset audit | `node scripts/audit-visual-assets.mjs --strict --json docs/asset-audit.json --md docs/asset-inventory.md` | 40 buildings, 67 props, **0 errors, 0 warnings**; exit 0 |
+| Asset tests | `npx vitest run src/render/building-inventory.test.ts src/render/glb-assets.test.ts` | 2 files, all tests passed |
+| Full suite | `npx vitest run` | 39 files, 342 tests passed (before the new manifest/ground tests) |
+| CI | `npm run ci` | tsc clean, tests green, production build ok |
+| Blender strict build | `blender -b --factory-startup --python blender/build_all.py -- --strict --out <dir>` | 40 models + 67 props, 0 problems, manifest written; `MAYOR_BUILDING_TRI_LIMIT=300` correctly exits 1 |
+
+### Confirmed bugs
+
+1. **`scripts/audit-visual-assets.mjs` crashed immediately** (`ReferenceError`): the asset list used the loop variable
+   `file` outside its scope. Fixed; the script now also reports vertices, normals, textures, degenerate triangles,
+   duplicate geometry, LOD readiness and classifies props/vehicles/vegetation.
+2. **Strict Blender validation was report-only**: `build_all.py` printed `inside_tile` but always exited 0. Added
+   `--strict` and a triangle limit.
+3. **Silent registry overrides**: `buildings_zz_hero.py` replaces 12 simpler models purely by import order. Now logged,
+   declared in `registry.DECLARED_OVERRIDES`, and enforced by `--strict`.
+4. **`public/models` had no manifest**: nothing recorded variant/version/footprint. `manifest.json` added and tested.
+
+### Findings that are NOT bugs
+
+- No model embeds textures and none has LOD nodes: by design today (textures are applied at load time).
+- All 40 use the full 0.96 plot pad; the 450-triangle limit is met by every building (max 444).
+
+### Artefacts
+
+`docs/asset-audit.json`, `docs/asset-inventory.md`, `docs/BUILDING-QUALITY-REPORT.md`,
+`docs/ASSET-ARCHITECTURE-V2.md`, `docs/VISUAL-UPGRADE-ROADMAP.md`.
