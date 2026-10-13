@@ -2,6 +2,17 @@
 
 Updated on 2026-10-13. Live status with screenshots: status artifact (source in [docs/mayor-status.html](docs/mayor-status.html)).
 
+## Visual upgrade — Cycle 2 (draft PR, not merged)
+
+- Five original Blender reference models (`01`, `10`, `20`, `21`, `38`) each have LOD0/1/2 source generators under `blender/visual_v2.py`.
+- `blender/build_v2.py` exports and checks the 15 prototype GLBs separately from the production kit. Blender export has **not been executed** in this environment.
+- `?visualV2=1` optionally loads a validated V2 LOD0 file from `public/models/v2/` when available, otherwise it automatically uses the current GLB. Normal gameplay remains unchanged.
+- `src/render/glb-models.ts` fixes non-indexed multi-material splitting, with regression tests.
+- Pending release gates: Python syntax, Blender output/screenshots, TypeScript, full local CI, save compatibility, Mac/iPad profiling. Existing far-box runtime LOD remains in place; new LOD1/2 models are not dynamically selected yet.
+- Detailed engineering contract: [docs/ASSET-ARCHITECTURE-V2.md](docs/ASSET-ARCHITECTURE-V2.md).
+
+
+
 ## State
 
 | Milestone | State | Notes |
