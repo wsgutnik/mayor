@@ -11,7 +11,10 @@ Base: `main`. Cycle 1 audit remains a separate open draft PR and must be verifie
 - `src/render/visual-v2.test.ts`: path, opt-in, invalid-ID, and fallback coverage.
 - `src/render/scene.ts`: optional loading of V2 LOD0 when `?visualV2=1` is in the URL. Legacy models remain the default; absent prototypes fall back to existing `NN.glb`.
 
-## Asset tiers
+## Cycle 2B update (validation tooling; still a draft)
+
+The opt-in runtime preview is now gated on the SHA256-containing asset manifest produced by `scripts/verify_v2_assets.py`. Missing or invalid manifests preserve the original GLBs. Blender export now defines front-left and front-right renders for each of the 15 reference models, totaling 30 previews after execution. The **source code and validation script are implemented**, but real Blender binaries, screenshots and hardware test results have not been verified. See [VISUAL-V2-VALIDATION.md](VISUAL-V2-VALIDATION.md).
+
 
 | Tier | Design intention | Runtime status |
 | --- | --- | --- |
