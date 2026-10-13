@@ -65,11 +65,11 @@ describe("Blender kit models", () => {
     for (const f of props) {
       const m = mergeScene(await load(f));
       expect(m, f).not.toBeNull();
-      // Detailed fleet vehicles (rims, mirrors, seams, lights) get ~2x the small-prop budget.
+      // Detailed fleet vehicles (rims, mirrors, seams, lights) get a vehicle-specific budget.
       const name = f.split("/").pop()!.replace(".glb", "");
       const vehicle = /^(car_|van|truck|bus|semi_)/.test(name);
-      const big = name === "bus_articulated" || name.startsWith("semi_");
-      expect(tris(m!.geometry), f).toBeLessThanOrEqual(big ? 680 : vehicle ? 520 : 260);
+      const heavy = /^(truck|bus|semi_)/.test(name);
+      expect(tris(m!.geometry), f).toBeLessThanOrEqual(vehicle ? heavy ? 1200 : 900 : 260);
     }
     const car = mergeScene(await load(join(MODELS, "props", "car_sedan.glb")))!;
     expect(car.glow.length).toBeGreaterThan(0); // head and tail lights

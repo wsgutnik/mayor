@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "triLimit": 700,
+ "triLimit": 1400,
  "buildings": [
   {
    "n": 1,
@@ -33,7 +33,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 403,
+   "tris": 669,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -54,7 +54,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 307,
+   "tris": 635,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -75,7 +75,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 359,
+   "tris": 687,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -96,7 +96,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 514,
+   "tris": 1030,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -117,7 +117,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 636,
+   "tris": 1160,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -138,7 +138,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 644,
+   "tris": 1166,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -159,7 +159,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 602,
+   "tris": 1170,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -167,7 +167,7 @@
     -0.48,
     0.48,
     0.0,
-    1.005
+    1.023
    ]
   },
   {
@@ -180,7 +180,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 432,
+   "tris": 938,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -222,7 +222,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 389,
+   "tris": 829,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -230,7 +230,7 @@
     -0.48,
     0.48,
     0.0,
-    0.279
+    0.308
    ]
   },
   {
@@ -243,7 +243,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 431,
+   "tris": 809,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -251,7 +251,7 @@
     -0.48,
     0.48,
     0.0,
-    0.309
+    0.314
    ]
   },
   {
@@ -264,7 +264,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 404,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -272,7 +272,7 @@
     -0.48,
     0.48,
     0.0,
-    0.309
+    0.313
    ]
   },
   {
@@ -285,7 +285,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 342,
+   "tris": 600,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -306,7 +306,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 352,
+   "tris": 682,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -327,7 +327,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 370,
+   "tris": 588,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -348,7 +348,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 424,
+   "tris": 604,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -369,7 +369,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 517,
+   "tris": 739,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -390,7 +390,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 350,
+   "tris": 754,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -453,7 +453,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 338,
+   "tris": 748,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -474,7 +474,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 310,
+   "tris": 640,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -482,7 +482,7 @@
     -0.48,
     0.48,
     0.0,
-    0.345
+    0.358
    ]
   },
   {
@@ -495,7 +495,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 513,
+   "tris": 1133,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -516,7 +516,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 358,
+   "tris": 634,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -537,7 +537,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 342,
+   "tris": 594,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -558,7 +558,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 460,
+   "tris": 912,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -579,7 +579,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 312,
+   "tris": 588,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -587,7 +587,7 @@
     -0.48,
     0.48,
     0.0,
-    0.325
+    0.343
    ]
   },
   {
@@ -600,7 +600,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 336,
+   "tris": 832,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -621,7 +621,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 541,
+   "tris": 981,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -629,7 +629,7 @@
     -0.48,
     0.48,
     0.0,
-    0.826
+    0.868
    ]
   },
   {
@@ -642,7 +642,7 @@
     1
    ],
    "module": "buildings_transport",
-   "tris": 526,
+   "tris": 812,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -650,7 +650,7 @@
     -0.48,
     0.48,
     0.0,
-    0.337
+    0.34
    ]
   },
   {
@@ -663,7 +663,7 @@
     1
    ],
    "module": "buildings_transport",
-   "tris": 558,
+   "tris": 698,
    "inside_tile": true,
    "bounds": [
     -0.498,
@@ -684,7 +684,7 @@
     1
    ],
    "module": "buildings_transport",
-   "tris": 598,
+   "tris": 1044,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -705,7 +705,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 475,
+   "tris": 775,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -713,7 +713,7 @@
     -0.48,
     0.48,
     0.0,
-    0.65
+    0.68
    ]
   },
   {
@@ -726,7 +726,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 381,
+   "tris": 591,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -747,7 +747,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 483,
+   "tris": 1001,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -768,7 +768,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 471,
+   "tris": 855,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -776,7 +776,7 @@
     -0.48,
     0.48,
     0.0,
-    0.762
+    0.78
    ]
   },
   {
@@ -810,7 +810,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 311,
+   "tris": 585,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -831,7 +831,7 @@
     1
    ],
    "module": "buildings_samples",
-   "tris": 540,
+   "tris": 1094,
    "inside_tile": true,
    "bounds": [
     -0.488,

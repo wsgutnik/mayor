@@ -1,5 +1,6 @@
 from lib import Model
 from registry import building
+from dress_det_d import bollards, guard_rail, pipe_run, roof_seams, tank_ladder, thin_frame
 
 
 def _back_door(m: Model, x, y_back, z=0.03, w=0.065, h=0.12, mat="metal_dark"):
@@ -54,6 +55,8 @@ def usina_termeletrica(m: Model):
     m.plot(lawn=False)
     m.box(-0.12, -0.08, 0.03, 0.46, 0.3, 0.28, "wall_grey")
     m.windows(-0.12, -0.08, 0.03, 0.46, 0.3, 0.28, 2, cols=4, sides="fbrl", lit=0.4)
+    thin_frame(m, -0.12, -0.23, 0.08, 0.28, 0.08)
+    roof_seams(m, -0.12, -0.08, 0.314, 0.46, 0.3, along="x", count=4)
     _back_door(m, -0.24, 0.07, w=0.055, h=0.11)
     _downpipes(m, -0.12, 0.07, 0.03, 0.28, 0.46)
     m.ac_unit(0.02, -0.08, 0.31, 0.07, 0.05, 0.035)
@@ -61,13 +64,18 @@ def usina_termeletrica(m: Model):
     m.box(0.2, -0.18, 0.03, 0.22, 0.2, 0.2, "wall_beige")
     m.windows(0.2, -0.18, 0.07, 0.22, 0.2, 0.1, 1, cols=1, sides="br", lit=0.35, slabs=False)
     m.box(0.2, -0.075, 0.03, 0.08, 0.012, 0.1, "metal_dark")
+    thin_frame(m, 0.2, -0.075, 0.03, 0.08, 0.1)
     for x, y, r, h in ((0.2, 0.22, 0.17, 0.75), (-0.2, 0.28, 0.15, 0.65)):
         m.cyl(x, y, 0.03, r, h, "concrete", seg=10, r_top=r * 0.72)           # cooling towers
         m.box(x, y - r * 0.7, 0.08, r * 0.9, 0.012, 0.06, "metal_dark")
+        tank_ladder(m, x, y - r * 0.74, 0.16, h * 0.6)
+        guard_rail(m, x - r * 0.5, x + r * 0.5, y - r * 0.38, z=0.17, posts=4)
     m.cyl(-0.38, -0.3, 0.03, 0.035, 0.95, "white", seg=7, r_top=0.028)        # chimney
     m.cyl(-0.38, -0.3, 0.86, 0.04, 0.05, "sign_red", seg=7)
     m.cyl(0.38, -0.34, 0.03, 0.09, 0.2, "metal", seg=8)
     m.box(0.38, 0.1, 0.03, 0.12, 0.16, 0.08, "metal_dark")
+    pipe_run(m, -0.02, (-0.28, -0.1, 0.12, 0.3), 0.12, 0.2)
+    bollards(m, (-0.44, -0.32, 0.3, 0.44), -0.08, mat="sign_orange")
     m.fence(-0.46, 0.46, 0.46, 0.46, 0.06, "metal_dark", 10)
     m.tree(0.38, 0.4, 0.9)
     m.tree(-0.42, 0.42, 0.9, dark=True)

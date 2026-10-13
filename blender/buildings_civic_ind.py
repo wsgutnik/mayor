@@ -1,6 +1,8 @@
 """Civic + industry kit models (entries 21-30, 34-39)."""
 from lib import Model
 from registry import building
+from dress_det_c import bollards, cornice, framed_window, paving_lines, rail, roof_seams
+from dress_det_d import bollards as d_bollards, container_ribs, guard_rail, pipe_run, roof_seams as d_roof_seams, tank_ladder, thin_frame
 
 
 def _sign(m: Model, cx, y, z, w, h=0.05, mat="glow_sign"):
@@ -128,6 +130,16 @@ def biblioteca(m: Model):
     _rear_pipes(m, 0.22, -0.34, 0.34, 0.03, 0.3)
     _roof_parapet(m, 0, 0.05, 0.52, 0.36, 0.36)
     m.ac_unit(0.14, 0.12, 0.39)
+    for x in (-0.18, -0.06, 0.06, 0.18):
+        framed_window(m, x, -0.12, 0.12, mat="glow_window")
+    for x in (-0.345, 0.345):
+        m.box(x, -0.12, 0.08, 0.018, 0.035, 0.2, "wall_cream")
+        m.box(x, 0.05, 0.33, 0.018, 0.34, 0.025, "concrete")
+    cornice(m, 0, 0.05, 0.52, 0.36, 0.39)
+    roof_seams(m, 0, 0.05, 0.46, 0.3, 0.392, n=5)
+    m.steps(-0.08, -0.17, 0.03, 0.22, 3)
+    bollards(m, (-0.22, -0.16, 0.0, 0.06), -0.25)
+    paving_lines(m, -0.31, xs=(-0.24, -0.08, 0.08, 0.24))
     m.tree(-0.37, -0.28, 1.0)
     m.tree(0.38, -0.3, 0.9)
 
@@ -150,6 +162,15 @@ def centro(m: Model):
     _louver(m, -0.18, 0.303, 0.12)
     _rear_pipes(m, 0.3, -0.31, 0.21, 0.03, 0.27)
     _roof_parapet(m, -0.05, 0.1, 0.56, 0.4, 0.31)
+    for x in (-0.22, -0.08, 0.06):
+        framed_window(m, x, -0.1, 0.11, mat="glow_window")
+    m.box(-0.28, -0.1, 0.04, 0.018, 0.34, 0.22, "wall_wood")
+    for y in (-0.03, 0.09, 0.21):
+        m.box(-0.345, y, 0.09, 0.012, 0.075, 0.012, "wall_cream")
+    cornice(m, -0.05, 0.1, 0.56, 0.4, 0.34)
+    m.steps(-0.05, -0.29, 0.03, 0.28, 3)
+    rail(m, -0.26, 0.16, -0.34, 0.04, posts=6)
+    bollards(m, (-0.3, 0.2, 0.3), -0.25)
     m.tree(0.36, -0.28, 1.0)
     m.tree(-0.38, -0.3, 0.9, dark=True)
 
@@ -194,6 +215,14 @@ def museu(m: Model):
     _louver(m, -0.16, 0.303, 0.16)
     _rear_pipes(m, 0.3, -0.28, 0.28, 0.03, 0.3)
     _roof_parapet(m, 0, 0.12, 0.6, 0.36, 0.33, mat="wall_cream")
+    for x in (-0.18, 0.0, 0.18):
+        framed_window(m, x, -0.06, 0.12, w=0.052, h=0.11, mat="glow_window", frame="wall_white")
+    for x in (-0.18, -0.06, 0.06, 0.18):
+        m.box(x, -0.24, 0.035, 0.07, 0.055, 0.012, "concrete")
+    m.box(0, -0.125, 0.435, 0.34, 0.018, 0.025, "slab")
+    m.box(0, -0.19, 0.31, 0.42, 0.018, 0.022, "slab")
+    cornice(m, 0, 0.12, 0.6, 0.36, 0.405, mat="wall_cream")
+    rail(m, -0.24, 0.24, -0.27, 0.05, posts=7)
     m.tree(0.37, -0.28, 1.0)
     m.tree(-0.37, -0.28, 0.9, dark=True)
 
@@ -216,6 +245,15 @@ def clinica(m: Model):
     _rear_pipes(m, 0.26, -0.28, 0.26, 0.03, 0.25)
     _roof_parapet(m, 0, 0.08, 0.56, 0.36, 0.29)
     m.ac_unit(-0.12, 0.16, 0.32)
+    for x in (-0.22, 0.02, 0.24):
+        framed_window(m, x, -0.1, 0.1, mat="glow_window")
+    m.box(-0.1, -0.18, 0.035, 0.2, 0.08, 0.012, "concrete")
+    m.steps(-0.1, -0.19, 0.03, 0.22, 2)
+    for x in (-0.42, -0.3):
+        m.box(x, -0.24, 0.03, 0.018, 0.04, 0.22, "metal")
+    cornice(m, 0, 0.08, 0.56, 0.36, 0.33)
+    roof_seams(m, 0, 0.08, 0.48, 0.3, 0.334, n=4)
+    bollards(m, (-0.24, 0.04), -0.23)
     m.tree(0.37, -0.28, 1.0)
     m.tree(-0.4, 0.3, 0.9, dark=True)
 
@@ -243,6 +281,17 @@ def hospital(m: Model):
     _louver(m, 0.18, 0.293, 0.13)
     _rear_pipes(m, 0.29, -0.42, 0.42, 0.03, 0.24)
     _roof_parapet(m, 0, 0.14, 0.3, 0.3, 0.55)
+    for x in (-0.08, 0.08):
+        framed_window(m, x, -0.015, 0.18, w=0.055, h=0.075, mat="glow_window")
+        framed_window(m, x, -0.015, 0.34, w=0.055, h=0.075, mat="glow_window")
+    for x in (-0.36, -0.2, 0.2, 0.36):
+        framed_window(m, x, -0.07, 0.1, w=0.052, h=0.075, mat="glow_window")
+    cornice(m, 0, 0.14, 0.3, 0.3, 0.59)
+    cornice(m, -0.28, 0.1, 0.26, 0.34, 0.3)
+    cornice(m, 0.28, 0.1, 0.26, 0.34, 0.3)
+    m.steps(0, -0.25, 0.03, 0.3, 3)
+    bollards(m, (-0.22, 0.22), -0.27)
+    m.box(0.22, 0.2, 0.31, 0.1, 0.08, 0.05, "metal", roof="metal_dark")
     m.tree(0.38, 0.34, 0.9)
     m.tree(-0.38, 0.34, 0.9, dark=True)
 
@@ -267,6 +316,14 @@ def escola1(m: Model):
     m.box(0.21, -0.3, 0.03, 0.02, 0.02, 0.14, "metal_dark")
     m.box(0.13, -0.3, 0.17, 0.2, 0.02, 0.02, "metal_dark")
     _fence_run(m, 0, -0.4, 0.9, 0)
+    for x in (-0.22, -0.08, 0.08):
+        framed_window(m, x, -0.01, 0.1, mat="glow_window")
+    cornice(m, -0.05, 0.14, 0.6, 0.3, 0.325)
+    m.steps(-0.05, -0.08, 0.03, 0.18, 2)
+    rail(m, -0.39, 0.31, -0.4, 0.09, h=0.045, posts=8)
+    m.box(-0.3, -0.28, 0.17, 0.09, 0.09, 0.012, "roof_blue")
+    for x in (0.08, 0.18):
+        m.box(x, -0.3, 0.06, 0.012, 0.012, 0.09, "metal")
     m.tree(0.36, 0.32, 1.0)
     m.tree(-0.38, 0.32, 0.9, dark=True)
 
@@ -293,6 +350,17 @@ def escola2(m: Model):
     _louver(m, 0.0, 0.343, 0.15)
     _rear_pipes(m, 0.35, -0.41, 0.39, 0.03, 0.33)
     m.ac_unit(-0.12, 0.24, 0.4)
+    for x in (-0.33, -0.2, 0.17, 0.3):
+        framed_window(m, x, 0.045, 0.12, w=0.05, h=0.075, mat="glow_window")
+        framed_window(m, x, 0.045, 0.25, w=0.05, h=0.075, mat="glass_dark")
+    cornice(m, -0.26, 0.2, 0.3, 0.3, 0.405)
+    cornice(m, 0.24, 0.2, 0.3, 0.3, 0.405)
+    for x in (-0.36, -0.28, -0.2, -0.12):
+        m.box(x, -0.02, 0.039, 0.006, 0.14, 0.006, "white")
+    for y in (0.0, 0.1):
+        m.box(-0.26, y, 0.04, 0.32, 0.006, 0.006, "white")
+    roof_seams(m, 0.2, -0.22, 0.28, 0.21, 0.355, n=4)
+    rail(m, -0.43, -0.08, 0.13, 0.04, h=0.045, posts=6)
     m.tree(0.38, 0.36, 0.9)
     m.tree(-0.4, -0.32, 0.9, dark=True)
 
@@ -330,13 +398,18 @@ def eta(m: Model):
     _roof_vent(m, 0.08, 0.24, 0.27)
     m.box(-0.3, 0.28, 0.03, 0.24, 0.12, 0.1, "glass_blue", roof="concrete")  # basins
     m.box(-0.3, 0.18, 0.04, 0.2, 0.018, 0.06, "metal_dark")
+    guard_rail(m, -0.41, -0.19, 0.345, z=0.12, posts=4)
+    tank_ladder(m, -0.22, -0.28, 0.08, 0.12)
+    tank_ladder(m, 0.02, -0.35, 0.08, 0.1)
     # water tower: tank on 4 legs
     for sx in (-1, 1):
         for sy in (-1, 1):
             m.box(0.32 + sx * 0.06, 0.3 + sy * 0.06, 0.03, 0.02, 0.02, 0.42, "metal_dark")
     m.cyl(0.32, 0.3, 0.45, 0.09, 0.14, "wall_white", seg=10)
     m.cone(0.32, 0.3, 0.59, 0.1, 0.06, "roof_slate", seg=10)
+    tank_ladder(m, 0.32, 0.21, 0.2, 0.32)
     m.cyl(-0.28, 0.1, 0.03, 0.05, 0.16, "wall_white", seg=8)  # dosing silo
+    pipe_run(m, 0.04, (-0.28, -0.08, 0.13), 0.08, 0.16)
     _fence_run(m, 0, -0.42, 0.9, 0)
     _fence_run(m, -0.44, 0, 0, 0.85)
     _fence_run(m, 0.44, 0, 0, 0.85)
@@ -353,12 +426,17 @@ def subestacao(m: Model):
     _back_door(m, -0.28, -0.2, w=0.055, h=0.1)
     m.box(0.08, -0.197, 0.08, 0.13, 0.01, 0.05, "metal_dark")
     m.box(0.22, -0.28, 0.21, 0.08, 0.06, 0.035, "metal", roof="metal_dark")
+    thin_frame(m, -0.1, -0.36, 0.07, 0.18, 0.08)
+    d_roof_seams(m, -0.1, -0.28, 0.214, 0.5, 0.16, along="x", count=4)
     _xfmr(m, -0.2, 0.12)
     _xfmr(m, 0.05, 0.12)
     _xfmr(m, 0.28, 0.12)
+    for x in (-0.2, 0.05, 0.28):
+        pipe_run(m, 0.12, (x - 0.04, x, x + 0.04), 0.16, 0.23, mat="trunk")
     _pylon(m, -0.28, 0.3, h=0.6)
     _pylon(m, 0.2, 0.3, h=0.6)
     m.box(0.32, -0.28, 0.03, 0.1, 0.14, 0.1, "metal")  # cabinets
+    m.box(0.32, -0.35, 0.09, 0.09, 0.008, 0.012, "metal_dark")
     _fence_run(m, 0, -0.05, 0.9, 0)
     _fence_run(m, -0.44, 0.15, 0, 0.6)
     _fence_run(m, 0.44, 0.15, 0, 0.6)
@@ -431,6 +509,7 @@ def reciclagem(m: Model):
     m.box(-0.18, 0.16, 0.03, 0.4, 0.4, 0.32, "wall_green", roof="roof_flat")
     m.box(-0.18, 0.16, 0.35, 0.42, 0.42, 0.03, "concrete")
     m.box(-0.18, -0.045, 0.12, 0.2, 0.01, 0.12, "wall_white")  # recycle logo plate
+    thin_frame(m, -0.18, -0.045, 0.12, 0.2, 0.12)
     m.windows(-0.18, 0.16, 0.18, 0.4, 0.4, 0.12, 1, cols=3, sides="brl", lit=0.45, slabs=False)
     m.box(-0.28, 0.365, 0.03, 0.12, 0.012, 0.14, "metal_dark")
     _back_door(m, -0.1, 0.36, w=0.055, h=0.1)
@@ -440,6 +519,7 @@ def reciclagem(m: Model):
     m.windows(0.3, -0.18, 0.06, 0.18, 0.3, 0.12, 1, cols=1, sides="br", lit=0.55, slabs=False)
     _back_door(m, 0.34, -0.03, w=0.05, h=0.1)
     m.box(0.18, 0.28, 0.2, 0.3, 0.2, 0.03, "metal")  # sorting canopy
+    d_roof_seams(m, 0.18, 0.28, 0.234, 0.3, 0.2, along="x", count=3)
     _column(m, 0.05, 0.2, 0.03, 0.17, w=0.03, mat="metal_dark")
     _column(m, 0.31, 0.2, 0.03, 0.17, w=0.03, mat="metal_dark")
     m._quad([(0.1, 0.2, 0.05), (0.26, 0.2, 0.2), (0.3, 0.2, 0.2), (0.14, 0.2, 0.05)], "metal_dark")  # conveyor
@@ -448,6 +528,9 @@ def reciclagem(m: Model):
     m.box(0.0, -0.26, 0.03, 0.16, 0.1, 0.1, "sign_green")
     m.box(0.3, -0.3, 0.03, 0.14, 0.08, 0.09, "sign_blue")
     m.box(-0.4, -0.1, 0.03, 0.08, 0.14, 0.09, "sign_blue")
+    container_ribs(m, -0.28, -0.26, 0.03, 0.16, 0.1, 0.1, along="x", count=3)
+    container_ribs(m, 0.0, -0.26, 0.03, 0.16, 0.1, 0.1, along="x", count=3)
+    d_bollards(m, (-0.38, -0.16, 0.12, 0.38), -0.42)
     m.windows(-0.18, 0.16, 0.03, 0.4, 0.4, 0.32, 1, cols=3, sides="f", lit=0.45)
     _roof_vent(m, -0.05, 0.22, 0.38)
     _fence_run(m, 0, 0.44, 0.85, 0)

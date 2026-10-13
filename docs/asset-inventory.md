@@ -3,45 +3,45 @@
 | ID | Building | Cat | Tris | Verts | Mats | Tex | Size (x × y × z) | KiB |
 |---|---|---|---|---|---|---|---|---|
 | 01 | Starter House | R1 | 403 | 794 | 17 | 0 | 0.96 × 0.532 × 0.96 | 57.3 |
-| 02 | Family House | R1 | 403 | 794 | 19 | 0 | 0.96 × 0.512 × 0.96 | 59.1 |
-| 03 | Modern Townhouse | R2 | 307 | 597 | 19 | 0 | 0.96 × 0.539 × 0.96 | 50.1 |
-| 04 | Semi-detached Villa | R2 | 359 | 696 | 17 | 0 | 0.96 × 0.479 × 0.96 | 52.2 |
-| 05 | Small Apartment | R3 | 514 | 995 | 17 | 0 | 0.96 × 1.055 × 0.96 | 65.9 |
-| 06 | Garden Condominium | R3 | 636 | 1236 | 18 | 0 | 0.96 × 0.805 × 0.96 | 78.0 |
-| 07 | Compact Tower | R4 | 644 | 1255 | 17 | 0 | 0.96 × 1.385 × 0.96 | 77.5 |
-| 08 | Balcony Residence | R3 | 602 | 1176 | 16 | 0 | 0.96 × 1.005 × 0.96 | 72.5 |
-| 09 | Local Mixed-use Building | R4 | 432 | 839 | 17 | 0 | 0.96 × 0.885 × 0.96 | 58.9 |
+| 02 | Family House | R1 | 669 | 1361 | 24 | 0 | 0.96 × 0.512 × 0.96 | 91.3 |
+| 03 | Modern Townhouse | R2 | 635 | 1288 | 24 | 0 | 0.96 × 0.539 × 0.96 | 87.8 |
+| 04 | Semi-detached Villa | R2 | 687 | 1432 | 20 | 0 | 0.96 × 0.479 × 0.96 | 90.1 |
+| 05 | Small Apartment | R3 | 1030 | 2067 | 19 | 0 | 0.96 × 1.055 × 0.96 | 118.2 |
+| 06 | Garden Condominium | R3 | 1160 | 2279 | 20 | 0 | 0.96 × 0.805 × 0.96 | 128.9 |
+| 07 | Compact Tower | R4 | 1166 | 2299 | 17 | 0 | 0.96 × 1.385 × 0.96 | 126.7 |
+| 08 | Balcony Residence | R3 | 1170 | 2352 | 18 | 0 | 0.96 × 1.023 × 0.96 | 130.3 |
+| 09 | Local Mixed-use Building | R4 | 938 | 1841 | 19 | 0 | 0.96 × 0.885 × 0.96 | 107.6 |
 | 10 | Premium Tower | R5 | 504 | 1000 | 16 | 0 | 0.96 × 1.525 × 0.96 | 65.4 |
-| 11 | Convenience Store | C1 | 389 | 756 | 20 | 0 | 0.99 × 0.279 × 0.96 | 58.2 |
-| 12 | Corner Café | C1 | 431 | 821 | 19 | 0 | 0.9625 × 0.309 × 0.96 | 60.0 |
-| 13 | Local Market | C2 | 404 | 790 | 20 | 0 | 0.99 × 0.309 × 0.96 | 59.7 |
-| 14 | Urban Restaurant | C2 | 342 | 659 | 16 | 0 | 0.96 × 0.515 × 0.96 | 49.7 |
-| 15 | Neighbourhood Pharmacy | C1 | 352 | 671 | 15 | 0 | 0.96 × 0.535 × 0.96 | 49.3 |
-| 16 | Compact Office | C2 | 370 | 707 | 18 | 0 | 0.96 × 0.84 × 0.96 | 54.2 |
-| 17 | Local Bank | C2 | 424 | 795 | 18 | 0 | 0.96 × 0.565 × 0.96 | 58.4 |
-| 18 | Executive Hotel | C3 | 517 | 1002 | 17 | 0 | 0.96 × 1.05 × 0.96 | 66.1 |
-| 19 | Neighbourhood Mall | C3 | 350 | 667 | 15 | 0 | 0.96 × 0.475 × 0.96 | 48.6 |
+| 11 | Convenience Store | C1 | 829 | 1611 | 24 | 0 | 0.99 × 0.308 × 0.96 | 102.3 |
+| 12 | Corner Café | C1 | 809 | 1602 | 24 | 0 | 0.9625 × 0.314 × 0.96 | 101.5 |
+| 13 | Local Market | C2 | 778 | 1563 | 24 | 0 | 0.99 × 0.313 × 0.96 | 99.7 |
+| 14 | Urban Restaurant | C2 | 600 | 1210 | 21 | 0 | 0.96 × 0.515 × 0.96 | 80.3 |
+| 15 | Neighbourhood Pharmacy | C1 | 682 | 1346 | 21 | 0 | 0.96 × 0.535 × 0.96 | 86.7 |
+| 16 | Compact Office | C2 | 588 | 1133 | 20 | 0 | 0.96 × 0.84 × 0.96 | 75.7 |
+| 17 | Local Bank | C2 | 604 | 1190 | 23 | 0 | 0.96 × 0.565 × 0.96 | 81.9 |
+| 18 | Executive Hotel | C3 | 739 | 1421 | 17 | 0 | 0.96 × 1.05 × 0.96 | 85.9 |
+| 19 | Neighbourhood Mall | C3 | 754 | 1435 | 15 | 0 | 0.96 × 0.475 × 0.96 | 84.3 |
 | 20 | Corporate Tower | C4 | 374 | 732 | 14 | 0 | 0.96 × 2.07 × 0.96 | 50.6 |
-| 21 | City Hall | S3 | 240 | 476 | 14 | 0 | 0.96 × 0.79 × 0.96 | 38.7 |
-| 22 | Public Library | S2 | 338 | 663 | 17 | 0 | 0.96 × 0.43 × 0.96 | 50.7 |
-| 23 | Community Centre | S2 | 310 | 612 | 18 | 0 | 0.96 × 0.345 × 0.96 | 49.6 |
-| 24 | Police Station | S3 | 513 | 1002 | 18 | 0 | 0.99 × 0.57 × 0.96 | 67.8 |
-| 25 | City Museum | S3 | 358 | 708 | 18 | 0 | 0.96 × 0.47 × 0.96 | 54.1 |
-| 26 | Clinic | S2 | 342 | 671 | 19 | 0 | 0.96 × 0.41 × 0.96 | 53.2 |
-| 27 | General Hospital | S4 | 460 | 912 | 14 | 0 | 0.96 × 0.65 × 0.96 | 58.7 |
-| 28 | Primary School | S2 | 312 | 616 | 18 | 0 | 0.96 × 0.325 × 0.96 | 49.5 |
-| 29 | Secondary School | S3 | 336 | 661 | 17 | 0 | 0.96 × 0.439 × 0.96 | 50.9 |
-| 30 | Fire Station | S3 | 541 | 1073 | 16 | 0 | 0.975 × 0.826 × 0.96 | 68.2 |
-| 31 | Bus Station | T2 | 526 | 1044 | 22 | 0 | 0.975 × 0.337 × 0.96 | 73.8 |
-| 32 | Train Station | T3 | 558 | 1111 | 25 | 0 | 0.995 × 0.67 × 0.96 | 80.8 |
-| 33 | Cargo Terminal | T3 | 598 | 1178 | 26 | 0 | 0.98 × 0.369 × 0.9674 | 84.1 |
-| 34 | Water Treatment Plant | U3 | 475 | 884 | 16 | 0 | 0.96 × 0.65 × 0.96 | 60.1 |
-| 35 | Electrical Substation | U2 | 381 | 731 | 12 | 0 | 0.96 × 0.63 × 0.96 | 48.1 |
-| 36 | Logistics Warehouse | I1 | 483 | 950 | 15 | 0 | 0.96 × 0.434 × 0.96 | 61.9 |
-| 37 | Light Factory | I2 | 471 | 919 | 17 | 0 | 0.9675 × 0.762 × 0.96 | 62.5 |
+| 21 | City Hall | S3 | 240 | 476 | 14 | 0 | 0.96 × 0.79 × 0.96 | 38.8 |
+| 22 | Public Library | S2 | 748 | 1455 | 17 | 0 | 0.96 × 0.43 × 0.96 | 87.7 |
+| 23 | Community Centre | S2 | 640 | 1249 | 19 | 0 | 0.96 × 0.358 × 0.96 | 80.4 |
+| 24 | Police Station | S3 | 1133 | 2222 | 19 | 0 | 0.99 × 0.57 × 0.96 | 125.1 |
+| 25 | City Museum | S3 | 634 | 1260 | 19 | 0 | 0.96 × 0.47 × 0.96 | 80.5 |
+| 26 | Clinic | S2 | 594 | 1161 | 20 | 0 | 0.96 × 0.41 × 0.96 | 77.5 |
+| 27 | General Hospital | S4 | 912 | 1798 | 16 | 0 | 0.96 × 0.65 × 0.96 | 102.1 |
+| 28 | Primary School | S2 | 588 | 1164 | 21 | 0 | 0.96 × 0.343 × 0.96 | 78.2 |
+| 29 | Secondary School | S3 | 832 | 1653 | 17 | 0 | 0.96 × 0.439 × 0.96 | 96.7 |
+| 30 | Fire Station | S3 | 981 | 1933 | 17 | 0 | 0.975 × 0.868 × 0.96 | 109.3 |
+| 31 | Bus Station | T2 | 812 | 1576 | 23 | 0 | 0.975 × 0.34 × 0.96 | 99.3 |
+| 32 | Train Station | T3 | 698 | 1391 | 25 | 0 | 0.995 × 0.67 × 0.96 | 93.7 |
+| 33 | Cargo Terminal | T3 | 1044 | 2010 | 26 | 0 | 0.98 × 0.369 × 0.9674 | 122.7 |
+| 34 | Water Treatment Plant | U3 | 775 | 1484 | 16 | 0 | 0.96 × 0.68 × 0.96 | 87.6 |
+| 35 | Electrical Substation | U2 | 591 | 1151 | 12 | 0 | 0.96 × 0.63 × 0.96 | 67.6 |
+| 36 | Logistics Warehouse | I1 | 1001 | 1906 | 16 | 0 | 0.96 × 0.434 × 0.96 | 107.2 |
+| 37 | Light Factory | I2 | 855 | 1647 | 18 | 0 | 0.9675 × 0.78 × 0.96 | 97.3 |
 | 38 | Heavy Factory | I4 | 432 | 813 | 13 | 0 | 0.97 × 0.58 × 0.96 | 53.3 |
-| 39 | Recycling Centre | U3 | 311 | 608 | 15 | 0 | 0.96 × 0.474 × 0.96 | 45.5 |
-| 40 | Thermal Power Plant | U4 | 540 | 1025 | 14 | 0 | 0.9675 × 0.98 × 0.96 | 64.2 |
+| 39 | Recycling Centre | U3 | 585 | 1116 | 16 | 0 | 0.96 × 0.474 × 0.96 | 70.4 |
+| 40 | Thermal Power Plant | U4 | 1094 | 2093 | 15 | 0 | 0.9675 × 0.98 × 0.96 | 114.6 |
 
 ## Props, vehicles, vegetation
 
@@ -54,25 +54,30 @@
 | props/boat_sail.glb | boat | 49 | 5 | 10.8 |
 | props/bollard.glb | street-furniture | 66 | 2 | 8.1 |
 | props/bus.glb | vehicle | 278 | 11 | 36.5 |
-| props/bus_articulated.glb | vehicle | 424 | 11 | 48.8 |
-| props/bus_city.glb | vehicle | 282 | 11 | 36.9 |
-| props/bus_coach.glb | vehicle | 380 | 11 | 44.2 |
-| props/bus_double.glb | vehicle | 292 | 11 | 37.8 |
-| props/bus_mini.glb | vehicle | 282 | 11 | 36.9 |
+| props/bus_articulated.glb | vehicle | 444 | 11 | 50.6 |
+| props/bus_city.glb | vehicle | 292 | 11 | 37.8 |
+| props/bus_coach.glb | vehicle | 390 | 11 | 45.1 |
+| props/bus_double.glb | vehicle | 302 | 11 | 38.8 |
+| props/bus_mini.glb | vehicle | 292 | 11 | 37.8 |
 | props/bus_school.glb | vehicle | 296 | 10 | 37.1 |
 | props/bush.glb | vehicle | 60 | 3 | 12.0 |
 | props/bush_flowers.glb | vehicle | 100 | 3 | 17.1 |
-| props/car_compact.glb | vehicle | 264 | 9 | 32.7 |
-| props/car_crossover.glb | vehicle | 264 | 9 | 32.8 |
-| props/car_electric.glb | vehicle | 274 | 10 | 35.0 |
-| props/car_hatch.glb | vehicle | 264 | 9 | 32.8 |
-| props/car_midsize.glb | vehicle | 264 | 9 | 32.8 |
-| props/car_minivan.glb | vehicle | 264 | 9 | 32.8 |
-| props/car_pickup.glb | vehicle | 296 | 9 | 35.7 |
-| props/car_police.glb | vehicle | 304 | 11 | 38.8 |
-| props/car_sedan.glb | vehicle | 264 | 9 | 32.8 |
-| props/car_suv.glb | vehicle | 264 | 9 | 32.8 |
-| props/car_taxi.glb | vehicle | 284 | 10 | 35.9 |
+| props/car_compact.glb | vehicle | 274 | 9 | 33.6 |
+| props/car_convertible.glb | vehicle | 282 | 9 | 34.5 |
+| props/car_coupe.glb | vehicle | 284 | 9 | 34.6 |
+| props/car_crossover.glb | vehicle | 274 | 9 | 33.7 |
+| props/car_electric.glb | vehicle | 284 | 10 | 35.9 |
+| props/car_hatch.glb | vehicle | 274 | 9 | 33.7 |
+| props/car_midsize.glb | vehicle | 274 | 9 | 33.7 |
+| props/car_minibus.glb | vehicle | 278 | 10 | 35.3 |
+| props/car_minivan.glb | vehicle | 274 | 9 | 33.7 |
+| props/car_pickup.glb | vehicle | 336 | 9 | 39.4 |
+| props/car_police.glb | vehicle | 314 | 11 | 39.8 |
+| props/car_sedan.glb | vehicle | 274 | 9 | 33.7 |
+| props/car_station_wagon.glb | vehicle | 318 | 9 | 37.8 |
+| props/car_suv.glb | vehicle | 274 | 9 | 33.7 |
+| props/car_suv_long.glb | vehicle | 314 | 9 | 37.4 |
+| props/car_taxi.glb | vehicle | 294 | 10 | 36.8 |
 | props/cyclist.glb | agent | 146 | 7 | 20.9 |
 | props/dog.glb | agent | 82 | 2 | 10.3 |
 | props/hydrant.glb | street-furniture | 100 | 2 | 11.5 |
@@ -87,8 +92,8 @@
 | props/planter_street.glb | street-furniture | 120 | 2 | 12.0 |
 | props/planter_tree.glb | street-furniture | 97 | 6 | 18.9 |
 | props/rock.glb | vegetation | 40 | 1 | 6.9 |
-| props/semi_box.glb | vehicle | 405 | 10 | 45.6 |
-| props/semi_container.glb | vehicle | 415 | 12 | 48.7 |
+| props/semi_box.glb | vehicle | 409 | 10 | 46.0 |
+| props/semi_container.glb | vehicle | 419 | 12 | 49.0 |
 | props/shelter_glass.glb | street-furniture | 100 | 5 | 16.7 |
 | props/shelter_small.glb | street-furniture | 100 | 5 | 16.6 |
 | props/stop_sign.glb | street-furniture | 67 | 3 | 9.1 |
@@ -106,11 +111,12 @@
 | props/tree_pine.glb | vegetation | 74 | 3 | 10.5 |
 | props/tree_poplar.glb | vegetation | 58 | 3 | 10.8 |
 | props/truck.glb | vehicle | 356 | 9 | 40.0 |
-| props/truck_box.glb | vehicle | 372 | 10 | 42.8 |
-| props/truck_cement.glb | vehicle | 406 | 11 | 47.3 |
-| props/truck_flatbed.glb | vehicle | 386 | 13 | 47.4 |
-| props/truck_garbage.glb | vehicle | 386 | 11 | 45.3 |
-| props/truck_tanker.glb | vehicle | 396 | 11 | 46.2 |
-| props/truck_utility.glb | vehicle | 406 | 12 | 48.2 |
-| props/van.glb | vehicle | 264 | 9 | 32.8 |
-| props/van_cargo.glb | vehicle | 284 | 10 | 35.8 |
+| props/truck_box.glb | vehicle | 376 | 10 | 43.2 |
+| props/truck_cement.glb | vehicle | 410 | 11 | 47.7 |
+| props/truck_flatbed.glb | vehicle | 440 | 13 | 52.3 |
+| props/truck_garbage.glb | vehicle | 390 | 11 | 45.7 |
+| props/truck_tanker.glb | vehicle | 400 | 11 | 46.6 |
+| props/truck_utility.glb | vehicle | 410 | 12 | 48.5 |
+| props/van.glb | vehicle | 274 | 9 | 33.7 |
+| props/van_cargo.glb | vehicle | 288 | 10 | 36.2 |
+| props/van_delivery.glb | vehicle | 290 | 10 | 36.4 |

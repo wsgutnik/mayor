@@ -29,7 +29,7 @@ Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with sc
 | UI-3 Zoning tools | partial | Marquee and Fill (classic and oriented, one undo entry each) |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 461 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 463 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 
@@ -56,7 +56,8 @@ Known gaps in the oriented path: neighbour-zone inheritance when painting single
 | Strict Blender export (`--strict`, `MAYOR_BUILDING_TRI_LIMIT`, default 700) | Done; fails on tile/height/triangle/unregistered/undeclared override |
 | Registry: base/variant, version, footprint, declared overrides | Done; variants export to `variants/<variant>/NN.glb` and `models/v2/NN_lod{0,1,2}.glb`, never replace base |
 | `public/models/manifest.json`, `public/models/v2/asset-manifest.json` + tests | Done (`scripts/verify_v2_assets.py --check`) |
-| Rear/side facades, detailed vehicles | Done for #05-#37, #39, #40; #20, #21, #38 also have v2 references |
+| Detail redesign (budget 1400) | Done for #02-#09, #11-#19, #22-#37, #39, #40: richer roofs, frames, trims, paving and rear/side facades (max 1170 triangles); vehicles got more detail plus 6 new car looks (38 vehicle models) |
+| AI-generated HD textures | Done: plaster, brick, concrete, roof tile, wood, metal, paving, gravel, grass, dirt, rock, sand, asphalt, foliage, sidewalk, kerb, plot (`blender/apply_ai_textures.py`, provenance in NOTICE.md) |
 | v2 reference buildings (#01, #10, #20, #21, #38) | Merged, opt-in `?visualV2=1`; LOD1/LOD2 not switched at runtime yet |
 | Asset architecture V2, roadmap | Documented (`docs/ASSET-ARCHITECTURE-V2.md`, `docs/VISUAL-UPGRADE-ROADMAP.md`); PBR/KTX2/multi-tile not implemented |
 | Hardware performance (Mac/Windows/iPad) | **Not measured** |

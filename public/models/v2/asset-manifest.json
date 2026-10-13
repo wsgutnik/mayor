@@ -13,7 +13,7 @@
       "variants": [
         {
           "file": "01_lod0.glb",
-          "sha256": "b60f5abe8beb6d12180352cb99c60d9f5007cd1377771d1b016a021935245809",
+          "sha256": "f015e02a6c25341c3e9f64029e489fcbd2cc3e4d935aaf42f068317a7c28902f",
           "bytes": 183788,
           "triangles": 1551,
           "vertices": 3152,
@@ -63,7 +63,7 @@
         },
         {
           "file": "01_lod1.glb",
-          "sha256": "880bf97b2fcff69a34baa36e96221460a8635a83d6306518fa698ea1c6e002ae",
+          "sha256": "00b1b9a01e2141f895ee341f0084785ccf91ba02261417e1dc74681bf230c5a5",
           "bytes": 66972,
           "triangles": 523,
           "vertices": 1050,
@@ -127,7 +127,7 @@
       "variants": [
         {
           "file": "10_lod0.glb",
-          "sha256": "286bd51dc405b19480f0852f1149dd629ab950443eb1ed7b14a5d01d06a9c494",
+          "sha256": "8ef0176c3f693fd2516acf1dd98d2349cf6bbcd29d5d32c50333cf8ee4e56d65",
           "bytes": 263560,
           "triangles": 2489,
           "vertices": 4857,
@@ -175,8 +175,8 @@
         },
         {
           "file": "10_lod1.glb",
-          "sha256": "b5a08c5c1e836e359a6d739f3595a80aa28f425a90da9554719ea754c2bd5684",
-          "bytes": 72684,
+          "sha256": "cff8435e9371cdeda3d05da6be1d3e2ba5c24d88c93649dbfe57c2550d3c8403",
+          "bytes": 72688,
           "triangles": 597,
           "vertices": 1179,
           "meshes": 1,
@@ -243,8 +243,8 @@
       "variants": [
         {
           "file": "20_lod0.glb",
-          "sha256": "c79e7ad7c9927fd97b6f662f6dbf03b4106d3231e4e0e143bd8fd6a36e564bb8",
-          "bytes": 200124,
+          "sha256": "c37eb28124402a9d479f1a6b2204d4e0c4293e13983575d4c2ae3de2eeab9fb7",
+          "bytes": 200120,
           "triangles": 1907,
           "vertices": 3756,
           "meshes": 1,
@@ -282,7 +282,7 @@
         },
         {
           "file": "20_lod1.glb",
-          "sha256": "2df3458db99871e5d4df686c51553dccd2f5874eae5748ac4c65af1e029f7f5d",
+          "sha256": "bf600eeb69849121089f976554517ce649f60a166c4286742b5ed9b4b9b889cc",
           "bytes": 54980,
           "triangles": 477,
           "vertices": 950,
@@ -339,7 +339,7 @@
       "variants": [
         {
           "file": "21_lod0.glb",
-          "sha256": "b89ef708662353d37ccce0f4428bdc96561ea01a67d6bc2ae7d06b9868d3a993",
+          "sha256": "3579cb8806ddde3d779be0f13bbc3446edb13b8778eebf1e55f2183c96630997",
           "bytes": 270308,
           "triangles": 2434,
           "vertices": 4802,
@@ -395,7 +395,7 @@
         },
         {
           "file": "21_lod1.glb",
-          "sha256": "ecd8ac031f3719398f8c165ce3fbd41080e9b2d10bb0fab3c5b6da2128cabefc",
+          "sha256": "583bb2bcd31f39d59c780e4511d1f1742b824a0df4a9e127640903ee78c964d6",
           "bytes": 85580,
           "triangles": 653,
           "vertices": 1274,
@@ -470,8 +470,8 @@
       "variants": [
         {
           "file": "38_lod0.glb",
-          "sha256": "07f36c9c06d4240b8741f6d3766fafde3578607f4497c5a749760f9f541df3c9",
-          "bytes": 341736,
+          "sha256": "956ce82899a74c34887696b57127bfd4c1a3041d1ff980593e62baa84c147c2b",
+          "bytes": 341740,
           "triangles": 3426,
           "vertices": 6471,
           "meshes": 1,
@@ -520,7 +520,7 @@
         },
         {
           "file": "38_lod1.glb",
-          "sha256": "61b8549d10d27da86b89902d67b856204db80181e343270dc0a6d3ace49ad644",
+          "sha256": "405edcb700b45f6dd12709eea67bbef9b1d135c29489c8028dfd56c14f2007a5",
           "bytes": 147516,
           "triangles": 1351,
           "vertices": 2585,
@@ -595,6 +595,6 @@
   "summary": {
     "assetCount": 15,
     "buildingCount": 5,
-    "totalBytes": 1796472
+    "totalBytes": 1796476
   }
 }

@@ -1,5 +1,6 @@
 """Vehicles, boats and street furniture. Vehicles drive along +X (the game rotates them); length 1 = one tile."""
 from registry import prop
+import dress_vehicles as dress
 
 
 def _side_quad(m, x0, x1, y, z0, z1, side, mat):
@@ -95,6 +96,86 @@ def _car(m, length, width, body_h, cabin_l, cabin_h, cabin_off=-0.02, wheel_r=0.
                 handles=(cabin_off + cabin_l * 0.12, cabin_off - cabin_l * 0.16))
     _mirrors(m, cabin_off + cabin_l / 2 - 0.01, cz + 0.008, width * 0.42)
     _wheels(m, (length * 0.3, -length * 0.3), hw, r=wheel_r)
+
+
+_car = dress.car
+_door_seams = dress.door_seams
+_face_quad = dress.face_quad
+_glass_pillars = dress.glass_pillars
+_grille = dress.grille
+_light_clusters = dress.light_clusters
+_mirrors = dress.mirrors
+_plates = dress.plates
+_rear_doors = dress.rear_doors
+_side_quad = dress.side_quad
+_wheels = dress.wheels
+
+
+@prop("car_station_wagon")
+def car_station_wagon(m):
+    _car(m, 0.44, 0.175, 0.072, 0.29, 0.064, cabin_off=-0.055, wheel_r=0.035, roof_detail="rack")
+    _glass_pillars(m, (-0.11,), 0.175 * 0.42, 0.032 + 0.072 + 0.008, 0.032 + 0.072 + 0.056)
+
+
+@prop("car_convertible")
+def car_convertible(m):
+    _car(m, 0.38, 0.17, 0.065, 0.16, 0.035, cabin_off=-0.015, wheel_r=0.034, rear_glass=False)
+    m.box(-0.08, 0, 0.034 * 0.8 + 0.067, 0.14, 0.13, 0.018, "black", roof="black")
+
+
+@prop("car_coupe")
+def car_coupe(m):
+    _car(m, 0.37, 0.168, 0.064, 0.18, 0.052, cabin_off=-0.01, wheel_r=0.034)
+    m.box(0.07, 0, 0.034 * 0.8 + 0.072, 0.07, 0.14, 0.012, "car_body", roof="car_body")
+
+
+@prop("van_delivery")
+def van_delivery(m):
+    r = 0.036
+    z = r * 0.8
+    hw = 0.092
+    front, back = 0.24, -0.23
+    m.box(-0.04, 0, z, 0.39, 0.184, 0.15, "car_body", roof="car_body")
+    m.box(0.19, 0, z, 0.1, 0.184, 0.078, "car_body", roof="car_body")
+    m.box(0.19, 0, z + 0.078, 0.08, 0.16, 0.052, "car_glass", roof="car_body")
+    m.box(front, 0, z + 0.005, 0.014, 0.17, 0.028, "black")
+    m.box(back, 0, z + 0.005, 0.014, 0.17, 0.028, "black")
+    _grille(m, front + 0.001, z + 0.032, z + 0.052, 0.08)
+    _plates(m, front + 0.0078, back - 0.0078, z + 0.008)
+    _light_clusters(m, front, back, hw, z + 0.026)
+    _mirrors(m, 0.21, z + 0.09, 0.08)
+    _door_seams(m, (0.12, -0.06), hw, z + 0.012, z + 0.076, handles=(0.14, -0.02))
+    _rear_doors(m, back, z + 0.032, z + 0.14)
+    m.box(-0.06, 0, z + 0.15, 0.12, 0.09, 0.018, "metal", roof="metal_dark")
+    _wheels(m, (0.16, -0.14), hw, r=r)
+
+
+@prop("car_minibus")
+def car_minibus(m):
+    r = 0.034
+    z = r * 0.8
+    hw = 0.085
+    front, back = 0.31, -0.31
+    m.box(0, 0, z, 0.62, 0.17, 0.17, "car_body", roof="car_body")
+    for s in (-1, 1):
+        y = s * (hw + 0.002)
+        for x in (-0.17, -0.05, 0.07, 0.19):
+            _side_quad(m, x - 0.04, x + 0.04, y, z + 0.085, z + 0.145, s, "car_glass")
+    _face_quad(m, front + 0.002, -0.055, 0.055, z + 0.08, z + 0.15, +1, "car_glass")
+    m.box(0.0, 0, z + 0.17, 0.18, 0.11, 0.022, "metal", roof="metal_dark")
+    m.box(front, 0, z + 0.005, 0.014, 0.15, 0.028, "black")
+    m.box(back, 0, z + 0.005, 0.014, 0.15, 0.028, "black")
+    _grille(m, front + 0.001, z + 0.03, z + 0.05, 0.078)
+    _plates(m, front + 0.0078, back - 0.0078, z + 0.008)
+    _light_clusters(m, front, back, hw, z + 0.026)
+    _door_seams(m, (0.18, 0.08), hw, z + 0.018, z + 0.14, handles=(0.11,))
+    _mirrors(m, front - 0.03, z + 0.1, hw)
+    _wheels(m, (0.2, -0.2), hw, r=r)
+
+
+@prop("car_suv_long")
+def car_suv_long(m):
+    _car(m, 0.47, 0.185, 0.092, 0.31, 0.073, cabin_off=-0.055, wheel_r=0.041, roof_detail="rack")
 
 
 @prop("car_sedan")

@@ -1,6 +1,7 @@
 """Transport kit models (entries 31-33): bus station, train station, cargo terminal."""
 from lib import Model
 from registry import building
+from dress_det_d import bollards, container_ribs, curb_stripes, guard_rail, roof_seams, thin_frame
 
 
 def _column(m: Model, x, y, z0, h, w=0.03, mat="metal_dark"):
@@ -118,9 +119,12 @@ def estacao_onibus(m: Model):
     _back_door(m, -0.22, 0.37, 0.03)
     _louver(m, 0.16, 0.373, 0.11)
     m.box(0.32, 0.4, 0.03, 0.12, 0.06, 0.05, "metal_dark", roof="metal")
+    thin_frame(m, -0.24, 0.165, 0.075, 0.12, 0.07)
+    thin_frame(m, 0.24, 0.165, 0.075, 0.12, 0.07)
     # linear canopy on dark columns, with a skylight strip and a glowing fascia
     m.box(0, -0.04, 0.3, 0.86, 0.4, 0.025, "roof_flat", roof="roof_flat")
     m.box(0, -0.04, 0.325, 0.7, 0.12, 0.012, "glass_blue", roof="glass_blue")
+    roof_seams(m, 0, -0.04, 0.328, 0.86, 0.4, along="x", count=5)
     m.box(0, -0.235, 0.285, 0.86, 0.015, 0.04, "wall_navy")
     m._quad([(-0.4, -0.243, 0.29), (-0.2, -0.243, 0.29),
              (-0.2, -0.243, 0.315), (-0.4, -0.243, 0.315)], "glow_sign")
@@ -148,6 +152,8 @@ def estacao_onibus(m: Model):
         x = -0.04 + i * 0.035
         m._quad([(x, -0.42, 0.033), (x + 0.022, -0.42, 0.033),
                  (x + 0.022, -0.34, 0.033), (x, -0.34, 0.033)], "white")
+    curb_stripes(m, -0.38, 0.38, -0.13, count=6)
+    bollards(m, (-0.42, -0.16, 0.16, 0.42), -0.22)
     m.tree(-0.42, 0.42, 0.9)
     m.tree(0.42, 0.42, 0.9, dark=True)
 
@@ -174,6 +180,8 @@ def estacao_trem(m: Model):
     _downpipes(m, 0, 0.42, 0.03, 0.24, 0.38)
     m.box(0, 0.13, 0.18, 0.16, 0.02, 0.05, "glow_sign")
     m.box(0.18, 0.427, 0.18, 0.14, 0.012, 0.035, "glow_sign")
+    thin_frame(m, 0, 0.136, 0.07, 0.11, 0.11)
+    roof_seams(m, 0, 0.28, 0.382, 0.44, 0.34, along="y", count=3, mat="metal")
     # clock tower with a glowing face
     m.box(0, 0.28, 0.38, 0.12, 0.12, 0.2, "wall_cream")
     m.pyramid(0, 0.28, 0.58, 0.15, 0.15, 0.09, "roof_blue")
@@ -199,6 +207,7 @@ def estacao_trem(m: Model):
     m._quad(list(reversed(north)), "metal_dark")
     m._quad([(0.403, -0.4, 0.28), (0.403, -0.06, 0.28),
              (0.403, -0.06, 0.34), (0.403, -0.4, 0.34)], "metal_dark")
+    guard_rail(m, -0.36, 0.26, -0.04, z=0.12, posts=6)
     m.ac_unit(-0.12, 0.28, 0.29, 0.07, 0.05, 0.03)
     m.box(0.18, 0.27, 0.29, 0.06, 0.04, 0.045, "metal_dark")
     _lamp(m, -0.42, 0.1)
@@ -215,6 +224,8 @@ def terminal_carga(m: Model):
     m.box(-0.12, 0.16, 0.31, 0.72, 0.44, 0.02, "slab")
     for x in (-0.34, -0.12, 0.1):
         m.box(x, -0.045, 0.03, 0.13, 0.015, 0.14, "wall_yellow")
+        m.box(x, -0.054, 0.095, 0.145, 0.008, 0.012, "metal_dark")
+        bollards(m, (x - 0.07, x + 0.07), -0.08, mat="sign_orange")
     m.windows(-0.12, 0.16, 0.17, 0.68, 0.4, 0.11, 1, cols=5, sides="f", lit=0.5, slabs=False)
     m.windows(-0.12, 0.16, 0.17, 0.68, 0.4, 0.11, 1, cols=5, sides="brl", lit=0.45, slabs=False)
     for x in (-0.26, 0.02):
@@ -234,6 +245,12 @@ def terminal_carga(m: Model):
     m.box(0.34, 0.32, 0.12, 0.09, 0.2, 0.09, "wall_red")
     m.box(-0.28, -0.26, 0.03, 0.2, 0.09, 0.09, "wall_green")
     m.box(0.1, -0.36, 0.03, 0.2, 0.09, 0.09, "wall_yellow")
+    for cx, cy, z, w, d, h, along in ((0.34, 0.2, 0.03, 0.09, 0.2, 0.09, "y"),
+                                      (0.34, 0.32, 0.03, 0.09, 0.2, 0.09, "y"),
+                                      (0.34, 0.32, 0.12, 0.09, 0.2, 0.09, "y"),
+                                      (-0.28, -0.26, 0.03, 0.2, 0.09, 0.09, "x"),
+                                      (0.1, -0.36, 0.03, 0.2, 0.09, 0.09, "x")):
+        container_ribs(m, cx, cy, z, w, d, h, along=along)
     # gantry crane straddling the container row, with cab and spreader
     for dx, dy in ((-0.09, -0.12), (0.09, -0.12), (-0.09, 0.12), (0.09, 0.12)):
         _column(m, 0.34 + dx, 0.26 + dy, 0.03, 0.3, w=0.03, mat="wall_yellow")

@@ -4,7 +4,8 @@
  */
 export const CAR_LOOKS = [
   "car_sedan", "car_hatch", "car_suv", "van", "car_midsize", "car_compact", "car_crossover", "car_minivan",
-  "car_electric", "car_pickup", "car_taxi",
+  "car_electric", "car_pickup", "car_taxi", "car_station_wagon", "car_convertible", "car_coupe",
+  "van_delivery", "car_minibus", "car_suv_long",
 ] as const;
 
 /** Freight: weighted toward small box trucks; semis are the minority. */
@@ -24,6 +25,8 @@ export const FLEET_BY_ROLE = {
   garbage: ["truck_garbage"],
   utility: ["truck_utility"],
   taxi: ["car_taxi"],
+  delivery: ["van_delivery"],
+  shuttle: ["car_minibus"],
   school: ["bus_school"],
   coach: ["bus_coach"],
   cement: ["truck_cement"],

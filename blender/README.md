@@ -36,3 +36,5 @@ registration for a number wins and any replacement must be listed in `registry.D
 name, variant, version, footprint, triangles, bounds, source module) is written next to the GLBs on a full build,
 and `src/render/building-inventory.test.ts` checks it against the GLBs. `--previews DIR` writes two angles per
 model (`NN.png` front-right, `NN_b.png` back-left) with identical lighting and framing.
+
+`apply_ai_textures.py` converts AI-generated texture swatches into the `*_hd.png` pattern textures (see NOTICE.md); dress helpers per redesign batch live in `dress_det_*.py` and `dress_vehicles.py`.

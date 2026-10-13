@@ -6,7 +6,22 @@ transport pack (third_party/mayor-transport-pack); automatic decimation of those
 so the shapes are rebuilt here from boxes, within the triangle budgets.
 """
 from registry import prop
-from props_vehicles import _car, _door_seams, _face_quad, _grille, _mirrors, _plates, _side_quad, _wheels
+from dress_vehicles import (
+    car as _car,
+    cargo_bed_ribs as _cargo_bed_ribs,
+    door_seams as _door_seams,
+    face_quad as _face_quad,
+    glass_pillars as _glass_pillars,
+    grille as _grille,
+    light_clusters as _dress_lights,
+    mirrors as _mirrors,
+    plates as _plates,
+    rear_bumper as _dress_rear_bumper,
+    rear_doors as _dress_rear_doors,
+    roof_rack as _roof_rack,
+    side_quad as _side_quad,
+    wheels as _wheels,
+)
 
 L_HEAD = "glow_head"
 L_TAIL = "glow_tail"
@@ -14,24 +29,16 @@ L_TAIL = "glow_tail"
 
 def _lights(m, front, back, half_w, z, h=0.025, spread=0.32):
     """Head/tail lights set into dark recess bezels."""
-    for s in (-1, 1):
-        y = s * half_w * 2 * spread
-        _face_quad(m, front + 0.001, y - 0.026, y + 0.026, z - 0.004, z + h + 0.004, +1, "black")
-        _face_quad(m, front + 0.002, y - 0.02, y + 0.02, z, z + h, +1, L_HEAD)
-        _face_quad(m, back - 0.001, y - 0.026, y + 0.026, z - 0.004, z + h + 0.004, -1, "black")
-        _face_quad(m, back - 0.002, y - 0.02, y + 0.02, z, z + h, -1, L_TAIL)
+    _dress_lights(m, front, back, half_w, z, h=h, spread=spread)
 
 
 def _rear_doors(m, back, z0, z1):
     """Split rear cargo doors: centre shut-line and two grab handles."""
-    _face_quad(m, back - 0.001, -0.0012, 0.0012, z0, z1, -1, "black")
-    _face_quad(m, back - 0.0015, 0.008, 0.02, (z0 + z1) / 2 - 0.004, (z0 + z1) / 2 + 0.004, -1, "metal_dark")
-    _face_quad(m, back - 0.0015, -0.02, -0.008, (z0 + z1) / 2 - 0.004, (z0 + z1) / 2 + 0.004, -1, "metal_dark")
+    _dress_rear_doors(m, back, z0, z1)
 
 
 def _rear_bumper(m, back, z, w=0.19):
-    m.box(back, 0, z + 0.005, 0.014, w, 0.028, "black")
-    _plates(m, None, back - 0.0078, z + 0.008, w=0.04)
+    _dress_rear_bumper(m, back, z, w=w)
 
 
 # ---------------------------------------------------------------- cars
@@ -91,6 +98,7 @@ def car_pickup(m):
     for sy in (-1, 1):
         m.box(-0.14, sy * 0.085, z + 0.04, 0.2, 0.012, 0.04, "car_body", roof="car_body")
     m.box(-0.235, 0, z + 0.04, 0.012, 0.16, 0.04, "car_body", roof="car_body")
+    _cargo_bed_ribs(m, -0.22, -0.06, hw, z + 0.045, n=4)
     m.box(front, 0, z + 0.005, 0.014, 0.165, 0.028, "black")                        # bumpers
     m.box(back, 0, z + 0.005, 0.014, 0.165, 0.028, "black")
     _grille(m, front + 0.001, z + 0.032, z + 0.052, 0.08)
@@ -107,6 +115,7 @@ def _cab_truck(m, r, cab_x, cab_l, cab_h, w):
     front = cab_x + cab_l / 2
     m.box(cab_x, 0, z, cab_l, w, cab_h * 0.55, "car_body", roof="car_body")
     m.box(cab_x, 0, z + cab_h * 0.55, cab_l * 0.9, w * 0.9, cab_h * 0.45, "car_glass", roof="car_body")
+    _glass_pillars(m, (cab_x + cab_l * 0.05,), w * 0.45, z + cab_h * 0.58, z + cab_h * 0.96)
     m.box(front, 0, z + 0.005, 0.014, w * 0.92, 0.028, "black")                     # bumper
     _grille(m, front + 0.001, z + 0.032, z + 0.052, w * 0.5)
     _plates(m, front + 0.0078, None, z + 0.008, w=0.04)
@@ -127,6 +136,7 @@ def van_cargo(m):
     m.box(-0.02, 0, z, 0.34, 0.18, 0.14, "car_body", roof="car_body")
     m.box(0.17, 0, z, 0.1, 0.18, 0.075, "car_body", roof="car_body")
     m.box(0.17, 0, z + 0.075, 0.08, 0.16, 0.05, "car_glass", roof="car_body")
+    _glass_pillars(m, (0.17,), 0.08, z + 0.083, z + 0.12)
     m.box(front, 0, z + 0.005, 0.014, 0.165, 0.028, "black")                        # bumpers
     m.box(back, 0, z + 0.005, 0.014, 0.165, 0.028, "black")
     _grille(m, front + 0.001, z + 0.032, z + 0.05, 0.08)
@@ -203,6 +213,7 @@ def truck_flatbed(m):
     z = _cab_truck(m, r, 0.21, 0.16, 0.13, 0.2)
     back = -0.29
     m.box(-0.1, 0, z + 0.01, 0.38, 0.2, 0.03, "metal", roof="metal")
+    _cargo_bed_ribs(m, -0.27, 0.05, 0.1, z + 0.045, n=5)
     m.box(-0.1, 0, z + 0.04, 0.12, 0.12, 0.07, "bark", roof="bark")                   # a load of crates
     m.box(-0.22, 0, z + 0.04, 0.1, 0.12, 0.05, "wall_wood", roof="wall_wood")
     m.box(0.0, 0, z - 0.004, 0.66, 0.14, 0.02, "metal_dark")
@@ -232,6 +243,7 @@ def _tractor(m, r, x0):
     m.box(x0 + 0.1, 0, z, 0.22, 0.2, 0.08, "car_body", roof="car_body")
     m.box(x0 + 0.04, 0, z + 0.08, 0.1, 0.2, 0.1, "car_body", roof="car_body")         # sleeper
     m.box(x0 + 0.13, 0, z + 0.08, 0.07, 0.18, 0.06, "car_glass", roof="car_body")
+    _glass_pillars(m, (x0 + 0.11,), 0.09, z + 0.087, z + 0.132)
     m.box(x0 + 0.04, 0, z - 0.004, 0.34, 0.14, 0.02, "metal_dark")
     m.box(front, 0, z + 0.005, 0.014, 0.184, 0.028, "black")                        # bumper
     _grille(m, front + 0.001, z + 0.03, z + 0.05, 0.1)
@@ -300,6 +312,7 @@ def _bus_rear(m, back, z, hw):
 
 def _bus_ac(m, x, z, top):
     m.box(x, 0, z + top, 0.2, 0.12, 0.028, "metal", roof="metal_dark")
+    m.box(x, 0, z + top + 0.028, 0.16, 0.08, 0.008, "metal_dark")
 
 
 def _bus_door(m, x, z, hw, h):
