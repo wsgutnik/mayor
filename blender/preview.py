@@ -5,8 +5,11 @@ import bpy
 from mathutils import Vector
 
 
-def setup_scene(width=480, height=360, top=0.6):
+def setup_scene(width=480, height=360, top=0.6, azimuth_deg=-35):
     sc = bpy.context.scene
+    # Re-framing for a second angle must not stack lights and cameras.
+    for o in [o for o in bpy.data.objects if o.name.split('.')[0] in ("sun", "cam")]:
+        bpy.data.objects.remove(o, do_unlink=True)
     try:
         sc.render.engine = "BLENDER_EEVEE"
     except TypeError:
@@ -31,9 +34,9 @@ def setup_scene(width=480, height=360, top=0.6):
     # frame tall buildings: the view must cover the footprint diagonal and the height
     cam.ortho_scale = max(1.75, top * 1.05 + 1.15)
     co = bpy.data.objects.new("cam", cam)
-    # main angle: from the front-right, looking down at 35 degrees (front is -Y)
+    # main angle (azimuth -35): from the front-right, looking down at 35 degrees (front is -Y); 145 is the back-left
     d = 4.0
-    el, az = math.radians(35), math.radians(-35)
+    el, az = math.radians(35), math.radians(azimuth_deg)
     co.location = Vector((d * math.cos(el) * math.sin(-az) * -1, -d * math.cos(el) * math.cos(az), d * math.sin(el) + top * 0.5))
     sc.collection.objects.link(co)
     look = (Vector((0, 0, top * 0.5)) - co.location).to_track_quat("-Z", "Y")

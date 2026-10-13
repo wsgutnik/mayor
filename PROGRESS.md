@@ -43,6 +43,19 @@ Tests: 339 passing (`npx vitest run`). Mac build verified; real Windows and iPad
 
 Known gaps in the oriented path: neighbour-zone inheritance when painting single cells (CS1 `G-INHERIT`) is not implemented; kerb strips in the middle of some blocks need a polish pass; growth is slow in sparse blocks because only front-row lots (column 0) are build candidates.
 
+## Visual asset upgrade (Cycle 1, PR #1)
+
+| Item | State |
+|---|---|
+| Audit script (`scripts/audit-visual-assets.mjs`) | Fixed (crashed on an undefined variable) and extended; 40 buildings + 67 props, 0 errors/warnings |
+| Strict Blender export (`--strict`, `MAYOR_BUILDING_TRI_LIMIT`) | Done; fails on tile/height/triangle/unregistered/undeclared override |
+| Registry: base/variant, version, footprint, declared overrides | Done; variants export to `variants/<variant>/NN.glb`, never replace base |
+| `public/models/manifest.json` + tests (40/40, tile, ground contact) | Done |
+| Two-angle Blender previews of all 40 | Done (`--previews`); quality report in `docs/BUILDING-QUALITY-REPORT.md` |
+| Asset architecture V2, roadmap | Documented (`docs/ASSET-ARCHITECTURE-V2.md`, `docs/VISUAL-UPGRADE-ROADMAP.md`); not implemented in the renderer |
+| Five reference buildings (#01, #10, #20, #21, #38) | Cycle 2 branch `visual/v2-reference-buildings` (separate PR) |
+| Hardware performance (Mac/Windows/iPad) | **Not measured** |
+
 ## Who Did What
 
 - **Claude (lead):** architecture, junctions, water v1, Underground view v1, shadows, merges, review fixes, interaction wiring (P6), documentation, status artifact.
