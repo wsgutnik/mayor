@@ -16,3 +16,14 @@ Add a model: create `blender/buildings_<group>.py` and register a function with 
 Rules: inside the tile (|x|,|y| <= 0.5, base z = 0), front faces -Y, at most ~420 triangles (average under 300),
 use palette material names (`glow_*` materials light up at night). Output goes to `public/models/NN.glb`;
 the game swaps procedural models for these as they load.
+
+
+## Visual V2 reference prototypes (non-production)
+
+Five original reference buildings have a separate generator; they do not replace the 40 existing GLBs:
+
+```bash
+blender -b --factory-startup --python blender/build_v2.py -- --out /tmp/mayor-v2 --previews /tmp/mayor-v2-previews
+```
+
+IDs: 01 Starter House, 10 Premium Tower, 20 Corporate Tower, 21 City Hall, 38 Heavy Factory. Each produces `NN_lod0.glb`, `NN_lod1.glb`, `NN_lod2.glb`; outputs also include `build-report.json`. Inspect exports and previews before copying into `public/models/v2/`. Browser preview is opt-in with `?visualV2=1`, and missing prototype GLBs fall back to production. Only LOD0 is used in-game at present. See [docs/ASSET-ARCHITECTURE-V2.md](../docs/ASSET-ARCHITECTURE-V2.md).
