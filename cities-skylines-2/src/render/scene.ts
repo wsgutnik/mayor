@@ -16,7 +16,7 @@ import { Ambience, SmokeSource } from "./ambience";
 import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
 import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 import { UndergroundView } from "./underground";
-import { createRoadDetailMaterial, loadRoadDetailMaps, RoadDetail } from "./road-material";
+import { createRoadDetailMaterial, loadRoadAtlas, loadRoadDetailMaps, RoadDetail } from "./road-material";
 import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat } from "./terrain-splat";
 import { LodSorter } from "./lod";
 import { QUALITY_PROFILE, qualityForPixelCap } from "../prefs";
@@ -142,6 +142,8 @@ export class CityRenderer {
   private splat!: TerrainSplat;
   private splatTier: "off" | SplatTier = "off";
   private roadDetail!: RoadDetail;
+  private roadAtlasReady = false;
+  private roadAtlasAllowed = true;
   private maxAniso = 4;
   private lod = new LodSorter();
   private lodBox!: THREE.InstancedMesh;
@@ -158,6 +160,8 @@ export class CityRenderer {
   private lastFrame = 0;
   private markMesh!: THREE.InstancedMesh;
   private previewMesh!: THREE.Mesh;
+  /** Crossing markers on the road ghost (junction yellow, grade-separated blue, blocked red). */
+  private crossMesh!: THREE.InstancedMesh;
   private zones!: THREE.InstancedMesh;
   private kerbs!: THREE.InstancedMesh;
   private underground!: UndergroundView;
@@ -209,6 +213,11 @@ export class CityRenderer {
     this.roadDetail = createRoadDetailMaterial(this.asphaltTex);
     this.maxAniso = this.renderer.capabilities.getMaxAnisotropy();
     loadRoadDetailMaps(this.asphaltTex, this.maxAniso, (m) => this.roadDetail.setMaps(m));
+    loadRoadAtlas(this.maxAniso, (m) => {
+      this.roadDetail.setAtlas(m);
+      this.roadAtlasReady = true;
+      if (this.roadMesh) this.rebuildRoads();
+    }, () => { /* atlas missing: keep the vertex-colour path */ });
     this.scene.background = new THREE.Color("#a9c8e8");
     this.scene.fog = new THREE.FogExp2("#a9c8e8", 0.0042);
     this.hemi = new THREE.HemisphereLight("#ffffff", "#6b7a5a", 1.35);
@@ -251,6 +260,12 @@ export class CityRenderer {
     this.previewMesh.frustumCulled = false;
     this.previewMesh.visible = false;
     this.scene.add(this.previewMesh);
+    this.crossMesh = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.42, 0.3, 0.42),
+      new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.9, depthWrite: false }), 64);
+    this.crossMesh.count = 0;
+    this.crossMesh.frustumCulled = false;
+    this.scene.add(this.crossMesh);
     const tex = makeWindowTextures();
     this.winMat = new THREE.MeshLambertMaterial({
       map: tex.map, vertexColors: true, emissive: new THREE.Color("#ffd98a"), emissiveMap: tex.glow, emissiveIntensity: 0,
@@ -926,7 +941,7 @@ export class CityRenderer {
   private rebuildRoads(): void {
     this.roadMesh.geometry.dispose();
     this.roadMesh.geometry = buildRoadNetworkGeometry(this.world, (x, z) => this.groundY(x, z),
-      { hideBridges: this.underground.visible });
+      { hideBridges: this.underground.visible, atlas: this.roadAtlasReady && this.roadAtlasAllowed });
     this.rebuildTransit();
   }
 
@@ -1057,6 +1072,7 @@ export class CityRenderer {
     for (const g of this.glowMats) g.emissiveIntensity = this.nightGlow;
     this.rainOn = raining;
     this.rain.visible = raining;
+    this.roadDetail.setDayWet(this.dayLevel, raining ? 1 : 0);
   }
 
   /** Traffic whose vehicles are drawn and whose loads colour the traffic infoview. */
@@ -1136,15 +1152,31 @@ export class CityRenderer {
     d.rotation.set(0, 0, 0);
   }
 
-  /** Ghost of a road being drawn; null clears it. */
-  setRoadPreview(seg: { type: RoadType; pts: Pt[] } | null, valid = true): void {
+  /** Ghost of a road being drawn; null clears it. Crossing markers reuse one instanced mesh. */
+  setRoadPreview(seg: { type: RoadType; pts: Pt[] } | null, valid = true,
+    crossings: { x: number; z: number; kind: "junction" | "overpass" | "underpass" | "blocked" }[] = []): void {
     this.previewMesh.visible = !!seg;
-    if (!seg) return;
+    if (!seg) { this.crossMesh.count = 0; this.crossMesh.instanceMatrix.needsUpdate = true; return; }
     this.previewMesh.geometry.dispose();
     // Clamped above the waterline so a bridge draft stays visible over the gap.
     this.previewMesh.geometry = buildStripGeometry([seg], (x, z) => Math.max(this.groundY(x, z), 0.12),
       new THREE.Color(valid ? "#7fe08a" : "#ff6b60"));
     this.previewMesh.position.y = 0.05;
+    const m = this.crossMesh, d = this.dummy, col = new THREE.Color();
+    let n = 0;
+    for (const c of crossings) {
+      if (n >= 64) break;
+      d.position.set(c.x, Math.max(this.groundY(c.x, c.z), 0.12) + 0.35, c.z);
+      d.rotation.set(0, 0, 0);
+      d.scale.set(1, 1, 1);
+      d.updateMatrix();
+      m.setMatrixAt(n, d.matrix);
+      m.setColorAt(n, col.set(c.kind === "junction" ? "#ffd84a" : c.kind === "blocked" ? "#ff6b60" : "#4aa8ff"));
+      n++;
+    }
+    m.count = n;
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
   /** Ground position under a client-space pointer. */
@@ -1338,6 +1370,12 @@ export class CityRenderer {
     this.pixelCap = Math.min(window.devicePixelRatio || 1, cap);
     this.pixelRatio = Math.min(this.pixelRatio, this.pixelCap);
     const profile = QUALITY_PROFILE[qualityForPixelCap(cap)];
+    // Road atlas follows the tier: the low tier keeps flat vertex colours.
+    const atlasAllowed = qualityForPixelCap(cap) !== "low";
+    if (atlasAllowed !== this.roadAtlasAllowed) {
+      this.roadAtlasAllowed = atlasAllowed;
+      if (this.roadMesh) this.rebuildRoads();
+    }
     // shadows by tier: off on low, a 1k map on medium, 2k on high
     const res = profile.shadow;
     this.sun.castShadow = res > 0;

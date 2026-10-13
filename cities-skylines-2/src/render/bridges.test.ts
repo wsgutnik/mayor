@@ -56,6 +56,22 @@ describe("bridge and tunnel geometry", () => {
     expect(openings).toBe(8);
   });
 
+  it("keeps decks, piers and parapets in atlas mode with fewer triangles", () => {
+    const { s } = spanTown();
+    const gy = (x: number, z: number): number => heightAt(s.world, x, z);
+    const flat = buildRoadNetworkGeometry(s.world, gy);
+    const atlas = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
+    finite(atlas);
+    expect(tris(atlas)).toBeGreaterThan(200);
+    expect(tris(atlas)).toBeLessThan(tris(flat));
+    const pos = atlas.attributes.position.array as Float32Array;
+    let above = 0;
+    for (let i = 0; i < pos.length; i += 3) {
+      if (pos[i] >= 30 && pos[i] <= 36 && pos[i + 1] > 0.5) above++;
+    }
+    expect(above).toBeGreaterThan(10);
+  });
+
   it("drops the decks for the underground view", () => {
     const { s } = spanTown();
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);

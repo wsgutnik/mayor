@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { newCity, placeRoad, CityState } from "../sim/sim";
 import { cidx, heightAt } from "../sim/world";
 import { nodeArms } from "../sim/roads";
-import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
+import { buildRoadNetworkGeometry, buildStripGeometry, JUNCTION_TILE, ROAD_CLASS, ROAD_TILE_LENGTH, roadClassFor } from "./roads";
 
 const tris = (g: THREE.BufferGeometry): number =>
   (g.index ? g.index.count : g.attributes.position.count) / 3;
@@ -150,6 +150,73 @@ describe("road network geometry", () => {
         const pz = node.z + arm.dz * d + arm.dx * 0.05;
         expect(covered(px, pz)).toBe(true);
       }
+    }
+  });
+
+  it("maps road types to atlas classes", () => {
+    expect(roadClassFor(1, 0)).toBe(ROAD_CLASS.STREET);
+    expect(roadClassFor(2, 0)).toBe(ROAD_CLASS.AVENUE);
+    expect(roadClassFor(3, 0)).toBe(ROAD_CLASS.HIGHWAY);
+    expect(roadClassFor(4, 0)).toBe(ROAD_CLASS.ONEWAY_STREET);
+    expect(roadClassFor(5, 0)).toBe(ROAD_CLASS.ONEWAY_AVENUE);
+    expect(roadClassFor(1, 1)).toBe(ROAD_CLASS.ONEWAY_STREET);
+    expect(roadClassFor(2, -1)).toBe(ROAD_CLASS.ONEWAY_AVENUE);
+  });
+
+  it("atlas avenue: one strip, UVs across 0..1 and along in tiles, 3x fewer vertices", () => {
+    const s = flatTown();
+    const ey = s.world.entry.y;
+    road(s, 2, [[4.5, ey + 0.5], [24.5, ey + 0.5]]);
+    const gy = (x: number, z: number): number => heightAt(s.world, x, z);
+    const flat = buildRoadNetworkGeometry(s.world, gy);
+    const atlas = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
+    finite(atlas);
+    const fv = flat.attributes.position.count;
+    const av = atlas.attributes.position.count;
+    expect(av * 3).toBeLessThanOrEqual(fv);
+    // Cross-section UVs: u spans exactly 0..1, v spans the length in tiles.
+    const uv = atlas.attributes.uv.array as Float32Array;
+    const cls = atlas.attributes.aClass.array as Float32Array;
+    let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity, n = 0;
+    for (let i = 0; i < cls.length; i++) {
+      if (cls[i] !== ROAD_CLASS.AVENUE) continue;
+      n++;
+      uMin = Math.min(uMin, uv[i * 2]); uMax = Math.max(uMax, uv[i * 2]);
+      vMin = Math.min(vMin, uv[i * 2 + 1]); vMax = Math.max(vMax, uv[i * 2 + 1]);
+    }
+    expect(n).toBeGreaterThan(0);
+    expect(uMin).toBe(0);
+    expect(uMax).toBe(1);
+    expect(vMin).toBe(0);
+    expect(vMax).toBeCloseTo(20 / ROAD_TILE_LENGTH, 5);
+  });
+
+  it("atlas junction: disc uses world-space UV, zebras are single textured quads", () => {
+    const s = junction();
+    const gy = (x: number, z: number): number => heightAt(s.world, x, z);
+    const g = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
+    finite(g);
+    const pos = g.attributes.position.array as Float32Array;
+    const uv = g.attributes.uv.array as Float32Array;
+    const cls = g.attributes.aClass.array as Float32Array;
+    const count = (c: number): number => cls.filter((v) => v === c).length;
+    // One quad (4 verts) per zebra arm, crosswalks paired with stop bars.
+    expect(count(ROAD_CLASS.CROSSWALK)).toBe(count(ROAD_CLASS.STOP_BAR));
+    expect(count(ROAD_CLASS.CROSSWALK)).toBeGreaterThanOrEqual(16);
+    expect(count(ROAD_CLASS.CROSSWALK) % 4).toBe(0);
+    expect(count(ROAD_CLASS.JUNCTION)).toBeGreaterThan(0);
+    for (let i = 0; i < cls.length; i++) {
+      if (cls[i] !== ROAD_CLASS.JUNCTION) continue;
+      expect(uv[i * 2]).toBeCloseTo(pos[i * 3] / JUNCTION_TILE, 4);
+      expect(uv[i * 2 + 1]).toBeCloseTo(pos[i * 3 + 2] / JUNCTION_TILE, 4);
+    }
+    // Crosswalk UVs stay inside the texture.
+    for (let i = 0; i < cls.length; i++) {
+      if (cls[i] !== ROAD_CLASS.CROSSWALK && cls[i] !== ROAD_CLASS.STOP_BAR) continue;
+      expect(uv[i * 2]).toBeGreaterThanOrEqual(0);
+      expect(uv[i * 2]).toBeLessThanOrEqual(1);
+      expect(uv[i * 2 + 1]).toBeGreaterThanOrEqual(0);
+      expect(uv[i * 2 + 1]).toBeLessThanOrEqual(1);
     }
   });
 

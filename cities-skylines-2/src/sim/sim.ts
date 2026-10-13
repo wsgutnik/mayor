@@ -8,6 +8,7 @@ import {
   Elevation,
 } from "./world";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
+import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
 import { addSegment, rebuildNodes, removeSegment, stampRoundabout, toggleOneWayAt } from "./roads";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
@@ -203,7 +204,11 @@ export interface RoadPlan {
   /** Set when the middle of the road crosses water/a valley (bridge) or a hill (tunnel). */
   span?: "bridge" | "tunnel";
   pieces?: RoadPiece[];
+  /** Every meeting with an existing road, in order along the drawn road. */
+  crossings?: Crossing[];
 }
+
+export type { Crossing, CrossingKind } from "./crossings";
 
 /** Cost multiplier per tile for an elevated piece. */
 const pieceMult = (e: Elevation): number => (e === "bridge" ? BRIDGE_COST_MULT : e === "tunnel" ? TUNNEL_COST_MULT : 1);
@@ -241,38 +246,65 @@ function needsElevation(w: World, pts: Pt[], kind: "bridge" | "tunnel"): boolean
 export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: RoadLevelInput = "ground"): RoadPlan {
   const level = normalizeRoadLevel(levelInput);
   const w = s.world;
-  const bad = (reason: string, tiles: number[] = []): RoadPlan => ({ ok: false, reason, tiles, newTiles: 0, cost: 0 });
+  const bad = (reason: string, tiles: number[] = [], crossings?: Crossing[]): RoadPlan =>
+    ({ ok: false, reason, tiles, newTiles: 0, cost: 0, ...(crossings ? { crossings } : {}) });
   if (pts.length < 2 || pts.length > 3) return bad("A road needs a start and an end");
   if (segmentLength(pts) > MAX_SEGMENT_TILES) return bad("Road is too long");
   const { tiles, outOfBounds } = rasterizeRoad(w, type, pts);
   if (outOfBounds) return bad("Outside the map", tiles);
+  const crossings = classifyCrossings(w, type, pts, level);
+  const blocked = crossings.find((c) => c.kind === "blocked");
+  if (blocked) {
+    return bad(blocked.blockedReason === "elevated-join" ? ELEVATED_JOIN_REASON : INTERCHANGE_REASON, tiles, crossings);
+  }
   // Explicit Elevado/Subterrâneo: deck/tunnel over everything crossed,
   // with 3-tile ground ramps at both ends (M24). Reuses splitPtsAt/pieces.
   if (level !== "ground") {
     const kind = level === "elevated" ? "bridge" as const : "tunnel" as const;
     const len = segmentLength(pts);
-    if (kind === "tunnel" && len < 4) return bad("Tunnel too short", tiles);
-    if (len < 2) return bad("Nothing to cross", tiles);
-    if (!needsElevation(w, pts, kind)) return bad("Nothing to cross", tiles);
+    if (kind === "tunnel" && len < 4) return bad("Tunnel too short", tiles, crossings);
+    if (len < 2) return bad("Nothing to cross", tiles, crossings);
+    // Rule 3: every crossing sits in a ramp zone -> fall back to a ground junction.
+    const terrain = detectSpan(w, type, pts);
+    const terrainNeeds = (terrain.ok && terrain.span?.kind === kind)
+      || (kind === "bridge" && tiles.some((t) => !isLand(w, t % w.size, (t / w.size) | 0)));
+    if (!terrainNeeds && crossings.length > 0 && crossings.every((c) => c.kind === "junction")) {
+      return planWithSpan(s, type, pts, tiles, null, bad, crossings);
+    }
+    if (!needsElevation(w, pts, kind)) return bad("Nothing to cross", tiles, crossings);
     const ramp = Math.min(RAMP_TILES, Math.floor((len - 1) / 2));
-    if (ramp < 1) return bad("Nothing to cross", tiles);
+    if (ramp < 1) return bad("Nothing to cross", tiles, crossings);
     const t0 = ramp / len, t1 = 1 - ramp / len;
     const [before, middle, after] = splitPtsAt(pts, t0, t1);
     const span = { kind, t0, t1, spanTiles: rasterizeRoad(w, type, middle).tiles.length, before, middle, after };
-    const foundSpan = span;
-    // Fall through to shared pricing below using foundSpan.
-    return planWithSpan(s, type, pts, tiles, foundSpan, bad);
+    return planWithSpan(s, type, pts, tiles, span, bad, crossings);
+  }
+  // Rule 1: a ground road meeting a highway is lifted over/under it automatically.
+  const auto = crossings.filter((c) => c.autoElevate);
+  if (auto.length) {
+    const kind = auto.every((c) => c.kind === "underpass") ? "tunnel" as const : "bridge" as const;
+    const len = segmentLength(pts);
+    const ramp = Math.min(RAMP_TILES, Math.floor((len - 1) / 2));
+    if (ramp < 1) return bad(INTERCHANGE_REASON, tiles, crossings);
+    // Anything else met inside the lifted middle is crossed at that level too.
+    const lifted = crossings.map((c) => (!c.atEnd && c.kind === "junction"
+      && c.distFromStart >= ramp && c.distFromEnd >= ramp)
+      ? { ...c, kind: kind === "bridge" ? "overpass" as const : "underpass" as const }
+      : c);
+    const [before, middle, after] = splitPtsAt(pts, ramp / len, 1 - ramp / len);
+    const span = { kind, before, middle, after };
+    return planWithSpan(s, type, pts, tiles, span, bad, lifted);
   }
   const found = detectSpan(w, type, pts);
-  if (!found.ok) return bad(found.reason, tiles);
-  const span = found.span;
-  return planWithSpan(s, type, pts, tiles, span, bad);
+  if (!found.ok) return bad(found.reason, tiles, crossings);
+  return planWithSpan(s, type, pts, tiles, found.span, bad, crossings);
 }
 
 function planWithSpan(
   s: CityState, type: RoadType, pts: Pt[], tiles: number[],
   span: { kind: "bridge" | "tunnel"; before: Pt[]; middle: Pt[]; after: Pt[] } | null,
-  bad: (reason: string, tiles?: number[]) => RoadPlan,
+  bad: (reason: string, tiles?: number[], crossings?: Crossing[]) => RoadPlan,
+  crossings?: Crossing[],
 ): RoadPlan {
   const w = s.world;
   let pieces: RoadPiece[];
@@ -318,8 +350,8 @@ function planWithSpan(
     const elevated = !ground.has(t);
     const under = elevated && span?.kind === "tunnel";
     if (!under) {
-      if (!elevated && !isLand(w, x, y)) return bad("Road would cross water", order);
-      if (w.facility[t]) return bad("Road would cross a building", order);
+      if (!elevated && !isLand(w, x, y)) return bad("Road would cross water", order, crossings);
+      if (w.facility[t]) return bad("Road would cross a building", order, crossings);
     }
     const layerExisting = elevated
       ? (span?.kind === "tunnel" ? w.roadTunnel[t] : w.roadDeck[t])
@@ -329,9 +361,9 @@ function planWithSpan(
       cost += rate.get(t)! * ROAD_COST[type];
     }
   }
-  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles: order, newTiles, cost };
+  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles: order, newTiles, cost, ...(crossings ? { crossings } : {}) };
   const builtSpan = middle ? span?.kind : undefined;
-  return { ok: true, tiles: order, newTiles, cost, ...(builtSpan ? { span: builtSpan } : {}), pieces };
+  return { ok: true, tiles: order, newTiles, cost, ...(builtSpan ? { span: builtSpan } : {}), pieces, ...(crossings ? { crossings } : {}) };
 }
 
 /** Build a road: flatten and clear the ground it covers, then charge for new tiles. */

@@ -49,6 +49,7 @@ linguagem visual da UI. Não é paridade de features.
 | M20 | ✅ Render | Terreno em camadas, texturas HD, sombras, tone mapping, LOD, níveis de qualidade |
 | M21 | ✅ Vias e sinalização | Mão única, rotatória, semáforos com fases, props de calçada |
 | M22 | pendente | Pedestres, polimento, validação em Windows e iPad |
+| M25 | ✅ Detecção e textura | Regras automáticas de cruzamento, prévia, trevo; estradas em textura de Blender |
 | M24 | ✅ Separação de níveis | Viaduto e passagem inferior sem nó, tráfego por camada |
 | M23 | ✅ Pontes e túneis | Elevação por segmento, vãos sobre água e colinas, tabuleiro, pilares, portais |
 

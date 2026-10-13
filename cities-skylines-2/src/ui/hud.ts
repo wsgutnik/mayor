@@ -92,6 +92,8 @@ const iconHtml = (i: Icon) =>
 export interface HudHooks {
   onMenu(): void;
   onRoad(type: RoadType, mode: RoadMode, level?: RoadLevel): void;
+  /** Stamp a diamond interchange on the next tapped bridge crossing. */
+  onInterchange?(): void;
   onCreateLine(): void;
   onLineVehicles(id: number, delta: number): void;
   onRemoveLine(id: number): void;
@@ -322,6 +324,10 @@ export class Hud {
       this.roadLevelBtns.set(lv.level, b);
       flyRoad.appendChild(b);
     }
+    const trevo = el("button", "tool", `<span class="ic">✥</span><span>${tr("Interchange")}</span>`);
+    trevo.title = tr("Tap a bridge crossing to stamp an interchange");
+    trevo.addEventListener("click", () => { this.hooks.onInterchange?.(); this.closeFlyouts(); });
+    flyRoad.appendChild(trevo);
     const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
       this.hooks.onTool("road");
       this.setTool("road");

@@ -48,6 +48,8 @@ npm run build   # tipos + bundle em dist/
   e props de calçada (postes, placas, hidrantes, lixeiras, pedestres, abrigos) por densidade de qualidade.
 - Frota: 11 modelos de carro (táxi, minivan, picape…), 10 de caminhão e semi-reboque e 9 de ônibus (articulado, de dois andares, escolar, rodoviário), escolhidos por veículo; polícia, lixo e utilitário já existem como props para uso futuro.
 - M24: separação de níveis. Nível Solo, Elevado (viaduto) ou Subterrâneo (passagem inferior) nos botões de estrada (tecla `E`); uma estrada elevada ou em túnel cruza outra sem criar nó, com rampas de 3 tiles; o tráfego de cada camada só se encontra pelas rampas.
+- Detecção automática de cruzamentos (`src/sim/crossings.ts`): uma via que cruza uma rodovia vira viaduto ou passagem sozinha; terminar de lado numa rodovia é recusado ("Rodovias precisam de um trevo"); cruzamento sem espaço para rampa cai para cruzamento no nível; a prévia lista cruzamentos, viadutos e passagens com marcadores; botão Trevo para rampas em diamante.
+- Estradas em textura (`blender/make_road_atlas.py` → `public/textures/road/`): cada trecho é uma tira com faixas, bordas, canteiro e calçada em textura de 512×1024; zebras, barras de retenção e setas de mão única são quads texturizados; cai para cor de vértice na qualidade baixa. Cerca de 3 vezes menos vértices por avenida.
 - Kit de prédios completo: estação de ônibus, estação de trem (usada nas estações de metrô) e terminal de carga (31 a 33).
 
 Documentação do processo, pesquisa e plano: [docs/process/](docs/process/). Progresso detalhado: [PROGRESS.md](PROGRESS.md). Guia para agentes: [AGENTS.md](AGENTS.md).

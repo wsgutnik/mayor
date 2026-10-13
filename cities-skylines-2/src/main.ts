@@ -11,7 +11,9 @@ import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
-import { Pt, ROAD_NAME, RoadType, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { Pt, ROAD_NAME, RoadType, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { diamondRamps, summarizeCrossings } from "./sim/crossings";
+import { addSegment } from "./sim/roads";
 import { setLang, tr, trReason, getLang } from "./i18n";
 import { MapData, MapIndex } from "./sim/maps";
 import { newCityFromMap } from "./sim/map-world";
@@ -36,6 +38,8 @@ let roadType: RoadType = 1;
 let roadMode: RoadMode = "line";
 let roadLevel: RoadLevel = "ground";
 
+/** Next road-tool tap stamps a diamond interchange instead of drawing. */
+let pendingInterchange = false;
 /** Points already placed for the road being drawn (start, and the bend in curve mode). */
 let draft: Pt[] = [];
 /** Stop ids picked so far for the transit line being built. */
@@ -54,6 +58,13 @@ function makeHud(): Hud {
   onTax: (r) => { state.taxRate = r; },
   onOverlay: (layer) => { overlay = layer; renderer.setOverlay(layer); },
   onRoad: (t, m, lvl) => { roadType = t; roadMode = m; if (lvl) roadLevel = lvl; cancelDraft(); refreshHint(); },
+  onInterchange: () => {
+    tool = "road";
+    cancelDraft();
+    pendingInterchange = true;
+    hud.setTool("road");
+    hud.setHint(tr("Tap a bridge crossing to stamp an interchange"));
+  },
   onFinishRoad: () => cancelDraft(),
   onMenu: () => menu.toggle(),
   onCreateLine: () => {
@@ -153,6 +164,7 @@ const lineTool = () => tool === "busline" || tool === "metroline";
 const placing = () => tool === "road" || lineTool() || tool === "roundabout";
 
 function cancelDraft(): void {
+  pendingInterchange = false;
   draft = [];
   lineDraft = [];
   cursor = null;
@@ -221,12 +233,59 @@ function updatePreview(): void {
   if (!seg) { renderer.setRoadPreview(null); return; }
   // Before the bend point is set in curve mode, show the straight guide.
   const plan = planRoad(state, roadType, seg.pts, roadLevel);
-  renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok);
+  const marks = (plan.crossings ?? []).filter((c) => !c.atEnd || c.kind === "blocked");
+  renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks);
   const name = tr(ROAD_NAME[roadType]);
   const spanHint = plan.span === "bridge" ? ` · ${tr("Bridge")}` : plan.span === "tunnel" ? ` · ${tr("Tunnel")}` : "";
-  hud.setHint(plan.ok
-    ? tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost }) + spanHint
-    : `${name}: ${trReason(plan.reason!)}`);
+  if (!plan.ok) { hud.setHint(`${name}: ${trReason(plan.reason!)}`); return; }
+  const n = summarizeCrossings(marks);
+  const parts: string[] = [];
+  if (n.overpass) parts.push(tr(n.overpass === 1 ? "{n} viaduct" : "{n} viaducts", { n: n.overpass }));
+  if (n.underpass) parts.push(tr(n.underpass === 1 ? "{n} underpass" : "{n} underpasses", { n: n.underpass }));
+  if (n.junction) parts.push(tr(n.junction === 1 ? "{n} crossing" : "{n} crossings", { n: n.junction }));
+  const crossHint = parts.length ? ` · ${parts.join(", ")}` : "";
+  const gradeHint = roadLevel !== "ground" && n.junction > 0 ? ` · ${tr("Crossing at grade")}` : "";
+  hud.setHint(tr("{name}: {n} tiles, ${cost}", { name, n: plan.newTiles, cost: plan.cost }) + spanHint + crossHint + gradeHint);
+}
+
+/** Stamp diamond ramps where a deck crosses a ground road (the Trevo button's tap). */
+function stampInterchangeAt(cx: number, cy: number): void {
+  const raw = renderer.pickPoint(cx, cy);
+  pendingInterchange = false;
+  if (!raw) return;
+  const w = state.world;
+  const tx = Math.floor(raw.x), ty = Math.floor(raw.z);
+  let tile = -1;
+  for (let r = 0; r <= 2 && tile < 0; r++) {
+    for (let dy = -r; dy <= r && tile < 0; dy++) for (let dx = -r; dx <= r; dx++) {
+      const x = tx + dx, y = ty + dy;
+      if (x < 0 || y < 0 || x >= w.size || y >= w.size) continue;
+      const t = idx(w, x, y);
+      if (w.roadDeck[t] && w.roadSurface[t]) { tile = t; break; }
+    }
+  }
+  if (tile < 0) { hud.showToast(tr("Tap a bridge crossing to stamp an interchange")); return; }
+  const deck = w.segments.find((sg) => (sg.elevation ?? "ground") === "bridge" && sg.tiles.includes(tile));
+  const ground = w.segments.find((sg) => (sg.elevation ?? "ground") === "ground" && sg.tiles.includes(tile));
+  if (!deck || !ground) return;
+  const dirOf = (pts: Pt[]) => {
+    const dx = pts[pts.length - 1].x - pts[0].x, dz = pts[pts.length - 1].z - pts[0].z;
+    const l = Math.hypot(dx, dz) || 1;
+    return { dx: dx / l, dz: dz / l };
+  };
+  const hwSeg = [deck, ground].find((sg) => sg.type === 3) ?? ground;
+  const crossSeg = hwSeg === deck ? ground : deck;
+  const cxp = (tile % w.size) + 0.5, czp = ((tile / w.size) | 0) + 0.5;
+  const ramps = diamondRamps(cxp, czp, dirOf(hwSeg.pts), dirOf(crossSeg.pts));
+  const cost = Math.round(ramps.reduce((a, r) => a + segmentLength(r), 0) * 22);
+  if (state.money < cost) { hud.showToast(trReason("Not enough money")); return; }
+  for (const ramp of ramps) addSegment(w, 4, ramp);
+  rebuildRoadRaster(w);
+  state.money -= cost;
+  state.monthExpenses += cost;
+  w.coverageDirty = true;
+  w.revision++;
+  hud.showToast(tr("Interchange"));
 }
 
 /** Move tool: a tap shows what stands on the tile. */
@@ -249,6 +308,7 @@ function onTap(cx: number, cy: number): void {
     if (!res.ok) hud.showToast(trReason(res.reason));
     return;
   }
+  if (pendingInterchange) { stampInterchangeAt(cx, cy); return; }
   const raw = renderer.pickPoint(cx, cy);
   if (!raw) return;
   const p = snap(raw);

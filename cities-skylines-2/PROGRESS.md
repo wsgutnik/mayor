@@ -17,9 +17,10 @@ Atualizado em 2026-10-12. Status vivo com capturas: artefato de status (fonte em
 | Frota de veículos | feito | 23 variantes paramétricas: carros (táxi, polícia, minivan, picape…), vans, caminhões (baú, lixo, utilitário, betoneira, prancha, tanque), semis (baú, contêiner), ônibus (urbano, articulado, escolar, dois andares, rodoviário, mini) |
 | M22 Acabamento | pendente | pedestres, polimento, Windows e iPad reais |
 | M23 Pontes e túneis | feito | custo 3× e 4×, tabuleiro, pilares, portais |
+| M25 Detecção de cruzamentos e estradas em textura | feito | regras automáticas para rodovias, prévia com marcadores, trevo; atlas de estrada em Blender/python |
 | M24 Separação de níveis | feito | viaduto e passagem inferior sem nó, botões Solo / Elevado / Subterrâneo e tecla E, tráfego por camada |
 
-Testes: 279 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
+Testes: 297 passando (`npx vitest run`). Build de Mac verificado; Windows e iPad reais ainda não testados.
 
 ## Quem fez o quê
 
@@ -54,6 +55,12 @@ CI e empacotamento são locais: `npm run ci` (tipos, testes, build) antes de cad
 - Props a partir do Kenney City Kit Roads (semáforos, postes, placas, barreiras): fontes em `third_party/`, conversão não feita.
 - Mobiliário convertido do pacote de transporte (abrigos, banco, jardineira, poste, quiosque, máquina de bilhetes, placa) está em `blender/props_fleet.py`, mas ainda não ligado aos props de calçada.
 - Entradas 31 (estação de ônibus) e 33 (terminal de carga) têm modelo mas nenhuma função no jogo; 32 (estação de trem) é o modelo das estações de metrô.
+
+## Pesquisa aplicável (docs/process/04-*)
+
+- Grade de zona do CS1: um bloco 8×4 células por lado de segmento no referencial do segmento, em vez de grade do mundo; resolução determinística de cantos (célula mais próxima da via vence). Ainda não implementado (candidato a M26).
+- Decisão de cruzamento por diferença de altura interpolada (≥ 6 m separa) e declive máximo de 12,5 %: hoje o Mayor decide por nível escolhido e por rodovia.
+- Marcações em SDF e KTX2/ASTC: hoje PNG; possível ganho de memória.
 
 ## Próximos passos
 

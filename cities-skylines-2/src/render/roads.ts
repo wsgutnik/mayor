@@ -37,16 +37,36 @@ export interface StripSeg {
   dirSign?: number;
 }
 
+/** Texture class per vertex (aClass attribute); 0 keeps the vertex-colour path. */
+export const ROAD_CLASS = {
+  FLAT: 0, STREET: 1, AVENUE: 2, ONEWAY_STREET: 3, ONEWAY_AVENUE: 4,
+  HIGHWAY: 5, JUNCTION: 6, CROSSWALK: 7, STOP_BAR: 8, ARROW: 9,
+} as const;
+/** World units covered by one cross-section texture tile along the road. */
+export const ROAD_TILE_LENGTH = 4;
+/** World units covered by one junction-asphalt tile (world-space UV). */
+export const JUNCTION_TILE = 2;
+
+export function roadClassFor(type: RoadType, dirSign: number): number {
+  const base = baseRoadType(type);
+  if (base === 3) return ROAD_CLASS.HIGHWAY;
+  if (dirSign !== 0 || type === 4 || type === 5) {
+    return base === 2 ? ROAD_CLASS.ONEWAY_AVENUE : ROAD_CLASS.ONEWAY_STREET;
+  }
+  return base === 2 ? ROAD_CLASS.AVENUE : ROAD_CLASS.STREET;
+}
+
 class Geo {
   pos: number[] = [];
   col: number[] = [];
   uv: number[] = [];
+  cls: number[] = [];
   ind: number[] = [];
   /** When set, every vertex takes this colour (build preview tint). */
   force: string | null = null;
   private palette = new Map<string, THREE.Color>();
 
-  vert(x: number, y: number, z: number, color: string): number {
+  vert(x: number, y: number, z: number, color: string, uv?: [number, number], cls = 0): number {
     const key = this.force ?? color;
     let c = this.palette.get(key);
     if (!c) {
@@ -56,8 +76,17 @@ class Geo {
     const vi = this.pos.length / 3;
     this.pos.push(x, y, z);
     this.col.push(c.r, c.g, c.b);
-    this.uv.push(x / 0.6, z / 0.6);
+    this.uv.push(uv ? uv[0] : x / 0.6, uv ? uv[1] : z / 0.6);
+    this.cls.push(cls);
     return vi;
+  }
+
+  /** Textured quad: corners in order, UVs (0,0) (1,0) (1,1) (0,1). */
+  texQuad(corners: { x: number; z: number }[], y: number, groundY: (x: number, z: number) => number, cls: number): void {
+    const uvs: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const ids = corners.map((p, i) => this.vert(p.x, groundY(p.x, p.z) + y, p.z, "#ffffff", uvs[i], cls));
+    this.tri(ids[0], ids[1], ids[2]);
+    this.tri(ids[0], ids[2], ids[3]);
   }
 
   tri(a: number, b: number, c: number): void {
@@ -82,6 +111,7 @@ class Geo {
     g.setAttribute("position", new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(this.col, 3));
     g.setAttribute("uv", new THREE.Float32BufferAttribute(this.uv, 2));
+    g.setAttribute("aClass", new THREE.Float32BufferAttribute(this.cls, 1));
     g.setIndex(this.ind);
     g.computeVertexNormals();
     return g;
@@ -145,12 +175,50 @@ export const NO_TRIM: RibbonOpts = {
  */
 function ribbon(
   g: Geo, pts: Pt[], type: RoadType, o: RibbonOpts,
-  groundY: (x: number, z: number) => number, tint?: THREE.Color, dirSign = 0,
+  groundY: (x: number, z: number) => number, tint?: THREE.Color, dirSign = 0, atlas = false,
 ): void {
   g.force = tint ? `#${tint.getHexString()}` : null;
   const samples = sampleCurve(pts);
   const total = samples[samples.length - 1].s;
   if (total < 1e-6) return;
+  if (atlas && !tint) {
+    // One textured strip for the whole cross-section: two triangles per
+    // sample, u across the full width, v along the length in texture tiles.
+    const walkA = makeWalker(samples);
+    const fw = fullHalf(type);
+    const cls = roadClassFor(type, dirSign);
+    const stations = [0];
+    let dense = pts.length > 2;
+    if (!dense && total > 0.5) {
+      const pa = walkA(0), pm = walkA(total / 2), pb = walkA(total);
+      const ya = groundY(pa.x, pa.z), ym = groundY(pm.x, pm.z), yb = groundY(pb.x, pb.z);
+      dense = Math.max(ya, ym, yb) - Math.min(ya, ym, yb) > 0.06;
+    }
+    if (dense) for (const p of samples) if (p.s > 0.01 && p.s < total - 0.01) stations.push(p.s);
+    stations.push(total);
+    let prev: number[] | null = null;
+    for (const s of stations) {
+      const p = walkA(s);
+      const nx = -p.dz, nz = p.dx;
+      const v = (dirSign < 0 ? total - s : s) / ROAD_TILE_LENGTH;
+      const lft = g.vert(p.x + nx * fw, groundY(p.x + nx * fw, p.z + nz * fw) + ROAD_LIFT, p.z + nz * fw, "#ffffff", [0, v], cls);
+      const rgt = g.vert(p.x - nx * fw, groundY(p.x - nx * fw, p.z - nz * fw) + ROAD_LIFT, p.z - nz * fw, "#ffffff", [1, v], cls);
+      if (prev) { g.tri(prev[0], prev[1], lft); g.tri(prev[1], rgt, lft); }
+      prev = [lft, rgt];
+    }
+    // One-way arrows as textured quads (arrow_oneway alpha texture).
+    if (dirSign !== 0) {
+      for (let s = 0.9; s < total - 0.3; s += 3.6) {
+        const p = walkA(s);
+        const tx = p.dx * dirSign, tz = p.dz * dirSign;
+        const nx = -tz, nz = tx;
+        const c = (off: number, side: number) => ({ x: p.x + tx * off + nx * side, z: p.z + tz * off + nz * side });
+        g.texQuad([c(-0.35, -0.14), c(-0.35, 0.14), c(0.35, 0.14), c(0.35, -0.14)], MARK_LIFT + 0.002, groundY, ROAD_CLASS.ARROW);
+      }
+    }
+    g.force = null;
+    return;
+  }
   const hw = type === 3 ? ROAD_DRAW_WIDTH[3] / 2 : halfAsphalt(type);
   const kw = type === 3 ? 0 : kerbWidth(type);
   const walk = makeWalker(samples);
@@ -455,12 +523,23 @@ function deadEnd(
 
 /** Zebra crossing plus stop line on one arm, just outside the junction. */
 function zebra(
-  g: Geo, l: NodeLayout, arm: NodeLayoutArm, groundY: GroundY,
+  g: Geo, l: NodeLayout, arm: NodeLayoutArm, groundY: GroundY, atlas = false,
 ): void {
   const hw = arm.halfWidth;
   const d = Math.max(arm.trimK.neg, arm.trimK.pos) + 0.1;
   const cx = l.cx + arm.dx * d, cz = l.cz + arm.dz * d;
   const px = -arm.dz, pz = arm.dx;
+  if (atlas) {
+    // One textured quad per marking instead of one quad per stripe.
+    const c = (along: number, side: number) => ({ x: cx + arm.dx * along + px * side, z: cz + arm.dz * along + pz * side });
+    g.texQuad([c(-0.16, -hw * 0.92), c(-0.16, hw * 0.92), c(0.16, hw * 0.92), c(0.16, -hw * 0.92)],
+      MARK_LIFT, groundY, ROAD_CLASS.CROSSWALK);
+    const bx = l.cx + arm.dx * (d + 0.32), bz = l.cz + arm.dz * (d + 0.32);
+    const b = (along: number, side: number) => ({ x: bx + arm.dx * along + px * side, z: bz + arm.dz * along + pz * side });
+    g.texQuad([b(-0.09, -hw * 0.92), b(-0.09, hw * 0.92), b(0.09, hw * 0.92), b(0.09, -hw * 0.92)],
+      MARK_LIFT, groundY, ROAD_CLASS.STOP_BAR);
+    return;
+  }
   const stripes = Math.max(4, Math.round(hw * 9));
   for (let k = 0; k < stripes; k++) {
     const t = ((k + 0.5) / stripes) * 2 - 1;
@@ -489,7 +568,7 @@ function zebra(
  * kerb sectors only in the gaps between the arms, so bends and junctions get rounded kerb corners without arcs
  * cutting across an arm's roadway.
  */
-function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY): void {
+function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void {
   const arms = l.arms
     .map((a) => ({ a, ang: Math.atan2(a.dz, a.dx) }))
     .sort((p, q) => p.ang - q.ang);
@@ -526,14 +605,19 @@ function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY): void {
       }
     }
   }
-  // Asphalt disc on top of everything laid by the ribbons.
+  // Asphalt disc on top of everything laid by the ribbons. In atlas mode it
+  // samples junction_asphalt with world-space UVs so it meets the strips.
   const N = 24;
-  const c0 = g.vert(l.cx, groundY(l.cx, l.cz) + lift, l.cz, ASPHALT);
+  const discCol = atlas ? "#ffffff" : ASPHALT;
+  const discCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;
+  const c0 = g.vert(l.cx, groundY(l.cx, l.cz) + lift, l.cz, discCol,
+    atlas ? [l.cx / JUNCTION_TILE, l.cz / JUNCTION_TILE] : undefined, discCls);
   const ring: number[] = [];
   for (let k = 0; k < N; k++) {
     const ang = (k / N) * Math.PI * 2;
     const x = l.cx + Math.cos(ang) * r, z = l.cz + Math.sin(ang) * r;
-    ring.push(g.vert(x, groundY(x, z) + lift, z, ASPHALT));
+    ring.push(g.vert(x, groundY(x, z) + lift, z, discCol,
+      atlas ? [x / JUNCTION_TILE, z / JUNCTION_TILE] : undefined, discCls));
   }
   for (let k = 0; k < N; k++) g.tri(c0, ring[k], ring[(k + 1) % N]);
 }
@@ -545,7 +629,8 @@ function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY): void {
  * tunnels show only their two portals (the ribbon stays buried). With
  * `hideBridges` the decks are dropped for the underground view.
  */
-export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hideBridges?: boolean }): THREE.BufferGeometry {
+export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hideBridges?: boolean; atlas?: boolean }): THREE.BufferGeometry {
+  const atlas = !!opts?.atlas;
   const g = new Geo();
   const cache = new Map<number, NodeLayout | null>();
   const layoutOf = (id: number): NodeLayout | null => {
@@ -580,7 +665,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     // A deck ribbon rides the profile instead of the terrain; its ramps meet the ground at the ends.
     const gy = deck ? (x: number, z: number): number => deck.yAt(deck.sAt(x, z)) : groundY;
     // Ribbons run the full length to each node centre; the node patch below rounds the corners over them.
-    ribbon(g, seg.pts, seg.type, NO_TRIM, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0);
+    ribbon(g, seg.pts, seg.type, NO_TRIM, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0, atlas);
     if (deck) {
       parapets(g, seg.type, deck);
       pillars(g, deck, groundY, w, seg.type);
@@ -602,10 +687,10 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
   for (const node of w.nodes) {
     const l = layoutOf(node.id);
     if (!l || l.arms.length < 2) continue;
-    nodePatch(g, l, groundY);
+    nodePatch(g, l, groundY, atlas);
     if (l.arms.length >= 3) {
       for (const arm of l.arms) {
-        zebra(g, l, arm, groundY);
+        zebra(g, l, arm, groundY, atlas);
       }
     }
   }

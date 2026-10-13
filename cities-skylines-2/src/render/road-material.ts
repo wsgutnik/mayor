@@ -105,9 +105,63 @@ export function loadRoadDetailMaps(
   }
 }
 
+/** Cross-section atlas set (public/textures/road/, see blender/make_road_atlas.py). */
+export interface RoadAtlasMaps {
+  street: THREE.Texture;
+  avenue: THREE.Texture;
+  onewayStreet: THREE.Texture;
+  onewayAvenue: THREE.Texture;
+  highway: THREE.Texture;
+  junction: THREE.Texture;
+  crosswalk: THREE.Texture;
+  stopBar: THREE.Texture;
+  arrow: THREE.Texture;
+}
+
+let atlasCache: RoadAtlasMaps | null = null;
+
+/**
+ * Lazily load the road atlas; any failure calls `onFallback` so the caller
+ * keeps the vertex-colour path. Anisotropy is capped at 8.
+ */
+export function loadRoadAtlas(
+  maxAniso: number,
+  onReady: (m: RoadAtlasMaps) => void,
+  onFallback: () => void,
+): void {
+  if (atlasCache) { onReady(atlasCache); return; }
+  const loader = new THREE.TextureLoader();
+  const files: [keyof RoadAtlasMaps, string][] = [
+    ["street", "/textures/road/road_street.png"],
+    ["avenue", "/textures/road/road_avenue.png"],
+    ["onewayStreet", "/textures/road/road_oneway_street.png"],
+    ["onewayAvenue", "/textures/road/road_oneway_avenue.png"],
+    ["highway", "/textures/road/road_highway.png"],
+    ["junction", "/textures/road/junction_asphalt.png"],
+    ["crosswalk", "/textures/road/crosswalk.png"],
+    ["stopBar", "/textures/road/stop_bar.png"],
+    ["arrow", "/textures/road/arrow_oneway.png"],
+  ];
+  const out = {} as RoadAtlasMaps;
+  let pending = files.length;
+  let failed = false;
+  const done = () => {
+    if (--pending !== 0) return;
+    if (failed) { onFallback(); return; }
+    atlasCache = out;
+    onReady(out);
+  };
+  for (const [key, url] of files) {
+    loader.load(url, (t) => { out[key] = prep(t, maxAniso); done(); }, undefined, () => { failed = true; done(); });
+  }
+}
+
 export interface RoadDetail {
   material: THREE.MeshStandardMaterial;
   setMaps(m: RoadDetailMaps): void;
+  setAtlas(m: RoadAtlasMaps): void;
+  /** Day factor 0..1 and wetness 0..1; writes existing uniforms only. */
+  setDayWet(day: number, wet: number): void;
 }
 
 /**
@@ -116,20 +170,30 @@ export interface RoadDetail {
  * kerb/sidewalk mix once loaded. Vertex colours stay as tint throughout.
  */
 export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDetail {
+  const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+  white.needsUpdate = true;
   const uniforms = {
-    uKerbMap: { value: null as THREE.Texture | null },
-    uSidewalkMap: { value: null as THREE.Texture | null },
+    uKerbMap: { value: white as THREE.Texture },
+    uSidewalkMap: { value: white as THREE.Texture },
     uAvgBase: { value: new THREE.Vector3(0.55, 0.55, 0.55) },
     uAvgKerb: { value: new THREE.Vector3(0.55, 0.55, 0.55) },
     uAvgSidewalk: { value: new THREE.Vector3(0.55, 0.55, 0.55) },
     uDetailOn: { value: 0 },
     // Kerb palette colour converted to the working (linear) space, matching vColor.
     uKerbColor: { value: new THREE.Color("#c4c7cc") },
+    uAtlasOn: { value: 0 },
+    uDayFactor: { value: 1 },
+    uWet: { value: 0 },
+    uTexStreet: { value: white as THREE.Texture },
+    uTexAvenue: { value: white as THREE.Texture },
+    uTexOnewayStreet: { value: white as THREE.Texture },
+    uTexOnewayAvenue: { value: white as THREE.Texture },
+    uTexHighway: { value: white as THREE.Texture },
+    uTexJunction: { value: white as THREE.Texture },
+    uTexCrosswalk: { value: white as THREE.Texture },
+    uTexStopBar: { value: white as THREE.Texture },
+    uTexArrow: { value: white as THREE.Texture },
   };
-  const white = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
-  white.needsUpdate = true;
-  uniforms.uKerbMap.value = white;
-  uniforms.uSidewalkMap.value = white;
 
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true, side: THREE.DoubleSide, map: fallbackAsphalt,
@@ -137,21 +201,52 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
   });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `#include <common>
+        attribute float aClass;
+        varying float vRoadClass;
+        varying vec2 vRoadUv;`)
+      .replace("#include <uv_vertex>", `#include <uv_vertex>
+        vRoadClass = aClass;
+        vRoadUv = uv;`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>
         uniform sampler2D uKerbMap, uSidewalkMap;
+        uniform sampler2D uTexStreet, uTexAvenue, uTexOnewayStreet, uTexOnewayAvenue;
+        uniform sampler2D uTexHighway, uTexJunction, uTexCrosswalk, uTexStopBar, uTexArrow;
         uniform vec3 uAvgBase, uAvgKerb, uAvgSidewalk;
         uniform vec3 uKerbColor;
-        uniform float uDetailOn;`)
+        uniform float uDetailOn, uAtlasOn, uDayFactor, uWet;
+        varying float vRoadClass;
+        varying vec2 vRoadUv;`)
       .replace("#include <map_fragment>", `
-        vec3 baseDet = texture2D(map, vMapUv).rgb / max(uAvgBase, vec3(0.05));
-        float kerbness = (1.0 - smoothstep(0.03, 0.12, distance(vColor.rgb, uKerbColor)))
-          * uDetailOn;
-        vec3 kerbDet = mix(texture2D(uKerbMap, vMapUv).rgb / max(uAvgKerb, vec3(0.05)),
-                           texture2D(uSidewalkMap, vMapUv).rgb / max(uAvgSidewalk, vec3(0.05)), 0.6);
-        diffuseColor.rgb *= mix(baseDet, kerbDet, kerbness);`);
+        if (uAtlasOn > 0.5 && vRoadClass > 0.5) {
+          vec3 roadCol;
+          if (vRoadClass < 1.5) roadCol = texture2D(uTexStreet, vRoadUv).rgb;
+          else if (vRoadClass < 2.5) roadCol = texture2D(uTexAvenue, vRoadUv).rgb;
+          else if (vRoadClass < 3.5) roadCol = texture2D(uTexOnewayStreet, vRoadUv).rgb;
+          else if (vRoadClass < 4.5) roadCol = texture2D(uTexOnewayAvenue, vRoadUv).rgb;
+          else if (vRoadClass < 5.5) roadCol = texture2D(uTexHighway, vRoadUv).rgb;
+          else if (vRoadClass < 6.5) roadCol = texture2D(uTexJunction, vRoadUv).rgb;
+          else if (vRoadClass < 7.5) { vec4 m = texture2D(uTexCrosswalk, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
+          else if (vRoadClass < 8.5) { vec4 m = texture2D(uTexStopBar, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
+          else { vec4 m = texture2D(uTexArrow, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
+          roadCol *= 0.30 + 0.70 * uDayFactor;
+          roadCol *= 1.0 - 0.18 * uWet;
+          diffuseColor.rgb = roadCol;
+        } else {
+          vec3 baseDet = texture2D(map, vMapUv).rgb / max(uAvgBase, vec3(0.05));
+          float kerbness = (1.0 - smoothstep(0.03, 0.12, distance(vColor.rgb, uKerbColor)))
+            * uDetailOn;
+          vec3 kerbDet = mix(texture2D(uKerbMap, vMapUv).rgb / max(uAvgKerb, vec3(0.05)),
+                             texture2D(uSidewalkMap, vMapUv).rgb / max(uAvgSidewalk, vec3(0.05)), 0.6);
+          diffuseColor.rgb *= mix(baseDet, kerbDet, kerbness);
+        }`)
+      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        roughnessFactor = mix(roughnessFactor, 0.32,
+          uWet * uAtlasOn * step(0.5, vRoadClass) * step(vRoadClass, 6.5));`);
   };
-  material.customProgramCacheKey = () => "m20-road-detail";
+  material.customProgramCacheKey = () => "road-atlas-v1";
   const v3 = (a: [number, number, number]) => new THREE.Vector3(...a);
   return {
     material,
@@ -164,6 +259,23 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
       uniforms.uAvgSidewalk.value = v3(m.avgSidewalk);
       uniforms.uDetailOn.value = 1;
       material.needsUpdate = true;
+    },
+    setAtlas: (m) => {
+      uniforms.uTexStreet.value = m.street;
+      uniforms.uTexAvenue.value = m.avenue;
+      uniforms.uTexOnewayStreet.value = m.onewayStreet;
+      uniforms.uTexOnewayAvenue.value = m.onewayAvenue;
+      uniforms.uTexHighway.value = m.highway;
+      uniforms.uTexJunction.value = m.junction;
+      uniforms.uTexCrosswalk.value = m.crosswalk;
+      uniforms.uTexStopBar.value = m.stopBar;
+      uniforms.uTexArrow.value = m.arrow;
+      uniforms.uAtlasOn.value = 1;
+      material.needsUpdate = true;
+    },
+    setDayWet: (day, wet) => {
+      uniforms.uDayFactor.value = day;
+      uniforms.uWet.value = wet;
     },
   };
 }
