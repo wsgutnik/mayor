@@ -11,7 +11,7 @@ Mayor focuses on the playable city-building loop: terrain, roads, zoning, lots, 
 | Area | What is in the game |
 |---|---|
 | Roads and junctions | Line and Curve road drawing, streets/avenues/highways, node-based junctions, curbs, crosswalks, stop lines, one-way streets, roundabouts, traffic-light phases, bridges, tunnels, overpasses, underpasses, and automatic highway crossing rules |
-| Zoning and lots | R/C/I zoning up to 4 lots from a road, persistent lots facing the street, 1×1 to 2×2 compound lots, empty-lot rendering, and lot validation for old saves. Street-aligned oriented lots are in development behind an experimental preference. |
+| Zoning and lots | R/C/I zoning up to 4 lots from a road, persistent lots facing the street, 1×1 to 2×2 compound lots, empty-lot rendering, and lot validation for old saves. Street-aligned oriented lots (zone cells and lots in each road's frame, free yaw, so diagonal and curved streets get properly aligned buildings) are available behind the experimental "Street-aligned lots" preference. |
 | Utilities and underground view | Water, sewage, and power flow through the road network with capacity limits; facilities connect to the nearest road; Underground view (`U`) shows pipes, valves, and flow |
 | Traffic and transit | A* traffic for residents and trucks, congestion, buses, metro stations, circular bus lines, fares, transit share, and line management |
 | Water and terrain | Heightmap terrain, selectable map types, official Map Kit maps, continuous water shoreline, wave normals, sky reflection, sun glint, foam, and quality tiers |

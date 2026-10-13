@@ -9,7 +9,7 @@ Game language: pt-BR by default, with English available. Project root: this repo
 npm install
 npm run dev           # http://localhost:5173
 npx tsc --noEmit      # types; must stay clean
-npx vitest run        # tests (225+); must stay green
+npx vitest run        # tests (339); must stay green
 npm run build         # types + bundle
 npm run ci            # local CI: types, tests, and build (always before merging or packaging)
 npm run package       # local CI + desktop app (Tauri); packages are always generated locally
@@ -25,7 +25,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 |---|---|
 | World and rules | `src/sim/world.ts` (tiles, segments, FAC, COVER), `sim.ts` (tools, simulation step, lots), `catalog.ts` |
 | Roads | `src/sim/roads.ts` (node and segment graph, splitting, signals), `elevation.ts` (bridge, tunnel) |
-| Blocks and lots | `src/sim/blocks.ts` (frontage, blocks, lot planning) |
+| Blocks and lots | `src/sim/blocks.ts` (classic tile frontage, blocks, lot planning); oriented model: `src/sim/zonecells.ts` (contracts), `zoneblocks.ts` (segment-frame blocks), `orientedlots.ts` (lots), `mirror.ts` (tile mirror); spec in `docs/process/05-oriented-lots.md` |
 | Utilities | `src/sim/networks.ts` (road-flow coverage, capacity); `COVER` remains the output |
 | Traffic and transit | `src/sim/traffic.ts` (A* with buffers, traffic lights), `transit.ts` |
 | Saves | `src/sim/save.ts` (structural validation, old-save compatibility) |

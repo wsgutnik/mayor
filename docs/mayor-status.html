@@ -203,7 +203,7 @@ npm run dev</pre>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
     updated: "2026-10-12",
-    headline: "M16 a M21, M23, M24 e M25 concluídos. Faltam polimento e validação em Windows e iPad.",
+    headline: "M16 a M21 e M23 a M27 concluídos; zoneamento orientado atrás de uma preferência.",
     summary: "A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
@@ -229,6 +229,7 @@ npm run dev</pre>
       { id: "M20", name: "Render", desc: "Terreno em camadas com texturas HD, sombras, tone mapping, LOD e níveis de qualidade.", status: "done" },
       { id: "M21", name: "Vias e sinalização", desc: "Mão única, rotatória, semáforos com fases e props de calçada.", status: "done" },
       { id: "M22", name: "Acabamento", desc: "Pedestres, polimento e validação em Windows e iPad.", status: "todo" },
+      { id: "M27", name: "Zoneamento orientado", desc: "Blocos por segmento e lotes com yaw livre, atrás de uma preferência; virada do padrão pendente.", status: "done" },
       { id: "M23", name: "Pontes e túneis", desc: "Estradas cruzam água e colinas por ponte ou túnel, sem nivelar o terreno.", status: "done" }
     ],
     checks: [
@@ -240,6 +241,14 @@ npm run dev</pre>
       { ok: false, text: "Windows e iPad reais ainda não testados; app de Mac sem assinatura nem notarização" }
     ],
     log: [
+      { date: "2026-10-12", title: "M27 · zoneamento orientado e documentação em inglês", items: [
+        "Causa raiz do prédio sobre a rua: a rua pode ser diagonal ou curva, mas o prédio só cabia em tiles retos; blocos de zona agora vivem no referencial de cada segmento e lotes têm yaw livre",
+        "P1 a P8 do spec (Fable) mesclados: blocos por segmento, planejador de lotes orientados, espelho em tiles, save v2 com migração do v1, renderização orientada, pintura por ponto no solo, upgrade de resolução e texturas HD (Codex, lead)",
+        "Preferência experimental 'Lotes alinhados à rua' no menu; caminho clássico intacto; padrão será trocado depois de teste mais longo (P9)",
+        "Desempenho: índices de segmento e nó, tabela de semáforos por tile, sincronização de lotes pela pegada inteira; mobiliário de calçada ligado (abrigos, bancos, jardineiras, quiosques) (Codex)",
+        "Repositório reorganizado: o jogo está na raiz; documentação em inglês; NOTICE com marcas e materiais de terceiros; repositório público; dmg e script de assinatura/notarização",
+        "Testes: 339 passando"
+      ] },
       { date: "2026-10-12", title: "M24 e M25 · níveis, detecção e estradas em textura", items: [
         "M24: Solo, Elevado e Subterrâneo nos botões de estrada (tecla E); viaduto e passagem inferior cruzam outra via sem criar nó, com rampas de 3 tiles e tráfego por camada (Muse)",
         "M25: detecção automática — rodovia nunca cruza no nível (vira viaduto ou passagem), terminar de lado em rodovia é recusado, cruzamento sem espaço para rampa cai para cruzamento no nível, prévia com marcadores amarelo, azul e vermelho, botão Trevo (Muse)",
