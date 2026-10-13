@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { depthShade, lotCentre, lotFrontTile, lotKerb, lotModelCells, lotYaw, orientedKerb, orientedModelCells, orientedPad } from "./lots";
+import { depthShade, lotCentre, lotFrontTile, lotInstances, lotKerb, lotModelCells, lotYaw, orientedKerb, orientedModelCells, orientedPad } from "./lots";
 
 describe("lot layout", () => {
   it("yaws models to face the street", () => {
@@ -62,5 +62,49 @@ describe("lot layout", () => {
   it("returns oriented kerb and pad transforms", () => {
     expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 19, len: 3, yaw: 0 });
     expect(orientedPad({ cx: 10, cz: 20, yaw: 0.5, w: 3, d: 2 })).toEqual({ x: 10, z: 20, sx: 3, sz: 2, yaw: 0.5 });
+  });
+
+  it("plans oriented render instances with rotated pads, kerbs, plots and models", () => {
+    const empty = lotInstances({
+      id: 1, seg: 1, side: -1, block: 0, row: 0, col: 1, w: 2, d: 2,
+      zone: 1, level: 0, cx: 10, cz: 20, yaw: Math.PI / 2, tiles: [],
+    });
+    expect(empty.pad).toHaveLength(4);
+    expect(empty.kerb).toHaveLength(0);
+    expect(empty.models).toHaveLength(0);
+    expect(empty.pad[0].yaw).toBeCloseTo(Math.PI / 2);
+    expect(empty.pad[0].shade).toBe(depthShade(1));
+    expect(empty.pad[2].shade).toBe(depthShade(2));
+
+    const built = lotInstances({
+      id: 2, seg: 1, side: -1, block: 0, row: 0, col: 0, w: 4, d: 4,
+      zone: 2, level: 2, cx: 12, cz: 20, yaw: Math.PI / 4, tiles: [],
+    });
+    expect(built.pad).toHaveLength(1);
+    expect(built.pad[0].plot).toBe(true);
+    expect(built.kerb).toHaveLength(1);
+    expect(built.kerb[0].yaw).toBeCloseTo(Math.PI / 4);
+    expect(built.models).toHaveLength(4);
+    expect(built.models.every((m) => m.yaw === Math.PI / 4)).toBe(true);
+  });
+
+  it("keeps observable instance counts equal for axis-aligned tile and oriented lots", () => {
+    const classicLots = Array.from({ length: 500 }, (_, id) => ({
+      id: id + 1, x: (id % 25) * 2, y: Math.floor(id / 25) * 2, w: 2, h: 2,
+      facing: { dx: 0 as const, dy: 1 as const }, zone: 1 as const, level: id % 2, depthFromRoad: 0,
+    }));
+    const orientedLots = classicLots.map((lot) => ({
+      id: lot.id, seg: 1, side: -1 as const, block: 0, row: lot.x, col: 0, w: lot.w, d: lot.h,
+      zone: lot.zone, level: lot.level, cx: lot.x + lot.w / 2, cz: lot.y + lot.h / 2, yaw: 0, tiles: [],
+    }));
+    const count = (lots: typeof classicLots | typeof orientedLots) => lots.reduce((sum, lot) => {
+      const plan = lotInstances(lot);
+      return {
+        zones: sum.zones + plan.pad.length,
+        kerbs: sum.kerbs + plan.kerb.length,
+        buildings: sum.buildings + plan.models.length,
+      };
+    }, { zones: 0, kerbs: 0, buildings: 0 });
+    expect(count(orientedLots)).toEqual(count(classicLots));
   });
 });

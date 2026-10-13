@@ -1,11 +1,15 @@
 import {
   CityState, newCity, refreshDerived,
 } from "./sim";
-import { BIOMES, FAC, Biome, generateWorld, RoadSegment, Roundabout, Stop, TransitLine, WorldLot } from "./world";
+import { lotPose } from "./orientedlots";
+import { rasterizeMirror } from "./mirror";
+import { buildZoneBlocks, cellIndex, nearestCell, type MigrationReport, type ZoneBlockSet } from "./zoneblocks";
+import type { OrientedLot, Side } from "./zonecells";
+import { BIOMES, FAC, Biome, generateWorld, rebuildRoadRaster, RoadSegment, Roundabout, Stop, TransitLine, WorldLot } from "./world";
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
-interface SaveFile {
+interface SaveFileV1 {
   v: number;
   seed: number;
   /** Terrain preset; absent in older saves, which were all plains. */
@@ -36,7 +40,41 @@ interface SaveFile {
   nextLotId?: number;
   /** dx/dy absent in older saves: the entry was always on the left edge. */
   entry: { x: number; y: number; dx?: number; dy?: number };
+  /** Optional rollback/migration hint used by the zoning feature flag. */
+  zoning?: "tiles" | "oriented";
 }
+
+interface SaveCell {
+  seg: number;
+  side: Side;
+  block: number;
+  rows: number;
+  zone: string;
+  level: string;
+}
+
+interface SaveOLot {
+  id: number;
+  seg: number;
+  side: Side;
+  block: number;
+  row: number;
+  col: number;
+  w: number;
+  d: number;
+  zone: 1 | 2 | 3;
+  level: 0 | 1 | 2 | 3;
+}
+
+interface SaveFileV2 extends Omit<SaveFileV1, "v" | "lots" | "nextLotId"> {
+  v: 2;
+  zoning: "tiles" | "oriented";
+  cells: SaveCell[];
+  lots: SaveOLot[];
+  nextOLotId: number;
+}
+
+type SaveFile = SaveFileV1 | SaveFileV2;
 
 function toB64(bytes: Uint8Array): string {
   let s = "";
@@ -60,8 +98,7 @@ function fromB64(b64: string): Uint8Array {
 /** Serialise only what the player created; everything else is derived on load. */
 export function serialize(s: CityState): string {
   const w = s.world;
-  const file: SaveFile = {
-    v: SAVE_VERSION,
+  const base = {
     seed: s.rngState,
     biome: w.biome,
     size: w.size,
@@ -84,9 +121,36 @@ export function serialize(s: CityState): string {
     lines: w.lines,
     nextSegmentId: w.nextSegmentId,
     nextTransitId: w.nextTransitId,
+    entry: w.entry,
+  };
+  if (w.zoning === "oriented") {
+    const set = w.cells as unknown as ZoneBlockSet | undefined ?? buildZoneBlocks(w);
+    const cells: SaveCell[] = [];
+    for (const b of set.blocks.values()) {
+      let used = false;
+      for (let i = 0; i < b.zone.length; i++) if (b.zone[i] || b.level[i]) { used = true; break; }
+      if (!used) continue;
+      cells.push({ seg: b.seg, side: b.side, block: b.block, rows: b.rows, zone: toB64(b.zone), level: toB64(b.level) });
+    }
+    const file: SaveFileV2 = {
+      v: SAVE_VERSION,
+      ...base,
+      zoning: "oriented",
+      cells,
+      lots: (w.olots ?? []).map((l) => ({
+        id: l.id, seg: l.seg, side: l.side, block: l.block, row: l.row, col: l.col,
+        w: l.w, d: l.d, zone: l.zone as 1 | 2 | 3, level: l.level as 0 | 1 | 2 | 3,
+      })),
+      nextOLotId: w.nextOLotId,
+    };
+    return JSON.stringify(file);
+  }
+  const file: SaveFileV1 = {
+    v: 1,
+    ...base,
+    zoning: "tiles",
     lots: w.lots,
     nextLotId: w.nextLotId,
-    entry: w.entry,
   };
   return JSON.stringify(file);
 }
@@ -94,7 +158,7 @@ export function serialize(s: CityState): string {
 export class SaveError extends Error {}
 
 /** Everything a hand-edited or truncated save could break must fail here as a SaveError. */
-function validateStructure(f: SaveFile, n: number): void {
+function validateCommon(f: SaveFile, n: number): void {
   const bad = () => { throw new SaveError("The save file is damaged"); };
   const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v);
   const tile = (t: unknown) => Number.isInteger(t) && (t as number) >= 0 && (t as number) < n * n;
@@ -137,6 +201,11 @@ function validateStructure(f: SaveFile, n: number): void {
     if (!l || !Array.isArray(l.stops) || !l.stops.every((id) => stopIds.has(id))) bad();
     if (!finite(l.vehicles) || l.vehicles < 0 || l.vehicles > 64) bad();
   }
+}
+
+function validateV1Lots(f: SaveFileV1, n: number): void {
+  const bad = () => { throw new SaveError("The save file is damaged"); };
+  const finite = (v: unknown) => typeof v === "number" && Number.isFinite(v);
   if (f.lots !== undefined) {
     if (!Array.isArray(f.lots) || f.lots.length > n * n || !finite(f.nextLotId)) bad();
     const lotIds = new Set<number>();
@@ -158,6 +227,97 @@ function validateStructure(f: SaveFile, n: number): void {
   }
 }
 
+function validateV2Oriented(f: SaveFileV2): void {
+  const bad = () => { throw new SaveError("The save file is damaged"); };
+  if (!Array.isArray(f.cells) || !Array.isArray(f.lots) || !Number.isFinite(f.nextOLotId)) bad();
+  const segIds = new Set(f.segments.map((s) => s.id));
+  const cells = new Map<string, SaveCell>();
+  for (const c of f.cells) {
+    if (!c || !segIds.has(c.seg) || (c.side !== -1 && c.side !== 1) || !Number.isInteger(c.block) || c.block < 0) bad();
+    if (!Number.isInteger(c.rows) || c.rows < 1 || c.rows > 8) bad();
+    const key = `${c.seg}:${c.side}:${c.block}`;
+    if (cells.has(key)) bad();
+    cells.set(key, c);
+    const zone = fromB64(c.zone), level = fromB64(c.level);
+    if (zone.length !== c.rows * 4 || level.length !== c.rows * 4) bad();
+    if (zone.some((v) => v > 3) || level.some((v) => v > 3)) bad();
+  }
+  const lotIds = new Set<number>();
+  const taken = new Set<string>();
+  for (const l of f.lots) {
+    if (!l || !Number.isInteger(l.id) || l.id < 1 || lotIds.has(l.id)) bad();
+    lotIds.add(l.id);
+    if (l.side !== -1 && l.side !== 1) bad();
+    const c = cells.get(`${l.seg}:${l.side}:${l.block}`);
+    if (!c) bad();
+    for (const k of ["row", "col", "w", "d"] as const) if (!Number.isInteger(l[k])) bad();
+    if (l.row < 0 || l.col < 0 || l.w < 1 || l.d < 1 || l.w > 4 || l.d > 4 || l.row + l.w > c!.rows || l.col + l.d > 4) bad();
+    if (![1, 2, 3].includes(l.zone) || ![0, 1, 2, 3].includes(l.level)) bad();
+    for (let row = l.row; row < l.row + l.w; row++) for (let col = l.col; col < l.col + l.d; col++) {
+      const key = `${l.seg}:${l.side}:${l.block}:${row}:${col}`;
+      if (taken.has(key)) bad();
+      taken.add(key);
+    }
+  }
+}
+
+/** Everything a hand-edited or truncated save could break must fail here as a SaveError. */
+function validateStructure(f: SaveFile, n: number): void {
+  validateCommon(f, n);
+  if (f.v === 2) validateV2Oriented(f as SaveFileV2);
+  else validateV1Lots(f as SaveFileV1, n);
+}
+
+function copySavedCells(f: SaveFileV2, set: ZoneBlockSet): void {
+  for (const c of f.cells) {
+    const b = set.blocks.get(`${c.seg}:${c.side}:${c.block}`);
+    if (!b || b.rows !== c.rows) throw new SaveError("The save file is damaged");
+    b.zone.set(fromB64(c.zone));
+    b.level.set(fromB64(c.level));
+  }
+}
+
+function hydrateSavedLots(f: SaveFileV2, set: ZoneBlockSet): OrientedLot[] {
+  const lots: OrientedLot[] = [];
+  for (const l of f.lots) {
+    const b = set.blocks.get(`${l.seg}:${l.side}:${l.block}`);
+    if (!b) throw new SaveError("The save file is damaged");
+    const lot = { ...l, ...lotPose(b, l), tiles: [] };
+    for (let row = lot.row; row < lot.row + lot.w; row++) for (let col = lot.col; col < lot.col + lot.d; col++) {
+      const i = cellIndex(row, col);
+      if (!b.valid[i] || b.zone[i] !== lot.zone || b.level[i] !== lot.level || b.lot[i] !== -1) {
+        throw new SaveError("The save file is damaged");
+      }
+      b.lot[i] = lot.id;
+    }
+    lots.push(lot);
+  }
+  return lots;
+}
+
+export function migrateV1Cells(w: import("./world").World): MigrationReport {
+  const oldZone = new Uint8Array(w.zone);
+  const oldLevel = new Uint8Array(w.level);
+  rebuildRoadRaster(w);
+  const set = buildZoneBlocks(w);
+  const report: MigrationReport = { moved: 0, dropped: [], lotsBroken: [] };
+  for (let y = 0; y < w.size; y++) for (let x = 0; x < w.size; x++) {
+    const tile = y * w.size + x;
+    if (!oldZone[tile]) continue;
+    const ref = nearestCell(set, x + 0.5, y + 0.5, 0.75);
+    if (!ref) { report.dropped.push({ seg: -1, side: 1, block: -1, row: y, col: x }); continue; }
+    const b = set.blocks.get(`${ref.seg}:${ref.side}:${ref.block}`)!;
+    const i = cellIndex(ref.row, ref.col);
+    if (b.zone[i]) { report.dropped.push(ref); continue; }
+    b.zone[i] = oldZone[tile];
+    b.level[i] = oldLevel[tile];
+    report.moved++;
+  }
+  w.zoning = "oriented";
+  w.cells = set as unknown as import("./world").World["cells"];
+  return report;
+}
+
 export function deserialize(json: string): CityState {
   let f: SaveFile;
   try {
@@ -165,7 +325,7 @@ export function deserialize(json: string): CityState {
   } catch {
     throw new SaveError("The save file is damaged");
   }
-  if (!f || typeof f !== "object" || f.v !== SAVE_VERSION) throw new SaveError("This save is from a different version");
+  if (!f || typeof f !== "object" || (f.v !== 1 && f.v !== 2)) throw new SaveError("This save is from a different version");
   const n = f.size;
   if (!Number.isInteger(n) || n < 8 || n > 512) throw new SaveError("The save file is damaged");
   validateStructure(f, n);
@@ -196,16 +356,39 @@ export function deserialize(json: string): CityState {
   w.nextSegmentId = Math.max(f.nextSegmentId, ...f.segments.map((g) => g.id + 1), 1);
   w.nextTransitId = Math.max(f.nextTransitId, ...f.stops.map((g) => g.id + 1), ...f.lines.map((g) => g.id + 1), 1);
   if (f.lots !== undefined) {
-    // Lots ride along with the save; the tile mirror still self-heals them in refreshDerived.
-    w.lots = f.lots;
-    w.nextLotId = Math.max(f.nextLotId!, ...f.lots.map((l) => l.id + 1), 1);
-    w.lotAt.fill(-1);
-    for (const l of w.lots) {
-      for (let y = l.y; y < l.y + l.h; y++) {
-        for (let x = l.x; x < l.x + l.w; x++) w.lotAt[y * n + x] = l.id;
+    if (f.v === 2) {
+      const f2 = f as SaveFileV2;
+      if (f2.zoning === "oriented") {
+        w.zoning = "oriented";
+        rebuildRoadRaster(w);
+        const set = buildZoneBlocks(w);
+        copySavedCells(f2, set);
+        w.cells = set as unknown as typeof w.cells;
+        w.olots = hydrateSavedLots(f2, set);
+        w.nextOLotId = Math.max(f2.nextOLotId, ...w.olots.map((l) => l.id + 1), 1);
+        rasterizeMirror(w, set, w.olots);
+        w.lotsDirty = false;
+      } else {
+        w.lotsDirty = true;
       }
+    } else {
+    // Lots ride along with the save; the tile mirror still self-heals them in refreshDerived.
+      const f1 = f as SaveFileV1;
+      w.lots = f1.lots!;
+      w.nextLotId = Math.max(f1.nextLotId!, ...f1.lots!.map((l) => l.id + 1), 1);
+      w.lotAt.fill(-1);
+      for (const l of w.lots) {
+        for (let y = l.y; y < l.y + l.h; y++) {
+          for (let x = l.x; x < l.x + l.w; x++) w.lotAt[y * n + x] = l.id;
+        }
+      }
+      w.lotsDirty = false;
     }
-    w.lotsDirty = false;
+  }
+  if (f.v === 1 && f.zoning === "oriented") {
+    migrateV1Cells(w);
+    w.olots = [];
+    w.lotsDirty = true;
   }
   w.entry = { x: f.entry.x, y: f.entry.y, dx: f.entry.dx ?? 1, dy: f.entry.dy ?? 0 };
   s.day = f.day;

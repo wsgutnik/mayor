@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CityState } from "../sim/sim";
+import type { CityState } from "../sim/sim";
 import {
   ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
   RoadType, Pt, inBounds, heightAt, Biome, blocksBuilding, isTunnelTile,
@@ -7,8 +7,7 @@ import {
 import { CameraRig } from "./camera";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
-import { getFrontage } from "../sim/blocks";
-import { depthShade, lotCentre, lotFrontTile, lotKerb, lotModelCells, lotYaw } from "./lots";
+import { lotFrontTile, lotInstances } from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
@@ -25,6 +24,9 @@ import { configureKitTextures } from "./kit-materials";
 import { nodeArms, signalNodes, signalPhase } from "../sim/roads";
 import { PROP_KINDS, PropKind, planProps } from "../sim/props";
 import { PROP_TINT, propGeometry } from "./props";
+import { nearestCell } from "../sim/mirror";
+import type { ZoneBlockSet } from "../sim/zoneblocks";
+import type { CellPose, CellRef } from "../sim/zonecells";
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
@@ -679,57 +681,66 @@ export class CityRenderer {
     }
     // Lots: empty lots read as depth-shaded pads with a street kerb; built
     // lots hold one composed building on a shared plot, facing the street.
-    const frontage = getFrontage(w);
-    for (const lot of w.lots) {
+    const renderLots = w.zoning === "oriented" ? (w.olots ?? []) : w.lots;
+    for (const lot of renderLots) {
       const z = lot.zone as 1 | 2 | 3;
-      const area = lot.w * lot.h;
-      const c = lotCentre(lot);
-      let hLot = 0;
-      for (let y = lot.y; y < lot.y + lot.h; y++) {
-        for (let x = lot.x; x < lot.x + lot.w; x++) hLot += tileHeight(w, x, y);
-      }
-      hLot /= area;
       // The kerb strip belongs on a road edge: skip lots whose front is not actually a road tile.
-      const front = lotFrontTile(lot);
-      const onRoad = !!front && inBounds(w, front.x, front.y) && w.road[idx(w, front.x, front.y)] > 0;
-      const kerb = onRoad ? lotKerb(lot) : null;
-      if (kerb && nk < this.kerbs.instanceMatrix.count) {
+      const onRoad = "cx" in lot
+        ? lot.col === 0
+        : (() => {
+            const front = lotFrontTile(lot);
+            return !!front && inBounds(w, front.x, front.y) && w.road[idx(w, front.x, front.y)] > 0;
+          })();
+      const plan = lotInstances(lot, onRoad);
+      const c = plan.centre;
+      let hLot = 0;
+      if ("cx" in lot) hLot = heightAt(w, c.x, c.z);
+      else {
+        for (let y = lot.y; y < lot.y + lot.h; y++) for (let x = lot.x; x < lot.x + lot.w; x++) hLot += tileHeight(w, x, y);
+        hLot /= plan.area;
+      }
+      for (const kerb of plan.kerb) {
+        if (nk >= this.kerbs.instanceMatrix.count) break;
         d.position.set(kerb.x, heightAt(w, kerb.x, kerb.z) + 0.06, kerb.z);
-        d.scale.set(Math.max(0.08, kerb.w - 0.04), 0.14, Math.max(0.08, kerb.d - 0.02));
+        d.rotation.set(0, kerb.yaw, 0);
+        d.scale.set(kerb.sx, 0.14, kerb.sz);
         d.updateMatrix();
         this.kerbs.setMatrixAt(nk, d.matrix);
         this.kerbs.setColorAt(nk++, KERB_TINT);
+        d.rotation.set(0, 0, 0);
       }
       if (lot.level === 0) {
-        for (let y = lot.y; y < lot.y + lot.h; y++) {
-          for (let x = lot.x; x < lot.x + lot.w; x++) {
-            const i = idx(w, x, y);
-            d.position.set(x + 0.5, tileHeight(w, x, y) + 0.03, y + 0.5);
-            d.scale.set(0.96, 0.06, 0.96);
-            d.updateMatrix();
-            this.zones.setMatrixAt(nz, d.matrix);
-            this.zones.setColorAt(nz++, tint.copy(ZONE_TILE[z]).multiplyScalar(depthShade(frontage.distance[i])));
-          }
+        for (const pad of plan.pad) {
+          if (nz >= this.zones.instanceMatrix.count) break;
+          d.position.set(pad.x, this.padY(pad.x, pad.z, pad.sx, pad.sz, pad.yaw, 0.03), pad.z);
+          d.rotation.set(0, pad.yaw, 0);
+          d.scale.set(pad.sx, 0.06, pad.sz);
+          d.updateMatrix();
+          this.zones.setMatrixAt(nz, d.matrix);
+          this.zones.setColorAt(nz++, tint.copy(ZONE_TILE[z]).multiplyScalar(pad.shade));
+          d.rotation.set(0, 0, 0);
         }
       } else {
-        if (area > 1 && nz < this.zones.instanceMatrix.count) {
-          d.position.set(c.x, hLot + 0.02, c.z);
-          d.scale.set(lot.w - 0.08, 0.08, lot.h - 0.08);
+        for (const pad of plan.pad) {
+          if (nz >= this.zones.instanceMatrix.count) break;
+          d.position.set(pad.x, this.padY(pad.x, pad.z, pad.sx, pad.sz, pad.yaw, 0.02), pad.z);
+          d.rotation.set(0, pad.yaw, 0);
+          d.scale.set(pad.sx, 0.08, pad.sz);
           d.updateMatrix();
           this.zones.setMatrixAt(nz, d.matrix);
           this.zones.setColorAt(nz++, PLOT_TINT);
+          d.rotation.set(0, 0, 0);
         }
-        const r = hash(lot.x, lot.y);
+        const r = hash(Math.floor(c.x), Math.floor(c.z));
         if (z === 3 && lot.level >= 2) {
           smoke.push({ x: c.x + 0.22, y: hLot + (lot.level === 3 ? 0.95 : 0.7), z: c.z - 0.2, strength: lot.level === 3 ? 0.8 : 0.5 });
         }
-        const look = pickLotEntry(z, lot.level, area, tileHash(lot.x + 17, lot.y + 29));
+        const look = pickLotEntry(z, lot.level, plan.area, tileHash(Math.floor(c.x) + 17, Math.floor(c.z) + 29));
         const mesh = this.bMeshes.get(`${z}-${look.level}-${look.index}`);
         if (mesh) {
           tint.setScalar(0.9 + r * 0.2);
-          const yaw = lotYaw(lot);
-          for (const cell of lotModelCells(lot)) {
-            this.placeLotCell(mesh, counts, cell.x, cell.z, yaw, 0.92 + r * 0.2, tint);
+          for (const cell of plan.models) {
+            this.placeLotCell(mesh, counts, cell.x, cell.z, cell.yaw, 0.92 + r * 0.2, tint);
           }
         }
       }
@@ -945,6 +956,15 @@ export class CityRenderer {
 
   private groundY(x: number, z: number): number {
     return heightAt(this.world, x, z);
+  }
+
+  private padY(x: number, z: number, sx: number, sz: number, yaw: number, lift: number): number {
+    const s = Math.sin(yaw), c = Math.cos(yaw);
+    let h = 0;
+    for (const ax of [-sx / 2, sx / 2]) {
+      for (const dz of [-sz / 2, sz / 2]) h += heightAt(this.world, x + ax * c + dz * s, z - ax * s + dz * c);
+    }
+    return h / 4 + lift;
   }
 
   /**
@@ -1333,10 +1353,27 @@ export class CityRenderer {
     return { x, y };
   }
 
+  pickCell(clientX: number, clientY: number): CellRef | null {
+    const p = this.pickPoint(clientX, clientY);
+    const set = this.world.cells as unknown as ZoneBlockSet | undefined;
+    return p && set ? nearestCell(set, p.x, p.z, 0.75) : null;
+  }
+
   setHover(tile: { x: number; y: number } | null, color = "#ffffff"): void {
     if (!tile) { this.hover.visible = false; return; }
     const h = tileHeight(this.world, tile.x, tile.y);
     this.hover.position.set(tile.x + 0.5, h + 0.1, tile.y + 0.5);
+    this.hover.rotation.set(0, 0, 0);
+    this.hover.scale.set(1, 1, 1);
+    (this.hover.material as THREE.MeshBasicMaterial).color.set(color);
+    this.hover.visible = true;
+  }
+
+  setHoverCell(pose: CellPose | null, color = "#ffffff"): void {
+    if (!pose) { this.hover.visible = false; return; }
+    this.hover.position.set(pose.x, heightAt(this.world, pose.x, pose.z) + 0.1, pose.z);
+    this.hover.rotation.set(0, pose.yaw, 0);
+    this.hover.scale.set(1, 1, 1);
     (this.hover.material as THREE.MeshBasicMaterial).color.set(color);
     this.hover.visible = true;
   }
