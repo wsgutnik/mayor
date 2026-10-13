@@ -54,7 +54,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "542163d84985",
+      "geometryHash": "22beb23c733e",
       "id": 1,
       "name": "Starter House",
       "category": "R1",
@@ -118,7 +118,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "7f4893158ec6",
+      "geometryHash": "e64d8c73d1a6",
       "id": 2,
       "name": "Family House",
       "category": "R1",
@@ -131,7 +131,7 @@
     {
       "file": "03.glb",
       "kind": "building",
-      "bytes": 51332,
+      "bytes": 51336,
       "meshes": 19,
       "vertices": 597,
       "triangles": 307,
@@ -182,7 +182,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "3f5fa3199a3b",
+      "geometryHash": "90e9da281186",
       "id": 3,
       "name": "Modern Townhouse",
       "category": "R2",
@@ -244,7 +244,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "cb4623fb2716",
+      "geometryHash": "85ecc6728498",
       "id": 4,
       "name": "Semi-detached Villa",
       "category": "R2",
@@ -257,7 +257,7 @@
     {
       "file": "05.glb",
       "kind": "building",
-      "bytes": 67520,
+      "bytes": 67516,
       "meshes": 17,
       "vertices": 995,
       "triangles": 514,
@@ -306,7 +306,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f6d9458f203b",
+      "geometryHash": "519df353b511",
       "id": 5,
       "name": "Small Apartment",
       "category": "R3",
@@ -319,7 +319,7 @@
     {
       "file": "06.glb",
       "kind": "building",
-      "bytes": 79916,
+      "bytes": 79920,
       "meshes": 18,
       "vertices": 1236,
       "triangles": 636,
@@ -369,7 +369,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "981d83215685",
+      "geometryHash": "c1ceb79d5ab0",
       "id": 6,
       "name": "Garden Condominium",
       "category": "R3",
@@ -431,7 +431,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "b2750e14aa1c",
+      "geometryHash": "14bf0bb3ab03",
       "id": 7,
       "name": "Compact Tower",
       "category": "R4",
@@ -444,7 +444,7 @@
     {
       "file": "08.glb",
       "kind": "building",
-      "bytes": 74740,
+      "bytes": 74272,
       "meshes": 16,
       "vertices": 1176,
       "triangles": 602,
@@ -492,7 +492,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "e73fb93f3c34",
+      "geometryHash": "85b6de45faa3",
       "id": 8,
       "name": "Balcony Residence",
       "category": "R3",
@@ -505,7 +505,7 @@
     {
       "file": "09.glb",
       "kind": "building",
-      "bytes": 60284,
+      "bytes": 60288,
       "meshes": 17,
       "vertices": 839,
       "triangles": 432,
@@ -554,7 +554,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "779791e857a3",
+      "geometryHash": "0df189e24f6c",
       "id": 9,
       "name": "Local Mixed-use Building",
       "category": "R4",
@@ -615,7 +615,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "95148d2e54f7",
+      "geometryHash": "244bfae89722",
       "id": 10,
       "name": "Premium Tower",
       "category": "R5",
@@ -681,7 +681,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8d65c1b4a88a",
+      "geometryHash": "eb0bff8f05b4",
       "id": 11,
       "name": "Convenience Store",
       "category": "C1",
@@ -758,7 +758,7 @@
     {
       "file": "13.glb",
       "kind": "building",
-      "bytes": 61116,
+      "bytes": 61112,
       "meshes": 20,
       "vertices": 790,
       "triangles": 404,
@@ -810,7 +810,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "ce61cac7f7ae",
+      "geometryHash": "f746b307595d",
       "id": 13,
       "name": "Local Market",
       "category": "C2",
@@ -823,12 +823,13 @@
     {
       "file": "14.glb",
       "kind": "building",
-      "bytes": 49656,
-      "meshes": 15,
+      "bytes": 50912,
+      "meshes": 16,
       "vertices": 659,
       "triangles": 342,
       "materials": [
         "black",
+        "glass_dark",
         "glow_window",
         "grass",
         "hedge",
@@ -870,7 +871,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "e09700928bbb",
+      "geometryHash": "abc9bc7e89ae",
       "id": 14,
       "name": "Urban Restaurant",
       "category": "C2",
@@ -883,7 +884,7 @@
     {
       "file": "15.glb",
       "kind": "building",
-      "bytes": 50440,
+      "bytes": 50432,
       "meshes": 15,
       "vertices": 671,
       "triangles": 352,
@@ -930,7 +931,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "218d61a5af11",
+      "geometryHash": "133d24fd34ef",
       "id": 15,
       "name": "Neighbourhood Pharmacy",
       "category": "C1",
@@ -993,7 +994,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "1fc5ff6706a3",
+      "geometryHash": "06cef9b5c621",
       "id": 16,
       "name": "Compact Office",
       "category": "C2",
@@ -1006,7 +1007,7 @@
     {
       "file": "17.glb",
       "kind": "building",
-      "bytes": 59832,
+      "bytes": 59836,
       "meshes": 18,
       "vertices": 795,
       "triangles": 424,
@@ -1057,7 +1058,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "c7be68c1e1f8",
+      "geometryHash": "42fd7b0bfa2c",
       "id": 17,
       "name": "Local Bank",
       "category": "C2",
@@ -1120,7 +1121,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "48ed981abc0e",
+      "geometryHash": "f1033000d0ef",
       "id": 18,
       "name": "Executive Hotel",
       "category": "C3",
@@ -1180,7 +1181,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "5ab098c5efe5",
+      "geometryHash": "eea6f19160e0",
       "id": 19,
       "name": "Neighbourhood Mall",
       "category": "C3",
@@ -1239,7 +1240,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "d6c55d3c506c",
+      "geometryHash": "eb18d4e63aab",
       "id": 20,
       "name": "Corporate Tower",
       "category": "C4",
@@ -1298,7 +1299,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "2a17cfc3e76d",
+      "geometryHash": "b2442228bab3",
       "id": 21,
       "name": "City Hall",
       "category": "S3",
@@ -1311,10 +1312,10 @@
     {
       "file": "22.glb",
       "kind": "building",
-      "bytes": 35272,
-      "meshes": 13,
-      "vertices": 408,
-      "triangles": 208,
+      "bytes": 51908,
+      "meshes": 17,
+      "vertices": 663,
+      "triangles": 338,
       "materials": [
         "concrete",
         "glass_blue",
@@ -1323,12 +1324,16 @@
         "glow_window",
         "grass",
         "hedge",
+        "metal",
+        "metal_dark",
         "paving",
         "roof_flat",
+        "slab",
         "tree_green",
         "trunk",
         "wall_brick",
-        "wall_cream"
+        "wall_cream",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_sign",
@@ -1357,7 +1362,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "3a11ce16fc30",
+      "geometryHash": "f2ca10382ff7",
       "id": 22,
       "name": "Public Library",
       "category": "S2",
@@ -1370,10 +1375,10 @@
     {
       "file": "23.glb",
       "kind": "building",
-      "bytes": 36712,
-      "meshes": 15,
-      "vertices": 392,
-      "triangles": 200,
+      "bytes": 50816,
+      "meshes": 18,
+      "vertices": 612,
+      "triangles": 310,
       "materials": [
         "glass_blue",
         "glass_dark",
@@ -1381,15 +1386,18 @@
         "glow_window",
         "grass",
         "hedge",
+        "metal_dark",
         "paving",
         "roof_dark",
         "roof_flat",
+        "slab",
         "tree_dark",
         "tree_green",
         "trunk",
         "wall_cream",
         "wall_white",
-        "wall_wood"
+        "wall_wood",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_sign",
@@ -1408,17 +1416,17 @@
         ],
         "max": [
           0.48,
-          0.33,
+          0.345,
           0.48
         ],
         "dimensions": [
           0.96,
-          0.33,
+          0.345,
           0.96
         ]
       },
       "lodNodes": [],
-      "geometryHash": "2ab242b85a0e",
+      "geometryHash": "dfe777b5f943",
       "id": 23,
       "name": "Community Centre",
       "category": "S2",
@@ -1431,10 +1439,10 @@
     {
       "file": "24.glb",
       "kind": "building",
-      "bytes": 61704,
+      "bytes": 69432,
       "meshes": 18,
-      "vertices": 838,
-      "triangles": 431,
+      "vertices": 1002,
+      "triangles": 513,
       "materials": [
         "concrete",
         "glass_dark",
@@ -1482,7 +1490,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "101318f88439",
+      "geometryHash": "cf924eea8007",
       "id": 24,
       "name": "Police Station",
       "category": "S3",
@@ -1495,10 +1503,10 @@
     {
       "file": "25.glb",
       "kind": "building",
-      "bytes": 42964,
-      "meshes": 16,
-      "vertices": 500,
-      "triangles": 254,
+      "bytes": 55424,
+      "meshes": 18,
+      "vertices": 708,
+      "triangles": 358,
       "materials": [
         "concrete",
         "glass_blue",
@@ -1506,6 +1514,7 @@
         "glow_window",
         "grass",
         "hedge",
+        "metal_dark",
         "paving",
         "roof_flat",
         "roof_slate",
@@ -1515,7 +1524,8 @@
         "trunk",
         "wall_cream",
         "wall_white",
-        "wall_wood"
+        "wall_wood",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -1543,7 +1553,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8c7e5bfbaf1a",
+      "geometryHash": "94156c161935",
       "id": 25,
       "name": "City Museum",
       "category": "S3",
@@ -1556,26 +1566,30 @@
     {
       "file": "26.glb",
       "kind": "building",
-      "bytes": 38580,
-      "meshes": 15,
-      "vertices": 428,
-      "triangles": 218,
+      "bytes": 54472,
+      "meshes": 19,
+      "vertices": 671,
+      "triangles": 342,
       "materials": [
         "glass_blue",
         "glass_dark",
         "glow_window",
         "grass",
         "hedge",
+        "metal",
+        "metal_dark",
         "paving",
         "roof_flat",
         "sign_blue",
         "sign_red",
+        "slab",
         "tree_dark",
         "tree_green",
         "trunk",
         "wall_grey",
         "wall_white",
-        "wall_wood"
+        "wall_wood",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -1603,7 +1617,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f2de0161ab25",
+      "geometryHash": "6a0c895db99d",
       "id": 26,
       "name": "Clinic",
       "category": "S2",
@@ -1616,14 +1630,15 @@
     {
       "file": "27.glb",
       "kind": "building",
-      "bytes": 42556,
-      "meshes": 12,
-      "vertices": 588,
-      "triangles": 298,
+      "bytes": 60112,
+      "meshes": 14,
+      "vertices": 912,
+      "triangles": 460,
       "materials": [
         "glass_blue",
         "glass_dark",
         "glow_window",
+        "metal_dark",
         "paving",
         "roof_flat",
         "sign_red",
@@ -1632,7 +1647,8 @@
         "tree_green",
         "trunk",
         "wall_grey",
-        "wall_white"
+        "wall_white",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -1660,7 +1676,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "800b9e416508",
+      "geometryHash": "f5e956d92c4e",
       "id": 27,
       "name": "General Hospital",
       "category": "S4",
@@ -1673,10 +1689,10 @@
     {
       "file": "28.glb",
       "kind": "building",
-      "bytes": 39032,
-      "meshes": 16,
-      "vertices": 420,
-      "triangles": 214,
+      "bytes": 50724,
+      "meshes": 18,
+      "vertices": 616,
+      "triangles": 312,
       "materials": [
         "glass_blue",
         "glass_dark",
@@ -1689,11 +1705,13 @@
         "sign_blue",
         "sign_orange",
         "sign_red",
+        "slab",
         "tree_dark",
         "tree_green",
         "trunk",
         "wall_brick",
-        "wall_cream"
+        "wall_cream",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -1711,17 +1729,17 @@
         ],
         "max": [
           0.48,
-          0.31,
+          0.325,
           0.48
         ],
         "dimensions": [
           0.96,
-          0.31,
+          0.325,
           0.96
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8564f2961da9",
+      "geometryHash": "8b66eb503140",
       "id": 28,
       "name": "Primary School",
       "category": "S2",
@@ -1734,15 +1752,17 @@
     {
       "file": "29.glb",
       "kind": "building",
-      "bytes": 36256,
-      "meshes": 14,
-      "vertices": 394,
-      "triangles": 200,
+      "bytes": 52156,
+      "meshes": 17,
+      "vertices": 661,
+      "triangles": 336,
       "materials": [
         "concrete",
         "glass_blue",
         "glass_dark",
         "glow_window",
+        "metal",
+        "metal_dark",
         "paving",
         "roof_dark",
         "roof_flat",
@@ -1752,7 +1772,8 @@
         "trunk",
         "wall_brick",
         "wall_cream",
-        "wall_green"
+        "wall_green",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -1770,17 +1791,17 @@
         ],
         "max": [
           0.48,
-          0.4,
+          0.439,
           0.48
         ],
         "dimensions": [
           0.96,
-          0.4,
+          0.439,
           0.96
         ]
       },
       "lodNodes": [],
-      "geometryHash": "3f386a24ea55",
+      "geometryHash": "09bea5442cb9",
       "id": 29,
       "name": "Secondary School",
       "category": "S3",
@@ -1793,10 +1814,10 @@
     {
       "file": "30.glb",
       "kind": "building",
-      "bytes": 49460,
-      "meshes": 15,
-      "vertices": 662,
-      "triangles": 333,
+      "bytes": 69852,
+      "meshes": 16,
+      "vertices": 1073,
+      "triangles": 541,
       "materials": [
         "glass_dark",
         "glow_sign",
@@ -1812,7 +1833,8 @@
         "trunk",
         "wall_brick",
         "wall_red",
-        "wall_white"
+        "wall_white",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_sign",
@@ -1841,7 +1863,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "4f8e98872e73",
+      "geometryHash": "ff212167d3d7",
       "id": 30,
       "name": "Fire Station",
       "category": "S3",
@@ -1854,10 +1876,10 @@
     {
       "file": "31.glb",
       "kind": "building",
-      "bytes": 67444,
+      "bytes": 75588,
       "meshes": 22,
-      "vertices": 880,
-      "triangles": 444,
+      "vertices": 1044,
+      "triangles": 526,
       "materials": [
         "bench_wood",
         "black",
@@ -1910,7 +1932,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "aac397fd5375",
+      "geometryHash": "8a926c88e11f",
       "id": 31,
       "name": "Bus Station",
       "category": "T2",
@@ -1923,10 +1945,10 @@
     {
       "file": "32.glb",
       "kind": "building",
-      "bytes": 71772,
+      "bytes": 82788,
       "meshes": 25,
-      "vertices": 880,
-      "triangles": 440,
+      "vertices": 1111,
+      "triangles": 558,
       "materials": [
         "asphalt",
         "black",
@@ -1982,7 +2004,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "e827db46e10b",
+      "geometryHash": "be6f5c06dabe",
       "id": 32,
       "name": "Train Station",
       "category": "T3",
@@ -1995,17 +2017,19 @@
     {
       "file": "33.glb",
       "kind": "building",
-      "bytes": 69020,
-      "meshes": 24,
-      "vertices": 868,
-      "triangles": 438,
+      "bytes": 86156,
+      "meshes": 26,
+      "vertices": 1178,
+      "triangles": 598,
       "materials": [
         "black",
+        "concrete",
         "glass_blue",
         "glass_dark",
         "glow_lamp",
         "glow_window",
         "lamp_pole",
+        "metal",
         "metal_dark",
         "paving",
         "roof_dark",
@@ -2042,17 +2066,17 @@
         ],
         "max": [
           0.4925,
-          0.36,
+          0.369,
           0.4855
         ],
         "dimensions": [
           0.98,
-          0.36,
+          0.369,
           0.9674
         ]
       },
       "lodNodes": [],
-      "geometryHash": "195cc594bad7",
+      "geometryHash": "90b3dd4e6e99",
       "id": 33,
       "name": "Cargo Terminal",
       "category": "T3",
@@ -2065,13 +2089,16 @@
     {
       "file": "34.glb",
       "kind": "building",
-      "bytes": 46588,
-      "meshes": 12,
-      "vertices": 670,
-      "triangles": 363,
+      "bytes": 61532,
+      "meshes": 16,
+      "vertices": 884,
+      "triangles": 475,
       "materials": [
         "concrete",
         "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "metal",
         "metal_dark",
         "paving",
         "roof_flat",
@@ -2081,9 +2108,12 @@
         "wall_cream",
         "wall_grey",
         "wall_white",
-        "water"
+        "water",
+        "white"
       ],
-      "emissiveMaterials": [],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
       "textures": [],
       "missingUV": 0,
       "missingNormals": 0,
@@ -2107,7 +2137,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "6b44c4d21ef0",
+      "geometryHash": "e624e98b85d5",
       "id": 34,
       "name": "Water Treatment Plant",
       "category": "U3",
@@ -2120,10 +2150,10 @@
     {
       "file": "35.glb",
       "kind": "building",
-      "bytes": 43956,
-      "meshes": 11,
-      "vertices": 643,
-      "triangles": 337,
+      "bytes": 49304,
+      "meshes": 12,
+      "vertices": 731,
+      "triangles": 381,
       "materials": [
         "glass_dark",
         "glow_window",
@@ -2135,7 +2165,8 @@
         "tree_dark",
         "tree_green",
         "trunk",
-        "wall_grey"
+        "wall_grey",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -2163,7 +2194,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "84aeb2567df1",
+      "geometryHash": "73449cf91e19",
       "id": 35,
       "name": "Electrical Substation",
       "category": "U2",
@@ -2176,10 +2207,10 @@
     {
       "file": "36.glb",
       "kind": "building",
-      "bytes": 50180,
+      "bytes": 63340,
       "meshes": 15,
-      "vertices": 688,
-      "triangles": 347,
+      "vertices": 950,
+      "triangles": 483,
       "materials": [
         "concrete",
         "glass_blue",
@@ -2213,17 +2244,17 @@
         ],
         "max": [
           0.48,
-          0.36,
+          0.434,
           0.48
         ],
         "dimensions": [
           0.96,
-          0.36,
+          0.434,
           0.96
         ]
       },
       "lodNodes": [],
-      "geometryHash": "21489a8599b3",
+      "geometryHash": "ae3493ff5437",
       "id": 36,
       "name": "Logistics Warehouse",
       "category": "I1",
@@ -2236,10 +2267,10 @@
     {
       "file": "37.glb",
       "kind": "building",
-      "bytes": 53008,
+      "bytes": 64048,
       "meshes": 17,
-      "vertices": 685,
-      "triangles": 349,
+      "vertices": 919,
+      "triangles": 471,
       "materials": [
         "concrete",
         "glass_dark",
@@ -2285,7 +2316,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "c9f33532002c",
+      "geometryHash": "97d57ed6e7e3",
       "id": 37,
       "name": "Light Factory",
       "category": "I2",
@@ -2343,7 +2374,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "fecef31a37ac",
+      "geometryHash": "20cc13b988ad",
       "id": 38,
       "name": "Heavy Factory",
       "category": "I4",
@@ -2356,10 +2387,10 @@
     {
       "file": "39.glb",
       "kind": "building",
-      "bytes": 32260,
-      "meshes": 14,
-      "vertices": 330,
-      "triangles": 167,
+      "bytes": 46588,
+      "meshes": 15,
+      "vertices": 608,
+      "triangles": 311,
       "materials": [
         "concrete",
         "glass_dark",
@@ -2374,7 +2405,8 @@
         "trunk",
         "wall_cream",
         "wall_green",
-        "wall_white"
+        "wall_white",
+        "white"
       ],
       "emissiveMaterials": [
         "glow_window"
@@ -2392,17 +2424,17 @@
         ],
         "max": [
           0.48,
-          0.38,
+          0.474,
           0.48
         ],
         "dimensions": [
           0.96,
-          0.38,
+          0.474,
           0.96
         ]
       },
       "lodNodes": [],
-      "geometryHash": "80f3bbf42f0f",
+      "geometryHash": "c96864afe64e",
       "id": 39,
       "name": "Recycling Centre",
       "category": "U3",
@@ -2415,15 +2447,16 @@
     {
       "file": "40.glb",
       "kind": "building",
-      "bytes": 38512,
-      "meshes": 13,
-      "vertices": 479,
-      "triangles": 262,
+      "bytes": 65756,
+      "meshes": 14,
+      "vertices": 1025,
+      "triangles": 540,
       "materials": [
         "concrete",
         "glass_dark",
         "glow_window",
         "metal",
+        "metal_dark",
         "paving",
         "sign_red",
         "slab",
@@ -2460,7 +2493,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "0f3d08b29889",
+      "geometryHash": "0c2eb0133836",
       "id": 40,
       "name": "Thermal Power Plant",
       "category": "U4",
@@ -5448,9 +5481,9 @@
       "agent": 5,
       "street-furniture": 20
     },
-    "totalBuildingTriangles": 14932,
-    "totalBuildingVertices": 29024,
-    "totalBuildingBytes": 2169036,
+    "totalBuildingTriangles": 17282,
+    "totalBuildingVertices": 33639,
+    "totalBuildingBytes": 2424544,
     "maxBuildingTriangles": 644,
     "buildingsWithLodNodes": 0,
     "buildingsWithTextures": 0,

@@ -6,6 +6,31 @@ from lib import Model
 from registry import building
 
 
+def _back_door(m: Model, x, y_back, z=0.03, w=0.07, h=0.12, mat="metal_dark"):
+    m.box(x, y_back + 0.004, z, w + 0.016, 0.008, h + 0.01, "white")
+    m._quad([(x + w / 2, y_back + 0.009, z), (x - w / 2, y_back + 0.009, z),
+             (x - w / 2, y_back + 0.009, z + h), (x + w / 2, y_back + 0.009, z + h)], mat)
+
+
+def _rear_pipes(m: Model, y_back, x0, x1, z0, h):
+    for x in (x0, x1):
+        m.box(x, y_back + 0.006, z0, 0.014, 0.012, h, "metal_dark")
+
+
+def _louver(m: Model, x, y_back, z, w=0.09, h=0.055):
+    m.box(x, y_back + 0.006, z, w, 0.01, h, "metal_dark")
+
+
+def _downpipes(m: Model, cx, y_back, z0, h, w):
+    for sx in (-1, 1):
+        m.box(cx + sx * (w / 2 - 0.03), y_back + 0.008, z0, 0.014, 0.012, h, "metal_dark")
+
+
+def _roof_vent(m: Model, x, y, z):
+    m.cyl(x, y, z, 0.018, 0.08, "metal", seg=6)
+    m.box(x, y, z + 0.08, 0.05, 0.05, 0.014, "metal_dark")
+
+
 @building(1, "Casa Inicial")
 def casa_inicial(m: Model):
     m.plot()
@@ -178,9 +203,16 @@ def armazem_logistico(m: Model):
         m.box(x, -0.157, 0.03, 0.13, 0.012, 0.13, "metal")                           # dock doors
         m.box(x, -0.2, 0.03, 0.15, 0.08, 0.012, "concrete", roof="concrete")        # dock apron
     m.windows(0.0, 0.1, 0.18, 0.76, 0.5, 0.09, 1, cols=6, sides="f", lit=0.5, slabs=False)
+    m.windows(0.0, 0.1, 0.18, 0.76, 0.5, 0.09, 1, cols=6, sides="brl", lit=0.45, slabs=False)
     m.box(0.0, 0.36, 0.03, 0.2, 0.03, 0.2, "wall_blue")                            # office bay
+    m.box(-0.25, 0.357, 0.03, 0.16, 0.012, 0.14, "metal_dark")                       # rear loading door
+    m.box(-0.25, 0.41, 0.03, 0.18, 0.08, 0.012, "concrete", roof="concrete")
+    _back_door(m, 0.1, 0.36, w=0.055, h=0.11)
+    _downpipes(m, 0.0, 0.35, 0.03, 0.26, 0.76)
     for x in (-0.3, 0.1):
         m.skylight(x, 0.12, 0.34, 0.12, 0.08)
+    m.ac_unit(0.28, 0.12, 0.34, 0.07, 0.05, 0.03)
+    _roof_vent(m, -0.05, 0.24, 0.34)
     # a truck backed into a bay, and a trailer in the yard
     m.box(-0.1, -0.3, 0.05, 0.32, 0.12, 0.13, "white", roof="white")
     m.box(0.1, -0.3, 0.05, 0.1, 0.1, 0.08, "sign_blue")
@@ -195,12 +227,18 @@ def fabrica_leve(m: Model):
     m.box(-0.08, 0.06, 0.03, 0.6, 0.46, 0.26, "wall_grey", roof="roof_flat")
     for i in range(3):                                                              # sawtooth roof
         m.gable(-0.08 - 0.2 + i * 0.2, 0.06, 0.29, 0.2, 0.46, 0.09, "roof_slate", end="wall_grey")
-    m.windows(-0.08, 0.06, 0.03, 0.6, 0.46, 0.26, 1, cols=6, sides="fr", lit=0.55)
+    m.windows(-0.08, 0.06, 0.03, 0.6, 0.46, 0.26, 1, cols=6, sides="fbrl", lit=0.55)
     m.door(-0.2, -0.174, 0.03, 0.14, 0.13, "metal")
+    m.box(-0.32, 0.293, 0.03, 0.13, 0.012, 0.13, "metal_dark")
+    _back_door(m, -0.08, 0.29, w=0.055, h=0.11)
+    _downpipes(m, -0.08, 0.29, 0.03, 0.26, 0.6)
     m.chimney(0.15, 0.2, 0.3, 0.45, 0.06, "wall_brick")
     m.cyl(0.36, -0.12, 0.03, 0.07, 0.26, "metal", seg=8)                           # silo
     m.cone(0.36, -0.12, 0.29, 0.075, 0.05, "metal_dark", seg=8)
     m.box(0.3, 0.24, 0.03, 0.2, 0.14, 0.1, "wall_beige", roof="roof_dark")        # annex
+    m.windows(0.3, 0.24, 0.05, 0.2, 0.14, 0.08, 1, cols=1, sides="br", lit=0.45, slabs=False)
+    m.ac_unit(0.08, 0.0, 0.38, 0.07, 0.05, 0.03)
+    _roof_vent(m, -0.26, 0.0, 0.38)
     m.parked_car(0.3, -0.38, "sign_red", "x")
     m.parked_car(0.0, -0.38, "white", "x")
     m.fence(-0.46, -0.46, 0.46, -0.46, 0.06, "metal_dark", 12)
@@ -234,10 +272,14 @@ def delegacia(m: Model):
     m.box(0.0, 0.06, 0.03, 0.66, 0.42, 0.34, "wall_white", roof="roof_flat")
     m.box(0.0, -0.17, 0.03, 0.66, 0.06, 0.34, "wall_navy")                          # front band
     m.box(0.0, 0.06, 0.37, 0.7, 0.46, 0.016, "slab")
-    m.windows(0.0, 0.06, 0.03, 0.66, 0.42, 0.34, 2, cols=4, sides="fr", lit=0.55)
+    m.windows(0.0, 0.06, 0.03, 0.66, 0.42, 0.34, 2, cols=4, sides="fbrl", lit=0.55)
     m.door(0.0, -0.205, 0.03, 0.1, 0.14, "glass_dark")
     m.sign(0.0, -0.205, 0.2, 0.26, 0.06, "glow_sign")
     m.steps(0.0, -0.21, 0.03, 0.18, 2)
+    _back_door(m, -0.18, 0.27, 0.03)
+    _louver(m, 0.12, 0.273, 0.16)
+    _rear_pipes(m, 0.27, -0.32, 0.32, 0.03, 0.34)
+    m.box(0.18, 0.36, 0.03, 0.18, 0.08, 0.05, "metal_dark", roof="metal")
     m.cyl(-0.3, -0.3, 0.03, 0.008, 0.34, "metal", seg=5)                           # flagpole
     m.box(-0.27, -0.3, 0.3, 0.06, 0.004, 0.04, "sign_green")
     m.cyl(0.18, 0.2, 0.39, 0.006, 0.18, "metal", seg=4)                            # antennas
@@ -256,10 +298,15 @@ def quartel_bombeiros(m: Model):
     for i in range(3):                                                              # engine bay doors
         m.box(-0.12 + i * 0.17, -0.215, 0.03, 0.13, 0.01, 0.17, "metal")
     m.box(-0.34, 0.05, 0.03, 0.18, 0.18, 0.78, "wall_brick", roof="roof_dark")      # hose tower
-    m.windows(-0.34, 0.05, 0.03, 0.18, 0.18, 0.78, 4, cols=1, sides="fr", lit=0.5)
+    m.windows(-0.34, 0.05, 0.03, 0.18, 0.18, 0.78, 4, cols=1, sides="fbrl", lit=0.5)
     m.box(-0.34, 0.05, 0.81, 0.24, 0.24, 0.016, "slab")
-    m.windows(0.05, 0.05, 0.03, 0.62, 0.44, 0.3, 1, cols=5, sides="r", lit=0.5)
+    m.windows(0.05, 0.05, 0.03, 0.62, 0.44, 0.3, 1, cols=5, sides="brl", lit=0.5)
     m.sign(0.05, -0.215, 0.23, 0.3, 0.05, "glow_sign")
+    _back_door(m, 0.2, 0.27, 0.03)
+    _louver(m, -0.02, 0.273, 0.14)
+    _rear_pipes(m, 0.27, -0.24, 0.36, 0.03, 0.29)
+    m.ac_unit(0.22, 0.14, 0.34)
+    m.fence(-0.46, 0.42, 0.3, 0.42, 0.06, "metal_dark", 9)
     # two red trucks on the apron
     for x in (-0.05, 0.22):
         m.box(x, -0.34, 0.04, 0.2, 0.09, 0.09, "sign_red", roof="sign_red")
