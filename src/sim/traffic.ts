@@ -1,6 +1,6 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
-import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity, layerClass, RoadLayer } from "./world";
+import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity, layerClass, RoadLayer, curvePoints } from "./world";
 import { SignalInfo, signalNodes, signalPhase } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
@@ -279,6 +279,91 @@ function smoothPath(w: World, tiles: number[]): Float32Array {
   return pts;
 }
 
+/** Per-world index: road centreline polylines (x/z pairs) by segment id, and the segments covering each tile. */
+const centreIndex = new WeakMap<World, { rev: number; lines: Map<number, Float32Array>; byTile: Map<number, number[]> }>();
+
+function getCentreIndex(w: World): { lines: Map<number, Float32Array>; byTile: Map<number, number[]> } {
+  const hit = centreIndex.get(w);
+  if (hit && hit.rev === w.graphRevision + w.segments.length * 1e6) return hit;
+  const lines = new Map<number, Float32Array>();
+  const byTile = new Map<number, number[]>();
+  for (const seg of w.segments) {
+    const pts = curvePoints(seg.pts, 0.5);
+    const a = new Float32Array(pts.length * 2);
+    pts.forEach((p, i) => { a[i * 2] = p.x; a[i * 2 + 1] = p.z; });
+    lines.set(seg.id, a);
+    for (const t of seg.tiles) {
+      const l = byTile.get(t);
+      if (l) l.push(seg.id); else byTile.set(t, [seg.id]);
+    }
+  }
+  const next = { rev: w.graphRevision + w.segments.length * 1e6, lines, byTile };
+  centreIndex.set(w, next);
+  return next;
+}
+
+/** Closest point of a polyline to (x, z): returns [px, pz, squared distance]. */
+function nearestOnLine(line: Float32Array, x: number, z: number): [number, number, number] {
+  let bx = x, bz = z, bd = Infinity;
+  for (let i = 0; i + 3 < line.length; i += 2) {
+    const ax = line[i], az = line[i + 1], cx = line[i + 2], cz = line[i + 3];
+    const dx = cx - ax, dz = cz - az;
+    const l2 = dx * dx + dz * dz;
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
+    const px = ax + dx * t, pz = az + dz * t;
+    const d = (px - x) ** 2 + (pz - z) ** 2;
+    if (d < bd) { bd = d; bx = px; bz = pz; }
+  }
+  return [bx, bz, bd];
+}
+
+/**
+ * Pull a tile-centre path onto the actual road centrelines. The A* path walks tile centres, which on diagonal and
+ * curved roads zig-zags and cuts corners outside the road; each point is projected onto the centreline of the
+ * segment that owns its tile (staying on the previous segment while it still covers the tile, so junction tiles do
+ * not flip between roads). Tiles with no owning segment keep their smoothed position.
+ */
+export function snapToCentrelines(w: World, tiles: number[], pts: Float32Array): Float32Array {
+  const { lines, byTile } = getCentreIndex(w);
+  const out = new Float32Array(pts.length);
+  let current = -1;
+  let px = NaN, pz = NaN;
+  for (let i = 0; i < tiles.length; i++) {
+    const x = pts[i * 2], z = pts[i * 2 + 1];
+    const segs = byTile.get(tiles[i]);
+    let nx = x, nz = z;
+    if (segs && segs.length) {
+      let pick = -1;
+      if (segs.includes(current)) pick = current;
+      else {
+        let bd = Infinity;
+        for (const id of segs) {
+          const line = lines.get(id);
+          if (!line) continue;
+          const d = nearestOnLine(line, x, z)[2];
+          if (d < bd) { bd = d; pick = id; }
+        }
+      }
+      const line = pick >= 0 ? lines.get(pick) : undefined;
+      if (line) {
+        const [sx, sz, d2] = nearestOnLine(line, x, z);
+        // Far from the centreline means the tile only brushes this segment: keep the smoothed point.
+        if (d2 <= 1.5 * 1.5) { nx = sx; nz = sz; current = pick; }
+      }
+    }
+    // Two tiles that project to the same spot would give a zero-length step (no heading): keep the smoothed point.
+    if (i > 0 && (nx - px) ** 2 + (nz - pz) ** 2 < 1e-4) { nx = x; nz = z; }
+    out[i * 2] = nx; out[i * 2 + 1] = nz;
+    px = nx; pz = nz;
+  }
+  return out;
+}
+
+/** Vehicle route geometry: tile centres smoothed, then snapped onto the road centrelines. */
+export function routePath(w: World, tiles: number[]): Float32Array {
+  return snapToCentrelines(w, tiles, smoothPath(w, tiles));
+}
+
 // ---------------------------------------------------------------- simulation
 
 /** Connected street/avenue tile touching a building, or -1. */
@@ -324,7 +409,7 @@ function planLeg(w: World, t: TrafficState, v: TransitVehicle): boolean {
   if (tiles.length < 2) tiles = [from.tile, to.tile];
   v.tiles = tiles;
   v.layers = layers;
-  v.pts = line.kind === "metro" ? centres(w, tiles) : smoothPath(w, tiles);
+  v.pts = line.kind === "metro" ? centres(w, tiles) : routePath(w, tiles);
   v.progress = 0;
   return true;
 }
@@ -376,7 +461,7 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
   if (a < 0 || b < 0) return;
   const lp = findLayeredPath(w, t.load, a, b);
   if (!lp || lp.tiles.length < 2) return;
-  t.vehicles.push({ id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts: smoothPath(w, lp.tiles), progress: 0, speedFactor: 1 });
+  t.vehicles.push({ id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts: routePath(w, lp.tiles), progress: 0, speedFactor: 1 });
 }
 
 function moveTransit(w: World, t: TrafficState, dt: number, weather: number): void {
