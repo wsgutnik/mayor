@@ -1,0 +1,5324 @@
+{
+  "schema": 2,
+  "expectedBuildings": 40,
+  "buildings": [
+    {
+      "file": "01.glb",
+      "kind": "building",
+      "bytes": 58700,
+      "meshes": 17,
+      "vertices": 794,
+      "triangles": 403,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal_dark",
+        "paving",
+        "roof_blue",
+        "roof_slate",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_cream",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.532,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.532,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "155e7d39ed44",
+      "id": 1,
+      "name": "Starter House",
+      "category": "R1",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "02.glb",
+      "kind": "building",
+      "bytes": 60560,
+      "meshes": 19,
+      "vertices": 794,
+      "triangles": 403,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal_dark",
+        "paving",
+        "roof_blue",
+        "roof_slate",
+        "sign_blue",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_beige",
+        "wall_brick",
+        "wall_navy",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.512,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.512,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "3923f5365a2e",
+      "id": 2,
+      "name": "Family House",
+      "category": "R1",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "03.glb",
+      "kind": "building",
+      "bytes": 51332,
+      "meshes": 19,
+      "vertices": 597,
+      "triangles": 307,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_orange",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_navy",
+        "wall_white",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.539,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.539,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "bdde6b44cf36",
+      "id": 3,
+      "name": "Modern Townhouse",
+      "category": "R2",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "04.glb",
+      "kind": "building",
+      "bytes": 53168,
+      "meshes": 17,
+      "vertices": 696,
+      "triangles": 359,
+      "materials": [
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_navy",
+        "wall_white",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.479,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.479,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "c9c37e22e46f",
+      "id": 4,
+      "name": "Semi-detached Villa",
+      "category": "R2",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "05.glb",
+      "kind": "building",
+      "bytes": 46220,
+      "meshes": 15,
+      "vertices": 596,
+      "triangles": 302,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          1.005,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          1.005,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "eeaaf92fa7c9",
+      "id": 5,
+      "name": "Small Apartment",
+      "category": "R3",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "06.glb",
+      "kind": "building",
+      "bytes": 53872,
+      "meshes": 14,
+      "vertices": 784,
+      "triangles": 400,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.805,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.805,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "c2872c3dc6c0",
+      "id": 6,
+      "name": "Garden Condominium",
+      "category": "R3",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "07.glb",
+      "kind": "building",
+      "bytes": 51988,
+      "meshes": 15,
+      "vertices": 720,
+      "triangles": 364,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          1.335,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          1.335,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "8f88692e3ade",
+      "id": 7,
+      "name": "Compact Tower",
+      "category": "R4",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "08.glb",
+      "kind": "building",
+      "bytes": 51100,
+      "meshes": 14,
+      "vertices": 732,
+      "triangles": 370,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.89,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.89,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "a8e849600269",
+      "id": 8,
+      "name": "Balcony Residence",
+      "category": "R3",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "09.glb",
+      "kind": "building",
+      "bytes": 38444,
+      "meshes": 15,
+      "vertices": 432,
+      "triangles": 220,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "sign_green",
+        "sign_orange",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_grey",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.835,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.835,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "fa1958d4e13a",
+      "id": 9,
+      "name": "Local Mixed-use Building",
+      "category": "R4",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "10.glb",
+      "kind": "building",
+      "bytes": 55576,
+      "meshes": 14,
+      "vertices": 808,
+      "triangles": 408,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          1.525,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          1.525,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "063c55fbf08c",
+      "id": 10,
+      "name": "Premium Tower",
+      "category": "R5",
+      "group": "residential",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "11.glb",
+      "kind": "building",
+      "bytes": 49736,
+      "meshes": 19,
+      "vertices": 572,
+      "triangles": 297,
+      "materials": [
+        "asphalt",
+        "glass_blue",
+        "glass_dark",
+        "glow_sign",
+        "grass",
+        "hedge",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "sign_orange",
+        "sign_red",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.495,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.495,
+          0.279,
+          0.48
+        ],
+        "dimensions": [
+          0.99,
+          0.279,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "db223da897d3",
+      "id": 11,
+      "name": "Convenience Store",
+      "category": "C1",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "12.glb",
+      "kind": "building",
+      "bytes": 61480,
+      "meshes": 19,
+      "vertices": 821,
+      "triangles": 431,
+      "materials": [
+        "glass_blue",
+        "glass_dark",
+        "glow_sign",
+        "grass",
+        "hedge",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "sign_red",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_cream",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.4825,
+          0.309,
+          0.48
+        ],
+        "dimensions": [
+          0.9625,
+          0.309,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "90909bc5dd27",
+      "id": 12,
+      "name": "Corner Café",
+      "category": "C1",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "13.glb",
+      "kind": "building",
+      "bytes": 49000,
+      "meshes": 18,
+      "vertices": 586,
+      "triangles": 302,
+      "materials": [
+        "flower_red",
+        "glass_blue",
+        "glass_dark",
+        "grass",
+        "hedge",
+        "leaf_c",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_green",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.495,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.495,
+          0.309,
+          0.48
+        ],
+        "dimensions": [
+          0.99,
+          0.309,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7860ca253510",
+      "id": 13,
+      "name": "Local Market",
+      "category": "C2",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "14.glb",
+      "kind": "building",
+      "bytes": 32348,
+      "meshes": 12,
+      "vertices": 372,
+      "triangles": 190,
+      "materials": [
+        "black",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.465,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.465,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "67d19a450f1e",
+      "id": 14,
+      "name": "Urban Restaurant",
+      "category": "C2",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "15.glb",
+      "kind": "building",
+      "bytes": 34824,
+      "meshes": 14,
+      "vertices": 376,
+      "triangles": 192,
+      "materials": [
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_red",
+        "wall_white",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.52,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.52,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "de521ddd569e",
+      "id": 15,
+      "name": "Neighbourhood Pharmacy",
+      "category": "C1",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "16.glb",
+      "kind": "building",
+      "bytes": 36144,
+      "meshes": 14,
+      "vertices": 404,
+      "triangles": 206,
+      "materials": [
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_beige",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.805,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.805,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "be051af20347",
+      "id": 16,
+      "name": "Compact Office",
+      "category": "C2",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "17.glb",
+      "kind": "building",
+      "bytes": 40976,
+      "meshes": 14,
+      "vertices": 504,
+      "triangles": 266,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.515,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.515,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7cf9228a316a",
+      "id": 17,
+      "name": "Local Bank",
+      "category": "C2",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "18.glb",
+      "kind": "building",
+      "bytes": 43632,
+      "meshes": 14,
+      "vertices": 562,
+      "triangles": 287,
+      "materials": [
+        "glass_dark",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.945,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.945,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "c8090a94dc50",
+      "id": 18,
+      "name": "Executive Hotel",
+      "category": "C3",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "19.glb",
+      "kind": "building",
+      "bytes": 32376,
+      "meshes": 12,
+      "vertices": 372,
+      "triangles": 190,
+      "materials": [
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "sign_orange",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.425,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.425,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7d14cd61accf",
+      "id": 19,
+      "name": "Neighbourhood Mall",
+      "category": "C3",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "20.glb",
+      "kind": "building",
+      "bytes": 51848,
+      "meshes": 14,
+      "vertices": 732,
+      "triangles": 374,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "paving",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_grey",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          2.07,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          2.07,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "d9d7a9b3ebee",
+      "id": 20,
+      "name": "Corporate Tower",
+      "category": "C4",
+      "group": "commercial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "21.glb",
+      "kind": "building",
+      "bytes": 39748,
+      "meshes": 14,
+      "vertices": 476,
+      "triangles": 240,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_blue",
+        "roof_flat",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_cream",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.79,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.79,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "90941b8cffa6",
+      "id": 21,
+      "name": "City Hall",
+      "category": "S3",
+      "group": "civic",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "22.glb",
+      "kind": "building",
+      "bytes": 35272,
+      "meshes": 13,
+      "vertices": 408,
+      "triangles": 208,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_flat",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_cream"
+      ],
+      "emissiveMaterials": [
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.43,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.43,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "5c05aef1f547",
+      "id": 22,
+      "name": "Public Library",
+      "category": "S2",
+      "group": "civic",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "23.glb",
+      "kind": "building",
+      "bytes": 36400,
+      "meshes": 15,
+      "vertices": 392,
+      "triangles": 200,
+      "materials": [
+        "glass_blue",
+        "glass_dark",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_cream",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.33,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.33,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "784f57c04687",
+      "id": 23,
+      "name": "Community Centre",
+      "category": "S2",
+      "group": "civic",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "24.glb",
+      "kind": "building",
+      "bytes": 61700,
+      "meshes": 18,
+      "vertices": 838,
+      "triangles": 431,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_green",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_navy",
+        "wall_white",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.495,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.495,
+          0.57,
+          0.48
+        ],
+        "dimensions": [
+          0.99,
+          0.57,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "a554d9779a41",
+      "id": 24,
+      "name": "Police Station",
+      "category": "S3",
+      "group": "safety",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "25.glb",
+      "kind": "building",
+      "bytes": 43120,
+      "meshes": 16,
+      "vertices": 500,
+      "triangles": 254,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_flat",
+        "roof_slate",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_cream",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.47,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.47,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "3250c0f75de2",
+      "id": 25,
+      "name": "City Museum",
+      "category": "S3",
+      "group": "civic",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "26.glb",
+      "kind": "building",
+      "bytes": 38580,
+      "meshes": 15,
+      "vertices": 428,
+      "triangles": 218,
+      "materials": [
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_grey",
+        "wall_white",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.41,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.41,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "378128a0b72a",
+      "id": 26,
+      "name": "Clinic",
+      "category": "S2",
+      "group": "health",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "27.glb",
+      "kind": "building",
+      "bytes": 42556,
+      "meshes": 12,
+      "vertices": 588,
+      "triangles": 298,
+      "materials": [
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "paving",
+        "roof_flat",
+        "sign_red",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_grey",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.65,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.65,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "d782b96c3988",
+      "id": 27,
+      "name": "General Hospital",
+      "category": "S4",
+      "group": "health",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "28.glb",
+      "kind": "building",
+      "bytes": 39032,
+      "meshes": 16,
+      "vertices": 420,
+      "triangles": 214,
+      "materials": [
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "grass",
+        "hedge",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "sign_orange",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_cream"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.31,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.31,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "309ca819c47c",
+      "id": 28,
+      "name": "Primary School",
+      "category": "S2",
+      "group": "education",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "29.glb",
+      "kind": "building",
+      "bytes": 36256,
+      "meshes": 14,
+      "vertices": 394,
+      "triangles": 200,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_cream",
+        "wall_green"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.4,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.4,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "44ea6c70ac02",
+      "id": 29,
+      "name": "Secondary School",
+      "category": "S3",
+      "group": "education",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "30.glb",
+      "kind": "building",
+      "bytes": 49456,
+      "meshes": 15,
+      "vertices": 662,
+      "triangles": 333,
+      "materials": [
+        "glass_dark",
+        "glow_sign",
+        "glow_window",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "sign_red",
+        "slab",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_red",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.495,
+          0.826,
+          0.48
+        ],
+        "dimensions": [
+          0.975,
+          0.826,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "a1620722b52a",
+      "id": 30,
+      "name": "Fire Station",
+      "category": "S3",
+      "group": "safety",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "31.glb",
+      "kind": "building",
+      "bytes": 67444,
+      "meshes": 22,
+      "vertices": 880,
+      "triangles": 444,
+      "materials": [
+        "bench_wood",
+        "black",
+        "glass_blue",
+        "glass_dark",
+        "glow_lamp",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "lamp_pole",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_cream",
+        "wall_navy",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_lamp",
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.4875,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.4875,
+          0.337,
+          0.48
+        ],
+        "dimensions": [
+          0.975,
+          0.337,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "58e628c040a4",
+      "id": 31,
+      "name": "Bus Station",
+      "category": "T2",
+      "group": "transport",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "32.glb",
+      "kind": "building",
+      "bytes": 71756,
+      "meshes": 25,
+      "vertices": 880,
+      "triangles": 440,
+      "materials": [
+        "asphalt",
+        "black",
+        "concrete",
+        "glass_dark",
+        "glow_lamp",
+        "glow_sign",
+        "glow_window",
+        "grass",
+        "hedge",
+        "lamp_pole",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_blue",
+        "roof_dark",
+        "roof_flat",
+        "roof_slate",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_brick",
+        "wall_cream",
+        "wall_red",
+        "wall_wood",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_lamp",
+        "glow_sign",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.4975,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.4975,
+          0.67,
+          0.48
+        ],
+        "dimensions": [
+          0.995,
+          0.67,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "6555fe5425cd",
+      "id": 32,
+      "name": "Train Station",
+      "category": "T3",
+      "group": "transport",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "33.glb",
+      "kind": "building",
+      "bytes": 69020,
+      "meshes": 24,
+      "vertices": 868,
+      "triangles": 438,
+      "materials": [
+        "black",
+        "glass_blue",
+        "glass_dark",
+        "glow_lamp",
+        "glow_window",
+        "lamp_pole",
+        "metal_dark",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "sign_blue",
+        "sign_orange",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_beige",
+        "wall_blue",
+        "wall_cream",
+        "wall_green",
+        "wall_grey",
+        "wall_red",
+        "wall_yellow",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_lamp",
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.4875,
+          0,
+          -0.482
+        ],
+        "max": [
+          0.4925,
+          0.36,
+          0.4855
+        ],
+        "dimensions": [
+          0.98,
+          0.36,
+          0.9674
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "0e2005ca4fbd",
+      "id": 33,
+      "name": "Cargo Terminal",
+      "category": "T3",
+      "group": "transport",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "34.glb",
+      "kind": "building",
+      "bytes": 46588,
+      "meshes": 12,
+      "vertices": 670,
+      "triangles": 363,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "roof_slate",
+        "tree_green",
+        "trunk",
+        "wall_cream",
+        "wall_grey",
+        "wall_white",
+        "water"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.65,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.65,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "6b44c4d21ef0",
+      "id": 34,
+      "name": "Water Treatment Plant",
+      "category": "U3",
+      "group": "utility",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "35.glb",
+      "kind": "building",
+      "bytes": 43956,
+      "meshes": 11,
+      "vertices": 643,
+      "triangles": 337,
+      "materials": [
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_grey"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.63,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.63,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "a7f39ba09b75",
+      "id": 35,
+      "name": "Electrical Substation",
+      "category": "U2",
+      "group": "utility",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "36.glb",
+      "kind": "building",
+      "bytes": 50184,
+      "meshes": 15,
+      "vertices": 688,
+      "triangles": 347,
+      "materials": [
+        "concrete",
+        "glass_blue",
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "roof_slate",
+        "sign_blue",
+        "tree_green",
+        "trunk",
+        "wall_blue",
+        "wall_grey",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.36,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.36,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "8b3b22aa8bb6",
+      "id": 36,
+      "name": "Logistics Warehouse",
+      "category": "I1",
+      "group": "industrial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "37.glb",
+      "kind": "building",
+      "bytes": 53004,
+      "meshes": 17,
+      "vertices": 685,
+      "triangles": 349,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "roof_slate",
+        "sign_red",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_beige",
+        "wall_brick",
+        "wall_grey",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.4875,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.762,
+          0.48
+        ],
+        "dimensions": [
+          0.9675,
+          0.762,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "3a54fdf0be94",
+      "id": 37,
+      "name": "Light Factory",
+      "category": "I2",
+      "group": "industrial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "38.glb",
+      "kind": "building",
+      "bytes": 54532,
+      "meshes": 13,
+      "vertices": 813,
+      "triangles": 432,
+      "materials": [
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_dark",
+        "roof_flat",
+        "sign_red",
+        "slab",
+        "wall_brick",
+        "wall_grey",
+        "wall_yellow",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.49,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.58,
+          0.48
+        ],
+        "dimensions": [
+          0.97,
+          0.58,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "b73e9fea2b78",
+      "id": 38,
+      "name": "Heavy Factory",
+      "category": "I4",
+      "group": "industrial",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "39.glb",
+      "kind": "building",
+      "bytes": 32260,
+      "meshes": 14,
+      "vertices": 330,
+      "triangles": 167,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "metal_dark",
+        "paving",
+        "roof_flat",
+        "sign_blue",
+        "sign_green",
+        "tree_green",
+        "trunk",
+        "wall_cream",
+        "wall_green",
+        "wall_white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.48,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.38,
+          0.48
+        ],
+        "dimensions": [
+          0.96,
+          0.38,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "35c47a32f429",
+      "id": 39,
+      "name": "Recycling Centre",
+      "category": "U3",
+      "group": "utility",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    },
+    {
+      "file": "40.glb",
+      "kind": "building",
+      "bytes": 38512,
+      "meshes": 13,
+      "vertices": 479,
+      "triangles": 262,
+      "materials": [
+        "concrete",
+        "glass_dark",
+        "glow_window",
+        "metal",
+        "paving",
+        "sign_red",
+        "slab",
+        "tree_dark",
+        "tree_green",
+        "trunk",
+        "wall_beige",
+        "wall_grey",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_window"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.4875,
+          0,
+          -0.48
+        ],
+        "max": [
+          0.48,
+          0.98,
+          0.48
+        ],
+        "dimensions": [
+          0.9675,
+          0.98,
+          0.96
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7394cb277134",
+      "id": 40,
+      "name": "Thermal Power Plant",
+      "category": "U4",
+      "group": "utility",
+      "lodReady": {
+        "hasLodNodes": false,
+        "trianglesVsProposedLod0": "below"
+      }
+    }
+  ],
+  "props": [
+    {
+      "file": "props/bench.glb",
+      "kind": "prop",
+      "bytes": 6268,
+      "meshes": 2,
+      "vertices": 80,
+      "triangles": 40,
+      "materials": [
+        "bench_wood",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.07,
+          0,
+          -0.025
+        ],
+        "max": [
+          0.07,
+          0.105,
+          0.0225
+        ],
+        "dimensions": [
+          0.14,
+          0.105,
+          0.0475
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "bc316e6a75ea",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/bench_road.glb",
+      "kind": "prop",
+      "bytes": 6052,
+      "meshes": 1,
+      "vertices": 96,
+      "triangles": 48,
+      "materials": [
+        "bench_wood"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0318,
+          0,
+          -0.1
+        ],
+        "max": [
+          0.0318,
+          0.1745,
+          0.1
+        ],
+        "dimensions": [
+          0.0636,
+          0.1745,
+          0.2
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "1fc1aac1c408",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/boat_ferry.glb",
+      "kind": "prop",
+      "bytes": 12636,
+      "meshes": 5,
+      "vertices": 131,
+      "triangles": 68,
+      "materials": [
+        "car_glass",
+        "hull_blue",
+        "hull_white",
+        "metal",
+        "sign_red"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.37,
+          0,
+          -0.111
+        ],
+        "max": [
+          0.42,
+          0.36,
+          0.111
+        ],
+        "dimensions": [
+          0.79,
+          0.36,
+          0.222
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "ebbb55deb853",
+      "class": "boat"
+    },
+    {
+      "file": "props/boat_motor.glb",
+      "kind": "prop",
+      "bytes": 9924,
+      "meshes": 4,
+      "vertices": 100,
+      "triangles": 50,
+      "materials": [
+        "car_glass",
+        "hull_blue",
+        "hull_white",
+        "metal"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.24,
+          0,
+          -0.086
+        ],
+        "max": [
+          0.27,
+          0.15,
+          0.086
+        ],
+        "dimensions": [
+          0.51,
+          0.15,
+          0.172
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "693c256af308",
+      "class": "boat"
+    },
+    {
+      "file": "props/boat_sail.glb",
+      "kind": "prop",
+      "bytes": 11048,
+      "meshes": 5,
+      "vertices": 98,
+      "triangles": 49,
+      "materials": [
+        "bench_wood",
+        "hull_blue",
+        "hull_white",
+        "metal",
+        "sail"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.22,
+          0,
+          -0.061
+        ],
+        "max": [
+          0.21,
+          0.52,
+          0.061
+        ],
+        "dimensions": [
+          0.43,
+          0.52,
+          0.122
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "10718fda6c66",
+      "class": "boat"
+    },
+    {
+      "file": "props/bollard.glb",
+      "kind": "prop",
+      "bytes": 8308,
+      "meshes": 2,
+      "vertices": 117,
+      "triangles": 66,
+      "materials": [
+        "metal_dark",
+        "white"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.02,
+          0,
+          -0.0173
+        ],
+        "max": [
+          0.02,
+          0.081,
+          0.0173
+        ],
+        "dimensions": [
+          0.04,
+          0.081,
+          0.0346
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "8ac92a9a4521",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/bus.glb",
+      "kind": "prop",
+      "bytes": 19568,
+      "meshes": 7,
+      "vertices": 232,
+      "triangles": 136,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "metal",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.39,
+          0.0054,
+          -0.129
+        ],
+        "max": [
+          0.393,
+          0.282,
+          0.129
+        ],
+        "dimensions": [
+          0.783,
+          0.2766,
+          0.258
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "6f80637de22d",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bus_articulated.glb",
+      "kind": "prop",
+      "bytes": 27132,
+      "meshes": 7,
+      "vertices": 384,
+      "triangles": 222,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.532,
+          0.0048,
+          -0.089
+        ],
+        "max": [
+          0.532,
+          0.2288,
+          0.089
+        ],
+        "dimensions": [
+          1.064,
+          0.224,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "90df6d34431c",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bus_city.glb",
+      "kind": "prop",
+      "bytes": 18472,
+      "meshes": 6,
+      "vertices": 228,
+      "triangles": 134,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.382,
+          0.0048,
+          -0.089
+        ],
+        "max": [
+          0.382,
+          0.2288,
+          0.089
+        ],
+        "dimensions": [
+          0.764,
+          0.224,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7bd79335e565",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bus_coach.glb",
+      "kind": "prop",
+      "bytes": 22536,
+      "meshes": 6,
+      "vertices": 312,
+      "triangles": 192,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.412,
+          0.0054,
+          -0.094
+        ],
+        "max": [
+          0.416,
+          0.242,
+          0.094
+        ],
+        "dimensions": [
+          0.828,
+          0.2366,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "d53ac0225f2e",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bus_double.glb",
+      "kind": "prop",
+      "bytes": 19412,
+      "meshes": 6,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.362,
+          0.0048,
+          -0.089
+        ],
+        "max": [
+          0.362,
+          0.3288,
+          0.089
+        ],
+        "dimensions": [
+          0.724,
+          0.324,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "8286dfb0bcaa",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bus_mini.glb",
+      "kind": "prop",
+      "bytes": 18468,
+      "meshes": 6,
+      "vertices": 228,
+      "triangles": 134,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.262,
+          0.0043,
+          -0.084
+        ],
+        "max": [
+          0.262,
+          0.1956,
+          0.084
+        ],
+        "dimensions": [
+          0.524,
+          0.1913,
+          0.168
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "d68a2a817400",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bus_school.glb",
+      "kind": "prop",
+      "bytes": 21360,
+      "meshes": 7,
+      "vertices": 268,
+      "triangles": 154,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.312,
+          0.0048,
+          -0.089
+        ],
+        "max": [
+          0.392,
+          0.2188,
+          0.089
+        ],
+        "dimensions": [
+          0.704,
+          0.214,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "b1e483d121b3",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bush.glb",
+      "kind": "prop",
+      "bytes": 12316,
+      "meshes": 3,
+      "vertices": 180,
+      "triangles": 60,
+      "materials": [
+        "leaf_a",
+        "leaf_b",
+        "leaf_c"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1193,
+          -0.0018,
+          -0.09
+        ],
+        "max": [
+          0.1393,
+          0.1239,
+          0.0954
+        ],
+        "dimensions": [
+          0.2586,
+          0.1257,
+          0.1854
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "8970938e23db",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/bush_flowers.glb",
+      "kind": "prop",
+      "bytes": 17500,
+      "meshes": 3,
+      "vertices": 300,
+      "triangles": 100,
+      "materials": [
+        "flower_red",
+        "flower_yellow",
+        "leaf_a"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0983,
+          0.0017,
+          -0.0867
+        ],
+        "max": [
+          0.0955,
+          0.1223,
+          0.0861
+        ],
+        "dimensions": [
+          0.1938,
+          0.1206,
+          0.1728
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "fd9e7f51f052",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_compact.glb",
+      "kind": "prop",
+      "bytes": 20604,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.157,
+          0.0043,
+          -0.084
+        ],
+        "max": [
+          0.157,
+          0.1656,
+          0.084
+        ],
+        "dimensions": [
+          0.314,
+          0.1613,
+          0.168
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "73f6b9336c87",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_crossover.glb",
+      "kind": "prop",
+      "bytes": 20680,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.202,
+          0.0051,
+          -0.094
+        ],
+        "max": [
+          0.202,
+          0.1854,
+          0.094
+        ],
+        "dimensions": [
+          0.404,
+          0.1803,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7486a0023eae",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_electric.glb",
+      "kind": "prop",
+      "bytes": 22932,
+      "meshes": 8,
+      "vertices": 268,
+      "triangles": 154,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_sign",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_sign",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.162,
+          0.0043,
+          -0.084
+        ],
+        "max": [
+          0.166,
+          0.1556,
+          0.084
+        ],
+        "dimensions": [
+          0.328,
+          0.1513,
+          0.168
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "1f47807bb228",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_hatch.glb",
+      "kind": "prop",
+      "bytes": 20664,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.167,
+          0.0046,
+          -0.0865
+        ],
+        "max": [
+          0.167,
+          0.1672,
+          0.0865
+        ],
+        "dimensions": [
+          0.334,
+          0.1626,
+          0.173
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "ed8f66ae33b5",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_midsize.glb",
+      "kind": "prop",
+      "bytes": 20668,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.202,
+          0.0046,
+          -0.089
+        ],
+        "max": [
+          0.202,
+          0.1572,
+          0.089
+        ],
+        "dimensions": [
+          0.404,
+          0.1526,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "c9f974cb75c0",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_minivan.glb",
+      "kind": "prop",
+      "bytes": 20660,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.212,
+          0.0048,
+          -0.094
+        ],
+        "max": [
+          0.212,
+          0.1988,
+          0.094
+        ],
+        "dimensions": [
+          0.424,
+          0.194,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "3f740fb6c8a2",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_pickup.glb",
+      "kind": "prop",
+      "bytes": 21300,
+      "meshes": 6,
+      "vertices": 288,
+      "triangles": 164,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.242,
+          0.0048,
+          -0.094
+        ],
+        "max": [
+          0.172,
+          0.1588,
+          0.094
+        ],
+        "dimensions": [
+          0.414,
+          0.154,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "babc5b733041",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_police.glb",
+      "kind": "prop",
+      "bytes": 26808,
+      "meshes": 10,
+      "vertices": 308,
+      "triangles": 174,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "sign_blue",
+        "sign_red",
+        "tire",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.207,
+          0.0046,
+          -0.089
+        ],
+        "max": [
+          0.207,
+          0.1752,
+          0.089
+        ],
+        "dimensions": [
+          0.414,
+          0.1706,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "5acac28b23a3",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_sedan.glb",
+      "kind": "prop",
+      "bytes": 20652,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.202,
+          0.0046,
+          -0.089
+        ],
+        "max": [
+          0.202,
+          0.1572,
+          0.089
+        ],
+        "dimensions": [
+          0.404,
+          0.1526,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "5112520e6214",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_suv.glb",
+      "kind": "prop",
+      "bytes": 20664,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.202,
+          0.0054,
+          -0.094
+        ],
+        "max": [
+          0.202,
+          0.192,
+          0.094
+        ],
+        "dimensions": [
+          0.404,
+          0.1866,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "65f07f173e62",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/car_taxi.glb",
+      "kind": "prop",
+      "bytes": 22908,
+      "meshes": 8,
+      "vertices": 268,
+      "triangles": 154,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_sign",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_sign",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.202,
+          0.0046,
+          -0.089
+        ],
+        "max": [
+          0.202,
+          0.1822,
+          0.089
+        ],
+        "dimensions": [
+          0.404,
+          0.1776,
+          0.178
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "eb62cf575456",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/cyclist.glb",
+      "kind": "prop",
+      "bytes": 21420,
+      "meshes": 7,
+      "vertices": 267,
+      "triangles": 146,
+      "materials": [
+        "black",
+        "rim",
+        "sign_red",
+        "skin_a",
+        "tire",
+        "wall_navy",
+        "wall_yellow"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.09,
+          0.0047,
+          -0.015
+        ],
+        "max": [
+          0.09,
+          0.139,
+          0.015
+        ],
+        "dimensions": [
+          0.18,
+          0.1343,
+          0.03
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "7a24f77a2cf1",
+      "class": "agent"
+    },
+    {
+      "file": "props/dog.glb",
+      "kind": "prop",
+      "bytes": 10564,
+      "meshes": 2,
+      "vertices": 166,
+      "triangles": 82,
+      "materials": [
+        "bark",
+        "trunk"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.055,
+          0,
+          -0.014
+        ],
+        "max": [
+          0.069,
+          0.071,
+          0.014
+        ],
+        "dimensions": [
+          0.124,
+          0.071,
+          0.028
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "2c2f9d384685",
+      "class": "agent"
+    },
+    {
+      "file": "props/hydrant.glb",
+      "kind": "prop",
+      "bytes": 11732,
+      "meshes": 2,
+      "vertices": 190,
+      "triangles": 100,
+      "materials": [
+        "metal_dark",
+        "sign_red"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.034,
+          0,
+          -0.0208
+        ],
+        "max": [
+          0.034,
+          0.093,
+          0.0208
+        ],
+        "dimensions": [
+          0.068,
+          0.093,
+          0.0416
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "53fcdba85ea9",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/kiosk_route.glb",
+      "kind": "prop",
+      "bytes": 6212,
+      "meshes": 2,
+      "vertices": 72,
+      "triangles": 36,
+      "materials": [
+        "glow_sign",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.017,
+          0,
+          -0.0403
+        ],
+        "max": [
+          0.017,
+          0.22,
+          0.0403
+        ],
+        "dimensions": [
+          0.034,
+          0.22,
+          0.0807
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "2db36e1f9c9d",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/lamp.glb",
+      "kind": "prop",
+      "bytes": 5924,
+      "meshes": 2,
+      "vertices": 66,
+      "triangles": 35,
+      "materials": [
+        "glow_lamp",
+        "lamp_pole"
+      ],
+      "emissiveMaterials": [
+        "glow_lamp"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.01,
+          0,
+          -0.015
+        ],
+        "max": [
+          0.095,
+          0.304,
+          0.015
+        ],
+        "dimensions": [
+          0.105,
+          0.304,
+          0.03
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "4f95bd2d6b44",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/mailbox.glb",
+      "kind": "prop",
+      "bytes": 8712,
+      "meshes": 4,
+      "vertices": 78,
+      "triangles": 38,
+      "materials": [
+        "lamp_pole",
+        "metal",
+        "sign_blue",
+        "sign_red"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0275,
+          0.02,
+          -0.075
+        ],
+        "max": [
+          0.034,
+          0.193,
+          0.0515
+        ],
+        "dimensions": [
+          0.0615,
+          0.173,
+          0.1265
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "46d50ab58045",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/newsstand.glb",
+      "kind": "prop",
+      "bytes": 19480,
+      "meshes": 10,
+      "vertices": 164,
+      "triangles": 82,
+      "materials": [
+        "bench_wood",
+        "flower_red",
+        "flower_yellow",
+        "metal_dark",
+        "roof_slate",
+        "sign_blue",
+        "sign_orange",
+        "sign_red",
+        "wall_green",
+        "white"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.15,
+          0,
+          -0.12
+        ],
+        "max": [
+          0.15,
+          0.22,
+          0.09
+        ],
+        "dimensions": [
+          0.3,
+          0.22,
+          0.21
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "4cd21517c0ac",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/pedestrian_a.glb",
+      "kind": "prop",
+      "bytes": 10824,
+      "meshes": 3,
+      "vertices": 151,
+      "triangles": 78,
+      "materials": [
+        "skin_a",
+        "wall_navy",
+        "wall_red"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.032,
+          0,
+          -0.014
+        ],
+        "max": [
+          0.032,
+          0.123,
+          0.014
+        ],
+        "dimensions": [
+          0.064,
+          0.123,
+          0.028
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "66950871643c",
+      "class": "agent"
+    },
+    {
+      "file": "props/pedestrian_b.glb",
+      "kind": "prop",
+      "bytes": 13024,
+      "meshes": 4,
+      "vertices": 171,
+      "triangles": 88,
+      "materials": [
+        "black",
+        "skin_c",
+        "wall_beige",
+        "wall_blue"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.032,
+          0,
+          -0.025
+        ],
+        "max": [
+          0.039,
+          0.123,
+          0.0135
+        ],
+        "dimensions": [
+          0.071,
+          0.123,
+          0.0385
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "2d10a19d70bc",
+      "class": "agent"
+    },
+    {
+      "file": "props/pedestrian_c.glb",
+      "kind": "prop",
+      "bytes": 10820,
+      "meshes": 3,
+      "vertices": 151,
+      "triangles": 78,
+      "materials": [
+        "skin_b",
+        "wall_green",
+        "wall_grey"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0282,
+          0,
+          -0.012
+        ],
+        "max": [
+          0.0282,
+          0.1082,
+          0.012
+        ],
+        "dimensions": [
+          0.0563,
+          0.1082,
+          0.0241
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "316e95068afa",
+      "class": "agent"
+    },
+    {
+      "file": "props/phone_booth.glb",
+      "kind": "prop",
+      "bytes": 14292,
+      "meshes": 5,
+      "vertices": 172,
+      "triangles": 86,
+      "materials": [
+        "black",
+        "concrete",
+        "glass_blue",
+        "glow_sign",
+        "sign_red"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.06,
+          0,
+          -0.06
+        ],
+        "max": [
+          0.06,
+          0.27,
+          0.06
+        ],
+        "dimensions": [
+          0.12,
+          0.27,
+          0.12
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "9a1edf0a8d2f",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/planter_street.glb",
+      "kind": "prop",
+      "bytes": 12244,
+      "meshes": 2,
+      "vertices": 198,
+      "triangles": 120,
+      "materials": [
+        "leaf_a",
+        "trunk"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.048,
+          0,
+          -0.09
+        ],
+        "max": [
+          0.048,
+          0.171,
+          0.09
+        ],
+        "dimensions": [
+          0.096,
+          0.171,
+          0.18
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "797be5bf3855",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/planter_tree.glb",
+      "kind": "prop",
+      "bytes": 19340,
+      "meshes": 6,
+      "vertices": 250,
+      "triangles": 97,
+      "materials": [
+        "bark",
+        "leaf_a",
+        "leaf_b",
+        "leaf_c",
+        "planter",
+        "trunk"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1161,
+          0,
+          -0.095
+        ],
+        "max": [
+          0.1144,
+          0.3702,
+          0.095
+        ],
+        "dimensions": [
+          0.2305,
+          0.3702,
+          0.19
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "aa0db5a09c98",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/rock.glb",
+      "kind": "prop",
+      "bytes": 7064,
+      "meshes": 1,
+      "vertices": 120,
+      "triangles": 40,
+      "materials": [
+        "rock"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.135,
+          -0.032,
+          -0.1123
+        ],
+        "max": [
+          0.1527,
+          0.1352,
+          0.1032
+        ],
+        "dimensions": [
+          0.2876,
+          0.1671,
+          0.2155
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "2f04ad992c35",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/semi_box.glb",
+      "kind": "prop",
+      "bytes": 27244,
+      "meshes": 8,
+      "vertices": 360,
+      "triangles": 212,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "tire",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.52,
+          0.0048,
+          -0.104
+        ],
+        "max": [
+          0.462,
+          0.3088,
+          0.104
+        ],
+        "dimensions": [
+          0.982,
+          0.304,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "10c55b94e35f",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/semi_container.glb",
+      "kind": "prop",
+      "bytes": 29260,
+      "meshes": 9,
+      "vertices": 380,
+      "triangles": 222,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "sign_blue",
+        "sign_red",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.52,
+          0.0048,
+          -0.104
+        ],
+        "max": [
+          0.462,
+          0.2688,
+          0.104
+        ],
+        "dimensions": [
+          0.982,
+          0.264,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "653d28efb9c1",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/shelter_glass.glb",
+      "kind": "prop",
+      "bytes": 17052,
+      "meshes": 5,
+      "vertices": 224,
+      "triangles": 100,
+      "materials": [
+        "bench_wood",
+        "concrete",
+        "glass_blue",
+        "glow_sign",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0971,
+          0,
+          -0.2
+        ],
+        "max": [
+          0.0971,
+          0.1732,
+          0.2
+        ],
+        "dimensions": [
+          0.1943,
+          0.1732,
+          0.4
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "2d21512258b2",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/shelter_small.glb",
+      "kind": "prop",
+      "bytes": 17048,
+      "meshes": 5,
+      "vertices": 224,
+      "triangles": 100,
+      "materials": [
+        "bench_wood",
+        "concrete",
+        "glass_blue",
+        "glow_sign",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1224,
+          0,
+          -0.18
+        ],
+        "max": [
+          0.1224,
+          0.2182,
+          0.18
+        ],
+        "dimensions": [
+          0.2448,
+          0.2182,
+          0.36
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "a8577ed4a8f6",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/stop_sign.glb",
+      "kind": "prop",
+      "bytes": 9288,
+      "meshes": 3,
+      "vertices": 111,
+      "triangles": 67,
+      "materials": [
+        "metal",
+        "sign_red",
+        "white"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0508,
+          0,
+          -0.0139
+        ],
+        "max": [
+          0.0508,
+          0.3508,
+          0.0139
+        ],
+        "dimensions": [
+          0.1016,
+          0.3508,
+          0.0277
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "195b967c0d09",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/stop_sign_bus.glb",
+      "kind": "prop",
+      "bytes": 9908,
+      "meshes": 2,
+      "vertices": 150,
+      "triangles": 84,
+      "materials": [
+        "metal_dark",
+        "sign_blue"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0243,
+          0,
+          -0.0348
+        ],
+        "max": [
+          0.0243,
+          0.28,
+          0.0348
+        ],
+        "dimensions": [
+          0.0486,
+          0.28,
+          0.0696
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "e9e22c03dc40",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/street_sign.glb",
+      "kind": "prop",
+      "bytes": 10604,
+      "meshes": 4,
+      "vertices": 117,
+      "triangles": 63,
+      "materials": [
+        "lamp_pole",
+        "metal_dark",
+        "sign_blue",
+        "sign_green"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.08,
+          0,
+          -0.0139
+        ],
+        "max": [
+          0.08,
+          0.287,
+          0.0139
+        ],
+        "dimensions": [
+          0.16,
+          0.287,
+          0.0277
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "f46acb96ad12",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/streetlight_b.glb",
+      "kind": "prop",
+      "bytes": 9896,
+      "meshes": 2,
+      "vertices": 148,
+      "triangles": 92,
+      "materials": [
+        "glow_lamp",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [
+        "glow_lamp"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0135,
+          0,
+          -0.0558
+        ],
+        "max": [
+          0.0135,
+          0.32,
+          0.0558
+        ],
+        "dimensions": [
+          0.0269,
+          0.32,
+          0.1115
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "ba21951f7e6c",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/ticket_machine.glb",
+      "kind": "prop",
+      "bytes": 6228,
+      "meshes": 2,
+      "vertices": 72,
+      "triangles": 36,
+      "materials": [
+        "concrete",
+        "glow_sign"
+      ],
+      "emissiveMaterials": [
+        "glow_sign"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0295,
+          0,
+          -0.0371
+        ],
+        "max": [
+          0.0295,
+          0.18,
+          0.0371
+        ],
+        "dimensions": [
+          0.059,
+          0.18,
+          0.0743
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "6f1f42100079",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/traffic_light.glb",
+      "kind": "prop",
+      "bytes": 15880,
+      "meshes": 6,
+      "vertices": 169,
+      "triangles": 89,
+      "materials": [
+        "black",
+        "glow_amber",
+        "glow_green",
+        "glow_red",
+        "lamp_pole",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [
+        "glow_amber",
+        "glow_green",
+        "glow_red"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.022,
+          0,
+          -0.035
+        ],
+        "max": [
+          0.13,
+          0.345,
+          0.0575
+        ],
+        "dimensions": [
+          0.152,
+          0.345,
+          0.0925
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "1056b58197c3",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/train.glb",
+      "kind": "prop",
+      "bytes": 9504,
+      "meshes": 4,
+      "vertices": 96,
+      "triangles": 48,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [
+        "glow_head"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.5,
+          0.015,
+          -0.152
+        ],
+        "max": [
+          0.503,
+          0.29,
+          0.152
+        ],
+        "dimensions": [
+          1.003,
+          0.275,
+          0.304
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "b899d28790eb",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/trash_bin.glb",
+      "kind": "prop",
+      "bytes": 8840,
+      "meshes": 2,
+      "vertices": 128,
+      "triangles": 73,
+      "materials": [
+        "black",
+        "metal_dark"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0324,
+          0,
+          -0.0351
+        ],
+        "max": [
+          0.036,
+          0.107,
+          0.0351
+        ],
+        "dimensions": [
+          0.0684,
+          0.107,
+          0.0702
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "e1e1766b2dec",
+      "class": "street-furniture"
+    },
+    {
+      "file": "props/tree_autumn.glb",
+      "kind": "prop",
+      "bytes": 13784,
+      "meshes": 3,
+      "vertices": 211,
+      "triangles": 78,
+      "materials": [
+        "bark",
+        "leaf_autumn",
+        "leaf_dry"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1786,
+          0,
+          -0.1354
+        ],
+        "max": [
+          0.2092,
+          0.4454,
+          0.1553
+        ],
+        "dimensions": [
+          0.3878,
+          0.4454,
+          0.2907
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "aba876410971",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/tree_cherry.glb",
+      "kind": "prop",
+      "bytes": 12536,
+      "meshes": 2,
+      "vertices": 211,
+      "triangles": 78,
+      "materials": [
+        "bark",
+        "leaf_pink"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1966,
+          0,
+          -0.1548
+        ],
+        "max": [
+          0.1998,
+          0.4334,
+          0.1593
+        ],
+        "dimensions": [
+          0.3964,
+          0.4334,
+          0.3141
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "65bd96f19fe2",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/tree_oak.glb",
+      "kind": "prop",
+      "bytes": 17780,
+      "meshes": 4,
+      "vertices": 271,
+      "triangles": 98,
+      "materials": [
+        "bark",
+        "leaf_a",
+        "leaf_b",
+        "leaf_c"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.2,
+          0,
+          -0.1503
+        ],
+        "max": [
+          0.2094,
+          0.4852,
+          0.1538
+        ],
+        "dimensions": [
+          0.4094,
+          0.4852,
+          0.3041
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "fc78c8d93e6a",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/tree_palm.glb",
+      "kind": "prop",
+      "bytes": 8760,
+      "meshes": 2,
+      "vertices": 127,
+      "triangles": 66,
+      "materials": [
+        "bark",
+        "palm_frond"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1412,
+          0,
+          -0.244
+        ],
+        "max": [
+          0.315,
+          0.44,
+          0.224
+        ],
+        "dimensions": [
+          0.4562,
+          0.44,
+          0.468
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "ca2f63cbbde6",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/tree_pine.glb",
+      "kind": "prop",
+      "bytes": 10744,
+      "meshes": 3,
+      "vertices": 143,
+      "triangles": 74,
+      "materials": [
+        "bark",
+        "leaf_pine",
+        "leaf_pine_b"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.1442,
+          0,
+          -0.156
+        ],
+        "max": [
+          0.16,
+          0.61,
+          0.156
+        ],
+        "dimensions": [
+          0.3042,
+          0.61,
+          0.312
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "d3f94db98ab5",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/tree_poplar.glb",
+      "kind": "prop",
+      "bytes": 11008,
+      "meshes": 3,
+      "vertices": 151,
+      "triangles": 58,
+      "materials": [
+        "bark",
+        "leaf_b",
+        "leaf_c"
+      ],
+      "emissiveMaterials": [],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.0682,
+          0,
+          -0.0729
+        ],
+        "max": [
+          0.0731,
+          0.6898,
+          0.0749
+        ],
+        "dimensions": [
+          0.1413,
+          0.6898,
+          0.1479
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "1f33af6de0a6",
+      "class": "vegetation"
+    },
+    {
+      "file": "props/truck.glb",
+      "kind": "prop",
+      "bytes": 24288,
+      "meshes": 7,
+      "vertices": 324,
+      "triangles": 192,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0054,
+          -0.104
+        ],
+        "max": [
+          0.33,
+          0.242,
+          0.104
+        ],
+        "dimensions": [
+          0.66,
+          0.2366,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "af5ed00e38e0",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/truck_box.glb",
+      "kind": "prop",
+      "bytes": 24300,
+      "meshes": 7,
+      "vertices": 324,
+      "triangles": 192,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0054,
+          -0.104
+        ],
+        "max": [
+          0.33,
+          0.254,
+          0.104
+        ],
+        "dimensions": [
+          0.66,
+          0.2486,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "237062d03d34",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/truck_cement.glb",
+      "kind": "prop",
+      "bytes": 29444,
+      "meshes": 9,
+      "vertices": 384,
+      "triangles": 222,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "sign_orange",
+        "tire",
+        "white"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0054,
+          -0.11
+        ],
+        "max": [
+          0.33,
+          0.252,
+          0.11
+        ],
+        "dimensions": [
+          0.66,
+          0.2466,
+          0.22
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "4a7eaade1e4d",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/truck_flatbed.glb",
+      "kind": "prop",
+      "bytes": 29356,
+      "meshes": 10,
+      "vertices": 364,
+      "triangles": 212,
+      "materials": [
+        "bark",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal",
+        "metal_dark",
+        "rim",
+        "tire",
+        "wall_wood"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0054,
+          -0.104
+        ],
+        "max": [
+          0.33,
+          0.162,
+          0.104
+        ],
+        "dimensions": [
+          0.66,
+          0.1566,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "b21917fa11fa",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/truck_garbage.glb",
+      "kind": "prop",
+      "bytes": 27424,
+      "meshes": 8,
+      "vertices": 364,
+      "triangles": 212,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal_dark",
+        "rim",
+        "tire",
+        "wall_green"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0054,
+          -0.104
+        ],
+        "max": [
+          0.33,
+          0.237,
+          0.104
+        ],
+        "dimensions": [
+          0.66,
+          0.2316,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "0ca895df2251",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/truck_tanker.glb",
+      "kind": "prop",
+      "bytes": 28372,
+      "meshes": 8,
+      "vertices": 384,
+      "triangles": 222,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal",
+        "metal_dark",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.33,
+          0.0054,
+          -0.104
+        ],
+        "max": [
+          0.33,
+          0.262,
+          0.104
+        ],
+        "dimensions": [
+          0.66,
+          0.2566,
+          0.208
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "98f4147eb3d1",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/truck_utility.glb",
+      "kind": "prop",
+      "bytes": 29240,
+      "meshes": 9,
+      "vertices": 380,
+      "triangles": 222,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "metal",
+        "metal_dark",
+        "rim",
+        "sign_orange",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.31,
+          0.0054,
+          -0.099
+        ],
+        "max": [
+          0.31,
+          0.232,
+          0.099
+        ],
+        "dimensions": [
+          0.62,
+          0.2266,
+          0.198
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "e1b29c1ccf93",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/van.glb",
+      "kind": "prop",
+      "bytes": 20652,
+      "meshes": 7,
+      "vertices": 248,
+      "triangles": 144,
+      "materials": [
+        "black",
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.212,
+          0.0051,
+          -0.094
+        ],
+        "max": [
+          0.212,
+          0.2204,
+          0.094
+        ],
+        "dimensions": [
+          0.424,
+          0.2153,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "f8862ce29fa6",
+      "class": "vehicle"
+    },
+    {
+      "file": "props/van_cargo.glb",
+      "kind": "prop",
+      "bytes": 18480,
+      "meshes": 6,
+      "vertices": 228,
+      "triangles": 134,
+      "materials": [
+        "car_body",
+        "car_glass",
+        "glow_head",
+        "glow_tail",
+        "rim",
+        "tire"
+      ],
+      "emissiveMaterials": [
+        "glow_head",
+        "glow_tail"
+      ],
+      "textures": [],
+      "missingUV": 0,
+      "missingNormals": 0,
+      "degenerateTriangles": 0,
+      "nonFinite": 0,
+      "bounds": {
+        "min": [
+          -0.192,
+          0.0048,
+          -0.094
+        ],
+        "max": [
+          0.222,
+          0.1688,
+          0.094
+        ],
+        "dimensions": [
+          0.414,
+          0.164,
+          0.188
+        ]
+      },
+      "lodNodes": [],
+      "geometryHash": "30621d0f3258",
+      "class": "vehicle"
+    }
+  ],
+  "issues": [],
+  "catalogEntries": 40,
+  "duplicateGeometry": [],
+  "summary": {
+    "buildingsFound": 40,
+    "propsFound": 67,
+    "propsByClass": {
+      "vehicle": 32,
+      "boat": 3,
+      "vegetation": 7,
+      "agent": 5,
+      "street-furniture": 20
+    },
+    "totalBuildingTriangles": 12446,
+    "totalBuildingVertices": 24296,
+    "totalBuildingBytes": 1902700,
+    "maxBuildingTriangles": 444,
+    "buildingsWithLodNodes": 0,
+    "buildingsWithTextures": 0,
+    "errors": 0,
+    "warnings": 0
+  }
+}
