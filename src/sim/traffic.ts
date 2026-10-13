@@ -359,9 +359,33 @@ export function snapToCentrelines(w: World, tiles: number[], pts: Float32Array):
   return out;
 }
 
-/** Vehicle route geometry: tile centres smoothed, then snapped onto the road centrelines. */
+/**
+ * Round the corners of a snapped route in place of a hard 90-degree kink: points around a turn sharper than ~25
+ * degrees get a (1,2,1) average, twice. Point count and order are unchanged (progress indexes tiles), and the
+ * displacement is at most about a fifth of a tile, which stays inside any carriageway.
+ */
+export function roundCorners(pts: Float32Array, tiles: number): Float32Array {
+  let cur = Float32Array.from(pts);
+  for (let pass = 0; pass < 2; pass++) {
+    const next = Float32Array.from(cur);
+    for (let i = 1; i + 1 < tiles; i++) {
+      const ax = cur[i * 2] - cur[i * 2 - 2], az = cur[i * 2 + 1] - cur[i * 2 - 1];
+      const bx = cur[i * 2 + 2] - cur[i * 2], bz = cur[i * 2 + 3] - cur[i * 2 + 1];
+      const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+      if (la < 1e-4 || lb < 1e-4) continue;
+      const cos = (ax * bx + az * bz) / (la * lb);
+      if (cos > 0.906) continue;                      // straighter than ~25 degrees: leave it
+      next[i * 2] = (cur[i * 2 - 2] + 2 * cur[i * 2] + cur[i * 2 + 2]) / 4;
+      next[i * 2 + 1] = (cur[i * 2 - 1] + 2 * cur[i * 2 + 1] + cur[i * 2 + 3]) / 4;
+    }
+    cur = next;
+  }
+  return cur;
+}
+
+/** Vehicle route geometry: tile centres smoothed, snapped onto the road centrelines, corners rounded. */
 export function routePath(w: World, tiles: number[]): Float32Array {
-  return snapToCentrelines(w, tiles, smoothPath(w, tiles));
+  return roundCorners(snapToCentrelines(w, tiles, smoothPath(w, tiles)), tiles.length);
 }
 
 // ---------------------------------------------------------------- simulation
