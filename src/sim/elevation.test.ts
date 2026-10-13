@@ -143,10 +143,11 @@ describe("bridges", () => {
     expect(placeRoad(s, ROAD.STREET, across(ey, 4, 21)).ok).toBe(true);
     // Water under the deck has no street frontage.
     expect(getFrontage(s.world).road[idx(s.world, 12, ey)]).toBe(-1);
-    // The utility flood stops at the shore: it never crosses the deck.
+    // The utility flood crosses the deck (ramps link layers) but the deck tiles carry no ground frontage.
     const dist = floodRoads(s.world, [idx(s.world, 4, ey)]);
     expect(dist[idx(s.world, 4, ey)]).toBe(0);
-    expect(dist[idx(s.world, 21, ey)]).toBe(-1);
+    expect(dist[idx(s.world, 12, ey)]).toBe(-1);
+    expect(dist[idx(s.world, 21, ey)]).toBeGreaterThan(0);
   });
 
   it("refuses bus stops on the deck", () => {
@@ -205,7 +206,8 @@ describe("tunnels", () => {
     // the plateau cells directly over the bore are too steep for the road's frontage, like CS1's slope rule
     expect(applyTool(s, "res", 13, ey + 1).ok).toBe(false);
     const dist = floodRoads(s.world, [idx(s.world, 3, ey)]);
-    expect(dist[idx(s.world, 24, ey)]).toBe(-1);
+    expect(dist[idx(s.world, 13, ey)]).toBe(-1);   // tunnel tile: no ground frontage
+    expect(dist[idx(s.world, 24, ey)]).toBeGreaterThan(0);   // pipes follow the bore to the far portal
     expect(applyTool(s, "busstop", 13, ey)).toEqual({ ok: false, reason: "Bus stops go on a road" });
   });
 

@@ -1,4 +1,4 @@
-import { COVER, FAC, FACILITY_INFO, FacilityKind, World, idx, inBounds } from "./world";
+import { COVER, FAC, FACILITY_INFO, FacilityKind, RoadLayer, World, idx, inBounds, layerClass } from "./world";
 import { findFrontage } from "./blocks";
 
 /** Bits in World.nets: which utility floods reached each road tile. */
@@ -94,24 +94,40 @@ export function facilityLinks(w: World): FacilityLink[] {
   return out;
 }
 
-/** Multi-source BFS over surface road tiles (4-neighbourhood). -1 marks unreachable tiles. Pipes run under streets, not over bridge decks or through tunnels. */
+/**
+ * Multi-source BFS over the road network (4-neighbourhood), layer aware like traffic: ground, bridge deck and tunnel
+ * are separate layers that meet only on `roadLink` ramp tiles, so power, water and sewage run over a bridge or through
+ * a tunnel to the ground road on the far side without leaking onto the road crossed underneath. The result is the
+ * distance on the GROUND layer per tile (-1 = not reached): buildings are served from ground frontage tiles only.
+ */
 export function floodRoads(w: World, entries: readonly number[]): Int32Array {
-  const dist = new Int32Array(w.size * w.size).fill(-1);
+  const n = w.size * w.size;
+  const state = new Int32Array(n * 3).fill(-1);          // distance per (tile, layer)
   const queue: number[] = [];
-  for (const e of entries) {
-    if (w.roadSurface[e] && dist[e] < 0) { dist[e] = 0; queue.push(e); }
-  }
+  const push = (tile: number, layer: RoadLayer, d: number): void => {
+    const k = tile * 3 + layer;
+    if (state[k] >= 0 || !layerClass(w, tile, layer)) return;
+    state[k] = d;
+    queue.push(k);
+  };
+  for (const e of entries) if (w.roadSurface[e]) push(e, 0, 0);
   let head = 0;
   while (head < queue.length) {
-    const t = queue[head++];
-    const x = t % w.size, y = (t / w.size) | 0;
+    const k = queue[head++];
+    const tile = (k / 3) | 0, layer = (k % 3) as RoadLayer;
+    const d = state[k];
+    const x = tile % w.size, y = (tile / w.size) | 0;
+    if (w.roadLink[tile]) {
+      for (const l of [0, 1, 2] as RoadLayer[]) if (l !== layer) push(tile, l, d);
+    }
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
       const nx = x + dx, ny = y + dy;
       if (!inBounds(w, nx, ny)) continue;
-      const n = idx(w, nx, ny);
-      if (w.roadSurface[n] && dist[n] < 0) { dist[n] = dist[t] + 1; queue.push(n); }
+      push(idx(w, nx, ny), layer, d + 1);
     }
   }
+  const dist = new Int32Array(n).fill(-1);
+  for (let t = 0; t < n; t++) dist[t] = state[t * 3];
   return dist;
 }
 
