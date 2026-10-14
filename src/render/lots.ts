@@ -92,7 +92,8 @@ export function orientedModelCells(f: LotFrame): { x: number; z: number }[] {
  * the front edge is +d/2; measured on a diagonal-and-curve test city, +d/2 is the nearer edge for every lot.
  */
 export function orientedKerb(f: LotFrame): { x: number; z: number; len: number; yaw: number } {
-  const p = rotateCell(f, 0, f.d / 2);
+  // The strip is 0.12 deep and centred on this line: pull it inside the lot so it never overlaps the road's own kerb.
+  const p = rotateCell(f, 0, f.d / 2 - 0.07);
   return { x: p.x, z: p.z, len: f.w, yaw: f.yaw };
 }
 
