@@ -49,6 +49,44 @@ export const CONTACT_LENGTH = 1.26;
 /** Contact darkness for cars (ambient occlusion, independent of the sun). */
 export const CONTACT_DARK = 0.95;
 
+// Adapted from fable-cities (MIT, (c) 2026 raw): createBeamMaterial and the
+// camera-facing lamp glare from src/modules/traffic/materials.js. Fable uses
+// metres; Mayor uses tiles, so the beam dimensions below are already ÷8 and
+// additionally scaled by the existing 0.70 vehicle presentation factor.
+const BEAM_CAP = 520;
+function beamMaterial(color: THREE.ColorRepresentation): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: 0 } },
+    vertexShader: `attribute float aStrength; varying float vStrength; void main(){vStrength=aStrength;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);}`,
+    fragmentShader: `uniform vec3 uColor; varying float vStrength; void main(){vec2 q=uv*2.0-1.0; float a=pow(max(0.0,1.0-length(q)),2.0)*vStrength; if(a<0.002) discard; gl_FragColor=vec4(uColor*a,a);}`,
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, toneMapped: false,
+  });
+}
+
+/** Fixed-cap additive ground washes; one draw per light colour, no per-frame allocation. */
+export class VehicleLightPools {
+  readonly head: THREE.InstancedMesh;
+  readonly tail: THREE.InstancedMesh;
+  private readonly ha: THREE.InstancedBufferAttribute;
+  private readonly ta: THREE.InstancedBufferAttribute;
+  private hn = 0; private tn = 0;
+  private readonly hm: THREE.ShaderMaterial; private readonly tm: THREE.ShaderMaterial;
+  constructor() {
+    const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    this.ha = new THREE.InstancedBufferAttribute(new Float32Array(BEAM_CAP), 1); this.ta = new THREE.InstancedBufferAttribute(new Float32Array(BEAM_CAP), 1);
+    this.ha.setUsage(THREE.DynamicDrawUsage); this.ta.setUsage(THREE.DynamicDrawUsage);
+    const hg = g.clone(); hg.setAttribute("aStrength", this.ha); const tg = g.clone(); tg.setAttribute("aStrength", this.ta);
+    this.hm = beamMaterial("#ffe0ad"); this.tm = beamMaterial("#ff2412");
+    this.head = new THREE.InstancedMesh(hg, this.hm, BEAM_CAP); this.tail = new THREE.InstancedMesh(tg, this.tm, BEAM_CAP);
+    for (const m of [this.head, this.tail]) { m.count = 0; m.frustumCulled = false; m.renderOrder = 7; }
+  }
+  begin(): void { this.hn = 0; this.tn = 0; }
+  addHead(matrix: THREE.Matrix4, strength: number): void { if (this.hn >= BEAM_CAP) return; this.head.setMatrixAt(this.hn, matrix); this.ha.array[this.hn++] = strength; }
+  addTail(matrix: THREE.Matrix4, strength: number): void { if (this.tn >= BEAM_CAP) return; this.tail.setMatrixAt(this.tn, matrix); this.ta.array[this.tn++] = strength; }
+  end(): void { this.head.count = this.hn; this.tail.count = this.tn; this.head.visible = this.hn > 0; this.tail.visible = this.tn > 0; this.head.instanceMatrix.needsUpdate = this.tail.instanceMatrix.needsUpdate = true; this.ha.needsUpdate = this.ta.needsUpdate = true; }
+  setStrength(lightsOn: number): void { this.hm.uniforms.uStrength.value = lightsOn * 0.15; this.tm.uniforms.uStrength.value = lightsOn * 0.17; }
+}
+
 /**
  * One instanced draw of grounding decals. The caller brackets a frame with
  * begin()/end() and adds one decal per visible ground vehicle (tunnel vehicles

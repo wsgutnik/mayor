@@ -63,3 +63,9 @@ SOFTWARE.
 swatches were derived from swatches generated with Higgsfield (GPT Image 2.5) on the project owner's account, then
 made seamless, desaturated and brightness-matched by `blender/apply_ai_textures.py`. They contain no third-party
 artwork by design (prompts describe generic materials).
+
+## Fable Cities CC0 texture port (2026-10-14)
+
+Selected files in `public/textures/*_hd.png` are resized colour maps from Fable Cities' public CC0 asset set;
+per-file source and upstream credits are recorded in `third_party/README.md`. Only ambientCG CC0 sources were used
+for this port; no non-CC0 Fable asset was copied.

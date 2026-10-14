@@ -73,6 +73,8 @@ function prep(tex: THREE.Texture, maxAniso: number, aniso: number): THREE.Textur
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = Math.min(aniso, maxAniso);
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
   return tex;
 }
 

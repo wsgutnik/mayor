@@ -11,7 +11,8 @@ import { bakeVehicleSurface, pitchFor, shadowProxy, type BakedVehicle } from "./
 import { createVehicleMaterial, vehicleUniforms } from "./vehicle-material";
 import { boxOf, paintOf } from "./vehicle-palette";
 import { shadowBias } from "./shadow-tuning";
-import { CONTACT_DARK, ContactShadows } from "./vehicle-fx";
+import { CONTACT_DARK, ContactShadows, VehicleLightPools } from "./vehicle-fx";
+import { StreetLightFx } from "./street-light";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
 import {
@@ -38,6 +39,8 @@ import { nodeArms, signalNodes, signalPhase } from "../sim/roads";
 import { PROP_KINDS, PropKind, planProps } from "../sim/props";
 import { PROP_TINT, propGeometry } from "./props";
 import { nearestCell } from "../sim/mirror";
+import { loadEnvironment } from "./environment";
+import { updateAtmosphereState, type AtmosphereState } from "./atmosphere";
 import type { ZoneBlockSet } from "../sim/zoneblocks";
 import type { CellPose, CellRef } from "../sim/zonecells";
 
@@ -81,6 +84,9 @@ const BIOME_LOOK: Record<Biome, { sand: string; grass: string; rock: string; roc
 
 /** Deep bed colour the underwater terrain fades to (shows through shallow water). */
 const BED_MUD = new THREE.Color("#2b4a3a");
+const _warmSun = new THREE.Color("#ff9a58");
+const _moonSun = new THREE.Color("#9db8ff");
+const _underSky = new THREE.Color("#5a4330");
 
 /** Which Blender prop a scattered plant uses, with cumulative weights per terrain preset. */
 const TREE_SPECIES = ["tree_oak", "tree_pine", "tree_poplar", "tree_cherry", "tree_autumn", "tree_palm", "bush", "bush_flowers", "rock"] as const;
@@ -156,6 +162,9 @@ export class CityRenderer {
   private noiseTex!: THREE.DataTexture;
   private dayLevel = 1;
   private skyCol = new THREE.Color("#a9c8e8");
+  private atmosphere: AtmosphereState = { day: 1, dusk: 0, wet: 0, exposure: 1.05 };
+  private atmosphereBackground = new THREE.Color("#a9c8e8");
+  private atmosphereSunColor = new THREE.Color("#fff4de");
   private props = new Map<string, LoadedModel | null>();
   private propPending = new Set<string>();
   private propWaiters = new Map<string, ((m: LoadedModel) => void)[]>();
@@ -169,6 +178,8 @@ export class CityRenderer {
   /** Shadow role per vehicle object: 0 body, 1 proxy, 2 grounding decal. */
   private vehShadowKind = new Map<THREE.Object3D, number>();
   private contact!: ContactShadows;
+  private vehicleLights!: VehicleLightPools;
+  private streetLightFx!: StreetLightFx;
   private lastBiasSpan = -1;
   private lastBiasRes = -1;
   // updateVehicles scratch: cleared or overwritten every frame, never reallocated.
@@ -182,6 +193,12 @@ export class CityRenderer {
   private decM = new THREE.Matrix4();
   private decR = new THREE.Matrix4();
   private decS = new THREE.Vector3();
+  private fxM = new THREE.Matrix4();
+  private txM = new THREE.Matrix4();
+  private fxP = new THREE.Vector3();
+  private txP = new THREE.Vector3();
+  private fxS = new THREE.Vector3();
+  private txS = new THREE.Vector3();
   private leanX = 0;
   private leanZ = 0;
   private boatMeshes = new Map<string, THREE.InstancedMesh>();
@@ -298,6 +315,7 @@ export class CityRenderer {
     this.sun.shadow.radius = 4;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    loadEnvironment(this.renderer, (env) => { this.scene.environment = env; });
     this.buildRain();
 
     this.rig = new CameraRig(1, size);
@@ -385,6 +403,10 @@ export class CityRenderer {
     }
     this.contact = new ContactShadows(CONTACT_CAP);
     this.scene.add(this.contact.mesh);
+    this.vehicleLights = new VehicleLightPools();
+    this.scene.add(this.vehicleLights.head, this.vehicleLights.tail);
+    this.streetLightFx = new StreetLightFx();
+    this.scene.add(this.streetLightFx.pools, this.streetLightFx.halos);
     this.vehShadowKind.set(this.contact.mesh, 2);
     for (const name of BOAT_PROPS) {
       const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), 16);
@@ -935,6 +957,7 @@ export class CityRenderer {
     this.kerbs.instanceMatrix.needsUpdate = true;
     if (this.kerbs.instanceColor) this.kerbs.instanceColor.needsUpdate = true;
     const furniturePlan = planProps(w, this.propDensity());
+    this.streetLightFx.begin();
     const alternateLamps = furniturePlan.filter((p) => p.kind === "streetlight_b");
     // Street lamps on the verge of every fourth street and avenue tile, arm turned over the road.
     for (let y = 0; y < w.size && nl < this.lampMesh.instanceMatrix.count; y++) {
@@ -954,6 +977,7 @@ export class CityRenderer {
           d.updateMatrix();
           this.lampMesh.setMatrixAt(nl, d.matrix);
           this.lampMesh.setColorAt(nl++, tint.setScalar(1));
+          this.streetLightFx.add(px, tileHeight(w, x, y) + 0.05, pz);
           d.rotation.set(0, 0, 0);
           break;
         }
@@ -962,6 +986,7 @@ export class CityRenderer {
     }
     this.ambience.setSources(smoke);
     this.lampMesh.count = nl;
+    this.streetLightFx.end();
     this.lampMesh.instanceMatrix.needsUpdate = true;
     if (this.lampMesh.instanceColor) this.lampMesh.instanceColor.needsUpdate = true;
     for (const m of this.treeMeshes.values()) {
@@ -1270,21 +1295,24 @@ export class CityRenderer {
    */
   setAtmosphere(tod: number, raining: boolean): void {
     this.lastAtmo = [tod, raining];
-    const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-    const elev = Math.sin((tod - 0.25) * Math.PI * 2);
-    const day = clamp01(elev * 1.3 + 0.25);
-    const dusk = clamp01(1 - Math.abs(elev) * 3.2) * (elev > -0.3 ? 1 : 0);
-    const sky = new THREE.Color("#0a1224").lerp(new THREE.Color("#a9c8e8"), day);
-    sky.lerp(new THREE.Color("#f0a070"), dusk * 0.45);
-    if (raining) sky.lerp(new THREE.Color("#6f7d8c"), 0.55);
+    updateAtmosphereState(this.atmosphere, this.skyCol, tod, raining, this.atmosphereBackground);
+    const day = this.atmosphere.day;
+    const dusk = this.atmosphere.dusk;
+    const sky = this.atmosphereBackground;
     // The underground view sits on a lit soil-brown backdrop whatever the hour.
-    (this.scene.background as THREE.Color).copy(this.overlayLayer === UNDERGROUND_LAYER ? sky.lerp(new THREE.Color("#5a4330"), 0.85) : sky);
-    this.dayLevel = day * (raining ? 0.6 : 1);
+    const background = this.overlayLayer === UNDERGROUND_LAYER
+      ? this.atmosphereBackground.copy(sky).lerp(_underSky, 0.85)
+      : this.atmosphereBackground.copy(sky);
+    (this.scene.background as THREE.Color).copy(background);
+    this.dayLevel = day * this.atmosphere.wet;
+    // The HDRI is a bright daytime sky: its image-based light must fade with the
+    // day or night scenes stay lit like noon (specular + ambient fill both).
+    this.scene.environmentIntensity = this.overlayLayer === UNDERGROUND_LAYER ? 0.4 : 0.05 + 0.5 * day * (raining ? 0.7 : 1);
     this.skyCol.copy(sky);
     const fog = this.scene.fog as THREE.FogExp2;
     fog.color.copy(sky);
     this.fogBase = raining ? 0.009 : 0.0042 + (1 - day) * 0.0008;
-    this.renderer.toneMappingExposure = 0.85 + day * 0.2 - dusk * 0.05;
+    this.renderer.toneMappingExposure = this.atmosphere.exposure;
     const a = (tod - 0.25) * Math.PI * 2;
     this.sunDir.set(-Math.cos(a) * 60, Math.max(6, Math.sin(a) * 70 + 8), 30);
     // Night keeps a readable moonlit floor (cool, soft) instead of near black; the underground view is always lit.
@@ -1292,11 +1320,12 @@ export class CityRenderer {
     const under = this.overlayLayer === UNDERGROUND_LAYER;
     this.sun.intensity = under ? 1.6 : (0.15 + 1.7 * day + 0.32 * night) * (raining ? 0.55 : 1);
     if (under) this.sun.color.set("#fff4de");
-    else this.sun.color.set("#fff4de").lerp(new THREE.Color("#ff9a58"), dusk * 0.6).lerp(new THREE.Color("#9db8ff"), night * 0.7);
+    else this.sun.color.copy(this.atmosphereSunColor).lerp(_warmSun, dusk * 0.6).lerp(_moonSun, night * 0.7);
     if (under) this.renderer.toneMappingExposure = 1.05;
     this.hemi.intensity = under ? 1.8 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
     this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
     this.nightGlow = this.winMat.emissiveIntensity;
+    if (this.streetLightFx) this.streetLightFx.setNight(this.nightGlow);
     for (const g of this.glowMats) {
       g.emissiveIntensity = this.nightGlow;
       setWindowNight(g, this.nightGlow); // per-window shader (V1); no-op for plain glow mats
@@ -1378,6 +1407,14 @@ export class CityRenderer {
     this.decM.scale(this.decS);
     this.decM.setPosition(x + this.leanX * wid, baseY + ROAD_LIFT + 0.002, z + this.leanZ * wid);
     this.contact.add(this.decM, dark);
+    // Two compact additive washes keep moving lamps readable on the low tier.
+    // The quads are deliberately ground-level and share the vehicle pose; no lights are spawned.
+    this.fxP.set(x + hx * len * 0.55, baseY + ROAD_LIFT + 0.004, z + hz * len * 0.55);
+    this.fxS.set(wid * 0.9, len * 1.1, 1); this.fxM.compose(this.fxP, this.vehQ, this.fxS);
+    this.txP.set(x - hx * len * 0.55, baseY + ROAD_LIFT + 0.005, z - hz * len * 0.55);
+    this.txS.set(wid * 0.7, len * 0.55, 1); this.txM.compose(this.txP, this.vehQ, this.txS);
+    this.vehicleLights.addHead(this.fxM, lightsOn);
+    this.vehicleLights.addTail(this.txM, lightsOn);
   }
 
   private updateVehicles(): void {
@@ -1385,7 +1422,9 @@ export class CityRenderer {
     if (!t) return;
     this.vehCounts.clear();
     this.contact.begin();
+    this.vehicleLights.begin();
     const lightsOn = Math.min(1, this.nightGlow);
+    this.vehicleLights.setStrength(lightsOn);
     vehicleUniforms.uLampExposure.value = this.renderer.toneMappingExposure || 1;
     const envI = this.scene.environmentIntensity ?? 1;
     vehicleUniforms.uEnvComp.value = envI < 1 && envI > 0.05 ? Math.min(1.5, 1 / envI) : 1;
@@ -1508,6 +1547,7 @@ export class CityRenderer {
       }
     }
     this.contact.end();
+    this.vehicleLights.end();
     if (this.overlayLayer === UNDERGROUND_LAYER) this.contact.mesh.visible = false;
   }
 

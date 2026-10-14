@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { applyMaterialTargets } from "./material-targets";
 
 /**
  * M20 — textured road material.
@@ -39,6 +40,8 @@ function prep(tex: THREE.Texture, maxAniso: number, aniso: number): THREE.Textur
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = Math.min(aniso, maxAniso);
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
   return tex;
 }
 
@@ -240,7 +243,7 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
           else if (vRoadClass < 7.5) { vec4 m = texture2D(uTexCrosswalk, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
           else if (vRoadClass < 8.5) { vec4 m = texture2D(uTexStopBar, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
           else { vec4 m = texture2D(uTexArrow, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
-          roadCol *= 0.30 + 0.70 * uDayFactor;
+          roadCol *= 0.55 + 0.45 * uDayFactor;
           roadCol *= 1.0 - 0.18 * uWet;
           diffuseColor.rgb = roadCol;
         } else {
@@ -285,6 +288,7 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
     setDayWet: (day, wet) => {
       uniforms.uDayFactor.value = day;
       uniforms.uWet.value = wet;
+      applyMaterialTargets(material, wet, 0.6);
     },
   };
 }
