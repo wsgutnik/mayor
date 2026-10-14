@@ -95,6 +95,7 @@ def prefeitura(m: Model):
     m.plot()
     m.box(0, 0.08, 0.03, 0.62, 0.4, 0.3, "wall_cream", roof="roof_flat")
     m.hip(0, 0.08, 0.33, 0.66, 0.44, 0.12, "roof_blue")
+    m.roof_kit(0, 0.08, 0.33, 0.66, 0.44, 0.12, "roof_blue", ridge="x", hip=True)
     # clock tower + dome
     m.box(0, 0.08, 0.45, 0.14, 0.14, 0.22, "wall_cream")
     m.pyramid(0, 0.08, 0.67, 0.17, 0.17, 0.12, "roof_blue")
@@ -105,8 +106,8 @@ def prefeitura(m: Model):
         _column(m, x, -0.21, 0.03, 0.27)
     m.box(0, -0.2, 0.03, 0.3, 0.1, 0.03, "concrete")
     m.box(0, -0.121, 0.03, 0.09, 0.01, 0.2, "wall_wood")  # door
-    m.windows(0, 0.08, 0.03, 0.62, 0.4, 0.3, 1, cols=5, sides="f", lit=0.5)
-    m.windows(0, 0.08, 0.03, 0.62, 0.4, 0.3, 1, cols=3, sides="r", lit=0.4)
+    m.windows(0, 0.08, 0.03, 0.62, 0.4, 0.3, 1, sides="f")
+    m.windows(0, 0.08, 0.03, 0.62, 0.4, 0.3, 1, sides="r")
     m.tree(0.36, -0.28, 1.0)
     m.tree(-0.37, 0.28, 0.9, dark=True)
 
@@ -120,11 +121,11 @@ def biblioteca(m: Model):
     m.box(0.3, 0.05, 0.03, 0.1, 0.34, 0.34, "wall_brick")
     m.box(0.28, 0.22, 0.03, 0.3, 0.2, 0.2, "wall_cream", roof="roof_flat")  # wing
     m.box(0, 0.05, 0.33, 0.52, 0.36, 0.03, "concrete")  # roof slab
-    m.box(0, 0.02, 0.36, 0.2, 0.14, 0.07, "glass_dark", roof="glass_blue")  # skylight
+    m.box(0, 0.02, 0.36, 0.2, 0.14, 0.07, "glass_blue", roof="glass_blue")  # skylight
     _sign(m, -0.08, -0.125, 0.2, 0.24)  # BIBLIOTECA band
     m.box(-0.08, -0.14, 0.03, 0.16, 0.06, 0.02, "concrete")  # entry step
-    m.windows(0, 0.05, 0.03, 0.5, 0.34, 0.3, 1, cols=4, sides="fbrl", lit=0.6)
-    m.windows(0.28, 0.22, 0.03, 0.3, 0.2, 0.2, 1, cols=2, sides="br", lit=0.5)
+    m.windows(0, 0.05, 0.03, 0.5, 0.34, 0.3, 1, sides="fbrl")
+    m.windows(0.28, 0.22, 0.03, 0.3, 0.2, 0.2, 1, sides="br")
     _back_door(m, -0.12, 0.22, 0.03)
     _louver(m, 0.12, 0.223, 0.12)
     _rear_pipes(m, 0.22, -0.34, 0.34, 0.03, 0.3)
@@ -156,8 +157,8 @@ def centro(m: Model):
     _column(m, 0.12, -0.26, 0.03, 0.21, w=0.03)
     _sign(m, -0.05, -0.105, 0.26, 0.3, h=0.04)
     m.box(-0.05, -0.12, 0.03, 0.2, 0.02, 0.16, "glass_blue")  # glazed entry
-    m.windows(-0.05, 0.1, 0.03, 0.56, 0.4, 0.28, 1, cols=4, sides="fbrl", lit=0.6)
-    m.windows(0.2, 0.22, 0.03, 0.26, 0.2, 0.18, 1, cols=2, sides="br", lit=0.45)
+    m.windows(-0.05, 0.1, 0.03, 0.56, 0.4, 0.28, 1, sides="fbrl")
+    m.windows(0.2, 0.22, 0.03, 0.26, 0.2, 0.18, 1, sides="br")
     _back_door(m, 0.05, 0.3, 0.03, mat="wall_wood")
     _louver(m, -0.18, 0.303, 0.12)
     _rear_pipes(m, 0.3, -0.31, 0.21, 0.03, 0.27)
@@ -191,7 +192,7 @@ def delegacia(m: Model):
     m.box(-0.31, -0.2, 0.25, 0.09, 0.01, 0.06, "sign_green")
     m.box(0.2, -0.28, 0.03, 0.1, 0.2, 0.09, "wall_navy")  # patrol car
     m.box(0.2, -0.36, 0.03, 0.09, 0.04, 0.07, "wall_white")
-    m.windows(0, 0.1, 0.03, 0.6, 0.36, 0.3, 1, cols=5, sides="f", lit=0.4)
+    m.windows(0, 0.1, 0.03, 0.6, 0.36, 0.3, 1, sides="f")
     m.tree(-0.4, 0.32, 0.9)
     m.tree(0.4, 0.32, 0.9, dark=True)
 
@@ -204,13 +205,14 @@ def museu(m: Model):
     # front pediment on 6 columns + stairs
     m.box(0, -0.12, 0.33, 0.44, 0.14, 0.05, "wall_cream")
     m.gable(0, -0.12, 0.38, 0.44, 0.14, 0.09, "roof_slate", end="wall_cream", ridge="x")
+    m.roof_kit(0, -0.12, 0.38, 0.44, 0.14, 0.09, "roof_slate", ridge="x")
     for x in (-0.18, -0.108, -0.036, 0.036, 0.108, 0.18):
         _column(m, x, -0.17, 0.03, 0.3, w=0.04)
     m.box(0, -0.2, 0.03, 0.4, 0.12, 0.03, "concrete")
     m.box(0, -0.061, 0.03, 0.1, 0.01, 0.2, "wall_wood")  # door
     m.box(-0.26, -0.061, 0.1, 0.08, 0.01, 0.16, "sign_red")  # banners
     m.box(0.26, -0.061, 0.1, 0.08, 0.01, 0.16, "sign_red")
-    m.windows(0, 0.12, 0.03, 0.6, 0.36, 0.3, 1, cols=5, sides="fbrl", lit=0.55)
+    m.windows(0, 0.12, 0.03, 0.6, 0.36, 0.3, 1, sides="fbrl")
     _back_door(m, 0.18, 0.3, 0.03, mat="wall_wood")
     _louver(m, -0.16, 0.303, 0.16)
     _rear_pipes(m, 0.3, -0.28, 0.28, 0.03, 0.3)
@@ -239,7 +241,7 @@ def clinica(m: Model):
     # totem sign with mini cross
     m.box(-0.36, -0.2, 0.03, 0.06, 0.04, 0.2, "wall_white")
     _cross(m, -0.36, -0.225, 0.16, s=0.05)
-    m.windows(0, 0.08, 0.03, 0.56, 0.36, 0.26, 1, cols=4, sides="fbrl", lit=0.6)
+    m.windows(0, 0.08, 0.03, 0.56, 0.36, 0.26, 1, sides="fbrl")
     _back_door(m, 0.18, 0.26, 0.03)
     _louver(m, -0.1, 0.263, 0.12)
     _rear_pipes(m, 0.26, -0.28, 0.26, 0.03, 0.25)
@@ -273,9 +275,9 @@ def hospital(m: Model):
     m.box(-0.2, 0.14, 0.55, 0.1, 0.1, 0.1, "wall_grey")
     _amb(m, -0.12, -0.3)
     _amb(m, 0.02, -0.3)
-    m.windows(0, 0.14, 0.03, 0.3, 0.3, 0.52, 3, cols=3, sides="fbrl", lit=0.5)
-    m.windows(-0.28, 0.1, 0.03, 0.26, 0.34, 0.24, 1, cols=2, sides="fbl", lit=0.5)
-    m.windows(0.28, 0.1, 0.03, 0.26, 0.34, 0.24, 1, cols=2, sides="fbr", lit=0.5)
+    m.windows(0, 0.14, 0.03, 0.3, 0.3, 0.52, 3, sides="fbrl")
+    m.windows(-0.28, 0.1, 0.03, 0.26, 0.34, 0.24, 1, sides="fbl")
+    m.windows(0.28, 0.1, 0.03, 0.26, 0.34, 0.24, 1, sides="fbr")
     _back_door(m, 0.0, 0.29, 0.03)
     _louver(m, -0.18, 0.293, 0.13)
     _louver(m, 0.18, 0.293, 0.13)
@@ -304,7 +306,7 @@ def escola1(m: Model):
     m.box(0.2, 0.14, 0.03, 0.14, 0.3, 0.28, "wall_brick")
     m.awning(-0.05, -0.01, 0.2, 0.2, mat="sign_blue")  # ESCOLA canopy
     m.box(-0.05, -0.03, 0.03, 0.12, 0.02, 0.15, "glass_blue")
-    m.windows(-0.05, 0.14, 0.03, 0.6, 0.3, 0.26, 1, cols=4, sides="fbrl", lit=0.55)
+    m.windows(-0.05, 0.14, 0.03, 0.6, 0.3, 0.26, 1, sides="fbrl")
     _back_door(m, 0.17, 0.29, 0.03)
     _louver(m, -0.11, 0.293, 0.12)
     _rear_pipes(m, 0.29, -0.36, 0.24, 0.03, 0.26)
@@ -339,12 +341,13 @@ def escola2(m: Model):
     m.box(0.24, 0.2, 0.37, 0.32, 0.32, 0.03, "concrete")
     m.box(0.2, -0.22, 0.03, 0.34, 0.24, 0.22, "wall_brick")  # gym
     m.gable(0.2, -0.22, 0.25, 0.36, 0.26, 0.1, "roof_dark", end="wall_brick", ridge="x")
+    m.roof_kit(0.2, -0.22, 0.25, 0.36, 0.26, 0.1, "roof_dark", ridge="x")
     m.box(-0.28, -0.2, 0.03, 0.2, 0.2, 0.16, "wall_cream", roof="roof_flat")
     # court: green slab + white edges
     m._quad([(-0.42, -0.02, 0.035), (-0.1, -0.02, 0.035), (-0.1, 0.12, 0.035), (-0.42, 0.12, 0.035)], "wall_green")
-    m.windows(-0.26, 0.2, 0.03, 0.3, 0.3, 0.34, 2, cols=3, sides="fbl", lit=0.45)
-    m.windows(0.24, 0.2, 0.03, 0.3, 0.3, 0.34, 2, cols=3, sides="fbr", lit=0.45)
-    m.windows(0.2, -0.22, 0.03, 0.34, 0.24, 0.22, 1, cols=3, sides="fbr", lit=0.4)
+    m.windows(-0.26, 0.2, 0.03, 0.3, 0.3, 0.34, 2, sides="fbl")
+    m.windows(0.24, 0.2, 0.03, 0.3, 0.3, 0.34, 2, sides="fbr")
+    m.windows(0.2, -0.22, 0.03, 0.34, 0.24, 0.22, 1, sides="fbr")
     _back_door(m, -0.28, 0.35, 0.03)
     _back_door(m, 0.24, 0.35, 0.03)
     _louver(m, 0.0, 0.343, 0.15)
@@ -352,7 +355,7 @@ def escola2(m: Model):
     m.ac_unit(-0.12, 0.24, 0.4)
     for x in (-0.33, -0.2, 0.17, 0.3):
         framed_window(m, x, 0.045, 0.12, w=0.05, h=0.075, mat="glow_window")
-        framed_window(m, x, 0.045, 0.25, w=0.05, h=0.075, mat="glass_dark")
+        framed_window(m, x, 0.045, 0.25, w=0.05, h=0.075, mat="glow_window")
     cornice(m, -0.26, 0.2, 0.3, 0.3, 0.405)
     cornice(m, 0.24, 0.2, 0.3, 0.3, 0.405)
     for x in (-0.36, -0.28, -0.2, -0.12):
@@ -380,7 +383,7 @@ def bombeiros(m: Model):
     m.box(-0.32, 0.2, 0.7, 0.16, 0.18, 0.1, "glass_dark")
     m.box(-0.32, 0.2, 0.8, 0.18, 0.2, 0.03, "wall_red")
     m.box(0.3, 0.12, 0.33, 0.12, 0.12, 0.06, "wall_grey")
-    m.windows(0.08, 0.12, 0.03, 0.6, 0.4, 0.3, 1, cols=4, sides="r", lit=0.45)
+    m.windows(0.08, 0.12, 0.03, 0.6, 0.4, 0.3, 1, sides="r")
     m.tree(0.38, -0.32, 0.9, dark=True)
 
 
@@ -391,7 +394,7 @@ def eta(m: Model):
     _tank(m, 0.02, -0.22, 0.13)
     m.box(0.14, 0.18, 0.03, 0.4, 0.3, 0.24, "wall_cream", roof="roof_flat")
     m.box(0.14, 0.18, 0.27, 0.12, 0.1, 0.06, "wall_grey")
-    m.windows(0.14, 0.18, 0.08, 0.4, 0.3, 0.16, 1, cols=3, sides="brl", lit=0.45, slabs=False)
+    m.windows(0.14, 0.18, 0.08, 0.4, 0.3, 0.16, 1, sides="brl", slabs=False, style="industrial")
     _back_door(m, 0.02, 0.33, w=0.055, h=0.1)
     _downpipes(m, 0.14, 0.33, 0.03, 0.24, 0.4)
     m.ac_unit(0.26, 0.15, 0.27, 0.06, 0.045, 0.03)
@@ -422,7 +425,7 @@ def subestacao(m: Model):
     # control block in front, fenced technical yard behind
     m.box(-0.1, -0.28, 0.03, 0.5, 0.16, 0.18, "wall_grey", roof="roof_flat")
     m.awning(-0.1, -0.36, 0.15, 0.2, mat="sign_blue")
-    m.windows(-0.1, -0.28, 0.03, 0.5, 0.16, 0.18, 1, cols=4, sides="fbrl", lit=0.5)
+    m.windows(-0.1, -0.28, 0.03, 0.5, 0.16, 0.18, 1, sides="fbrl", style="industrial")
     _back_door(m, -0.28, -0.2, w=0.055, h=0.1)
     m.box(0.08, -0.197, 0.08, 0.13, 0.01, 0.05, "metal_dark")
     m.box(0.22, -0.28, 0.21, 0.08, 0.06, 0.035, "metal", roof="metal_dark")
@@ -456,7 +459,7 @@ def armazem(m: Model):
     for x in (-0.2, 0.0, 0.2):
         m.box(x, -0.06, 0.03, 0.12, 0.03, 0.14, "metal_dark")
     m.box(0.32, -0.12, 0.03, 0.16, 0.24, 0.16, "wall_cream", roof="roof_flat")
-    m.windows(0.32, -0.12, 0.03, 0.16, 0.24, 0.16, 1, cols=1, sides="fr", lit=0.5)
+    m.windows(0.32, -0.12, 0.03, 0.16, 0.24, 0.16, 1, sides="fr", style="industrial")
     _truck(m, -0.2, -0.28)
     _truck(m, 0.0, -0.28, body_mat="wall_cream", cab_mat="wall_red")
     m.tree(0.4, 0.34, 0.85)
@@ -477,7 +480,7 @@ def fabrica_leve(m: Model):
     m.box(-0.28, -0.2, 0.03, 0.14, 0.02, 0.12, "wall_navy")  # big door
     m.box(0.12, -0.2, 0.03, 0.1, 0.02, 0.18, "metal_dark")  # side door
     m.box(-0.36, -0.28, 0.03, 0.1, 0.1, 0.1, "wall_wood")  # crates
-    m.windows(-0.05, 0.1, 0.03, 0.62, 0.5, 0.3, 1, cols=4, sides="r", lit=0.4)
+    m.windows(-0.05, 0.1, 0.03, 0.62, 0.5, 0.3, 1, sides="r", style="industrial")
     m.tree(-0.4, 0.36, 0.85, dark=True)
 
 
@@ -498,7 +501,7 @@ def fabrica_pesada(m: Model):
         m.box(px, 0.22, 0.03, 0.025, 0.025, 0.34, "metal_dark")
     m.box(0.04, 0.22, 0.37, 0.4, 0.03, 0.025, "metal_dark")
     m.box(0.04, -0.16, 0.03, 0.2, 0.02, 0.16, "wall_navy")  # main door
-    m.windows(-0.05, 0.0, 0.03, 0.44, 0.34, 0.3, 1, cols=4, sides="f", lit=0.45)
+    m.windows(-0.05, 0.0, 0.03, 0.44, 0.34, 0.3, 1, sides="f", style="industrial")
     m.tree(-0.4, -0.34, 0.85, dark=True)
 
 
@@ -510,13 +513,13 @@ def reciclagem(m: Model):
     m.box(-0.18, 0.16, 0.35, 0.42, 0.42, 0.03, "concrete")
     m.box(-0.18, -0.045, 0.12, 0.2, 0.01, 0.12, "wall_white")  # recycle logo plate
     thin_frame(m, -0.18, -0.045, 0.12, 0.2, 0.12)
-    m.windows(-0.18, 0.16, 0.18, 0.4, 0.4, 0.12, 1, cols=3, sides="brl", lit=0.45, slabs=False)
+    m.windows(-0.18, 0.16, 0.18, 0.4, 0.4, 0.12, 1, sides="brl", slabs=False, style="industrial")
     m.box(-0.28, 0.365, 0.03, 0.12, 0.012, 0.14, "metal_dark")
     _back_door(m, -0.1, 0.36, w=0.055, h=0.1)
     _downpipes(m, -0.18, 0.36, 0.03, 0.32, 0.4)
     m.ac_unit(-0.28, 0.1, 0.38, 0.06, 0.045, 0.03)
     m.box(0.3, -0.18, 0.03, 0.18, 0.3, 0.2, "wall_cream", roof="roof_flat")
-    m.windows(0.3, -0.18, 0.06, 0.18, 0.3, 0.12, 1, cols=1, sides="br", lit=0.55, slabs=False)
+    m.windows(0.3, -0.18, 0.06, 0.18, 0.3, 0.12, 1, sides="br", slabs=False, style="industrial")
     _back_door(m, 0.34, -0.03, w=0.05, h=0.1)
     m.box(0.18, 0.28, 0.2, 0.3, 0.2, 0.03, "metal")  # sorting canopy
     d_roof_seams(m, 0.18, 0.28, 0.234, 0.3, 0.2, along="x", count=3)
@@ -531,7 +534,7 @@ def reciclagem(m: Model):
     container_ribs(m, -0.28, -0.26, 0.03, 0.16, 0.1, 0.1, along="x", count=3)
     container_ribs(m, 0.0, -0.26, 0.03, 0.16, 0.1, 0.1, along="x", count=3)
     d_bollards(m, (-0.38, -0.16, 0.12, 0.38), -0.42)
-    m.windows(-0.18, 0.16, 0.03, 0.4, 0.4, 0.32, 1, cols=3, sides="f", lit=0.45)
+    m.windows(-0.18, 0.16, 0.03, 0.4, 0.4, 0.32, 1, sides="f", style="industrial")
     _roof_vent(m, -0.05, 0.22, 0.38)
     _fence_run(m, 0, 0.44, 0.85, 0)
     m.tree(0.4, 0.34, 0.85)

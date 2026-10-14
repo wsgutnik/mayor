@@ -10,14 +10,14 @@ def front_frame(m, x, y, z, w=0.09, h=0.12, frame="white", pane="glow_window"):
     m.box(x, y - 0.018, z, 0.01, 0.012, h, frame)
 
 
-def back_frame(m, x, y, z, w=0.08, h=0.1, frame="white", pane="glass_dark"):
+def back_frame(m, x, y, z, w=0.08, h=0.1, frame="white", pane="glow_window"):
     m.box(x, y + 0.006, z, w + 0.016, 0.01, h + 0.016, frame)
     m._quad([(x + w / 2, y + 0.012, z), (x - w / 2, y + 0.012, z),
              (x - w / 2, y + 0.012, z + h), (x + w / 2, y + 0.012, z + h)], pane)
     m.box(x, y + 0.017, z - 0.01, w + 0.03, 0.024, 0.012, "concrete", roof="concrete")
 
 
-def side_frame(m, x, y, z, side, w=0.08, h=0.1, frame="white", pane="glass_dark"):
+def side_frame(m, x, y, z, side, w=0.08, h=0.1, frame="white", pane="glow_window"):
     off = 0.006 if side > 0 else -0.006
     m.box(x + off, y, z, 0.01, w + 0.016, h + 0.016, frame)
     xx = x + (0.012 if side > 0 else -0.012)

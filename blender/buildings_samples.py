@@ -29,7 +29,7 @@ def casa_inicial(m: Model):
     m.box(-0.17, -0.14, 0.03, 0.04, 0.04, 0.24, "wall_wood")                # porch post
     m.box(0.13, -0.14, 0.03, 0.04, 0.04, 0.24, "wall_wood")
     m.box(-0.02, -0.16, 0.27, 0.34, 0.12, 0.025, "roof_slate")              # porch roof
-    m.windows(-0.02, 0.04, 0.03, 0.46, 0.34, 0.26, 1, cols=3, sides="fr", lit=0.7)
+    m.windows(-0.02, 0.04, 0.03, 0.46, 0.34, 0.26, 1, sides="fr", style="house", roof="pitched")
     m.box(-0.02, -0.132, 0.03, 0.07, 0.01, 0.15, "wall_wood")               # door
     m.tree(0.36, -0.3, 1.2)
     m.tree(-0.38, 0.3, 1.0, dark=True)
@@ -40,11 +40,10 @@ def casa_inicial(m: Model):
 def torre_corporativa(m: Model):
     m.plot()
     m.box(0, 0.02, 0.03, 0.74, 0.5, 0.2, "wall_white")                       # podium
-    m.windows(0, 0.02, 0.03, 0.74, 0.5, 0.2, 1, cols=6, sides="fr", lit=0.5)
+    m.windows(0, 0.02, 0.03, 0.74, 0.5, 0.2, 1, sides="fr", style="retail")
     m.box(0.04, 0.06, 0.23, 0.4, 0.34, 1.5, "glass_blue", roof="concrete")     # tower
-    m.windows(0.04, 0.06, 0.23, 0.4, 0.34, 1.5, 9, cols=4, sides="fr", lit=0.35)
-    m.box(0.04, 0.06, 1.73, 0.26, 0.22, 0.12, "wall_grey")
-    m.cyl(0.04, 0.06, 1.85, 0.012, 0.22, "metal", seg=5)
+    m.windows(0.04, 0.06, 0.23, 0.4, 0.34, 1.5, 9, sides="fr", style="curtain")
+    m.crown(0.04, 0.06, 1.73, 0.4, 0.34, 4, "wall_grey")  # mast + beacons (fable crown kind 4)
     m.tree(-0.36, -0.3, 1.0)
     m.tree(0.38, -0.32, 1.0)
     m.tree(-0.38, 0.36, 0.9, dark=True)
@@ -54,7 +53,7 @@ def torre_corporativa(m: Model):
 def usina_termeletrica(m: Model):
     m.plot(lawn=False)
     m.box(-0.12, -0.08, 0.03, 0.46, 0.3, 0.28, "wall_grey")
-    m.windows(-0.12, -0.08, 0.03, 0.46, 0.3, 0.28, 2, cols=4, sides="fbrl", lit=0.4)
+    m.windows(-0.12, -0.08, 0.03, 0.46, 0.3, 0.28, 2, sides="fbrl", style="industrial")
     thin_frame(m, -0.12, -0.23, 0.08, 0.28, 0.08)
     roof_seams(m, -0.12, -0.08, 0.314, 0.46, 0.3, along="x", count=4)
     _back_door(m, -0.24, 0.07, w=0.055, h=0.11)
@@ -62,7 +61,7 @@ def usina_termeletrica(m: Model):
     m.ac_unit(0.02, -0.08, 0.31, 0.07, 0.05, 0.035)
     _roof_vent(m, -0.22, -0.02, 0.31)
     m.box(0.2, -0.18, 0.03, 0.22, 0.2, 0.2, "wall_beige")
-    m.windows(0.2, -0.18, 0.07, 0.22, 0.2, 0.1, 1, cols=1, sides="br", lit=0.35, slabs=False)
+    m.windows(0.2, -0.18, 0.07, 0.22, 0.2, 0.1, 1, sides="br", slabs=False, style="industrial")
     m.box(0.2, -0.075, 0.03, 0.08, 0.012, 0.1, "metal_dark")
     thin_frame(m, 0.2, -0.075, 0.03, 0.08, 0.1)
     for x, y, r, h in ((0.2, 0.22, 0.17, 0.75), (-0.2, 0.28, 0.15, 0.65)):

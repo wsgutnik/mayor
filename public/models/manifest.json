@@ -12,7 +12,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 403,
+   "tris": 525,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -33,7 +33,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 669,
+   "tris": 801,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -54,7 +54,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 635,
+   "tris": 655,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -75,7 +75,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 687,
+   "tris": 715,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -96,7 +96,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 1030,
+   "tris": 1088,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -117,7 +117,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 1160,
+   "tris": 1194,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -138,7 +138,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 1166,
+   "tris": 1178,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -146,7 +146,7 @@
     -0.48,
     0.48,
     0.0,
-    1.385
+    1.758
    ]
   },
   {
@@ -159,7 +159,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 1170,
+   "tris": 1212,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -180,7 +180,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 938,
+   "tris": 954,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -201,7 +201,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 504,
+   "tris": 600,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -209,7 +209,7 @@
     -0.48,
     0.48,
     0.0,
-    1.525
+    1.849
    ]
   },
   {
@@ -222,7 +222,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 829,
+   "tris": 815,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -243,7 +243,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 809,
+   "tris": 817,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -264,7 +264,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 778,
+   "tris": 764,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -285,7 +285,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 600,
+   "tris": 594,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -306,7 +306,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 682,
+   "tris": 672,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -327,7 +327,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 588,
+   "tris": 622,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -348,7 +348,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 604,
+   "tris": 630,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -369,7 +369,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 739,
+   "tris": 765,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -390,7 +390,7 @@
     1
    ],
    "module": "buildings_res_com",
-   "tris": 754,
+   "tris": 732,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -411,7 +411,7 @@
     1
    ],
    "module": "buildings_samples",
-   "tris": 374,
+   "tris": 441,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -419,7 +419,7 @@
     -0.48,
     0.48,
     0.0,
-    2.07
+    2.245
    ]
   },
   {
@@ -432,7 +432,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 240,
+   "tris": 292,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -453,7 +453,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 748,
+   "tris": 770,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -474,7 +474,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 640,
+   "tris": 662,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -495,7 +495,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 1133,
+   "tris": 1159,
    "inside_tile": true,
    "bounds": [
     -0.495,
@@ -516,7 +516,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 634,
+   "tris": 688,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -524,7 +524,7 @@
     -0.48,
     0.48,
     0.0,
-    0.47
+    0.478
    ]
   },
   {
@@ -537,7 +537,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 594,
+   "tris": 612,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -558,7 +558,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 912,
+   "tris": 962,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -579,7 +579,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 588,
+   "tris": 610,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -600,7 +600,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 832,
+   "tris": 912,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -621,7 +621,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 981,
+   "tris": 1057,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -642,7 +642,7 @@
     1
    ],
    "module": "buildings_transport",
-   "tris": 812,
+   "tris": 838,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -663,7 +663,7 @@
     1
    ],
    "module": "buildings_transport",
-   "tris": 698,
+   "tris": 882,
    "inside_tile": true,
    "bounds": [
     -0.498,
@@ -684,7 +684,7 @@
     1
    ],
    "module": "buildings_transport",
-   "tris": 1044,
+   "tris": 1060,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -705,7 +705,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 775,
+   "tris": 767,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -726,7 +726,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 591,
+   "tris": 579,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -747,7 +747,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 1001,
+   "tris": 1013,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -768,7 +768,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 855,
+   "tris": 853,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -789,7 +789,7 @@
     1
    ],
    "module": "buildings_zz_hero",
-   "tris": 432,
+   "tris": 422,
    "inside_tile": true,
    "bounds": [
     -0.49,
@@ -810,7 +810,7 @@
     1
    ],
    "module": "buildings_civic_ind",
-   "tris": 585,
+   "tris": 567,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -831,7 +831,7 @@
     1
    ],
    "module": "buildings_samples",
-   "tris": 1094,
+   "tris": 1060,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -933,7 +933,7 @@
     1,
     1
    ],
-   "tris": 210,
+   "tris": 222,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -993,7 +993,7 @@
     1,
     1
    ],
-   "tris": 180,
+   "tris": 216,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1053,7 +1053,7 @@
     1,
     1
    ],
-   "tris": 142,
+   "tris": 158,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1113,7 +1113,7 @@
     1,
     1
    ],
-   "tris": 218,
+   "tris": 282,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1173,7 +1173,7 @@
     1,
     1
    ],
-   "tris": 244,
+   "tris": 284,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1213,7 +1213,7 @@
     1,
     1
    ],
-   "tris": 1212,
+   "tris": 1252,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1233,7 +1233,7 @@
     1,
     1
    ],
-   "tris": 300,
+   "tris": 396,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1293,7 +1293,7 @@
     1,
     1
    ],
-   "tris": 270,
+   "tris": 334,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1353,7 +1353,7 @@
     1,
     1
    ],
-   "tris": 140,
+   "tris": 200,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1393,7 +1393,7 @@
     1,
     1
    ],
-   "tris": 2489,
+   "tris": 3299,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1413,7 +1413,7 @@
     1,
     1
    ],
-   "tris": 597,
+   "tris": 853,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1453,7 +1453,7 @@
     1,
     1
    ],
-   "tris": 685,
+   "tris": 725,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1513,7 +1513,7 @@
     1,
     1
    ],
-   "tris": 729,
+   "tris": 769,
    "inside_tile": true,
    "bounds": [
     -0.488,
@@ -1573,7 +1573,7 @@
     1,
     1
    ],
-   "tris": 660,
+   "tris": 700,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1633,7 +1633,7 @@
     1,
     1
    ],
-   "tris": 566,
+   "tris": 646,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1693,7 +1693,7 @@
     1,
     1
    ],
-   "tris": 595,
+   "tris": 635,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1753,7 +1753,7 @@
     1,
     1
    ],
-   "tris": 572,
+   "tris": 862,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1773,7 +1773,7 @@
     1,
     1
    ],
-   "tris": 284,
+   "tris": 356,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1813,7 +1813,7 @@
     1,
     1
    ],
-   "tris": 478,
+   "tris": 590,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1833,7 +1833,7 @@
     1,
     1
    ],
-   "tris": 226,
+   "tris": 338,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1873,7 +1873,7 @@
     1,
     1
    ],
-   "tris": 686,
+   "tris": 1006,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1893,7 +1893,7 @@
     1,
     1
    ],
-   "tris": 464,
+   "tris": 784,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -1933,7 +1933,7 @@
     1,
     1
    ],
-   "tris": 658,
+   "tris": 718,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2053,7 +2053,7 @@
     1,
     1
    ],
-   "tris": 2434,
+   "tris": 2626,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2073,7 +2073,7 @@
     1,
     1
    ],
-   "tris": 653,
+   "tris": 757,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2113,7 +2113,7 @@
     2,
     2
    ],
-   "tris": 708,
+   "tris": 1074,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2153,7 +2153,7 @@
     1,
     1
    ],
-   "tris": 282,
+   "tris": 346,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2213,7 +2213,7 @@
     1,
     1
    ],
-   "tris": 256,
+   "tris": 288,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2273,7 +2273,7 @@
     1,
     1
    ],
-   "tris": 231,
+   "tris": 295,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2333,7 +2333,7 @@
     1,
     1
    ],
-   "tris": 384,
+   "tris": 416,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2393,7 +2393,7 @@
     1,
     1
    ],
-   "tris": 260,
+   "tris": 292,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2433,7 +2433,7 @@
     2,
     2
    ],
-   "tris": 938,
+   "tris": 1570,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2473,7 +2473,7 @@
     1,
     1
    ],
-   "tris": 220,
+   "tris": 252,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2513,7 +2513,7 @@
     2,
     2
    ],
-   "tris": 640,
+   "tris": 1128,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2553,7 +2553,7 @@
     1,
     1
    ],
-   "tris": 246,
+   "tris": 278,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2653,7 +2653,7 @@
     2,
     2
    ],
-   "tris": 850,
+   "tris": 1104,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2673,7 +2673,7 @@
     1,
     1
    ],
-   "tris": 889,
+   "tris": 953,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2693,7 +2693,7 @@
     1,
     1
    ],
-   "tris": 412,
+   "tris": 476,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2733,7 +2733,7 @@
     2,
     2
    ],
-   "tris": 821,
+   "tris": 877,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2813,7 +2813,7 @@
     1,
     1
    ],
-   "tris": 997,
+   "tris": 1097,
    "inside_tile": true,
    "bounds": [
     -0.49,
@@ -2833,7 +2833,7 @@
     1,
     1
    ],
-   "tris": 366,
+   "tris": 466,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2873,7 +2873,7 @@
     1,
     1
    ],
-   "tris": 882,
+   "tris": 962,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2893,7 +2893,7 @@
     1,
     1
    ],
-   "tris": 196,
+   "tris": 276,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2953,7 +2953,7 @@
     1,
     1
    ],
-   "tris": 1351,
+   "tris": 1457,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -2993,7 +2993,7 @@
     1,
     1
    ],
-   "tris": 938,
+   "tris": 990,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -3013,7 +3013,7 @@
     1,
     1
    ],
-   "tris": 158,
+   "tris": 210,
    "inside_tile": true,
    "bounds": [
     -0.48,
@@ -3053,7 +3053,7 @@
     2,
     2
    ],
-   "tris": 665,
+   "tris": 857,
    "inside_tile": true,
    "bounds": [
     -0.98,

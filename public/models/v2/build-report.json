@@ -70,7 +70,7 @@
    "name": "Casa Familiar",
    "lod": 1,
    "file": "02_lod1.glb",
-   "triangles": 210,
+   "triangles": 222,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -118,7 +118,7 @@
    "name": "Sobrado Moderno",
    "lod": 1,
    "file": "03_lod1.glb",
-   "triangles": 180,
+   "triangles": 216,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -166,7 +166,7 @@
    "name": "Vila Geminada",
    "lod": 1,
    "file": "04_lod1.glb",
-   "triangles": 142,
+   "triangles": 158,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -214,7 +214,7 @@
    "name": "Pequeno Apartamento",
    "lod": 1,
    "file": "05_lod1.glb",
-   "triangles": 218,
+   "triangles": 282,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -262,7 +262,7 @@
    "name": "Condom\u00ednio Jardim",
    "lod": 1,
    "file": "06_lod1.glb",
-   "triangles": 244,
+   "triangles": 284,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -294,7 +294,7 @@
    "name": "Torre Compacta",
    "lod": 0,
    "file": "07_lod0.glb",
-   "triangles": 1212,
+   "triangles": 1252,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -310,7 +310,7 @@
    "name": "Torre Compacta",
    "lod": 1,
    "file": "07_lod1.glb",
-   "triangles": 300,
+   "triangles": 396,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -358,7 +358,7 @@
    "name": "Residencial Varanda",
    "lod": 1,
    "file": "08_lod1.glb",
-   "triangles": 270,
+   "triangles": 334,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -406,7 +406,7 @@
    "name": "Edif\u00edcio Misto Local",
    "lod": 1,
    "file": "09_lod1.glb",
-   "triangles": 140,
+   "triangles": 200,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -438,7 +438,7 @@
    "name": "Premium Tower",
    "lod": 0,
    "file": "10_lod0.glb",
-   "triangles": 2489,
+   "triangles": 3299,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -454,7 +454,7 @@
    "name": "Premium Tower",
    "lod": 1,
    "file": "10_lod1.glb",
-   "triangles": 597,
+   "triangles": 853,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -486,7 +486,7 @@
    "name": "Loja de Conveni\u00eancia",
    "lod": 0,
    "file": "11_lod0.glb",
-   "triangles": 685,
+   "triangles": 725,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -534,7 +534,7 @@
    "name": "Caf\u00e9 de Esquina",
    "lod": 0,
    "file": "12_lod0.glb",
-   "triangles": 729,
+   "triangles": 769,
    "insideTile": true,
    "bounds": [
     -0.488,
@@ -582,7 +582,7 @@
    "name": "Mercado Local",
    "lod": 0,
    "file": "13_lod0.glb",
-   "triangles": 660,
+   "triangles": 700,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -630,7 +630,7 @@
    "name": "Restaurante Urbano",
    "lod": 0,
    "file": "14_lod0.glb",
-   "triangles": 566,
+   "triangles": 646,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -678,7 +678,7 @@
    "name": "Farm\u00e1cia de Bairro",
    "lod": 0,
    "file": "15_lod0.glb",
-   "triangles": 595,
+   "triangles": 635,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -726,7 +726,7 @@
    "name": "Escrit\u00f3rio Compacto",
    "lod": 0,
    "file": "16_lod0.glb",
-   "triangles": 572,
+   "triangles": 862,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -742,7 +742,7 @@
    "name": "Escrit\u00f3rio Compacto",
    "lod": 1,
    "file": "16_lod1.glb",
-   "triangles": 284,
+   "triangles": 356,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -774,7 +774,7 @@
    "name": "Banco Local",
    "lod": 0,
    "file": "17_lod0.glb",
-   "triangles": 478,
+   "triangles": 590,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -790,7 +790,7 @@
    "name": "Banco Local",
    "lod": 1,
    "file": "17_lod1.glb",
-   "triangles": 226,
+   "triangles": 338,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -822,7 +822,7 @@
    "name": "Hotel Executivo",
    "lod": 0,
    "file": "18_lod0.glb",
-   "triangles": 686,
+   "triangles": 1006,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -838,7 +838,7 @@
    "name": "Hotel Executivo",
    "lod": 1,
    "file": "18_lod1.glb",
-   "triangles": 464,
+   "triangles": 784,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -870,7 +870,7 @@
    "name": "Shopping de Bairro",
    "lod": 0,
    "file": "19_lod0.glb",
-   "triangles": 658,
+   "triangles": 718,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -966,7 +966,7 @@
    "name": "Prefeitura",
    "lod": 0,
    "file": "21_lod0.glb",
-   "triangles": 2434,
+   "triangles": 2626,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -982,7 +982,7 @@
    "name": "Prefeitura",
    "lod": 1,
    "file": "21_lod1.glb",
-   "triangles": 653,
+   "triangles": 757,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1030,7 +1030,7 @@
    "name": "Biblioteca Municipal",
    "lod": 1,
    "file": "22_lod1.glb",
-   "triangles": 282,
+   "triangles": 346,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1078,7 +1078,7 @@
    "name": "Centro Comunit\u00e1rio",
    "lod": 1,
    "file": "23_lod1.glb",
-   "triangles": 256,
+   "triangles": 288,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1126,7 +1126,7 @@
    "name": "Delegacia",
    "lod": 1,
    "file": "24_lod1.glb",
-   "triangles": 231,
+   "triangles": 295,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1174,7 +1174,7 @@
    "name": "Museu Municipal",
    "lod": 1,
    "file": "25_lod1.glb",
-   "triangles": 384,
+   "triangles": 416,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1222,7 +1222,7 @@
    "name": "Cl\u00ednica",
    "lod": 1,
    "file": "26_lod1.glb",
-   "triangles": 260,
+   "triangles": 292,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1270,7 +1270,7 @@
    "name": "Escola Prim\u00e1ria",
    "lod": 1,
    "file": "28_lod1.glb",
-   "triangles": 220,
+   "triangles": 252,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1318,7 +1318,7 @@
    "name": "Quartel dos Bombeiros",
    "lod": 1,
    "file": "30_lod1.glb",
-   "triangles": 246,
+   "triangles": 278,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1398,7 +1398,7 @@
    "name": "Terminal de Carga",
    "lod": 0,
    "file": "33_lod0.glb",
-   "triangles": 889,
+   "triangles": 953,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1414,7 +1414,7 @@
    "name": "Terminal de Carga",
    "lod": 1,
    "file": "33_lod1.glb",
-   "triangles": 412,
+   "triangles": 476,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1494,7 +1494,7 @@
    "name": "Armaz\u00e9m Log\u00edstico",
    "lod": 0,
    "file": "36_lod0.glb",
-   "triangles": 997,
+   "triangles": 1097,
    "insideTile": true,
    "bounds": [
     -0.49,
@@ -1510,7 +1510,7 @@
    "name": "Armaz\u00e9m Log\u00edstico",
    "lod": 1,
    "file": "36_lod1.glb",
-   "triangles": 366,
+   "triangles": 466,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1542,7 +1542,7 @@
    "name": "F\u00e1brica Leve",
    "lod": 0,
    "file": "37_lod0.glb",
-   "triangles": 882,
+   "triangles": 962,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1558,7 +1558,7 @@
    "name": "F\u00e1brica Leve",
    "lod": 1,
    "file": "37_lod1.glb",
-   "triangles": 196,
+   "triangles": 276,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1606,7 +1606,7 @@
    "name": "F\u00e1brica Pesada",
    "lod": 1,
    "file": "38_lod1.glb",
-   "triangles": 1351,
+   "triangles": 1457,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1638,7 +1638,7 @@
    "name": "Centro de Reciclagem",
    "lod": 0,
    "file": "39_lod0.glb",
-   "triangles": 938,
+   "triangles": 990,
    "insideTile": true,
    "bounds": [
     -0.48,
@@ -1654,7 +1654,7 @@
    "name": "Centro de Reciclagem",
    "lod": 1,
    "file": "39_lod1.glb",
-   "triangles": 158,
+   "triangles": 210,
    "insideTile": true,
    "bounds": [
     -0.48,

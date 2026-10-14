@@ -61,9 +61,14 @@ def main():
     # The GLBs carry UVs, tints and material names; the game supplies the shared textures and this table.
     os.makedirs(opts["out"], exist_ok=True)
     with open(os.path.join(opts["out"], "patterns.json"), "w") as fh:
-        # name -> [texture, world size of one repeat, base colour]; the game applies the tint itself
+        # name -> [texture, world size of one repeat, base colour]; the game applies the tint itself.
+        # The glow_window_* family panes are left out on purpose: kit-materials.ts only wires the
+        # emissive map for plain "glow_window", so an entry here would rebuild the families with a
+        # black emissive (dark windows at night). Without an entry the renderer keeps the GLB-authored
+        # pane material, which glows correctly. V1 (per-window night lights) removes this carve-out
+        # when it teaches kit-materials.ts the family suffixes (report 09 section 8, V1/V2).
         json.dump({k: [lib.PATTERN[k][0] if k in lib.PATTERN else None, lib.PATTERN[k][1] if k in lib.PATTERN else None, v[0]]
-                   for k, v in lib.PALETTE.items()}, fh, indent=1)
+                   for k, v in lib.PALETTE.items() if not k.startswith("glow_window_")}, fh, indent=1)
     tex_out = os.path.join(opts["out"], "..", "textures")
     os.makedirs(tex_out, exist_ok=True)
     import shutil

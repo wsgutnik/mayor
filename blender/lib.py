@@ -6,6 +6,10 @@ Conventions (match the game):
   * Blender is Z-up; the front of a building faces -Y (the glTF exporter turns that into +Z in three.js).
   * Materials are named; any material whose name starts with "glow" is emissive and the game turns its
     intensity up at night.
+
+Portions of the facade, roof and palette recipes below are adapted from Fable Cities (MIT,
+(c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10); each ported function carries its own
+header comment. See docs/process/09-fable-buildings-port.md sections 0, 2.3B, 3.1 and 6 R1.
 """
 import math
 import os
@@ -15,31 +19,89 @@ import bmesh
 import bpy
 from mathutils import Matrix, Vector
 
+# Fable metres -> kit tiles for facade details (report 09 section 0: KIT = 0.6 * m/8).
+# Plan quantities use m/8; heights use KIT_STOREY floors. Only small facade/roof trim uses this factor.
+_KIT = 0.6 / 8.0
+
+
+# Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+# buildings/facadeShader.js#bayLayout. Metres converted with KIT (sideM 0.55 m -> 0.041).
+def bay_layout(face_w, bay_w, side_m=0.041):
+    """Facade bay layout; mirrors the fable GLSL so geometry lands on real bays.
+
+    Returns {"sideM", "usable", "nB", "bay", "x0"} with x0 the local x of the first bay's left edge.
+    """
+    usable = max(face_w - 2 * side_m, 0.0375)
+    nB = max(1, math.floor(usable / max(bay_w, 0.09) + 0.35))
+    return {"sideM": side_m, "usable": usable, "nB": nB, "bay": usable / nB, "x0": -face_w / 2 + side_m}
+
+
+# Glow family per facade style. The suffix selects the V1 night-light litBias; plain "glow_window"
+# keeps the 0.6 default. House shares the res family (fable: house 0.70, apartment 0.60).
+GLOW_FAMILY = {
+    "house": "glow_window_res",
+    "apartment": "glow_window_res",
+    "retail": "glow_window_shop",
+    "curtain": "glow_window_office",
+    "industrial": "glow_window_ind",
+}
+# Fable litBias per generator (facadeShader.js night block; V1 CPU-mirror contract).
+LIT_BIAS = {"glow_window": 0.6, "glow_window_res": 0.6, "glow_window_shop": 0.75,
+            "glow_window_office": 0.55, "glow_window_ind": 0.35}
+
+# Per-style window boxes from fable FACADE styles (report 09 section 3.1), kit-scaled:
+# bay_w (default bay width), win_frac (window width / bay), win_h (absolute, house only),
+# win_h_frac / win_c (window height / storey, centre / storey), sill, plinth (band height).
+FACADE_STYLES = {
+    "house": {"bay_w": 0.18, "win_frac": 0.62, "win_cap": 0.139, "win_h": 0.116, "win_c": 0.55,
+              "sill": True, "plinth": 0.0255},
+    "apartment": {"bay_w": 0.24, "win_frac": 0.50, "win_h_frac": 0.54, "win_c": 0.56,
+                  "tall_frac": 0.28, "tall_h_frac": 0.76, "tall_c": 0.49,
+                  "sill": True, "plinth": 0.0638},
+    "retail": {"bay_w": 0.28, "win_frac": 0.88, "win_h_frac": 0.60, "win_c": 0.40,
+               "sill": False, "plinth": 0.0225},
+    "curtain": {"bay_w": 0.14, "mullion": 0.018, "win_h_red": 0.0195, "win_c": 0.50,
+                "sill": False, "plinth": 0.0675},
+    "industrial": {"bay_w": 0.32, "win_frac": 0.50, "win_h_frac": 0.40, "win_c": 0.62,
+                   "sill": False, "plinth": 0.0},
+}
+# Top margin below the eave/parapet: flat roof 0.45 m, pitched 0.10 m (report 09 section 2.3 B1).
+TOP_MARGIN = {"flat": 0.0338, "pitched": 0.0075}
+
 # name -> (base colour hex, roughness, emission hex or None, emission strength)
+# Wall tints adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities
+# @ aea8b10): buildings/generators.js tint tables (linear) converted to sRGB. Fable's lit facades
+# sit at Y ~ 0.18, hue 30-55, S 0.2-0.4; the old kit whites were far brighter and the primaries
+# far more saturated (report 09 section 2.3 B8).
 PALETTE = {
-    "white": ("#f1eee6", 0.8, None, 0),
-    "wall_cream": ("#eadfc8", 0.85, None, 0),
-    "wall_beige": ("#d9c7a3", 0.85, None, 0),
-    "wall_white": ("#f3f1ea", 0.8, None, 0),
-    "wall_grey": ("#bfc3c8", 0.85, None, 0),
-    "wall_brick": ("#b5654a", 0.9, None, 0),
-    "wall_wood": ("#a8683a", 0.8, None, 0),
-    "wall_blue": ("#3f5f93", 0.7, None, 0),
-    "wall_red": ("#c23b32", 0.75, None, 0),
-    "wall_green": ("#2f8a55", 0.75, None, 0),
-    "wall_yellow": ("#e6b84a", 0.75, None, 0),
-    "wall_navy": ("#1f3558", 0.7, None, 0),
+    "white": ("#cecbc4", 0.8, None, 0),          # FASCIA_TINTS[0]
+    "wall_cream": ("#ccbfae", 0.88, None, 0),    # PLASTER_TINTS[0]
+    "wall_beige": ("#bfb1a2", 0.88, None, 0),    # PLASTER_TINTS[2]
+    "wall_white": ("#d7d4ce", 0.88, None, 0),    # PICKET_TINTS[0], never pure white
+    "wall_grey": ("#a2a6aa", 0.88, None, 0),     # MODERN_TINTS[3]
+    "wall_brick": ("#b5654a", 0.88, None, 0),
+    "wall_wood": ("#9e897e", 0.88, None, 0),     # SIDING_TINTS[6] stained timber
+    "wall_blue": ("#adb8bb", 0.88, None, 0),     # SIDING_TINTS[2] slate blue
+    "wall_red": ("#ad6961", 0.88, None, 0),      # DOOR_TINTS[3] barn red
+    "wall_green": ("#9ea9a6", 0.88, None, 0),    # SIDING_TINTS[3] sage
+    "wall_yellow": ("#d4c29e", 0.88, None, 0),   # PLASTER_TINTS[3] ochre
+    "wall_navy": ("#869399", 0.88, None, 0),     # SIDING_TINTS[9] dark slate
     "roof_blue": ("#2c4a86", 0.6, None, 0),
     "roof_red": ("#b8402f", 0.7, None, 0),
     "roof_slate": ("#4a5565", 0.65, None, 0),
     "roof_flat": ("#6d747d", 0.9, None, 0),
     "roof_dark": ("#2b303a", 0.8, None, 0),
     "roof_green": ("#3f7a4e", 0.7, None, 0),
-    "glass_blue": ("#5b94d0", 0.15, None, 0),
-    "glass_dark": ("#3d5a82", 0.2, None, 0),
+    "glass_blue": ("#5b94d0", 0.1, None, 0),
+    "glass_dark": ("#3d5a82", 0.1, None, 0),
     "slab": ("#aeb4bb", 0.9, None, 0),
     "hedge": ("#3b8a47", 0.95, None, 0),
-    "glow_window": ("#3d5a82", 0.2, "#ffd27a", 1.0),
+    "glow_window": ("#3d5a82", 0.1, "#ffd27a", 1.0),
+    # Per-family panes (report 09 section 2.3 B2); the suffix selects the V1 litBias.
+    "glow_window_res": ("#3d5a82", 0.1, "#ffd27a", 1.0),
+    "glow_window_shop": ("#3d5a82", 0.1, "#ffd27a", 1.0),
+    "glow_window_office": ("#3d5a82", 0.1, "#ffd27a", 1.0),
+    "glow_window_ind": ("#3d5a82", 0.1, "#ffd27a", 1.0),
     "glow_sign": ("#f5c04a", 0.4, "#ffc94d", 1.0),
     "concrete": ("#c9ccd0", 0.9, None, 0),
     "asphalt": ("#4b4f56", 0.95, None, 0),
@@ -90,20 +152,25 @@ PALETTE = {
 TEXTURE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "textures")
 
 # palette name -> (texture, world size of one texture repeat). "window" cells map 0..1 per quad.
+# Repeat sizes follow fable's TEX_SCALE (generators.js) converted with KIT: brick 1.5-1.7 m
+# -> 0.15, plaster 3.0-3.2 m -> 0.22, siding 1.5 m -> 0.11, concrete wall 3.6 m -> 0.27,
+# corrugated 2.0 m -> 0.15 (report 09 section 2.3 B7). The old repeats were 2-3x coarse.
 PATTERN = {}
 for _n in ("white", "wall_cream", "wall_beige", "wall_white", "wall_grey", "wall_blue", "wall_red", "wall_green", "wall_yellow", "wall_navy"):
-    PATTERN[_n] = ("plaster", 0.5)
+    PATTERN[_n] = ("plaster", 0.22)
 PATTERN.update({
-    "wall_brick": ("brick", 0.4), "wall_wood": ("wood", 0.35), "bench_wood": ("wood", 0.2), "bark": ("wood", 0.2), "trunk": ("wood", 0.2),
+    "wall_brick": ("brick", 0.15), "wall_wood": ("wood", 0.11), "bench_wood": ("wood", 0.2), "bark": ("wood", 0.2), "trunk": ("wood", 0.2),
     "roof_blue": ("roof_tile", 0.3), "roof_red": ("roof_tile", 0.3), "roof_slate": ("roof_tile", 0.3), "roof_green": ("roof_tile", 0.3),
     "roof_flat": ("gravel", 0.35), "roof_dark": ("gravel", 0.35),
-    "concrete": ("concrete", 0.5), "slab": ("concrete", 0.5), "paving": ("paving", 0.3), "asphalt": ("asphalt", 0.5),
+    "concrete": ("concrete", 0.27), "slab": ("concrete", 0.27), "paving": ("paving", 0.3), "asphalt": ("asphalt", 0.5),
     "grass": ("grass", 0.25), "hedge": ("leaf", 0.12), "tree_green": ("leaf", 0.12), "tree_dark": ("leaf", 0.12),
     "leaf_a": ("leaf", 0.18), "leaf_b": ("leaf", 0.18), "leaf_c": ("leaf", 0.18), "leaf_pine": ("leaf", 0.18), "leaf_pine_b": ("leaf", 0.18),
     "leaf_pink": ("leaf", 0.18), "leaf_autumn": ("leaf", 0.18), "leaf_dry": ("leaf", 0.18), "palm_frond": ("leaf", 0.18),
-    "metal": ("metal", 0.3), "metal_dark": ("metal", 0.3), "lamp_pole": ("metal", 0.3),
+    "metal": ("metal", 0.15), "metal_dark": ("metal", 0.15), "lamp_pole": ("metal", 0.15),
     "glass_blue": ("glass_curtain", 0.5), "rock": ("concrete", 0.3),
     "glass_dark": ("window", None), "glow_window": ("window", None),
+    "glow_window_res": ("window", None), "glow_window_shop": ("window", None),
+    "glow_window_office": ("window", None), "glow_window_ind": ("window", None),
 })
 
 
@@ -156,7 +223,7 @@ def material(name):
             links.new(mix.outputs[2], bsdf.inputs["Base Color"])
     if emi:
         er, eg, eb, _ = hex_rgba(emi)
-        if name == "glow_window" and os.path.exists(os.path.join(TEXTURE_DIR, "window_glow.png")):
+        if name.startswith("glow_window") and os.path.exists(os.path.join(TEXTURE_DIR, "window_glow.png")):
             etex = nodes.new("ShaderNodeTexImage")
             etex.image = _image("window_glow")
             links.new(etex.outputs["Color"], bsdf.inputs["Emission Color"])
@@ -284,31 +351,102 @@ class Model:
             self._tri([(cx, y0 + w, cz), (p0[0], y0 + w, p0[1]), (p1[0], y0 + w, p1[1])], rim)
 
     # -- details ----------------------------------------------------------
-    def windows(self, cx, cy, z0, w, d, h, floors, cols=None, lit=0.35, sides="fbrl", margin=0.05, off=0.003, slabs=True):
-        """Window rows on a box's walls: one emissive/dark quad per window, plus a thin slab line per floor."""
-        cols = cols or max(1, round(w / 0.13))
-        lit = max(lit, 0.45)
+    # Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+    # buildings/facadeShader.js FACADE window boxes + sill. Thickness 0.10 m, projection 0.14 m,
+    # 0.11 m past the window each side, converted with KIT.
+    def sill(self, side, cu, wall, u0, u1, za, off=0.003, mat="white"):
+        """A protruding sill under one window: top ledge + front strip. For f/b sides cu is the
+        wall centre x and wall is the wall y; for r/l sides cu is the centre y and wall is the wall x."""
+        t, proj, ov = 0.10 * _KIT, 0.14 * _KIT, 0.11 * _KIT
+        a0, a1 = cu + u0 - ov, cu + u1 + ov
+        if side == "f":
+            self._quad([(a0, wall - off - proj, za), (a1, wall - off - proj, za), (a1, wall - off, za), (a0, wall - off, za)], mat)
+            self._quad([(a0, wall - off - proj, za - t), (a1, wall - off - proj, za - t), (a1, wall - off - proj, za), (a0, wall - off - proj, za)], mat)
+        elif side == "b":
+            self._quad([(a0, wall + off, za), (a1, wall + off, za), (a1, wall + off + proj, za), (a0, wall + off + proj, za)], mat)
+            self._quad([(a1, wall + off + proj, za - t), (a0, wall + off + proj, za - t), (a0, wall + off + proj, za), (a1, wall + off + proj, za)], mat)
+        elif side == "r":
+            self._quad([(wall + off, a0, za), (wall + off + proj, a0, za), (wall + off + proj, a1, za), (wall + off, a1, za)], mat)
+            self._quad([(wall + off + proj, a0, za - t), (wall + off + proj, a1, za - t), (wall + off + proj, a1, za), (wall + off + proj, a0, za)], mat)
+        else:
+            self._quad([(wall - off - proj, a0, za), (wall - off, a0, za), (wall - off, a1, za), (wall - off - proj, a1, za)], mat)
+            self._quad([(wall - off - proj, a1, za - t), (wall - off - proj, a0, za - t), (wall - off - proj, a0, za), (wall - off - proj, a1, za)], mat)
+
+    # Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+    # buildings/facadeShader.js FACADE plinth bands (house 0.34 m, apartment 0.85 m, retail 0.30 m,
+    # curtain 0.9 m, converted with KIT; see FACADE_STYLES).
+    def plinth(self, cx, cy, z0, w, d, h, mat="slab"):
+        """A masonry band around the base of a mass, slightly proud of the walls."""
+        self.box(cx, cy, z0, w + 0.006, d + 0.006, h, mat, roof=mat)
+
+    # Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+    # buildings/facadeShader.js#bayLayout + FACADE window boxes, sill and plinth (report 09
+    # sections 2.3 B1-B3, 3.1). Every pane is a glow_window family pane; the lit/unlit choice moves
+    # to the V1 night shader. `lit` stays accepted for old call sites and is ignored.
+    def windows(self, cx, cy, z0, w, d, h, floors, cols=None, lit=0.35, sides="fbrl", margin=0.041,
+                off=0.003, slabs=True, style="apartment", family=None, bay_w=None, sills=True,
+                plinth=True, roof="flat"):
+        """Window rows on a box's walls: one glow quad per window with sill, plinth band at the base,
+        and a thin slab line per floor. cols=None lays bays out with bay_layout; an explicit cols keeps
+        the old window count with the new per-style boxes. style is house/apartment/retail/curtain/
+        industrial (FACADE_STYLES); family overrides the GLOW_FAMILY pane material."""
+        st = FACADE_STYLES[style]
+        mat = family or GLOW_FAMILY[style]
+        bw = bay_w or st["bay_w"]
         x0, x1, y0, y1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2
         fh = h / floors
+        top_margin = TOP_MARGIN[roof]
+        # The plinth belongs to the whole mass: emit it once, on the call that carries the front.
+        # Clamped to 0.22 of the ground storey so short kit floors keep their window clear of it.
+        if plinth and st["plinth"] > 0 and z0 < 0.06 and "f" in sides:
+            self.plinth(cx, cy, z0, w, d, min(st["plinth"], 0.22 * fh))
         for fl in range(floors):
-            za = z0 + fl * fh + fh * 0.2
-            zb = z0 + fl * fh + fh * 0.8
+            zf = z0 + fl * fh
+            # Retail upper floors read as apartment boxes (fable RETAIL branch); the ground floor
+            # gets the wide shopfront box.
+            fst = st if (style != "retail" or fl == 0) else FACADE_STYLES["apartment"]
+            if style == "curtain":
+                wH, wC = fh - fst["win_h_red"], fst["win_c"]  # width is bay - mullions
+            elif "win_h" in fst:
+                wH, wC = min(fst["win_h"], 0.8 * fh), fst["win_c"]
+            elif "tall_frac" in fst and self.rng.random() < fst["tall_frac"]:
+                wH, wC = fst["tall_h_frac"] * fh, fst["tall_c"]
+            else:
+                wH, wC = fst["win_h_frac"] * fh, fst["win_c"]
+            zb = min(zf + wC * fh + wH / 2, zf + fh - (top_margin if fl == floors - 1 else 0.0))
+            za = max(zb - wH, zf + 0.02 * fh)
             for side in sides:
-                n = cols if side in "fb" else max(1, round(d / 0.13))
                 span = (x1 - x0) if side in "fb" else (y1 - y0)
-                cw = (span - 2 * margin) / n
+                if cols is None:
+                    lay = bay_layout(span, bw, margin)
+                    n, bay, bx0 = lay["nB"], lay["bay"], lay["x0"]
+                else:
+                    n = cols if side in "fb" else max(1, round(span / 0.13))
+                    usable = max(span - 2 * margin, 0.0375)
+                    n, bay, bx0 = n, usable / n, -span / 2 + margin
                 for c in range(n):
-                    u0 = -span / 2 + margin + c * cw + cw * 0.12
-                    u1 = -span / 2 + margin + (c + 1) * cw - cw * 0.12
-                    mat = "glow_window" if self.rng.random() < lit else "glass_dark"
+                    if style == "curtain":
+                        ww = max(bay - 2 * fst["mullion"], 0.03)
+                    else:
+                        ww = min(bay * fst["win_frac"], fst.get("win_cap", 9.0))
+                    u0 = bx0 + (c + 0.5) * bay - ww / 2
+                    u1 = bx0 + (c + 0.5) * bay + ww / 2
                     if side == "f":
                         self._quad([(cx + u0, y0 - off, za), (cx + u1, y0 - off, za), (cx + u1, y0 - off, zb), (cx + u0, y0 - off, zb)], mat)
+                        if sills and fst["sill"]:
+                            self.sill("f", cx, y0, u0, u1, za, off)
                     elif side == "b":
                         self._quad([(cx + u1, y1 + off, za), (cx + u0, y1 + off, za), (cx + u0, y1 + off, zb), (cx + u1, y1 + off, zb)], mat)
+                        if sills and fst["sill"]:
+                            self.sill("b", cx, y1, u0, u1, za, off)
                     elif side == "r":
                         self._quad([(x1 + off, cy + u0, za), (x1 + off, cy + u1, za), (x1 + off, cy + u1, zb), (x1 + off, cy + u0, zb)], mat)
+                        if sills and fst["sill"]:
+                            self.sill("r", cy, x1, u0, u1, za, off)
                     else:
                         self._quad([(x0 - off, cy + u1, za), (x0 - off, cy + u0, za), (x0 - off, cy + u0, zb), (x0 - off, cy + u1, zb)], mat)
+                        if sills and fst["sill"]:
+                            self.sill("l", cy, x0, u0, u1, za, off)
             if slabs and fl > 0:
                 zs = z0 + fl * fh
                 t = 0.012
@@ -354,9 +492,104 @@ class Model:
         self._quad([(cx + w / 2, y_wall - depth, z + 0.012), (cx + w / 2, y_wall, z + 0.012), (cx + w / 2, y_wall, z + 0.055), (cx + w / 2, y_wall - depth, z + 0.055)], rail)
         self._quad([(cx - w / 2, y_wall, z + 0.012), (cx - w / 2, y_wall - depth, z + 0.012), (cx - w / 2, y_wall - depth, z + 0.055), (cx - w / 2, y_wall, z + 0.055)], rail)
 
-    def door(self, cx, y_wall, z, w=0.06, h=0.1, mat="wall_wood", frame="white"):
-        self.box(cx, y_wall - 0.004, z, w + 0.016, 0.008, h + 0.01, frame)
+    # Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+    # buildings/generators.js#house front door (architrave slab, leaf, step, canopy, lamp).
+    # Architrave 1.36 x 2.42 m over a 1.06 x 2.22 m leaf; step, canopy and lamp converted with KIT.
+    def door(self, cx, y_wall, z, w=0.06, h=0.1, mat="wall_wood", frame="white",
+             step=False, canopy=False, lamp=False):
+        """Front door on a -Y wall: architrave slab + leaf, with optional step, canopy and lamp."""
+        self.box(cx, y_wall - 0.004, z, w + 0.022, 0.008, h + 0.015, frame)
         self._quad([(cx - w / 2, y_wall - 0.009, z), (cx + w / 2, y_wall - 0.009, z), (cx + w / 2, y_wall - 0.009, z + h), (cx - w / 2, y_wall - 0.009, z + h)], mat)
+        if step:
+            self.box(cx, y_wall - 0.032, z, 0.1425, 0.064, 0.012, "concrete", roof="concrete")
+        if canopy:
+            self.box(cx, y_wall - 0.034, z + h + 0.015, 0.1425, 0.0675, 0.0105, frame, roof=frame)
+        if lamp:
+            self.box(cx + w / 2 + 0.035, y_wall - 0.004, z + h - 0.035, 0.012, 0.0105, 0.0195, "glow_lamp")
+
+    # Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+    # buildings/generators.js#house roof trim. Fascia board 0.22 m, gutters 0.13 x 0.14 m on the two
+    # eave sides, ridge cap 0.17 x 0.36 m always in the roof's own material; hip roofs keep a shorter
+    # ridge (x0.34 / 0.52 / 0.68 by plan ratio). Kit roofs already overhang ~0.03, so w/d are the
+    # modelled roof footprint. z_eave is the eave height, ridge_h the ridge rise above it.
+    def roof_kit(self, cx, cy, z_eave, w, d, ridge_h, roof_mat, ridge="y", hip=False,
+                 fascia=True, gutters=True, cap=True, fascia_mat="white"):
+        """Eave fascia, gutters and ridge cap over a pitched roof. Ridge runs along y (default) or x."""
+        if fascia:
+            self.box(cx, cy, z_eave - 0.0175, w, d, 0.0165, fascia_mat, roof=fascia_mat)
+        if gutters:
+            gl, gh, gd = 0.0045, 0.0098, 0.0105
+            if ridge == "y":  # eaves face +-x
+                for s in (-1, 1):
+                    self.box(cx + s * (w / 2 + 0.0008), cy, z_eave - 0.027 - gh / 2, gd, d + gl, gh, "slab", roof="slab")
+            else:  # eaves face +-y
+                for s in (-1, 1):
+                    self.box(cx, cy + s * (d / 2 + 0.0008), z_eave - 0.027 - gh / 2, w + gl, gd, gh, "slab", roof="slab")
+        if cap:
+            shrink = 1.0
+            if hip:
+                ratio = min(w, d) / max(w, d)
+                shrink = 0.34 if ratio > 0.85 else (0.52 if ratio > 0.62 else 0.68)
+            zc = z_eave + ridge_h - 0.0045
+            if ridge == "y":
+                self.box(cx, cy, zc, 0.027, d * shrink, 0.0128, roof_mat, roof=roof_mat)
+            else:
+                self.box(cx, cy, zc, w * shrink, 0.027, 0.0128, roof_mat, roof=roof_mat)
+
+    # Ported from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10):
+    # buildings/generators.js#crown. Six archetypes so downtown never repeats one silhouette: flat
+    # parapet, stepped setback (x0.74, x0.50), pitched cap, cornice + lantern (0.42w), mast +
+    # beacons, glazed lightbox. Kit heights are pinned mid-range; the mast is clamped to 0.45 so the
+    # kit skyline stays under the height cap (report 09 section 6 R2). Returns the apex height.
+    def crown(self, cx, cy, top, w, d, kind, wall_mat="wall_white", roof_mat="roof_flat"):
+        """Tower crown of one of six archetypes. Returns the apex height."""
+        if kind == 0:  # flat: parapet ring + coping
+            self.box(cx, cy, top - 0.0675, w + 0.0375, d + 0.0375, 0.0788, "slab", roof="slab")
+            self.box(cx, cy, top + 0.011, w + 0.0675, d + 0.0675, 0.012, "concrete", roof="concrete")
+            return top + 0.023
+        if kind == 1:  # stepped setback
+            y = top
+            for hh, sc in ((0.26, 0.74), (0.22, 0.50)):
+                self.box(cx, cy, y - 0.004, w * sc, d * sc, hh, wall_mat, roof=wall_mat)
+                self.box(cx, cy, y + hh - 0.0175, w * sc + 0.045, d * sc + 0.045, 0.015, "concrete", roof="concrete")
+                y += hh
+            return y + 0.015
+        if kind == 2:  # pitched / chamfered cap
+            hh = min(w, d) * 0.28
+            self.box(cx, cy, top - 0.0525, w + 0.03, d + 0.03, 0.0638, "slab", roof="slab")
+            self.hip(cx, cy, top + 0.011, w + 0.0375, d + 0.0375, hh, roof_mat)
+            zc = top + 0.011 + hh - 0.0045
+            if w >= d:  # hip() ridges along the long side
+                self.box(cx, cy, zc, (w + 0.0375) * 0.52, 0.027, 0.0128, roof_mat, roof=roof_mat)
+            else:
+                self.box(cx, cy, zc, 0.027, (d + 0.0375) * 0.52, 0.0128, roof_mat, roof=roof_mat)
+            return top + 0.011 + hh
+        if kind == 3:  # projecting cornice + lantern
+            self.box(cx, cy, top - 0.041, w + 0.1125, d + 0.1125, 0.056, "concrete", roof="concrete")
+            self.box(cx, cy, top + 0.015, w + 0.045, d + 0.045, 0.0675, "slab", roof="slab")
+            self.box(cx, cy, top + 0.0825, w * 0.42, d * 0.42, 0.30, "glass_blue", roof="glass_blue")
+            self.box(cx, cy, top + 0.3825, w * 0.42 + 0.0525, d * 0.42 + 0.0525, 0.0165, "concrete", roof="concrete")
+            return top + 0.40
+        if kind == 4:  # mast + beacons (mast clamped to 0.45 for the kit skyline)
+            self.box(cx, cy, top - 0.0675, w + 0.0375, d + 0.0375, 0.0788, "slab", roof="slab")
+            mh = 0.45
+            self.cyl(cx, cy, top + 0.015, 0.0165, mh, "metal", seg=6)
+            for i in range(3):
+                self.cyl(cx, cy, top + 0.02 + (i * 2 + 0.5) * mh / 6, 0.0175, mh / 6 * 0.9, "sign_red", seg=6)
+            for f in (0.62, 1.0):
+                self.cyl(cx, cy, top + 0.015 + mh * f, 0.011, 0.0165, "metal_dark", seg=6)
+                self.box(cx, cy, top + 0.015 + mh * f + 0.015, 0.017, 0.017, 0.0195, "glow_lamp")
+            self.cone(cx, cy, top + 0.015 + mh, 0.0165, 0.05, "metal", seg=6)
+            return top + 0.065 + mh
+        # kind 5: glazed lightbox crown with a lit band
+        self.box(cx, cy, top - 0.004, w * 0.9, d * 0.9, 0.32, "glass_blue", roof="glass_blue")
+        y0, y1 = cy - d * 0.45 - 0.002, cy + d * 0.45 + 0.002
+        self._quad([(cx - w * 0.45 - 0.002, y0, top + 0.10), (cx + w * 0.45 + 0.002, y0, top + 0.10),
+                    (cx + w * 0.45 + 0.002, y0, top + 0.22), (cx - w * 0.45 - 0.002, y0, top + 0.22)], "glow_window_office")
+        self._quad([(cx + w * 0.45 + 0.002, y1, top + 0.10), (cx - w * 0.45 - 0.002, y1, top + 0.10),
+                    (cx - w * 0.45 - 0.002, y1, top + 0.22), (cx + w * 0.45 + 0.002, y1, top + 0.22)], "glow_window_office")
+        self.box(cx, cy, top + 0.30, w * 0.9 + 0.0675, d * 0.9 + 0.0675, 0.018, "concrete", roof="concrete")
+        return top + 0.34
 
     def steps(self, cx, y_wall, z, w, n=3, depth=0.04, rise=0.012, mat="concrete"):
         for i in range(n):

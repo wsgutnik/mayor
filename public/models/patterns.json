@@ -1,63 +1,63 @@
 {
  "white": [
   "plaster",
-  0.5,
-  "#f1eee6"
+  0.22,
+  "#cecbc4"
  ],
  "wall_cream": [
   "plaster",
-  0.5,
-  "#eadfc8"
+  0.22,
+  "#ccbfae"
  ],
  "wall_beige": [
   "plaster",
-  0.5,
-  "#d9c7a3"
+  0.22,
+  "#bfb1a2"
  ],
  "wall_white": [
   "plaster",
-  0.5,
-  "#f3f1ea"
+  0.22,
+  "#d7d4ce"
  ],
  "wall_grey": [
   "plaster",
-  0.5,
-  "#bfc3c8"
+  0.22,
+  "#a2a6aa"
  ],
  "wall_brick": [
   "brick",
-  0.4,
+  0.15,
   "#b5654a"
  ],
  "wall_wood": [
   "wood",
-  0.35,
-  "#a8683a"
+  0.11,
+  "#9e897e"
  ],
  "wall_blue": [
   "plaster",
-  0.5,
-  "#3f5f93"
+  0.22,
+  "#adb8bb"
  ],
  "wall_red": [
   "plaster",
-  0.5,
-  "#c23b32"
+  0.22,
+  "#ad6961"
  ],
  "wall_green": [
   "plaster",
-  0.5,
-  "#2f8a55"
+  0.22,
+  "#9ea9a6"
  ],
  "wall_yellow": [
   "plaster",
-  0.5,
-  "#e6b84a"
+  0.22,
+  "#d4c29e"
  ],
  "wall_navy": [
   "plaster",
-  0.5,
-  "#1f3558"
+  0.22,
+  "#869399"
  ],
  "roof_blue": [
   "roof_tile",
@@ -101,7 +101,7 @@
  ],
  "slab": [
   "concrete",
-  0.5,
+  0.27,
   "#aeb4bb"
  ],
  "hedge": [
@@ -121,7 +121,7 @@
  ],
  "concrete": [
   "concrete",
-  0.5,
+  0.27,
   "#c9ccd0"
  ],
  "asphalt": [
@@ -136,12 +136,12 @@
  ],
  "metal": [
   "metal",
-  0.3,
+  0.15,
   "#a9b0b8"
  ],
  "metal_dark": [
   "metal",
-  0.3,
+  0.15,
   "#59616b"
  ],
  "grass": [
@@ -301,7 +301,7 @@
  ],
  "lamp_pole": [
   "metal",
-  0.3,
+  0.15,
   "#3a3f47"
  ],
  "bench_wood": [
