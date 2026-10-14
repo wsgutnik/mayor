@@ -81,3 +81,9 @@ The owner must create iOS signing assets in the Apple Developer portal or Xcode.
 | XcodeGen missing | Tauri cannot generate the Xcode project. | Run `brew install xcodegen`. |
 | Signing fails on a device | Certificate/profile/App ID mismatch. | Use team `4AFHZKZYQ6`, App ID `com.mayor.game`, and a profile that includes the target device. |
 | Black or unstable WebGL view | Device texture/GPU limits are lower than desktop. | Use the in-game graphics quality menu; high shadows are capped on iOS by the renderer. |
+
+## Known toolchain pin
+
+`libc` is pinned to 0.2.189 in `src-tauri/Cargo.lock`. libc 0.2.190 made `mach_task_self` macOS-only, which breaks
+`num_threads 0.1.7` (a dependency of `time`) when building for `aarch64-apple-ios`. Remove the pin once `time`/`num_threads`
+no longer depend on it (`cargo update -p libc` then rebuild for iOS to check).

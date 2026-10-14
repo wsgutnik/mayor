@@ -20,7 +20,7 @@ warn() {
 }
 
 version_major_minor() {
-  sed -nE 's/.*([0-9]+)\.([0-9]+).*/\1.\2/p' | sed -n '1p'
+  sed -nE 's/^[^0-9]*([0-9]+)\.([0-9]+).*/\1.\2/p' | sed -n '1p'
 }
 
 echo "== Xcode"
@@ -56,8 +56,13 @@ if command -v xcrun >/dev/null 2>&1; then
   if xcrun simctl list runtimes 2>/dev/null | grep -E 'iOS .+\\(available\\)' >/dev/null; then
     echo "ok: available iOS simulator runtime"
   else
-    echo "missing: available iOS simulator runtime"
-    missing=1
+    # Device builds do not need a simulator runtime; only warn unless IOS_REQUIRE_SIM=1.
+    if [ "${IOS_REQUIRE_SIM:-0}" = "1" ]; then
+      echo "missing: available iOS simulator runtime"
+      missing=1
+    else
+      echo "warn: no iOS simulator runtime (needed for npm run ios:dev on a simulator; xcodebuild -downloadPlatform iOS)"
+    fi
   fi
 else
   echo "missing: xcrun"
