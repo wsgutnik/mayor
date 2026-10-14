@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newCity, placeRoad } from "./sim";
-import { findPath, routePath } from "./traffic";
+import { findPath, pointAtRouteArc, routeArcIndex, routeArcLengths, routePath } from "./traffic";
 import { cidx, idx } from "./world";
 
 function flat(s: ReturnType<typeof newCity>) {
@@ -63,5 +63,18 @@ describe("roundCorners", () => {
     expect(moved).toBeLessThan(0.6);
     // straight stretches are untouched
     expect([out[2], out[3]]).toEqual([1, 0]);
+  });
+});
+
+describe("route arc lengths", () => {
+  it("measure and locate unequal connector samples without tile-index drift", () => {
+    const pts = new Float32Array([0, 0, 0.25, 0, 1.25, 0, 1.25, 2]);
+    const arc = routeArcLengths(pts);
+    expect([...arc]).toEqual([0, 0.25, 1.25, 3.25]);
+    expect(routeArcIndex(arc, 0.9)).toBe(1);
+    const p = pointAtRouteArc(pts, arc, 2.25);
+    expect(p.index).toBe(2);
+    expect(p.x).toBeCloseTo(1.25);
+    expect(p.z).toBeCloseTo(1);
   });
 });

@@ -156,6 +156,24 @@ Use IMT's (MIT) **"enter point" model** as the markings stage's internal represe
 
 ## 4. Recommended order (fits 07a §4 P0–P7)
 
+### 2026-10-14 implementation note: lane-arrow and controller contracts
+
+Junction arrow decals are derived exclusively from `JunctionLayout.laneArrows`.
+For each legal inbound lane, the decal centre is `trim + 0.98 t` along the
+outward arm vector (0.60 t before the stop-bar centre) and at that lane's
+signed `RoadProfile.laneCentres` offset.  It is a 0.22 t by at-most-0.28 t
+quad on `NODE_MARK_LIFT` with `ROAD_CLASS.ARROW`; it therefore shares the
+junction patch's marking plane and cannot z-fight the asphalt.
+
+The adaptive-controller pure contract is: green is at least 3 s and at most
+8 s, yellow is 2 s, all-red is 1 s.  After minimum green, a strictly higher
+`queuedVehicles + 0.3 * accumulatedWaitSeconds` may end green; ties resolve
+by phase index.  This makes replay independent of frame timing when ticks are
+sub-stepped.  Physical vehicle-route progress is represented by cumulative
+polyline arc length (`routeArcLengths`), not point index, when connectors are
+spliced: binary lookup selects the preceding point, and equal-length samples
+resolve forward.
+
 1. **Profiles (with 07a P1):** add the §3.1 lane grid table to `corridor.ts` (lane centres, median, speed). Tests: symmetry, containment, sum = asphalt within 0.01 t.
 2. **Junction trims and fillets (with P2/P3):** osm2streets perpendicular-projection trim, CSUR `halfWidth + 3 m` oracle test (0.825 t street cross), SUMO R = 4 m with ≥5 points per quarter, osm2streets sidewalk-corner fallback for acute corners, square terminus.
 3. **Connectors (with P7d, but build them in P3):** TMPE turn classification, A/B existence and lane-matching rules, TMPE `DistributeLanes3` arrows, **A/B quadratic/cubic connector curve** replacing the Hermite. Containment and curvature tests over the 07a hard cases (Y at 25°, avenue+street T, 5-arm).

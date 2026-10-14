@@ -169,6 +169,24 @@ describe("road network geometry", () => {
     expect(white(buildRoadNetworkGeometry(lone.world, gy))).toBe(0);
   });
 
+  it("exports inbound lane arrows on the junction-mark lift", () => {
+    const s = flatTown();
+    const ey = s.world.entry.y;
+    road(s, 2, [[4.5, ey + 0.5], [28.5, ey + 0.5]]);
+    road(s, 1, [[16.5, ey - 8], [16.5, ey + 8]]);
+    const gy = (x: number, z: number): number => heightAt(s.world, x, z);
+    const g = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
+    const cls = g.getAttribute("aClass").array as Float32Array;
+    const pos = g.getAttribute("position").array as Float32Array;
+    const arrows: number[] = [];
+    for (let i = 0; i < cls.length; i++) if (cls[i] === ROAD_CLASS.ARROW) arrows.push(i);
+    expect(arrows.length).toBeGreaterThan(0);
+    expect(arrows.length % 4).toBe(0);
+    for (const i of arrows) {
+      expect(pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2])).toBeCloseTo(0.084, 3);
+    }
+  });
+
   it("keeps every vertex on a small fixed set of lifts (no per-segment offsets)", () => {
     const s = junction();
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);

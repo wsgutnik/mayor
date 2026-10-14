@@ -203,3 +203,76 @@ export function signalPhase(tick: number): 0 | 1 {
 export function signalPhaseAt(nodeId: number, tick: number): 0 | 1 {
   return signalPhase(tick + signalOffset(nodeId));
 }
+
+/** Adaptive timings in game seconds (TM:PE-inspired, kept deliberately short). */
+export const SIGNAL_MIN_GREEN = 3;
+export const SIGNAL_MAX_GREEN = 8;
+export const SIGNAL_YELLOW = 2;
+export const SIGNAL_ALL_RED = 1;
+export type SignalStage = "green" | "yellow" | "allRed";
+
+/**
+ * Serializable-free controller state.  It is derived at graph rebuild and is
+ * intentionally not saved: old saves restart safely on their deterministic
+ * offset phase.  `wait` is accumulated only while a phase has queued traffic.
+ */
+export interface AdaptiveSignalState {
+  phase: number;
+  stage: SignalStage;
+  elapsed: number;
+  wait: number[];
+}
+
+export function newAdaptiveSignal(phases = 2, initial = 0): AdaptiveSignalState {
+  return { phase: Math.max(0, Math.min(phases - 1, initial | 0)), stage: "green", elapsed: 0, wait: new Array(phases).fill(0) };
+}
+
+/** Select a next phase by queue length plus accumulated wait; ties are index-stable. */
+export function chooseAdaptivePhase(queues: readonly number[], wait: readonly number[], current: number): number {
+  let best = (current + 1) % Math.max(1, queues.length), score = -Infinity;
+  for (let i = 0; i < queues.length; i++) {
+    if (i === current && queues.length > 1) continue;
+    const s = Math.max(0, queues[i] || 0) + Math.max(0, wait[i] || 0) * 0.3;
+    if (s > score + 1e-9 || (Math.abs(s - score) <= 1e-9 && i < best)) { best = i; score = s; }
+  }
+  return best;
+}
+
+// TM:PE MIT concept: bounded green plus queue/wait weighted phase choice.
+// This is a clean TypeScript implementation, not a source port.
+export function stepAdaptiveSignal(state: AdaptiveSignalState, dt: number, queues: readonly number[]): AdaptiveSignalState {
+  const n = Math.max(1, queues.length);
+  const out: AdaptiveSignalState = { phase: Math.min(n - 1, state.phase), stage: state.stage, elapsed: state.elapsed, wait: Array.from({ length: n }, (_, i) => state.wait[i] || 0) };
+  let left = Math.max(0, dt);
+  while (left > 1e-9) {
+    if (out.stage === "green" && out.elapsed >= SIGNAL_MIN_GREEN) {
+      const next = chooseAdaptivePhase(queues, out.wait, out.phase);
+      const currentScore = Math.max(0, queues[out.phase] || 0) + Math.max(0, out.wait[out.phase] || 0) * 0.3;
+      const nextScore = Math.max(0, queues[next] || 0) + Math.max(0, out.wait[next] || 0) * 0.3;
+      if (next !== out.phase && nextScore > currentScore + 1e-9) { out.stage = "yellow"; out.elapsed = 0; continue; }
+    }
+    const limit = out.stage === "green" ? SIGNAL_MAX_GREEN : out.stage === "yellow" ? SIGNAL_YELLOW : SIGNAL_ALL_RED;
+    const use = Math.min(left, Math.max(0, limit - out.elapsed));
+    for (let i = 0; i < n; i++) {
+      if (i === out.phase && out.stage === "green") out.wait[i] = 0;
+      else if ((queues[i] || 0) > 0) out.wait[i] += use;
+    }
+    out.elapsed += use; left -= use;
+    if (out.stage === "green" && out.elapsed >= SIGNAL_MIN_GREEN && out.elapsed < SIGNAL_MAX_GREEN) {
+      const next = chooseAdaptivePhase(queues, out.wait, out.phase);
+      const currentScore = Math.max(0, queues[out.phase] || 0) + Math.max(0, out.wait[out.phase] || 0) * 0.3;
+      const nextScore = Math.max(0, queues[next] || 0) + Math.max(0, out.wait[next] || 0) * 0.3;
+      if (next !== out.phase && nextScore > currentScore + 1e-9) { out.stage = "yellow"; out.elapsed = 0; continue; }
+    }
+    if (out.elapsed < limit - 1e-9) break;
+    out.elapsed = 0;
+    if (out.stage === "green") {
+      // Minimum green protects a just-selected approach; max green guarantees progress.
+      out.stage = "yellow";
+    } else if (out.stage === "yellow") out.stage = "allRed";
+    else { out.phase = chooseAdaptivePhase(queues, out.wait, out.phase); out.stage = "green"; }
+    // exact-boundary calls must make progress through zero-length remainder.
+    if (use === 0 && left === 0) break;
+  }
+  return out;
+}

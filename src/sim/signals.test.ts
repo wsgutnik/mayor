@@ -6,6 +6,7 @@ import {
   signalGroups, signalNodes, signalOffset, signalPhase, signalPhaseAt,
   SIGNAL_OPPOSITION_TOL, TURN_STRAIGHT_MAX, TURN_UTURN_MIN,
 } from "./roads";
+import { chooseAdaptivePhase, newAdaptiveSignal, SIGNAL_ALL_RED, SIGNAL_MAX_GREEN, SIGNAL_MIN_GREEN, SIGNAL_YELLOW, stepAdaptiveSignal } from "./signals";
 import { indexSignals, newTraffic, redCrawl } from "./traffic";
 import { generateWorld, idx, rebuildRoadRaster, ROAD } from "./world";
 
@@ -177,6 +178,29 @@ describe("signal offsets and cycle", () => {
     expect(crosses.length).toBe(2);
     const scans = Array.from({ length: 33 }, (_, k) => k * 0.5);
     expect(scans.some((t) => signalPhaseAt(crosses[0].id, t) !== signalPhaseAt(crosses[1].id, t))).toBe(true);
+  });
+});
+
+describe("adaptive signal controller", () => {
+  it("keeps green for 3..8 s, then yellow 2 s and all-red 1 s", () => {
+    let s = newAdaptiveSignal(2, 0);
+    s = stepAdaptiveSignal(s, SIGNAL_MIN_GREEN - 0.01, [0, 10]);
+    expect(s.stage).toBe("green");
+    s = stepAdaptiveSignal(s, 0.02, [0, 10]);
+    expect(s.stage).toBe("yellow");
+    s = stepAdaptiveSignal(s, SIGNAL_YELLOW, [0, 10]);
+    expect(s.stage).toBe("allRed");
+    s = stepAdaptiveSignal(s, SIGNAL_ALL_RED, [0, 10]);
+    expect(s.stage).toBe("green");
+    expect(s.phase).toBe(1);
+    // With no competing demand a green reaches its hard max deterministically.
+    s = stepAdaptiveSignal(newAdaptiveSignal(), SIGNAL_MAX_GREEN, [1, 0]);
+    expect(s.stage).toBe("yellow");
+  });
+
+  it("chooses queue plus wait deterministically", () => {
+    expect(chooseAdaptivePhase([1, 1, 1], [0, 0, 0], 2)).toBe(0);
+    expect(chooseAdaptivePhase([1, 2, 1], [20, 0, 0], 1)).toBe(0);
   });
 });
 

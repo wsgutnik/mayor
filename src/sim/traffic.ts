@@ -263,6 +263,30 @@ export function vmaxAt(pts: Float32Array): Float32Array {
   return out;
 }
 
+/** Cumulative route distance, in tiles; unlike legacy `progress`, this is geometry-aware. */
+export function routeArcLengths(pts: Float32Array): Float32Array {
+  const n = pts.length >> 1, out = new Float32Array(n);
+  for (let i = 1; i < n; i++) out[i] = out[i - 1] + Math.hypot(pts[i * 2] - pts[i * 2 - 2], pts[i * 2 + 1] - pts[i * 2 - 1]);
+  return out;
+}
+
+/** Locate an arc length on a route.  Equal-length samples resolve forward, deterministically. */
+export function routeArcIndex(arcs: Float32Array, s: number): number {
+  if (arcs.length < 2) return 0;
+  const target = Math.max(0, Math.min(arcs[arcs.length - 1], s));
+  let lo = 0, hi = arcs.length - 1;
+  while (lo + 1 < hi) { const m = (lo + hi) >> 1; if (arcs[m] <= target) lo = m; else hi = m; }
+  return lo;
+}
+
+/** Interpolate a route at physical distance, for connector samples and legacy polylines alike. */
+export function pointAtRouteArc(pts: Float32Array, arcs: Float32Array, s: number): { x: number; z: number; index: number; t: number } {
+  const i = routeArcIndex(arcs, s);
+  const a = arcs[i] || 0, b = arcs[Math.min(i + 1, arcs.length - 1)] || a;
+  const t = b > a ? Math.max(0, Math.min(1, (s - a) / (b - a))) : 0;
+  return { x: pts[i * 2] + (pts[Math.min(i + 1, arcs.length - 1) * 2] - pts[i * 2]) * t, z: pts[i * 2 + 1] + (pts[Math.min(i + 1, arcs.length - 1) * 2 + 1] - pts[i * 2 + 1]) * t, index: i, t };
+}
+
 /**
  * Turn sign at route index `at` from the cross product of the next two steps:
  * +1 left, −1 right, 0 straight or no turn ahead (x right, z down, so a left

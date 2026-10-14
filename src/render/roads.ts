@@ -690,6 +690,54 @@ function junctionGuides(g: Geo, l: JunctionLayout, groundY: GroundY): void {
 }
 
 /**
+ * One atlas arrow per inbound lane with an allowed movement.  The atlas arrow
+ * points along the local +along direction, which is deliberately the travel
+ * direction (back from an arm toward the junction).  Keeping this here, next
+ * to the stop bars, makes the decal share their node lift and avoids a second
+ * mesh or per-frame instances.
+ */
+function junctionLaneArrows(g: Geo, l: JunctionLayout, groundY: GroundY): void {
+  for (const arrow of l.laneArrows) {
+    if (!arrow.turns.length) continue;
+    const arm = l.arms[arrow.arm];
+    if (!arm || arm.markingsSuppressed) continue;
+    // lanes.ts indexes the inbound half of the profile in signed-centre order.
+    const offsets = profileOf(arm.type).laneCentres.filter((x) => arm.end === "b" ? x < 0 : x > 0);
+    const off = offsets[arrow.lane];
+    if (off === undefined) continue;
+    const trim = Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt);
+    // 0.6 t before the stop bar (whose centre is trim + 0.38 t), per 12 §3.5.
+    const cx = l.centre.x + arm.dx * (trim + 0.98) - arm.dz * off;
+    const cz = l.centre.z + arm.dz * (trim + 0.98) + arm.dx * off;
+    const dx = -arm.dx, dz = -arm.dz; // inbound travel direction
+    const px = -dz, pz = dx;
+    const along = 0.11, wide = Math.min(0.14, profileOf(arm.type).laneWidth * 0.36);
+    // Painted arrows are vertex-coloured polygons: the atlas arrow cell is opaque
+    // and showed up as a tan square on the junction asphalt.
+    const tris: [Pt, Pt, Pt][] = [];
+    const turns = arrow.turns.filter((t) => t !== "uturn");
+    const nT = Math.max(1, turns.length);
+    turns.forEach((turn, k) => {
+      const lat = (k - (nT - 1) / 2) * (wide * 1.25);
+      const ang = turn === "left" ? 0.62 : turn === "right" ? -0.62 : 0;
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      // local frame: a along inbound travel, s lateral; rotate the head by ang
+      const q = (a: number, s: number): Pt => {
+        const ra = a * ca - s * sa, rs = a * sa + s * ca;
+        return { x: cx + dx * ra + px * (rs + lat), z: cz + dz * ra + pz * (rs + lat) };
+      };
+      const sw = 0.018, headLen = along * 0.8, headW = wide * 0.5;
+      // shaft
+      tris.push([q(-along, -sw), q(-along, sw), q(along - headLen, sw)]);
+      tris.push([q(-along, -sw), q(along - headLen, sw), q(along - headLen, -sw)]);
+      // head
+      tris.push([q(along - headLen, -headW), q(along - headLen, headW), q(along, 0)]);
+    });
+    if (tris.length) emitTris(g, tris, NODE_MARK_LIFT + 0.002, "#e9e4d4", groundY);
+  }
+}
+
+/**
  * Thin adapter over the junction layout: the asphalt polygon and the kerb /
  * sidewalk outer rings as polylines, for tests and SVG dumps.
  */
@@ -841,6 +889,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
       // Roundabout ring nodes read as circulation: no straight-through guides.
       const onRing = l.arms.some((arm) => w.segments.find((sg) => sg.id === arm.segId)?.roundabout);
       if (!onRing) junctionGuides(g, l, groundY);
+      junctionLaneArrows(g, l, groundY);
     }
   }
 
