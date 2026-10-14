@@ -72,6 +72,13 @@ derived, unsaved data and is bounded by arms² × lanes² × 14 samples.
 
 ## Invariants (asserted by `checkJunction` and the test suite)
 
+Close approaches use a minimum 5° mouth gap.  Below it the renderer treats
+the gap as merged; no ring may use a negative trim, and every emitted ring is
+simple.  A mixed-width offset tangent behind its node is replaced by the
+budgeted chamfer station.  Kerb-band triangulation is accepted only when its
+triangle area differs from `outer - inner` by at most `max(0.02, 5%)`; an
+invalid band is drawn below the asphalt patch.
+
 Rings closed, CCW, simple; nested; arm centreline at trim lies on the ring (1e-3); fillets tangent to both edge lines
 and r >= 0.2; crosswalk and stop-line quads inside asphalt ∪ ribbon and non-overlapping; no triangle with area < 1e-5
 or angle < 5 degrees; kerbs never inside asphalt and never crossing an arm mouth; sidewalk closed around every convex

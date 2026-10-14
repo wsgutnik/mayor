@@ -593,6 +593,12 @@ function bandCompute(ringA: Pt[], ringB: Pt[]): Tri[] | null {
   // Work CCW throughout (fronts and slit both assume it).
   const inner = signedArea(ringA) >= 0 ? ringA : [...ringA].reverse();
   const outer = signedArea(ringB) >= 0 ? ringB : [...ringB].reverse();
+  const wantedArea = Math.abs(signedArea(outer)) - Math.abs(signedArea(inner));
+  const areaOK = (tris: Tri[]): boolean => {
+    let got = 0;
+    for (const [a, b, c] of tris) got += Math.abs((b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x)) / 2;
+    return wantedArea >= 0 && Math.abs(got - wantedArea) <= Math.max(0.02, wantedArea * 0.05);
+  };
   const strip = triangulateStrip(inner, outer);
   // Fast accept: thinness ≤ 1/sin(5°) proves every angle exceeds 5°.
   if (strip) {
@@ -601,7 +607,7 @@ function bandCompute(ringA: Pt[], ringB: Pt[]): Tri[] | null {
       const th = thinness(t[0], t[1], t[2]);
       if (th > maxThin) maxThin = th;
     }
-    if (maxThin <= 11.47) return strip;
+    if (maxThin <= 11.47 && areaOK(strip)) return strip;
   }
   // The strip stalled or settled thin: try slit clips (a different
   // triangulation of the same band) and keep whichever shapes best by exact
@@ -631,11 +637,12 @@ function bandCompute(ringA: Pt[], ringB: Pt[]): Tri[] | null {
     if (!slitOk(inner, outer, i, j)) continue;
     tried++;
     const clip = clipBand(inner, outer, i, j);
+    if (!areaOK(clip)) continue;
     const w = minAngleOf(clip);
     if (w > bestW) { best = clip; bestW = w; }
     if (bestW >= 5) break;
   }
-  return best;
+  return best && areaOK(best) ? best : null;
 }
 
 type BandEntry = { outer: Pt[]; sa: RingSample; sb: RingSample; out: Tri[] | null };

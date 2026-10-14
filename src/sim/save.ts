@@ -314,11 +314,28 @@ function hydrateSavedLots(f: SaveFileV2, set: ZoneBlockSet): OrientedLot[] {
     const b = set.blocks.get(`${l.seg}:${l.side}:${l.block}`);
     if (!b) throw new SaveError("The save file is damaged");
     const lot = { ...l, build: l.build ?? 1, ...lotPose(b, l), tiles: [] };
+    let invalidUnderCurrentRules = false;
     for (let row = lot.row; row < lot.row + lot.w; row++) for (let col = lot.col; col < lot.col + lot.d; col++) {
       const i = cellIndex(row, col);
-      if (!b.valid[i] || b.zone[i] !== lot.zone || b.level[i] !== lot.level || b.lot[i] !== -1) {
+      if (!b.valid[i]) { invalidUnderCurrentRules = true; continue; }
+      if (b.zone[i] !== lot.zone || b.level[i] !== lot.level || b.lot[i] !== -1) {
         throw new SaveError("The save file is damaged");
       }
+    }
+    // Rule changes may invalidate a formerly legal cell.  This is a normal
+    // migration condition, not corruption: discard the entire lot and clear
+    // its persisted cells so replanning can fill the remaining legal space.
+    if (invalidUnderCurrentRules) {
+      for (let row = lot.row; row < lot.row + lot.w; row++) for (let col = lot.col; col < lot.col + lot.d; col++) {
+        const i = cellIndex(row, col);
+        b.zone[i] = 0;
+        b.level[i] = 0;
+        b.lot[i] = -1;
+      }
+      continue;
+    }
+    for (let row = lot.row; row < lot.row + lot.w; row++) for (let col = lot.col; col < lot.col + lot.d; col++) {
+      const i = cellIndex(row, col);
       b.lot[i] = lot.id;
     }
     lots.push(lot);

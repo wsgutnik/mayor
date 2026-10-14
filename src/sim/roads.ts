@@ -569,9 +569,10 @@ export interface RoadArm {
 function endTangent(seg: RoadSegment, end: "a" | "b"): { dx: number; dz: number } {
   const pts = seg.pts;
   const tip = end === "a" ? pts[0] : pts[pts.length - 1];
-  const inner = end === "a"
-    ? pts.length === 3 ? pts[1] : pts[1]
-    : pts.length === 3 ? pts[1] : pts[pts.length - 2];
+  // A curve control point may coincide with its end.  Skip coincident points
+  // and use the chord to the first real point, never manufacture a (0,0) arm.
+  const candidates = end === "a" ? pts.slice(1) : pts.slice(0, -1).reverse();
+  const inner = candidates.find((p) => Math.hypot(p.x - tip.x, p.z - tip.z) > 1e-6) ?? tip;
   // From the node back into the segment (tip - inner would arrive INTO the node
   // and mirror every asymmetric junction onto its wrong side).
   const vx = inner.x - tip.x, vz = inner.z - tip.z;

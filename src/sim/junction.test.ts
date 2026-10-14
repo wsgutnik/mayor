@@ -349,6 +349,15 @@ describe("junction builder P2", () => {
     }
   });
 
+  it("uses the curve chord when a control point coincides with its node", () => {
+    const w = blank(64);
+    addSegment(w, 1, [{ x: 10.5, z: 32.5 }, { x: 50.5, z: 32.5 }]);
+    addSegment(w, 1, [{ x: 30.5, z: 32.5 }, { x: 30.5, z: 32.5 }, { x: 40.5, z: 45.5 }]);
+    const l = buildJunction(w, near(w, 30.5, 32.5))!;
+    expect(l.arms.every((a) => Math.hypot(a.dx, a.dz) > 0.999)).toBe(true);
+    expectClean(l);
+  });
+
   it("excludes bridge arms from ground layouts", () => {
     const w = blank();
     addSegment(w, 1, [{ x: 4.5, z: 20.5 }, { x: 20.5, z: 20.5 }]);

@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { makeRng } from "../sim/rng";
 import {
   BRIGHT_HI, BRIGHT_LO, COOL_HOME, COOL_OFFICE, EMISSIVE_GAIN, LIT_FRACTION,
-  WINDOW_FAMILIES, WINDOW_LIGHT_FRAG, WINDOW_LIGHT_VERT, WARM_HI, WARM_LO,
+  WINDOW_FAMILIES, WINDOW_LIGHT_FRAG, WINDOW_LIGHT_FRAG_PARS, WINDOW_LIGHT_VERT, WINDOW_LIGHT_VERT_PARS, WARM_HI, WARM_LO,
   familyFor, patchWindowMaterial, setWindowNight, windowEmissive, windowLight,
 } from "./window-light";
 
@@ -110,6 +110,9 @@ describe("window-light families and GLSL", () => {
     expect(WINDOW_LIGHT_FRAG).toContain("vec3(1.0, 0.56, 0.24)");
     expect(WINDOW_LIGHT_VERT).toContain("floor(position / 0.02)");
     expect(WINDOW_LIGHT_VERT).toContain("instanceMatrix[3]");
+    // The per-pane identifier must not be interpolated across a triangle.
+    expect(WINDOW_LIGHT_VERT_PARS).toContain("flat varying vec3 vWinLocal");
+    expect(WINDOW_LIGHT_FRAG_PARS).toContain("flat varying vec3 vWinLocal");
   });
 
   it("patches a shared material and drives uNight per frame", () => {

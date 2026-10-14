@@ -779,17 +779,18 @@ function emitTris(
 function drawJunctionPatch(g: Geo, l: JunctionLayout, groundY: GroundY, atlas = false): void {
   if (l.asphalt.length < 3) return;
   const bandLift = NODE_ASPHALT_LIFT + 0.004;
+  const fallbackLift = NODE_ASPHALT_LIFT - 0.004;
   const kerb = l.kerbOuter.length >= 3 ? l.kerbOuter : null;
   const walk = l.sidewalkOuter.length >= 3 ? l.sidewalkOuter : null;
   if (kerb) {
     const band = triangulateBand(l.asphalt, kerb);
     if (band) emitTris(g, band, bandLift, KERB, groundY);
-    else emitTris(g, triangulateRing(kerb), bandLift, KERB, groundY);
+    else emitTris(g, triangulateRing(kerb), fallbackLift, KERB, groundY);
   }
   if (kerb && walk) {
     const band = triangulateBand(kerb, walk);
     if (band) emitTris(g, band, bandLift, KERB, groundY);
-    else emitTris(g, triangulateRing(walk), bandLift, KERB, groundY);
+    else emitTris(g, triangulateRing(walk), fallbackLift, KERB, groundY);
   }
   const patchCol = atlas ? "#ffffff" : ASPHALT;
   const patchCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;

@@ -38,7 +38,10 @@ export const R_FLOOR = 0.2;
 /** Outer layer below this radius chamfers (straight segment, same trims). */
 export const LAYER_MIN_RADIUS = 0.05;
 /** Arms closer than this merge (no sliver wedge). */
-export const MERGE_GAP = (3 * Math.PI) / 180;
+// A smaller threshold still leaves the offset mouths crossing after 1e-3
+// quantisation.  Five degrees is the smallest tested gap that leaves room for
+// a kerb return; narrower approaches are represented as a single mouth.
+export const MERGE_GAP = (5 * Math.PI) / 180;
 /** Minimum visible asphalt ribbon between two junction pads. */
 const MIN_RIBBON = 0.12;
 /** Crosswalk + stop-bar clearance required before end markings may coexist. */
@@ -873,6 +876,18 @@ export function buildJunction(
             const fB = footOnLine(o, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
             const tA = q((fA.x - cx - nax * offA) * a.dx + (fA.z - cz - naz * offA) * a.dz);
             const tB = q((fB.x - cx - nbx * offB) * b.dx + (fB.z - cz - nbz * offB) * b.dz);
+            // An asymmetric outer offset can put the mathematical tangent
+            // behind a node.  It is not a usable trim: use the budgeted
+            // chamfer/miter stations instead of folding the ring backwards.
+            if (tA < 0 || tB < 0) {
+              diags.push({ code: "trim-clamped", detail: `layer ${L.name} tangent behind node` });
+              layerData[li].push({
+                eA: E(a, nax, naz, q(f.tA), offA), eB: E(b, nbx, nbz, q(f.tB), offB),
+                tA: q(f.tA), tB: q(f.tB), interior: [], sweep: 0, steps: 0,
+                ox: f.mx, oz: f.mz, rho: 0, miter: false,
+              });
+              return;
+            }
             const eA = E(a, nax, naz, tA, offA);
             const eB = E(b, nbx, nbz, tB, offB);
             const dir = pickSweepDir(o.x, o.z, rho, eA, eB, cx, cz, false);
@@ -900,6 +915,15 @@ export function buildJunction(
           const fB = footOnLine(o, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
           const tA = q((fA.x - cx - nax * offA) * a.dx + (fA.z - cz - naz * offA) * a.dz);
           const tB = q((fB.x - cx - nbx * offB) * b.dx + (fB.z - cz - nbz * offB) * b.dz);
+          if (tA < 0 || tB < 0) {
+            diags.push({ code: "trim-clamped", detail: `layer ${L.name} tangent behind node` });
+            layerData[li].push({
+              eA: E(a, nax, naz, q(f.tA), offA), eB: E(b, nbx, nbz, q(f.tB), offB),
+              tA: q(f.tA), tB: q(f.tB), interior: [], sweep: 0, steps: 0,
+              ox: f.mx, oz: f.mz, rho: 0, miter: false,
+            });
+            return;
+          }
           const eA = E(a, nax, naz, tA, offA);
           const eB = E(b, nbx, nbz, tB, offB);
           const dir = pickSweepDir(o.x, o.z, rho, eA, eB, cx, cz, false);
@@ -973,8 +997,8 @@ export function buildJunction(
       cx + nax * offA, cz + naz * offA, a.dx, a.dz,
       cx + nbx * offB, cz + nbz * offB, b.dx, b.dz,
     ) ?? { x: cx, z: cz };
-    const tA = q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz);
-    const tB = q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz);
+    const tA = Math.max(0, q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz));
+    const tB = Math.max(0, q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz));
     layerData[li][k] = {
       eA: { x: cx + a.dx * tA + nax * offA, z: cz + a.dz * tA + naz * offA },
       eB: { x: cx + b.dx * tB + nbx * offB, z: cz + b.dz * tB + nbz * offB },

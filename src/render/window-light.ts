@@ -130,8 +130,8 @@ function g(n: number): string {
 
 /** Vertex declarations: instance translation + quantised local id per window. */
 export const WINDOW_LIGHT_VERT_PARS = /* glsl */`
-varying vec3 vWinInstance;
-varying vec3 vWinLocal;
+flat varying vec3 vWinInstance;
+flat varying vec3 vWinLocal;
 `;
 
 /** After `#include <begin_vertex>` (`position` is the pre-instance local). */
@@ -145,8 +145,8 @@ vWinInstance = vec3(0.0);
 `;
 
 export const WINDOW_LIGHT_FRAG_PARS = /* glsl */`
-varying vec3 vWinInstance;
-varying vec3 vWinLocal;
+flat varying vec3 vWinInstance;
+flat varying vec3 vWinLocal;
 uniform float uNight;
 uniform float uLitBias;
 uniform float uOffice;
