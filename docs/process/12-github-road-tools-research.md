@@ -122,6 +122,42 @@ For Mayor (compressed): street→avenue changes the half-width by 0.43 t per sid
    - The main road is the highest-class near-opposite pair of arms. Those arms are Main; the others are Yield (Stop where sight is poor or the angle is acute).
    - On the same level: **yield to the vehicle from your right** (right-hand traffic), and left-turners yield to oncoming traffic. Across levels, Main always wins. A vehicle already leaving the junction is never forced to stop.
    - Default signal policy stays as today (≥4 arms, or 3 arms with an avenue). A street-only T gets priority signs instead of a light.
+   - **Implemented recipe (2026-10, `src/sim/priority.ts` + `traffic.ts` `updatePriority`; tests `src/sim/priority.test.ts`).**
+     1. *Scope.* Nodes with a `JunctionLayout`, ≥ 3 ground arms, connectors, and `hasSignal` false. Signalised
+        nodes are untouched (`TrafficState.forcePriority` is a test-only hook that runs a signalised node through
+        this path instead). Under today's signal policy that means street-only Ts: unequal at-grade nodes are
+        always signalised, so the main-road rule is exercised only through the hook.
+     2. *Movement identity.* `routePath` splices one connector per node run (the old per-sample splice repeated
+        a straight connector three times and sent cars backwards), choosing it by the run's entry and exit
+        directions, and adds a sample where a wide road cuts a pad diagonally. It records
+        `{node, connector index, point range i0..i1, layout}` in a `WeakMap` keyed by the returned polyline
+        (`routeMovesOf`). Vehicles read it lazily (`Vehicle.moves`, `moveAt`); nothing is saved.
+     3. *Conflict table* (`buildPriorityTable`, cached per layout object, so per graph revision and node):
+        same inbound lane never conflicts; same outbound lane always (merge); otherwise polylines cross or pass
+        within 0.55 × the narrower lane width.
+     4. *Yield relation* (static per pair of conflicting movements): lower arm rank (class × 10 + asphaltHalf)
+        yields; among equals the far turn yields to oncoming straight/near turns, then traffic from the priority
+        side wins. **Handedness is read from the connectors** (`trafficHand`): the far turn and priority side
+        are "left"/"right" under right-hand lanes and "right"/"left" under left-hand lanes. Today's
+        `lanes.ts` puts a→b lanes on the negative side of n = (−dz, dx), which in Mayor's x-right, z-down
+        frame (and in 3D, x̂ × ŷ = ẑ) is the *left* of travel, so connectors are left-hand while the renderer's
+        straight-road lane offset (`scene.ts`, `(-hz, hx)·0.1`) is right-hand. The rules follow the connectors;
+        fixing the lane side flips them automatically.
+     5. *Claims* (`ClaimSet`, typed arrays per node). A vehicle registers when its front bumper is within
+        v²/(2·1.5) + 0.75 tiles of its connector start. A granted claim latches (committed) once stopping would
+        need more than 2.5 tiles/s², and on physical entry. Order per substep: committed claims first; then
+        waiting claims topologically by "must yield to", ties and cycles by arrival time, inbound arm index,
+        vehicle id (so an equal 4-way all-way tie always has a head and cannot deadlock). Each claim in order
+        is granted if it conflicts with no earlier committed, granted or waiting claim; a claim whose exit lane
+        holds a slow same-direction car within 2·half + 0.3 is not granted and does not hold up others
+        ("don't block the box"). Release when the rear bumper passes the connector end, when the vehicle
+        disappears (unrefreshed), or 12 game seconds after commit (`prioTimeouts`, the car then crosses
+        unclaimed). A refused claim becomes the red-light virtual stopped leader at connector start − 0.06.
+     6. *Spawns.* No spawn starts or ends within 1.1 tiles of a priority node centre, a spawn before the first
+        stop line starts slow enough to stop for it, and spawn clearance reads vehicle tiles from arc length.
+     7. *Numbers* (stress fixture: six street Ts, 20 spawns/s, 600 s, seed 7): baseline before the change 1077
+        completed; with priority 1686 (×1.57); the same fixed routes and spawns without priority 2893 (cars
+        drive through each other); 0 conflicting overlaps, 0 overruns, 0 timeouts.
 6. **Inspector modes** (TLE ideas): Vanilla (protected straight, protected right, permissive left), Split (one arm at a time), Protected-left-first, plus toggles for "turn on red" and "exclusive pedestrian phase". Save as an optional `signalMode?` per node id in `save.ts`.
 
 ### 3.5 Lane markings (`junction.ts` markings stage + `render/roads.ts`)

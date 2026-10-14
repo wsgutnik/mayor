@@ -1,11 +1,12 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
 import { ROAD, World, ZONE, heightAt, idx, inBounds, isTunnelTile, TransitKind, updateConnectivity, layerClass, RoadLayer, curvePoints } from "./world";
-import { SignalInfo, signalNodes, signalPhaseAt } from "./roads";
+import { SignalInfo, hasSignal, signalNodes, signalPhaseAt } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
 import { profileOf } from "./corridor";
-import { junctionsOf } from "./junction";
+import { JunctionLayout, junctionsOf } from "./junction";
+import { ClaimSet, PRIORITY_CLAIM_TIMEOUT, newClaimSet, priorityTableOf, resolveClaims, sweepClaims, upsertClaim, removeClaim } from "./priority";
 import { AdaptiveSignalState, newAdaptiveSignal, stepAdaptiveSignalInPlace } from "./signals";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
@@ -50,6 +51,33 @@ export interface Vehicle {
   stuck: boolean;
   /** Unsaved free-road no-motion watchdog, in simulation seconds. */
   stuckTime?: number;
+  /** Junction movements on this route (derived from `pts`, never saved); null when none. */
+  moves?: RouteMoves | null;
+  /** Index of the next movement in `moves` not yet cleared. */
+  moveAt?: number;
+  /** Movement whose claim timed out: crossed without a claim. */
+  prioSkip?: number;
+  /** Right-of-way stop distance for this substep (front bumper to stop line), or Infinity. */
+  prioStop?: number;
+}
+
+/**
+ * Junction movements a route makes, recorded when `routePath` splices lane
+ * connectors.  Index j: node id, connector index into that layout's
+ * `connectors`, and the polyline point range [i0, i1] the connector occupies.
+ */
+export interface RouteMoves {
+  n: number;
+  node: Int32Array;
+  conn: Int32Array;
+  i0: Int32Array;
+  i1: Int32Array;
+  layouts: JunctionLayout[];
+}
+const movesByRoute = new WeakMap<Float32Array, RouteMoves>();
+/** Movements recorded for a route polyline produced by `routePath`, or undefined. */
+export function routeMovesOf(pts: Float32Array): RouteMoves | undefined {
+  return movesByRoute.get(pts);
 }
 
 /** A bus or metro train looping over its line's stops. */
@@ -98,6 +126,19 @@ export interface TrafficState {
   adaptiveSignals: Map<number, AdaptiveSignalState>;
   /** Reused approach queue counters, in SignalInfo arm order. */
   signalQueues: Map<number, number[]>;
+  /** Unsignalised right-of-way nodes and their live claims, rebuilt with sigNodes; never saved. */
+  prioNodes: Map<number, ClaimSet>;
+  /** Substep stamp for claim refresh. */
+  prioStamp: number;
+  /** Claims dropped by the 12 s inside-the-box timeout (diagnostic). */
+  prioTimeouts: number;
+  /** Vehicles that reached the box without a granted claim (diagnostic; should stay 0). */
+  prioOverruns: number;
+  /**
+   * Test/debug hook: signalised node ids to run as unsignalised priority
+   * junctions instead.  Absent in the game, so signalised nodes are unchanged.
+   */
+  forcePriority?: Set<number>;
 }
 
 export function newTraffic(size: number, seed = 7): TrafficState {
@@ -106,6 +147,7 @@ export function newTraffic(size: number, seed = 7): TrafficState {
     rng: makeRng(seed), spawnCarry: 0, truckCarry: 0, listRevision: -1,
     homes: [], shops: [], factories: [], jobs: [],
     time: 0, sigRev: -1, sigNodes: [], sigByTile: new Map(), adaptiveSignals: new Map(), signalQueues: new Map(),
+    prioNodes: new Map(), prioStamp: 0, prioTimeouts: 0, prioOverruns: 0,
   };
 }
 
@@ -576,6 +618,10 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
     }
   }
 
+  // Right of way at unsignalised junctions: the same virtual stopped leader.
+  const ps = v.prioStop;
+  if (ps !== undefined && ps < stopDist) stopDist = ps;
+
   const aFree = idmAccel(vv, v0, 1e9, 0);
   let a = aFree;
   if (leadGap < 1e8) a = Math.min(a, idmAccel(vv, v0, leadGap, vv - leadV));
@@ -613,6 +659,130 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   // tile — counts. This keeps the old model's meaning (and the happiness
   // balance) while real queues now read as congestion too.
   v.stuck = fCap < 0.6 || (nv < 0.6 * free && aInt < 0.5 * aFree);
+}
+
+// ------------------------------------------------- unsignalised right of way
+//
+// Rules and claim ordering live in priority.ts.  This pass maps vehicles to
+// movements (from the connectors routePath spliced), refreshes claims, grants
+// them, and turns a refused claim into a stop-line distance for stepVehicle.
+
+/** Register a claim this far before the connector: comfortable stop plus margin. */
+const PRIO_REG_B = 1.5, PRIO_REG_MARGIN = 0.75;
+/** A granted claim latches once stopping would need more than this decel (tiles/s²). */
+const PRIO_COMMIT_B = 2.5, PRIO_COMMIT_MARGIN = 0.1;
+/** Exit room needed beyond the connector end, besides the vehicle's own length. */
+const PRIO_EXIT_ROOM = 0.3;
+const exitPose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
+const exitPose2: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
+
+/** Is the lane just past this connector exit held by a slow vehicle (do not block the box)? */
+function exitBlocked(w: World, t: TrafficState, k: number, v: Vehicle, sExit: number): boolean {
+  const arcs = v.arcs!;
+  const total = arcs[arcs.length - 1];
+  if (sExit >= total - 0.05) return false;
+  const e = pointAtRouteArcInto(v.pts, arcs, sExit, exitPose);
+  const ex = e.x, ez = e.z;
+  const f = pointAtRouteArcInto(v.pts, arcs, Math.min(total, sExit + 0.25), exitPose2);
+  let hx = f.x - ex, hz = f.z - ez;
+  const hl = Math.hypot(hx, hz);
+  if (hl < 1e-6) return false;
+  hx /= hl; hz /= hl;
+  const need = 2 * halfLength(v.kind) + PRIO_EXIT_ROOM;
+  const { head, next } = buckets;
+  let lastTile = -1;
+  for (let scan = sExit; scan <= Math.min(total, sExit + need + 0.5) + 1e-6; scan += 0.5) {
+    const tile = routeTileAt(w, v, scan);
+    if (tile === lastTile) continue;
+    lastTile = tile;
+    for (let u = head[tile]; u >= 0; u = next[u]) {
+      if (u === k) continue;
+      const o = t.vehicles[u];
+      if ((o.v ?? 0) > 0.5) continue;
+      const oarcs = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
+      const op = pointAtRouteArcInto(o.pts, oarcs, vehicleArc(o), leaderPose);
+      const rx = op.x - ex, rz = op.z - ez;
+      const long = rx * hx + rz * hz - halfLength(o.kind);
+      if (long < -0.1 || long > need) continue;
+      if (Math.abs(rx * hz - rz * hx) > 0.2) continue;
+      // Same direction only: oncoming cars waiting at their own line do not fill our exit.
+      const oi = Math.max(0, Math.min(oarcs.length - 2, op.index));
+      const odx = o.pts[oi * 2 + 2] - o.pts[oi * 2], odz = o.pts[oi * 2 + 3] - o.pts[oi * 2 + 1];
+      if (odx * hx + odz * hz <= 0.3 * Math.hypot(odx, odz)) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+function updatePriority(w: World, t: TrafficState): void {
+  if (!t.prioNodes.size) {
+    if (t.prioStamp) { for (const v of t.vehicles) v.prioStop = Infinity; t.prioStamp = 0; }
+    return;
+  }
+  const stamp = ++t.prioStamp;
+  for (let k = 0; k < t.vehicles.length; k++) {
+    const v = t.vehicles[k];
+    v.prioStop = Infinity;
+    if (v.tiles.length < 2) continue;
+    let m = v.moves;
+    if (m === undefined) m = v.moves = routeMovesOf(v.pts) ?? null;
+    if (!m) continue;
+    const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
+    const s = vehicleArc(v);
+    const half = halfLength(v.kind);
+    let j = v.moveAt ?? 0;
+    while (j < m.n && s - half >= arcs[m.i1[j]]) j++;
+    v.moveAt = j;
+    if (j >= m.n || v.prioSkip === j) continue;
+    const cs = t.prioNodes.get(m.node[j]);
+    if (!cs || cs.layout !== m.layouts[j]) continue;
+    const d = arcs[m.i0[j]] - (s + half);
+    const vv = v.v ?? 0;
+    if (d > (vv * vv) / (2 * PRIO_REG_B) + PRIO_REG_MARGIN) continue;
+    const slot = upsertClaim(cs, v.id, m.conn[j], t.time, stamp);
+    cs.vidx[slot] = k;
+    cs.dist[slot] = d;
+    if (cs.state[slot] === 0) {
+      if (d <= 0) {
+        if (!cs.go[slot]) t.prioOverruns++;
+        cs.state[slot] = 1; cs.enterAt[slot] = t.time;
+      } else if (cs.go[slot] && d < (vv * vv) / (2 * PRIO_COMMIT_B) + PRIO_COMMIT_MARGIN) {
+        cs.state[slot] = 1; cs.enterAt[slot] = t.time;
+      }
+    }
+    if (cs.state[slot] === 1) {
+      cs.blocked[slot] = 0;
+      if (t.time - cs.enterAt[slot] > PRIORITY_CLAIM_TIMEOUT) {
+        removeClaim(cs, slot);
+        v.prioSkip = j;
+        t.prioTimeouts++;
+      }
+    } else cs.blocked[slot] = exitBlocked(w, t, k, v, arcs[m.i1[j]]) ? 1 : 0;
+  }
+  const IDM_LINE = IDM_STOP_LINE;
+  for (const cs of t.prioNodes.values()) {
+    if (!cs.n) continue;
+    sweepClaims(cs, stamp);
+    resolveClaims(cs);
+    for (let q = 0; q < cs.n; q++) {
+      if (cs.go[q]) continue;
+      const veh = t.vehicles[cs.vidx[q]];
+      veh.prioStop = Math.max(0, cs.dist[q] - IDM_LINE);
+    }
+  }
+}
+
+/** Rebuild the unsignalised junction set (graph edits only). */
+function rebuildPriority(w: World, t: TrafficState): void {
+  const prev = t.prioNodes;
+  t.prioNodes = new Map();
+  for (const l of junctionsOf(w).byNode.values()) {
+    if (l.arms.length < 3 || !l.connectors.length) continue;
+    if (hasSignal(w, l.nodeId) && !t.forcePriority?.has(l.nodeId)) continue;
+    const old = prev.get(l.nodeId);
+    t.prioNodes.set(l.nodeId, old && old.layout === l ? old : newClaimSet(priorityTableOf(l), l));
+  }
 }
 
 // ---------------------------------------------------------------- pathfinding
@@ -867,22 +1037,49 @@ export function roundCorners(pts: Float32Array, tiles: number): Float32Array {
  * migrated from tile indices to lane arc length.
  */
 export function routePath(w: World, tiles: number[]): Float32Array {
-  const base = snapToCentrelines(w, tiles, smoothPath(w, tiles));
+  const snapped = snapToCentrelines(w, tiles, smoothPath(w, tiles));
   const layouts = junctionsOf(w).byNode;
-  if (!layouts.size || base.length < 6) return base;
-  const out: number[] = [base[0], base[1]];
+  if (!layouts.size || snapped.length < 6) return snapped;
+  // A wide road can let the tile route cut a junction diagonally with no
+  // sample near the node; add the closest point of such a step as a sample.
+  const grown: number[] = [];
+  for (let i = 0; i < snapped.length / 2; i++) {
+    const x0 = snapped[i * 2], z0 = snapped[i * 2 + 1];
+    grown.push(x0, z0);
+    if (i + 1 >= snapped.length / 2) break;
+    const x1 = snapped[i * 2 + 2], z1 = snapped[i * 2 + 3];
+    const dx = x1 - x0, dz = z1 - z0, l2 = dx * dx + dz * dz;
+    if (l2 < 1e-6) continue;
+    for (const l of layouts.values()) {
+      if (!l.connectors.length) continue;
+      const cx = l.centre.x, cz = l.centre.z;
+      if ((x0 - cx) ** 2 + (z0 - cz) ** 2 <= 1.21 || (x1 - cx) ** 2 + (z1 - cz) ** 2 <= 1.21) continue;
+      const u = ((cx - x0) * dx + (cz - z0) * dz) / l2;
+      if (u <= 0 || u >= 1) continue;
+      const px = x0 + dx * u, pz = z0 + dz * u;
+      if ((px - cx) ** 2 + (pz - cz) ** 2 < 1.21) { grown.push(px, pz); break; }
+    }
+  }
+  const base = grown.length === snapped.length ? snapped : new Float32Array(grown);
+  const n = base.length / 2;
   // A route is still tile-indexed for A*, but its physical polyline owns node
-  // traversal.  Replace the one centre sample closest to a node by its legal
-  // lane connector, choosing the connector whose endpoints best match travel.
-  for (let i = 1; i + 1 < base.length / 2; i++) {
+  // traversal.  Each interior centre sample near a node proposes the legal
+  // lane connector whose endpoints best match travel.  Consecutive samples
+  // proposing the same node splice it once, at the best-scoring sample; the
+  // others are kept only outside the connector's span.  (Splicing per sample
+  // used to repeat a straight connector three times, sending cars backwards.)
+  const bestL: (JunctionLayout | undefined)[] = new Array(n);
+  const bestC = new Int32Array(n).fill(-1);
+  const bestS = new Float64Array(n).fill(-Infinity);
+  for (let i = 1; i + 1 < n; i++) {
     const x = base[i * 2], z = base[i * 2 + 1];
     const ax = x - base[i * 2 - 2], az = z - base[i * 2 - 1];
     const bx = base[i * 2 + 2] - x, bz = base[i * 2 + 3] - z;
     const al = Math.hypot(ax, az) || 1, bl = Math.hypot(bx, bz) || 1;
-    let best: { points: { x: number; z: number }[]; score: number } | undefined;
     for (const l of layouts.values()) {
       if ((l.centre.x - x) ** 2 + (l.centre.z - z) ** 2 > 1.1 * 1.1) continue;
-      for (const c of l.connectors) {
+      for (let ci = 0; ci < l.connectors.length; ci++) {
+        const c = l.connectors[ci];
         const p0 = c.points[0], pn = c.points[c.points.length - 1];
         const cinx = c.points[Math.min(1, c.points.length - 1)].x - p0.x;
         const cinz = c.points[Math.min(1, c.points.length - 1)].z - p0.z;
@@ -891,19 +1088,70 @@ export function routePath(w: World, tiles: number[]): Float32Array {
         const il = Math.hypot(cinx, cinz) || 1, ol = Math.hypot(coutx, coutz) || 1;
         const score = (ax * cinx + az * cinz) / (al * il) + (bx * coutx + bz * coutz) / (bl * ol)
           - 0.08 * (Math.hypot(p0.x - x, p0.z - z) + Math.hypot(pn.x - x, pn.z - z));
-        if (!best || score > best.score) best = { points: c.points, score };
+        if (score > bestS[i]) { bestS[i] = score; bestL[i] = l; bestC[i] = ci; }
       }
     }
-    if (best && best.score > 1.2) {
-      for (let k = 0; k < best.points.length; k++) {
-        const p = best.points[k];
-        const lx = out[out.length - 2], lz = out[out.length - 1];
-        if ((p.x - lx) ** 2 + (p.z - lz) ** 2 > 1e-5) out.push(p.x, p.z);
-      }
-    } else out.push(x, z);
+    if (bestS[i] <= 1.2) { bestL[i] = undefined; bestC[i] = -1; }
   }
-  out.push(base[base.length - 2], base[base.length - 1]);
-  return new Float32Array(out);
+  const out: number[] = [base[0], base[1]];
+  const mNode: number[] = [], mConn: number[] = [], mI0: number[] = [], mI1: number[] = [];
+  const mLayouts: JunctionLayout[] = [];
+  const push = (px: number, pz: number): void => {
+    const lx = out[out.length - 2], lz = out[out.length - 1];
+    if ((px - lx) ** 2 + (pz - lz) ** 2 > 1e-5) out.push(px, pz);
+  };
+  let i = 1;
+  while (i + 1 < n) {
+    const l = bestL[i];
+    if (!l) { push(base[i * 2], base[i * 2 + 1]); i++; continue; }
+    let end = i;
+    while (end + 2 < n && bestL[end + 1] === l) end++;
+    // The run enters along (i-1 → i) and leaves along (end → end+1): pick the
+    // connector matching both, nearest the route at its mouths.
+    const ix = base[i * 2] - base[i * 2 - 2], iz = base[i * 2 + 1] - base[i * 2 - 1];
+    const ox = base[end * 2 + 2] - base[end * 2], oz = base[end * 2 + 3] - base[end * 2 + 1];
+    const il = Math.hypot(ix, iz) || 1, ol = Math.hypot(ox, oz) || 1;
+    let ci = bestC[i], cs = -Infinity;
+    for (let q = 0; q < l.connectors.length; q++) {
+      const cq = l.connectors[q];
+      const ia = l.arms[cq.inArm], oa = l.arms[cq.outArm];
+      const a0 = cq.points[0], an = cq.points[cq.points.length - 1];
+      const score = -(ix * ia.dx + iz * ia.dz) / il + (ox * oa.dx + oz * oa.dz) / ol
+        - 0.08 * (Math.hypot(a0.x - base[i * 2], a0.z - base[i * 2 + 1]) + Math.hypot(an.x - base[end * 2], an.z - base[end * 2 + 1]));
+      if (score > cs) { cs = score; ci = q; }
+    }
+    // Splice at the sample nearest the node centre.
+    let pick = i;
+    for (let r = i + 1; r <= end; r++) {
+      if ((base[r * 2] - l.centre.x) ** 2 + (base[r * 2 + 1] - l.centre.z) ** 2 < (base[pick * 2] - l.centre.x) ** 2 + (base[pick * 2 + 1] - l.centre.z) ** 2) pick = r;
+    }
+    bestC[pick] = ci;
+    const c = l.connectors[ci];
+    const p0 = c.points[0], pn = c.points[c.points.length - 1];
+    const inA = l.arms[c.inArm], outA = l.arms[c.outArm];
+    for (let r = i; r < pick; r++) {
+      // Before the mouth along the inbound travel direction (-arm).
+      if ((base[r * 2] - p0.x) * -inA.dx + (base[r * 2 + 1] - p0.z) * -inA.dz < -0.05) push(base[r * 2], base[r * 2 + 1]);
+    }
+    push(p0.x, p0.z);
+    const at0 = out.length / 2 - 1; // p0, or the coincident point it deduped onto
+    for (let q = 1; q < c.points.length; q++) push(c.points[q].x, c.points[q].z);
+    mNode.push(l.nodeId); mConn.push(bestC[pick]); mLayouts.push(l);
+    mI0.push(at0); mI1.push(out.length / 2 - 1);
+    for (let r = pick + 1; r <= end; r++) {
+      if ((base[r * 2] - pn.x) * outA.dx + (base[r * 2 + 1] - pn.z) * outA.dz > 0.05) push(base[r * 2], base[r * 2 + 1]);
+    }
+    i = end + 1;
+  }
+  push(base[base.length - 2], base[base.length - 1]);
+  const pts = new Float32Array(out);
+  if (mNode.length) {
+    movesByRoute.set(pts, {
+      n: mNode.length, node: Int32Array.from(mNode), conn: Int32Array.from(mConn),
+      i0: Int32Array.from(mI0), i1: Int32Array.from(mI1), layouts: mLayouts,
+    });
+  }
+  return pts;
 }
 
 // ---------------------------------------------------------------- simulation
@@ -1007,23 +1255,41 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
     const lp = findLayeredPath(w, t.load, a, b);
     if (!lp || lp.tiles.length < 2) continue;
     const pts = routePath(w, lp.tiles);
-    // Spawn clearance: the start point needs half + half + 0.31 tile of room.
+    const arcs = routeArcLengths(pts);
     const myHalf = halfLength(kind);
+    let v0 = ROAD_SPEED[w.road[a]] * 0.55;
+    if (t.prioNodes.size) {
+      // Never start or end inside a right-of-way junction box (no claim covers
+      // it), and start slow enough to stop for the first stop line.
+      let inBox = false;
+      const ex = pts[pts.length - 2], ez = pts[pts.length - 1];
+      for (const cs of t.prioNodes.values()) {
+        const c = cs.layout!.centre;
+        if ((pts[0] - c.x) ** 2 + (pts[1] - c.z) ** 2 < 1.21 || (ex - c.x) ** 2 + (ez - c.z) ** 2 < 1.21) { inBox = true; break; }
+      }
+      if (inBox) continue;
+      const mv = routeMovesOf(pts);
+      if (mv && t.prioNodes.has(mv.node[0])) {
+        const d0 = arcs[mv.i0[0]] - myHalf - IDM_STOP_LINE;
+        if (d0 < 0.05) continue;
+        v0 = Math.min(v0, Math.sqrt(2 * PRIO_COMMIT_B * Math.max(0, d0 - PRIO_COMMIT_MARGIN)));
+      }
+    }
+    // Spawn clearance: the start point needs half + half + 0.31 tile of room
+    // from vehicles on the access tile or about to enter it.  Tiles come from
+    // the arc position: connector samples mean route points no longer index tiles.
     let blocked = false;
     for (const u of t.vehicles) {
-      const ulen = u.tiles.length;
-      if (ulen < 2) continue;
-      const uat = Math.max(0, Math.min(ulen - 2, Math.floor(u.progress)));
-      if (u.tiles[uat] !== a && u.tiles[uat + 1] !== a) continue;
-      const of = Math.min(1, Math.max(0, u.progress - uat));
-      const ux = u.pts[uat * 2] + (u.pts[uat * 2 + 2] - u.pts[uat * 2]) * of;
-      const uz = u.pts[uat * 2 + 1] + (u.pts[uat * 2 + 3] - u.pts[uat * 2 + 1]) * of;
-      if (Math.hypot(ux - pts[0], uz - pts[1]) - myHalf - halfLength(u.kind) < IDM_SPAWN_GAP) { blocked = true; break; }
+      if (u.tiles.length < 2) continue;
+      const us = vehicleArc(u);
+      if (routeTileAt(w, u, us) !== a && routeTileAt(w, u, us + 1) !== a) continue;
+      const up = pointAtRouteArcInto(u.pts, u.arcs!, us, leaderPose);
+      if (Math.hypot(up.x - pts[0], up.z - pts[1]) - myHalf - halfLength(u.kind) < IDM_SPAWN_GAP) { blocked = true; break; }
     }
     if (blocked) continue;
     t.vehicles.push({
       id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts,
-      progress: 0, arc: 0, arcs: routeArcLengths(pts), speedFactor: 1, v: ROAD_SPEED[w.road[a]] * 0.55, vf: 0.86 + t.rng() * 0.24,
+      progress: 0, arc: 0, arcs, speedFactor: 1, v: v0, vf: 0.86 + t.rng() * 0.24,
       vmax: vmaxAt(pts), brake: 0, blink: 0, seed: t.rng() * BLINK_PERIOD, stuck: false,
     });
     return;
@@ -1061,6 +1327,20 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   if (w.connectivityDirty) updateConnectivity(w);
   if (t.listRevision !== w.revision) refreshLists(w, t);
   if (t.transitRevision !== w.revision) syncTransit(w, t);
+  // Rebuilt even while paused (dt 0) so a fresh state is ready before the first step.
+  if (t.sigRev !== (w.graphRevision ?? 0)) {
+    t.sigRev = w.graphRevision ?? 0;
+    t.sigNodes = t.forcePriority?.size ? signalNodes(w).filter((sn) => !t.forcePriority!.has(sn.id)) : signalNodes(w);
+    t.sigByTile = indexSignals(w, t.sigNodes);
+    t.adaptiveSignals.clear(); t.signalQueues.clear();
+    for (const sn of t.sigNodes) {
+      // Two opposition groups are the established signal contract. A node
+      // with one effective pair retains its old fixed timing by omitting a controller.
+      if (sn.arms.length > 2) t.adaptiveSignals.set(sn.id, newAdaptiveSignal(2, signalPhaseAt(sn.id, t.time)));
+      t.signalQueues.set(sn.id, [0, 0]);
+    }
+    rebuildPriority(w, t);
+  }
   if (dt <= 0) return;
 
   // Spawn: commuters scale with residents, trucks with industry.
@@ -1079,19 +1359,6 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   }
   moveTransit(w, t, dt, s.raining ? RAIN_SPEED_FACTOR : 1);
 
-  if (t.sigRev !== (w.graphRevision ?? 0)) {
-    t.sigRev = w.graphRevision ?? 0;
-    t.sigNodes = signalNodes(w);
-    t.sigByTile = indexSignals(w, t.sigNodes);
-    t.adaptiveSignals.clear(); t.signalQueues.clear();
-    for (const sn of t.sigNodes) {
-      // Two opposition groups are the established signal contract. A node
-      // with one effective pair retains its old fixed timing by omitting a controller.
-      if (sn.arms.length > 2) t.adaptiveSignals.set(sn.id, newAdaptiveSignal(2, signalPhaseAt(sn.id, t.time)));
-      t.signalQueues.set(sn.id, [0, 0]);
-    }
-  }
-
   // IDM substeps: explicit Euler is stable only for h well under the headway.
   const weather = s.raining ? RAIN_SPEED_FACTOR : 1;
   const steps = Math.max(1, Math.ceil(dt / IDM_SUBSTEP - 1e-9));
@@ -1108,6 +1375,7 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
       buckets.head[v.tiles[at]] = k;
     }
     updateAdaptiveSignals(w, t, h);
+    updatePriority(w, t);
     for (let k = 0; k < t.vehicles.length; k++) stepVehicle(w, t, k, h, weather);
   }
 

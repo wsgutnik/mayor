@@ -251,14 +251,17 @@ describe("weather", () => {
       s.population = 600;
       s.capacity = { res: 600, com: 200, ind: 0 };
       const t = newTraffic(s.world.size);
-      let travelled = 0;
+      // Mean progress per vehicle-tick: total distance is set by the spawn
+      // rate (slower cars just stay on the road longer), the mean is not.
+      let travelled = 0, vehicleTicks = 0;
       for (let i = 0; i < 200; i++) {
         s.raining = raining;
         const before = new Map(t.vehicles.map((v) => [v.id, v.progress]));
         tickTraffic(s, t, 0.1);
+        vehicleTicks += t.vehicles.length;
         for (const v of t.vehicles) travelled += v.progress - (before.get(v.id) ?? 0);
       }
-      return travelled;
+      return travelled / Math.max(1, vehicleTicks);
     };
     expect(run(true)).toBeLessThan(run(false));
     expect(RAIN_SPEED_FACTOR).toBeLessThan(1);
