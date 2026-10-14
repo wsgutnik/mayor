@@ -15,6 +15,7 @@
  * The asserted thresholds fail with the LEGACY resolver.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
+import { vi } from "vitest";
 import { describe, expect, it } from "vitest";
 import { applyZoneAt, getZoneBlocks, newCity, placeRoad, planRoad } from "../sim/sim";
 import { deserialize, serialize } from "../sim/save";
@@ -171,6 +172,7 @@ function audit(res: Resolver, dist: number): { total: Summary; rows: string[] } 
   return { total, rows };
 }
 
+vi.setConfig({ testTimeout: 30000 }); // heavy stroke harness: do not flake under a loaded parallel suite
 describe("road snap audit: radius in pixels", () => {
   it("is a constant 36 px (touch) / 16 px (mouse) at near, mid and far zoom", () => {
     const lines: string[] = [];

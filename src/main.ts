@@ -17,6 +17,7 @@ import { cityEvents } from "./ui/events";
 import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
 import { exitAngle, loadRoadSnap, resolveRoadSnap, saveRoadSnap, snapRadiusTiles, worldPerPixel, type RoadSnapOptions, type SnapHit, type SnapTarget } from "./ui/road-snap";
+import { guideAngles, resolveGuide, type RoadGuide } from "./ui/road-guides";
 import { loadRoadParallel, offsetPolyline, parallelOffset, saveRoadParallel, type RoadParallelOptions } from "./ui/road-parallel";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { floodFill, rectangleTiles, ZONE_FILL_CAP, type ZoneMode, type ZoneTile } from "./ui/zone-tools";
@@ -66,6 +67,8 @@ let parallelOpts: RoadParallelOptions = loadRoadParallel();
 let lastSegDir: number | null = null;
 /** Alt/Option held: all road snapping is temporarily off. */
 let altDown = false;
+let shiftDown = false;
+let guideHold: RoadGuide | null = null;
 /** Last resolved snap of the draft cursor (target, refusal) and the target held for hysteresis. */
 let lastSnap: SnapHit | null = null;
 let snapHold: SnapTarget | null = null;
@@ -347,7 +350,7 @@ function refreshHint(): void {
  * road snap so connecting to existing roads still wins. Alt/Option bypasses all.
  */
 function resolveDraftPoint(raw: Pt): Pt {
-  if (altDown) { lastSnap = null; snapHold = null; return raw; }
+  if (altDown) { lastSnap = null; snapHold = null; guideHold = null; return raw; }
   const anchor = draft.length ? draft[draft.length - 1] : null;
   // Constant on-screen radius: tiles per CSS pixel at the picked ground point.
   const cam = renderer.rig.camera;
@@ -359,6 +362,13 @@ function resolveDraftPoint(raw: Pt): Pt {
   });
   lastSnap = hit;
   snapHold = hit.target;
+  // Existing node/segment attachments always win. A guide only affects free space.
+  if (hit.kind === "free" && anchor && snapOpts.guides && !shiftDown) {
+    const guide = resolveGuide(anchor, hit.pt, guideAngles(anchor, lastSegDir ?? startRef), radius * (touchPointer ? .5 : 1), 4, guideHold);
+    guideHold = guide.guide;
+    return guide.pt;
+  }
+  guideHold = null;
   return hit.pt;
 }
 
@@ -838,12 +848,15 @@ window.addEventListener("keydown", (e) => {
 /** Alt/Option held temporarily disables all road snapping; the preview follows live. */
 window.addEventListener("keydown", (e) => {
   if (e.key === "Alt" && !e.repeat && !altDown) { altDown = true; refreshDraftPoint(); }
+  if (e.key === "Shift" && !e.repeat && !shiftDown) { shiftDown = true; refreshDraftPoint(); }
 });
 window.addEventListener("keyup", (e) => {
   if (e.key === "Alt" && altDown) { altDown = false; refreshDraftPoint(); }
+  if (e.key === "Shift" && shiftDown) { shiftDown = false; refreshDraftPoint(); }
 });
 window.addEventListener("blur", () => {
   if (altDown) { altDown = false; refreshDraftPoint(); }
+  if (shiftDown) { shiftDown = false; refreshDraftPoint(); }
 });
 
 /** True while the player is typing (menu seed, save name): H must not hide panels then. */

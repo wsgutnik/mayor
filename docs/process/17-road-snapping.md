@@ -111,6 +111,23 @@ grid (the rest of `planRoad` is 4-13 ms there).
 - Parallel pair: every interior row keeps exactly `gap` valid cells on the inner side.
 - Resolver cost: 0.27 ms per pointer event on a 313-segment grid.
 
+## Guides (v4)
+
+Guides are a visual assist, never a constraint. While a road draft has an anchor,
+the overlay offers world-axis rays at 45-degree multiples and, when the anchor is
+on a road, the same fan relative to that road's tangent (parallel, perpendicular
+and diagonals). The optional 15-degree fan is retained through the legacy Angle
+setting. A cursor only moves to a ray when it is within 4 degrees; outside that
+cone its odd angle is left untouched. The cone grows to roughly 14–18 screen px
+at close touch distances. The currently chosen ray remains held until 1.35 times
+the acquire cone to prevent flicker.
+
+Priority remains node, centreline T, guide, free. Shift or Alt/Option temporarily
+suspends guides on desktop; touch disables them with the Guides toggle. The toggle
+is stored with `mayor:road-snap`, defaults on for old stored values, and does not
+change saves. A placement refusal is still produced by `planRoad`; guide geometry
+never bends a road around a keep-out or overlap.
+
 ## Known gaps
 
 - Overlap rules: two dead ends facing each other tip to tip closer than their footprints (the tile-paint idiom: a road

@@ -15,10 +15,12 @@ export interface RoadSnapOptions {
   length: LengthSnap;
   /** Snap onto the centre of an existing road tile so new roads connect cleanly. */
   roads: boolean;
+  /** Faint 45° guide rays; unlike legacy angle snap these never force a stroke outside their cone. */
+  guides: boolean;
 }
 
 /** Out of the box the draft behaves as before UI-2: only road snap is on. */
-export const DEFAULT_ROAD_SNAP: RoadSnapOptions = { angle: 0, length: 0, roads: true };
+export const DEFAULT_ROAD_SNAP: RoadSnapOptions = { angle: 0, length: 0, roads: true, guides: true };
 
 const ANGLES: readonly AngleSnap[] = [0, 15, 45];
 const LENGTHS: readonly LengthSnap[] = [0, 1, 2, 4];
@@ -32,6 +34,8 @@ export function normalizeRoadSnap(v: unknown): RoadSnapOptions {
     angle: ANGLES.includes(o.angle as AngleSnap) ? (o.angle as AngleSnap) : d.angle,
     length: LENGTHS.includes(o.length as LengthSnap) ? (o.length as LengthSnap) : d.length,
     roads: typeof o.roads === "boolean" ? o.roads : d.roads,
+    // Old preferences had only `angle`; retain it and make the new optional guide visible by default.
+    guides: typeof o.guides === "boolean" ? o.guides : d.guides,
   };
 }
 

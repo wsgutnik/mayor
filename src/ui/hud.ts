@@ -214,6 +214,7 @@ export class Hud {
   private snapAngleBtns = new Map<AngleSnap, HTMLButtonElement>();
   private snapLengthBtns = new Map<LengthSnap, HTMLButtonElement>();
   private snapRoadsBtn: HTMLButtonElement | null = null;
+  private snapGuidesBtn: HTMLButtonElement | null = null;
   private parallel: RoadParallelOptions = { ...DEFAULT_ROAD_PARALLEL };
   private parallelToggleBtn: HTMLButtonElement | null = null;
   private parallelGapBtns = new Map<ParallelGap, HTMLButtonElement>();
@@ -596,6 +597,13 @@ export class Hud {
     roads.addEventListener("click", () => this.setSnap({ ...this.snap, roads: !this.snap.roads }));
     this.snapRoadsBtn = roads;
     roadsRow.appendChild(roads);
+    const guidesRow = row(tr("Guides"));
+    const guides = el("button", "tool snap-btn", `<span>${tr("Guides")}</span>`);
+    guides.title = tr("Guides");
+    guides.setAttribute("aria-pressed", String(this.snap.guides));
+    guides.addEventListener("click", () => this.setSnap({ ...this.snap, guides: !this.snap.guides }));
+    this.snapGuidesBtn = guides;
+    guidesRow.appendChild(guides);
     this.setSnap(this.snap, false);
     return group;
   }
@@ -776,6 +784,10 @@ export class Hud {
     if (this.snapRoadsBtn) {
       this.snapRoadsBtn.classList.toggle("active", opts.roads);
       this.snapRoadsBtn.setAttribute("aria-pressed", String(opts.roads));
+    }
+    if (this.snapGuidesBtn) {
+      this.snapGuidesBtn.classList.toggle("active", opts.guides);
+      this.snapGuidesBtn.setAttribute("aria-pressed", String(opts.guides));
     }
     if (notify) this.hooks.onSnap?.({ ...this.snap });
   }

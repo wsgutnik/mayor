@@ -20,6 +20,7 @@ const PT: Record<string, string> = {
   "Street": "Rua", "Avenue": "Avenida", "Highway": "Autoestrada", "Paint": "Pintar", "Line": "Linha", "Curve": "Curva",
   "Marquee": "Retângulo", "Fill": "Preencher",
   "Snap": "Encaixe", "Angle": "Ângulo", "Road snap": "Encaixe nas estradas",
+  "Guides": "Guias",
   "Parallel": "Paralela",
   "Upgrade road": "Melhorar via",
   "Tap a road to change its class": "Toque numa via para mudar a classe", "Gap": "Espaço", "Side": "Lado", "On": "Ligado", "Left": "Esquerda", "Right": "Direita",
