@@ -169,22 +169,26 @@ describe("road network geometry", () => {
     expect(white(buildRoadNetworkGeometry(lone.world, gy))).toBe(0);
   });
 
-  it("exports inbound lane arrows on the junction-mark lift", () => {
+  it("paints inbound lane arrows as coloured polygons above the junction asphalt", () => {
     const s = flatTown();
     const ey = s.world.entry.y;
     road(s, 2, [[4.5, ey + 0.5], [28.5, ey + 0.5]]);
     road(s, 1, [[16.5, ey - 8], [16.5, ey + 8]]);
+    const node = s.world.nodes.find((n) => n.segs.length >= 3)!;
+    const layout = junctionsOf(s.world).get(node.id)!;
+    expect(layout.laneArrows.some((a) => a.turns.length > 0)).toBe(true);
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
     const g = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
     const cls = g.getAttribute("aClass").array as Float32Array;
     const pos = g.getAttribute("position").array as Float32Array;
-    const arrows: number[] = [];
-    for (let i = 0; i < cls.length; i++) if (cls[i] === ROAD_CLASS.ARROW) arrows.push(i);
-    expect(arrows.length).toBeGreaterThan(0);
-    expect(arrows.length % 4).toBe(0);
-    for (const i of arrows) {
-      expect(pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2])).toBeCloseTo(0.084, 3);
+    // Arrows are not atlas decals any more (the cell was an opaque square).
+    let painted = 0;
+    for (let i = 0; i < pos.length / 3; i++) {
+      if (cls[i] !== ROAD_CLASS.FLAT) continue;
+      const lift = pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2]);
+      if (Math.abs(lift - 0.086) < 1e-3) painted++;
     }
+    expect(painted).toBeGreaterThanOrEqual(3);
   });
 
   it("keeps every vertex on a small fixed set of lifts (no per-segment offsets)", () => {
