@@ -33,6 +33,15 @@ describe("dev showcase", () => {
     expect((globalThis as unknown as { __showcase?: ShowcaseApi }).__showcase).toBe(api);
     expect(seen.city).toBeDefined();
     expect(seen.city!.world.roundabouts.length).toBe(1);
+    const lots = seen.city!.world.olots!;
+    expect(lots.map((l) => [l.w, l.d, l.level])).toEqual([[2, 2, 2], [4, 2, 2], [3, 3, 3]]);
+    // Building presets are genuine zoned/levelled oriented lots, not empty
+    // renderer dummies: their mirror owns every footprint tile.
+    for (const lot of lots) for (const i of lot.tiles) {
+      expect(seen.city!.world.zone[i]).toBe(lot.zone);
+      expect(seen.city!.world.level[i]).toBe(lot.level);
+      expect(seen.city!.world.lotAt[i]).toBe(lot.id);
+    }
     // Default light is the low day sun, and the camera starts on the first case.
     expect(seen.tod).toBe(SHOWCASE_TOD.day);
     expect(api.list()).toEqual([...SHOWCASE_CASES, "building-house-2x2", "building-shop-4x2", "building-office-3x3", "overview"]);

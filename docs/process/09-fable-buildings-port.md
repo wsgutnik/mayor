@@ -519,6 +519,30 @@ touches.
 
 ## 8. Prioritized tasks (one contributor agent each)
 
+## 9. GB3 acceptance recipe: kit-scale procedural buildings
+
+The procedural path is for oriented lots of area at least four, with base at
+local `y=0` and front `+z`. It must sit beside the Blender kit, rather than
+using Fable's real-world height scale.
+
+- `KIT_STOREY = 0.25` tile. Houses use 1--2 floors. Apartment, shop, mixed
+  and office recipes use level ranges 2--3, 4--6 and 7--9 floors; the ninth
+  floor deliberately leaves room for roof detail under the 2.5-tile cap.
+  Industrial uses 1--3 taller hall floors.
+- The body is inset by kind-specific side/front setbacks. Roof, parapet,
+  window strips and roof plant use the body footprint exactly: no eaves,
+  awnings or slabs may cross the lot boundary.
+- Each normal floor has four inset glazed strips. The exposed wall at their
+  edges is the mullion, and the wall band between strips is the spandrel. A
+  0.045-tile roof, 0.10-tile parapet and small central HVAC casing complete
+  flat-roof forms. Glass uses the `glow_window_*` V1 material family so pane
+  instances receive deterministic per-window night light.
+- Invariants: every part is positive and contained within the local lot;
+  every elevated part overlaps a lower part whose top reaches its base within
+  `1e-3`; recipe triangles remain at most 1400; final height includes roof
+  detail and is no more than 2.5 tiles. Tests cover 1x4, 2x2, 2x3, 4x2 and
+  3x3 lots.
+
 Each task works in its own worktree and must cite `.claude/skills/mayor-visual-quality/SKILL.md` and this report. The
 gate is `npx tsc --noEmit` and `npx vitest run` green. Visual tasks end with the lead's day and night screenshots of the
 hard cases (diagonal street, curve, T and acute junction, dead end, slope). Effort is in agent-days.

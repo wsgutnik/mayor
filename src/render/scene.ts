@@ -1352,6 +1352,7 @@ export class CityRenderer {
       g.emissiveIntensity = this.nightGlow;
       setWindowNight(g, this.nightGlow); // per-window shader (V1); no-op for plain glow mats
     }
+    this.procBuildings?.setNight(this.nightGlow);
     this.rainOn = raining;
     this.rain.visible = raining;
     this.roadDetail.setDayWet(this.dayLevel, raining ? 1 : 0);

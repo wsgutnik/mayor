@@ -60,6 +60,30 @@ export interface ShowcaseApi {
   stats: () => ShowcaseStats;
 }
 
+/** A real oriented-zoning fixture, rather than renderer-only placeholder lots.
+ * It mirrors every parcel into World.zone/level/lotAt, so the showcase uses
+ * exactly the same built-lot branch as a grown city. */
+function stageBuildingLots(state: CityState): void {
+  const specs = [
+    { id: 9001, cx: 15, cz: 82, w: 2, d: 2, zone: 1 as const, level: 2 },
+    { id: 9002, cx: 45, cz: 82, w: 4, d: 2, zone: 2 as const, level: 2 },
+    { id: 9003, cx: 75, cz: 82, w: 3, d: 3, zone: 2 as const, level: 3 },
+  ];
+  const w = state.world;
+  w.zoning = "oriented";
+  w.olots = specs.map((s) => {
+    const tiles: number[] = [];
+    const x0 = Math.floor(s.cx - s.w / 2), z0 = Math.floor(s.cz - s.d / 2);
+    for (let z = z0; z < z0 + s.d; z++) for (let x = x0; x < x0 + s.w; x++) {
+      const i = z * w.size + x;
+      tiles.push(i); w.zone[i] = s.zone; w.level[i] = s.level; w.lotAt[i] = s.id;
+    }
+    return { ...s, seg: 0, side: 1 as const, block: 0, row: 0, col: 0, build: 1, yaw: 0, tiles };
+  });
+  w.nextOLotId = 9004;
+  w.zoneRevision++;
+}
+
 interface Deps {
   useCity: (next: CityState) => void;
   renderer: CityRenderer;
@@ -71,14 +95,7 @@ const GAME = { dist: 38, pitch: 0.9, yaw: 0.65 };
 
 export function initShowcase(deps: Deps): ShowcaseApi {
   const { state, focusOf } = buildShowcaseWorld();
-  // Three isolated oriented lots are deliberately direct fixtures: this dev-only
-  // staging hook keeps the road showcase deterministic while exposing B5 forms.
-  state.world.zoning = "oriented";
-  state.world.olots = [
-    { id: 9001, seg: 0, side: 1, block: 0, row: 0, col: 0, w: 2, d: 2, zone: 1, level: 2, build: 1, cx: 15, cz: 82, yaw: 0, tiles: [] },
-    { id: 9002, seg: 0, side: 1, block: 0, row: 0, col: 0, w: 4, d: 2, zone: 2, level: 2, build: 1, cx: 45, cz: 82, yaw: 0, tiles: [] },
-    { id: 9003, seg: 0, side: 1, block: 0, row: 0, col: 0, w: 3, d: 3, zone: 2, level: 3, build: 1, cx: 75, cz: 82, yaw: 0, tiles: [] },
-  ];
+  stageBuildingLots(state);
   deps.useCity(state);
   deps.setTod(SHOWCASE_TOD.day);
 

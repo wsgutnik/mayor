@@ -1,18 +1,17 @@
 // Portions adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10): buildings/renderer.js Pool / BuildingRenderer.
 import * as THREE from "three";
-import { geometryFor, type ProcShape } from "./procgeo";
+import { geometryFor } from "./procgeo";
 import { constructionParts, proceduralBuilding, type ProcPart } from "./procbuildings";
 import { createFacadeMaterial } from "./facade-material";
 import { bucketOrder } from "./lod";
+import { setWindowNight } from "./window-light";
 import type { OrientedLot } from "../sim/zonecells";
 
-type Mat = ProcPart["material"];
-const SHAPES: ProcShape[] = ["box", "gable", "hip", "wedge"];
-const MATS: Mat[] = ["wall", "roof", "glass", "metal"];
 const CAPACITY = 4096;
 export interface ProcPlacedLot extends OrientedLot { groundY: number }
 
-/** Static instanced pools, one for each geometry/material pair (16 draw calls maximum). */
+/** Static instanced pools. Style-specific wall/window pools preserve the kit
+ * palette and V1's per-window night family without per-building materials. */
 export class ProcBuildingsRenderer {
   readonly group = new THREE.Group();
   private pools = new Map<string, THREE.InstancedMesh>();
@@ -20,14 +19,7 @@ export class ProcBuildingsRenderer {
   private dummy = new THREE.Object3D();
   private xs = new Float32Array(CAPACITY);
   private zs = new Float32Array(CAPACITY);
-  constructor() {
-    for (const shape of SHAPES) for (const mat of MATS) {
-      const style = mat === "glass" ? "curtain" : mat === "metal" ? "industrial" : "retail";
-      const mesh = new THREE.InstancedMesh(geometryFor(shape).geometry, createFacadeMaterial(style), CAPACITY);
-      mesh.count = 0; mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
-      this.pools.set(`${shape}:${mat}`, mesh); this.group.add(mesh);
-    }
-  }
+  constructor() { /* pools are lazy: unused facade variants cost no draw calls */ }
   rebuild(lots: readonly ProcPlacedLot[]): void {
     this.counts.clear();
     for (const lot of lots) {
@@ -46,8 +38,20 @@ export class ProcBuildingsRenderer {
   }
   poolCount(): number { return this.pools.size; }
   instanceCount(): number { let n = 0; for (const m of this.pools.values()) n += m.count; return n; }
+  setNight(night: number): void {
+    for (const mesh of this.pools.values()) setWindowNight(mesh.material as THREE.MeshStandardMaterial, night);
+  }
   private add(lot: ProcPlacedLot, p: ProcPart): void {
-    const key = `${p.shape}:${p.material}`, mesh = this.pools.get(key)!;
+    // Wall and glass pools retain their authored facade family. Roof/metal
+    // stay shared, avoiding an unnecessary draw-call multiplier.
+    const key = `${p.shape}:${p.material}:${p.material === "wall" || p.material === "glass" ? p.style : "shared"}`;
+    let mesh = this.pools.get(key);
+    if (!mesh) {
+      const style = p.material === "glass" || p.material === "wall" ? p.style : p.material === "metal" ? "industrial" : "retail";
+      mesh = new THREE.InstancedMesh(geometryFor(p.shape).geometry, createFacadeMaterial(style, p.material === "glass"), CAPACITY);
+      mesh.count = 0; mesh.castShadow = mesh.receiveShadow = true; mesh.frustumCulled = false;
+      this.pools.set(key, mesh); this.group.add(mesh);
+    }
     const i = this.counts.get(key) ?? 0; if (i >= CAPACITY) return;
     const s = Math.sin(lot.yaw), c = Math.cos(lot.yaw);
     this.dummy.position.set(lot.cx + p.x * c + p.z * s, lot.groundY + p.y, lot.cz - p.x * s + p.z * c);
