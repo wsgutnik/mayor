@@ -836,7 +836,9 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
           profileOf(arm.type).asphaltHalf,
           Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt), groundY, atlas);
       }
-      junctionGuides(g, l, groundY);
+      // Roundabout ring nodes read as circulation: no straight-through guides.
+      const onRing = l.arms.some((arm) => w.segments.find((sg) => sg.id === arm.segId)?.roundabout);
+      if (!onRing) junctionGuides(g, l, groundY);
     }
   }
 
