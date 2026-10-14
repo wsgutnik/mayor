@@ -282,6 +282,23 @@ describe("road graph", () => {
       expect(a.trimA.pos).toBe(0);
     }
   });
+
+  it("clamps acute junction corner miters deterministically", () => {
+    const s = newCity(3);
+    const ey = flat(s);
+    road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
+    road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
+    road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
+    const node = s.world.nodes.find((n) => n.segs.length === 4)!;
+    const a = nodeLayout(s.world, node.id)!;
+    const b = nodeLayout(s.world, node.id)!;
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(a.corners.some((c) => c.beveled)).toBe(true);
+    for (const arm of a.arms) {
+      expect(arm.trimA.neg).toBeLessThanOrEqual(a.miterLimit + 1e-6);
+      expect(arm.trimA.pos).toBeLessThanOrEqual(a.miterLimit + 1e-6);
+    }
+  });
 });
 
 describe("traffic signals", () => {

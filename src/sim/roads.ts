@@ -629,6 +629,8 @@ export interface NodeCorner {
   r: number;
   /** Kerb width at this corner (max of the two arms). */
   kerb: number;
+  /** True when an acute miter was clamped into a bevel instead of a long spike. */
+  beveled?: boolean;
 }
 
 export interface NodeLayout {
@@ -637,6 +639,8 @@ export interface NodeLayout {
   /** Largest arm half width plus fillet: the asphalt disc radius. */
   radius: number;
   fillet: number;
+  /** Maximum centreline trim allowed for any corner miter at this node. */
+  miterLimit: number;
   arms: NodeLayoutArm[];
   corners: NodeCorner[];
 }
@@ -668,6 +672,7 @@ export function nodeLayout(w: World, nodeId: number): NodeLayout | null {
   const arms = nodeArms(w, nodeId);
   const fillet = Math.max(0.25, ...arms.map((a) => cornerRadius(a.type)));
   const radius = Math.max(0, ...arms.map((a) => a.halfWidth)) + fillet;
+  const miterLimit = Math.max(0.85, Math.min(1.8, radius + fillet * 1.5));
   const out: NodeLayoutArm[] = arms.map((a) => ({
     ...a, trimA: { neg: 0, pos: 0 }, trimK: { neg: 0, pos: 0 },
   }));
@@ -726,7 +731,9 @@ export function nodeLayout(w: World, nodeId: number): NodeLayout | null {
     const ta = (o.x - cx - na.x * a.halfWidth) * a.dx + (o.z - cz - na.z * a.halfWidth) * a.dz;
     const tb = (o.x - cx - nb.x * b.halfWidth) * b.dx + (o.z - cz - nb.z * b.halfWidth) * b.dz;
     if (ta < -0.05 || tb < -0.05) continue;
-    const cta = Math.max(0, ta), ctb = Math.max(0, tb);
+    const rawA = Math.max(0, ta), rawB = Math.max(0, tb);
+    const cta = Math.min(rawA, miterLimit);
+    const ctb = Math.min(rawB, miterLimit);
     setTrim(a, 1, cta);
     setTrim(b, -1, ctb);
     corners.push({
@@ -739,9 +746,16 @@ export function nodeLayout(w: World, nodeId: number): NodeLayout | null {
       r: fillet,
       // Highway corners stay asphalt-only, like real merges.
       kerb: a.type === 3 || b.type === 3 ? 0 : Math.max(a.kerb, b.kerb),
+      beveled: rawA > miterLimit + 1e-6 || rawB > miterLimit + 1e-6,
     });
   }
-  return { cx, cz, radius, fillet, arms: out, corners };
+  for (const arm of out) {
+    const a = Math.max(arm.trimA.neg, arm.trimA.pos);
+    const k = Math.max(arm.trimK.neg, arm.trimK.pos);
+    arm.trimA.neg = arm.trimA.pos = a;
+    arm.trimK.neg = arm.trimK.pos = k;
+  }
+  return { cx, cz, radius, fillet, miterLimit, arms: out, corners };
 }
 
 /** Unit bisector of the gap from arm a to arm b (null when opposed). */

@@ -567,56 +567,74 @@ function zebra(
  */
 function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void {
   const arms = l.arms
-    .map((a) => ({ a, ang: Math.atan2(a.dz, a.dx) }))
+    .map((a, idx) => ({ a, idx, ang: Math.atan2(a.dz, a.dx) }))
     .sort((p, q) => p.ang - q.ang);
   // A straight continuation (two arms, opposite) needs no patch.
   if (arms.length === 2) {
     const dot = arms[0].a.dx * arms[1].a.dx + arms[0].a.dz * arms[1].a.dz;
     if (dot < -0.985) return;
   }
-  const r = Math.max(...arms.map((p) => p.a.halfWidth));
-  const kw = Math.max(...arms.map((p) => kerbWidth(p.a.type)));
-  const lift = ROAD_LIFT + 0.02;
-  // Kerb sectors in the gaps between consecutive arms (angles wrap around).
-  if (kw > 0) {
-    for (let i = 0; i < arms.length; i++) {
-      const p = arms[i], q = arms[(i + 1) % arms.length];
-      const open0 = p.ang + Math.asin(Math.min(1, p.a.halfWidth / (r + kw * 0.5)));
-      let end = q.ang;
-      if (end <= p.ang) end += Math.PI * 2;
-      const open1 = end - Math.asin(Math.min(1, q.a.halfWidth / (r + kw * 0.5)));
-      if (open1 - open0 < 0.05) continue;
-      const steps = Math.max(2, Math.ceil((open1 - open0) / 0.2));
-      let prev: number[] | null = null;
-      for (let k = 0; k <= steps; k++) {
-        const ang = open0 + ((open1 - open0) * k) / steps;
-        const ix = l.cx + Math.cos(ang) * r, iz = l.cz + Math.sin(ang) * r;
-        const ox = l.cx + Math.cos(ang) * (r + kw), oz = l.cz + Math.sin(ang) * (r + kw);
-        const v0 = g.vert(ix, groundY(ix, iz) + KERB_LIFT + 0.012, iz, KERB);
-        const v1 = g.vert(ox, groundY(ox, oz) + KERB_LIFT + 0.012, oz, KERB);
-        if (prev) {
-          g.tri(prev[0], v0, prev[1]);
-          g.tri(prev[1], v0, v1);
-        }
-        prev = [v0, v1];
-      }
+  const cornerByA = new Map<number, (typeof l.corners)[number]>();
+  for (const c of l.corners) cornerByA.set(c.aIdx, c);
+  const sidePoint = (a: NodeLayoutArm, side: -1 | 1, trim: number, width = a.halfWidth): Pt => {
+    const nx = -a.dz * side, nz = a.dx * side;
+    return { x: l.cx + a.dx * trim + nx * width, z: l.cz + a.dz * trim + nz * width };
+  };
+  const arc = (c: (typeof l.corners)[number], outer = 0): Pt[] => {
+    const pts: Pt[] = [];
+    const r = c.r + outer;
+    if (c.beveled || r <= 1e-6) return pts;
+    let a0 = Math.atan2(c.pa.z - c.oz, c.pa.x - c.ox);
+    let a1 = Math.atan2(c.pb.z - c.oz, c.pb.x - c.ox);
+    while (a1 <= a0) a1 += Math.PI * 2;
+    if (a1 - a0 > Math.PI) [a0, a1] = [a1, a0 + Math.PI * 2];
+    const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / 0.18));
+    for (let k = 1; k < steps; k++) {
+      const a = a0 + ((a1 - a0) * k) / steps;
+      pts.push({ x: c.ox + Math.cos(a) * r, z: c.oz + Math.sin(a) * r });
+    }
+    return pts;
+  };
+  const ring: Pt[] = [];
+  for (let i = 0; i < arms.length; i++) {
+    const p = arms[i].a;
+    const q = arms[(i + 1) % arms.length].a;
+    const corner = cornerByA.get(arms[i].idx);
+    const pTrim = p.trimA.pos || l.radius * 0.55;
+    const qTrim = q.trimA.neg || l.radius * 0.55;
+    ring.push(corner?.pa ?? sidePoint(p, 1, pTrim));
+    for (const pt of corner ? arc(corner) : []) ring.push(pt);
+    ring.push(corner?.pb ?? sidePoint(q, -1, qTrim));
+  }
+  const clean: Pt[] = [];
+  for (const p of ring) {
+    const last = clean[clean.length - 1];
+    if (!last || Math.hypot(last.x - p.x, last.z - p.z) > 1e-4) clean.push(p);
+  }
+  if (clean.length < 3) return;
+  // Kerb strips follow the same corner fillets as the asphalt boundary, so
+  // sidewalks no longer stop bluntly at the node.
+  for (const c of l.corners) {
+    if (c.kerb <= 0) continue;
+    const inner = [c.pa, ...arc(c), c.pb];
+    const outer = [sidePoint(l.arms[c.aIdx], 1, l.arms[c.aIdx].trimA.pos, l.arms[c.aIdx].halfWidth + c.kerb),
+      ...arc(c, c.kerb),
+      sidePoint(l.arms[c.bIdx], -1, l.arms[c.bIdx].trimA.neg, l.arms[c.bIdx].halfWidth + c.kerb)];
+    const n = Math.min(inner.length, outer.length);
+    for (let k = 0; k + 1 < n; k++) {
+      const a = inner[k], b = inner[k + 1], c0 = outer[k + 1], d = outer[k];
+      g.quad(a.x, a.z, b.x, b.z, c0.x, c0.z, d.x, d.z, KERB_LIFT + 0.012, KERB, groundY);
     }
   }
-  // Asphalt disc on top of everything laid by the ribbons. In atlas mode it
-  // samples junction_asphalt with world-space UVs so it meets the strips.
-  const N = 24;
   const discCol = atlas ? "#ffffff" : ASPHALT;
   const discCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;
+  const lift = ROAD_LIFT;
   const c0 = g.vert(l.cx, groundY(l.cx, l.cz) + lift, l.cz, discCol,
     atlas ? [l.cx / JUNCTION_TILE, l.cz / JUNCTION_TILE] : undefined, discCls);
-  const ring: number[] = [];
-  for (let k = 0; k < N; k++) {
-    const ang = (k / N) * Math.PI * 2;
-    const x = l.cx + Math.cos(ang) * r, z = l.cz + Math.sin(ang) * r;
-    ring.push(g.vert(x, groundY(x, z) + lift, z, discCol,
-      atlas ? [x / JUNCTION_TILE, z / JUNCTION_TILE] : undefined, discCls));
-  }
-  for (let k = 0; k < N; k++) g.tri(c0, ring[k], ring[(k + 1) % N]);
+  const ids = clean.map((p) =>
+    g.vert(p.x, groundY(p.x, p.z) + lift, p.z, discCol,
+      atlas ? [p.x / JUNCTION_TILE, p.z / JUNCTION_TILE] : undefined, discCls));
+  for (let k = 0; k < ids.length; k++) g.tri(c0, ids[k], ids[(k + 1) % ids.length]);
 }
 
 /**
@@ -633,6 +651,16 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
   const layoutOf = (id: number): NodeLayout | null => {
     if (!cache.has(id)) cache.set(id, nodeLayout(w, id));
     return cache.get(id)!;
+  };
+  const trimsFor = (layout: NodeLayout | null, seg: RoadSegment, end: "a" | "b"): Pick<RibbonOpts, "aNeg" | "aPos" | "kNeg" | "kPos"> => {
+    const zero = { aNeg: 0, aPos: 0, kNeg: 0, kPos: 0 };
+    if (!layout || layout.arms.length < 2) return zero;
+    const arm = layout.arms.find((a) => a.segId === seg.id && a.end === end);
+    if (!arm) return zero;
+    if (end === "a") {
+      return { aNeg: arm.trimA.neg, aPos: arm.trimA.pos, kNeg: arm.trimK.neg, kPos: arm.trimK.pos };
+    }
+    return { aNeg: arm.trimA.pos, aPos: arm.trimA.neg, kNeg: arm.trimK.pos, kPos: arm.trimK.neg };
   };
   for (const seg of w.segments) {
     const elev = segElevation(seg);
@@ -661,8 +689,16 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     const deck = elev === "bridge" ? makeDeckSampler(w, seg.pts) : null;
     // A deck ribbon rides the profile instead of the terrain; its ramps meet the ground at the ends.
     const gy = deck ? (x: number, z: number): number => deck.yAt(deck.sAt(x, z)) : groundY;
-    // Ribbons run the full length to each node centre; the node patch below rounds the corners over them.
-    ribbon(g, seg.pts, seg.type, NO_TRIM, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0, atlas);
+    const ta = trimsFor(la, seg, "a");
+    const tb = trimsFor(lb, seg, "b");
+    const trim: RibbonOpts = {
+      ...ta,
+      eANeg: tb.aNeg,
+      eAPos: tb.aPos,
+      eKNeg: tb.kNeg,
+      eKPos: tb.kPos,
+    };
+    ribbon(g, seg.pts, seg.type, trim, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0, atlas);
     if (deck) {
       parapets(g, seg.type, deck);
       pillars(g, deck, groundY, w, seg.type);
