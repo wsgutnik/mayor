@@ -34,7 +34,11 @@ function laneOffsets(a: LaneArm, incoming: boolean): number[] {
   return all.filter(x => wantNeg ? x < 0 : x > 0);
 }
 function endpoint(c: Pt, a: LaneArm, off: number): Pt {
-  return { x:c.x+a.dx*a.trim-a.dz*off, z:c.z+a.dz*a.trim+a.dx*off };
+  // Stay a hair inside the final asphalt ring.  `trim` lies on the pad/road
+  // seam, and strict polygon containment intentionally rejects boundary
+  // points to avoid a connector that rides a kerb after float quantisation.
+  const trim = Math.max(0, a.trim - 0.012);
+  return { x:c.x+a.dx*trim-a.dz*off, z:c.z+a.dz*trim+a.dx*off };
 }
 function sampleCubic(p0: Pt, p1: Pt, p2: Pt, p3: Pt, n: number): Pt[] {
   const out: Pt[]=[];

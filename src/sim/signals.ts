@@ -276,3 +276,32 @@ export function stepAdaptiveSignal(state: AdaptiveSignalState, dt: number, queue
   }
   return out;
 }
+
+/** Allocation-free variant used by the live traffic loop. */
+export function stepAdaptiveSignalInPlace(state: AdaptiveSignalState, dt: number, queues: readonly number[]): void {
+  const n = Math.max(1, queues.length);
+  while (state.wait.length < n) state.wait.push(0);
+  if (state.phase >= n) state.phase = 0;
+  let left = Math.max(0, dt);
+  while (left > 1e-9) {
+    if (state.stage === "green" && state.elapsed >= SIGNAL_MIN_GREEN) {
+      const next = chooseAdaptivePhase(queues, state.wait, state.phase);
+      const cur = Math.max(0, queues[state.phase] || 0) + Math.max(0, state.wait[state.phase] || 0) * 0.3;
+      const score = Math.max(0, queues[next] || 0) + Math.max(0, state.wait[next] || 0) * 0.3;
+      if (next !== state.phase && score > cur + 1e-9) { state.stage = "yellow"; state.elapsed = 0; continue; }
+    }
+    const limit = state.stage === "green" ? SIGNAL_MAX_GREEN : state.stage === "yellow" ? SIGNAL_YELLOW : SIGNAL_ALL_RED;
+    const use = Math.min(left, Math.max(0, limit - state.elapsed));
+    for (let i = 0; i < n; i++) {
+      if (i === state.phase && state.stage === "green") state.wait[i] = 0;
+      else if ((queues[i] || 0) > 0) state.wait[i] += use;
+    }
+    state.elapsed += use; left -= use;
+    if (state.elapsed < limit - 1e-9) break;
+    state.elapsed = 0;
+    if (state.stage === "green") state.stage = "yellow";
+    else if (state.stage === "yellow") state.stage = "allRed";
+    else { state.phase = chooseAdaptivePhase(queues, state.wait, state.phase); state.stage = "green"; }
+    if (use === 0 && left === 0) break;
+  }
+}

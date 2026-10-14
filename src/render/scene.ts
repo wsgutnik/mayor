@@ -24,7 +24,7 @@ import { loadManifestGatedModel } from "./visual-v2-manifest";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
-import { TrafficState } from "../sim/traffic";
+import { TrafficState, pointAtRouteArc, routeArcLengths } from "../sim/traffic";
 import { buildCoverageField, coverageRamp, isCoverageLayer } from "../sim/coverage-field";
 import { CoverageOverlay } from "./coverage-overlay";
 import { TrafficTint } from "./traffic-tint";
@@ -1464,7 +1464,10 @@ export class CityRenderer {
     const vd1 = lod * lod, vd2 = vd1 * 2.56, vdMax = vd1 * 6.25;
     for (let k = 0; k < t.vehicles.length; k++) {
       const v = t.vehicles[k];
-      const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
+      const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
+      const routeArc = v.arc ?? arcs[Math.min(arcs.length - 1, Math.max(0, Math.floor(v.progress)))];
+      const routePose = pointAtRouteArc(v.pts, arcs, routeArc);
+      const i = Math.min(v.tiles.length - 2, routePose.index);
       if (i < 0) continue;
       // Layer decides height: tunnel hidden, deck rides deckH, ground stays low even under a deck.
       const vi = Math.min(v.tiles.length - 1, Math.floor(v.progress));
@@ -1478,8 +1481,8 @@ export class CityRenderer {
       const segL = Math.hypot(segX, segZ) || 1;
       const hx = segX / segL, hz = segZ / segL;
       const lane = v.kind === 1 ? 0.12 : 0.1;
-      const px = ax + segX * (v.progress - i) - hz * lane;
-      const pz = az + segZ * (v.progress - i) + hx * lane;
+      const px = ax + segX * routePose.t - hz * lane;
+      const pz = az + segZ * routePose.t + hx * lane;
       const dx = px - tx, dz = pz - tz;
       const d2 = dx * dx + dz * dz;
       if (d2 > vdMax) continue;

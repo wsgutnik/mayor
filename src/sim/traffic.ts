@@ -5,6 +5,8 @@ import { SignalInfo, signalNodes, signalPhaseAt } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
 import { profileOf } from "./corridor";
+import { junctionsOf } from "./junction";
+import { AdaptiveSignalState, newAdaptiveSignal, stepAdaptiveSignalInPlace } from "./signals";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
 export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7, [ROAD.ONEWAY_STREET]: 3, [ROAD.ONEWAY_AVENUE]: 4.5 };
@@ -26,6 +28,10 @@ export interface Vehicle {
   pts: Float32Array;
   /** Index into `tiles`, fractional. */
   progress: number;
+  /** Physical distance along `pts`.  Traffic is transient, so this is never saved. */
+  arc?: number;
+  /** Cumulative geometry distance for `pts`; built once with the route. */
+  arcs?: Float32Array;
   /** Current speed as a fraction of free flow (1 = no congestion). */
   speedFactor: number;
   /** Current speed in tiles/s (IDM state). */
@@ -86,6 +92,10 @@ export interface TrafficState {
   sigNodes: SignalInfo[];
   /** Signal approaches near each road tile, rebuilt with sigNodes. */
   sigByTile: Map<number, SignalInfo[]>;
+  /** Live, unsaved adaptive controllers keyed by signal node id. */
+  adaptiveSignals: Map<number, AdaptiveSignalState>;
+  /** Reused approach queue counters, in SignalInfo arm order. */
+  signalQueues: Map<number, number[]>;
 }
 
 export function newTraffic(size: number, seed = 7): TrafficState {
@@ -93,7 +103,7 @@ export function newTraffic(size: number, seed = 7): TrafficState {
     vehicles: [], transit: [], transitRevision: -1, load: new Uint16Array(size * size), completed: 0, nextId: 1,
     rng: makeRng(seed), spawnCarry: 0, truckCarry: 0, listRevision: -1,
     homes: [], shops: [], factories: [], jobs: [],
-    time: 0, sigRev: -1, sigNodes: [], sigByTile: new Map(),
+    time: 0, sigRev: -1, sigNodes: [], sigByTile: new Map(), adaptiveSignals: new Map(), signalQueues: new Map(),
   };
 }
 
@@ -129,8 +139,9 @@ export function redCrawl(w: World, t: TrafficState, tile: number, next: number, 
         const s = -(sn.arms[k].dx * ux + sn.arms[k].dz * uz);
         if (s > bd) { bd = s; best = k; }
       }
-      const phase = signalPhaseAt(sn.id, tick);
-      if (bd > 0.3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return RED_CRAWL;
+      const controller = t.adaptiveSignals.get(sn.id);
+      const phase = controller?.stage === "green" ? controller.phase : -1;
+      if (!controller ? (bd > 0.3 && (sn.arms[best].ns ? signalPhaseAt(sn.id, tick) !== 0 : signalPhaseAt(sn.id, tick) !== 1)) : (bd > 0.3 && phase !== (sn.arms[best].ns ? 0 : 1))) return RED_CRAWL;
     }
     return 1;
   };
@@ -154,6 +165,35 @@ export function indexSignals(w: World, signals: SignalInfo[]): Map<number, Signa
     }
   }
   return out;
+}
+
+/** Count waiting vehicles on each incoming signal arm without allocating in ticks. */
+function updateAdaptiveSignals(w: World, t: TrafficState, h: number): void {
+  for (const q of t.signalQueues.values()) q.fill(0);
+  for (const v of t.vehicles) {
+    if (v.tiles.length < 2 || v.v > IDM_V_STOP * 2) continue;
+    const s = vehicleArc(v);
+    const tile = routeTileAt(w, v, s);
+    const candidates = t.sigByTile.get(tile);
+    if (!candidates) continue;
+    const p = pointAtRouteArc(v.pts, v.arcs!, s);
+    const ni = routeArcIndex(v.arcs!, Math.min(v.arcs![v.arcs!.length - 1], s + 0.25));
+    const hx = v.pts[Math.min(v.pts.length - 2, ni * 2 + 2)] - p.x;
+    const hz = v.pts[Math.min(v.pts.length - 1, ni * 2 + 3)] - p.z;
+    for (const sn of candidates) {
+      let best = 0, bd = -Infinity;
+      for (let i = 0; i < sn.arms.length; i++) {
+        const d = -(sn.arms[i].dx * hx + sn.arms[i].dz * hz);
+        if (d > bd) { bd = d; best = i; }
+      }
+      if (bd > 0.3) t.signalQueues.get(sn.id)![sn.arms[best].ns ? 0 : 1]++;
+    }
+  }
+  for (const sn of t.sigNodes) {
+    const controller = t.adaptiveSignals.get(sn.id);
+    const queues = t.signalQueues.get(sn.id);
+    if (controller && queues) stepAdaptiveSignalInPlace(controller, h, queues);
+  }
 }
 
 // ------------------------------------------------------- IDM car following
@@ -287,6 +327,27 @@ export function pointAtRouteArc(pts: Float32Array, arcs: Float32Array, s: number
   return { x: pts[i * 2] + (pts[Math.min(i + 1, arcs.length - 1) * 2] - pts[i * 2]) * t, z: pts[i * 2 + 1] + (pts[Math.min(i + 1, arcs.length - 1) * 2 + 1] - pts[i * 2 + 1]) * t, index: i, t };
 }
 
+/** Tile below an arc position.  This deliberately keeps the existing tile buckets. */
+function routeTileAt(w: World, v: Vehicle, s: number): number {
+  const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
+  const p = pointAtRouteArc(v.pts, arcs, s);
+  const x = Math.max(0, Math.min(w.size - 1, Math.floor(p.x)));
+  const z = Math.max(0, Math.min(w.size - 1, Math.floor(p.z)));
+  const under = z * w.size + x;
+  return w.road[under] ? under : v.tiles[Math.min(v.tiles.length - 1, p.index)] ?? under;
+}
+
+/** Keeps old transient hand-built test vehicles valid while making arc authoritative. */
+function vehicleArc(v: Vehicle): number {
+  const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
+  if (v.arc === undefined) {
+    const i = Math.max(0, Math.min(arcs.length - 2, Math.floor(v.progress)));
+    const f = Math.max(0, Math.min(1, v.progress - i));
+    return arcs[i] + (arcs[i + 1] - arcs[i]) * f;
+  }
+  return v.arc;
+}
+
 /**
  * Turn sign at route index `at` from the cross product of the next two steps:
  * +1 left, −1 right, 0 straight or no turn ahead (x right, z down, so a left
@@ -407,12 +468,16 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   const v = t.vehicles[k];
   const len = v.tiles.length;
   if (len < 2) return;
-  const at = Math.floor(v.progress);
-  if (at >= len - 1 || at < 0) return;
-  const tile = v.tiles[at];
+  const arcDriven = v.arc !== undefined;
+  const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
+  const routeS = vehicleArc(v);
+  const pose = pointAtRouteArc(v.pts, arcs, routeS);
+  const at = pose.index;
+  if (at >= arcs.length - 1 || at < 0) return;
+  const tile = routeTileAt(w, v, routeS);
   const cls = w.road[tile];
   if (!cls) return;
-  const f = v.progress - at;
+  const f = pose.t;
   const ax = v.pts[at * 2], az = v.pts[at * 2 + 1];
   const bx = v.pts[at * 2 + 2], bz = v.pts[at * 2 + 3];
   const segLen = Math.hypot(bx - ax, bz - az) || 1;
@@ -427,10 +492,10 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   const free = ROAD_SPEED[cls] * vf * weather;
   const fCap = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
   let v0 = Math.min(free * fCap, v.vmax ? v.vmax[at] : Infinity);
-  const ncls = w.road[v.tiles[at + 1]];
+  const ncls = w.road[routeTileAt(w, v, Math.min(arcs[arcs.length - 1], routeS + Math.max(0.3, segLen)))];
   if (ncls) {
     const entry = ROAD_SPEED[ncls] * vf * weather;
-    const remain = Math.max(0, at + 1 - v.progress);
+    const remain = Math.max(0, arcs[Math.min(at + 1, arcs.length - 1)] - routeS);
     const ve = Math.sqrt(entry * entry + 2 * IDM_B_ENTRY * remain);
     if (ve < v0) v0 = ve;
   }
@@ -440,15 +505,16 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   // through until the lane graph lands, as before.
   let leadGap = Infinity, leadV = 0;
   const { head, next } = buckets;
-  const last = Math.min(len - 1, at + IDM_LOOKAHEAD);
-  for (let j = at; j <= last; j++) {
-    for (let u = head[v.tiles[j]]; u >= 0; u = next[u]) {
+  const last = Math.min(arcs[arcs.length - 1], routeS + IDM_LOOKAHEAD);
+  for (let scan = routeS; scan <= last + 1e-6; scan += 1) {
+    const scanTile = routeTileAt(w, v, scan);
+    for (let u = head[scanTile]; u >= 0; u = next[u]) {
       if (u === k) continue;
       const o = t.vehicles[u];
-      const olen = o.tiles.length;
-      if (olen < 2) continue;
-      const oat = Math.max(0, Math.min(olen - 2, Math.floor(o.progress)));
-      const of = Math.min(1, Math.max(0, o.progress - oat));
+      const oarcs = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
+      const op = pointAtRouteArc(o.pts, oarcs, vehicleArc(o));
+      const oat = Math.max(0, Math.min(oarcs.length - 2, op.index));
+      const of = op.t;
       const oax = o.pts[oat * 2], oaz = o.pts[oat * 2 + 1];
       const obx = o.pts[oat * 2 + 2], obz = o.pts[oat * 2 + 3];
       const oseg = Math.hypot(obx - oax, obz - oaz) || 1;
@@ -469,12 +535,28 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   let stopDist = Infinity;
   const onGround = !v.layers || v.layers[at] === 0;
   if (onGround && t.sigNodes.length) {
-    for (let sk = 0; sk <= IDM_LOOKAHEAD && at + sk + 1 < len; sk++) {
+    // Use the coarse tile route to identify the stop line.  The fine route may
+    // contain several connector samples in a single tile, while signal arms
+    // are indexed by their approach tiles.
+    for (let sk = 0; sk <= IDM_LOOKAHEAD && at + sk + 1 < v.tiles.length; sk++) {
       if (redCrawl(w, t, v.tiles[at + sk], v.tiles[at + sk + 1], t.time) !== RED_CRAWL) continue;
-      const d = at + sk + 1 - IDM_STOP_LINE - (v.progress + myHalf);
+      // Stop-line ownership remains tied to the coarse approach tile.  The
+      // vehicle state and leader gaps are arclength based; using this tile
+      // boundary preserves the authored stop bar when connector samples add
+      // extra polyline points at the node.
+      const d = Math.max(0, at + sk + 1 - IDM_STOP_LINE - (v.progress + myHalf));
+      stopDist = d;
+      break;
+    }
+    if (stopDist === Infinity) {
+    for (let scan = routeS; scan <= Math.min(arcs[arcs.length - 1] - 0.01, routeS + IDM_LOOKAHEAD); scan += 0.5) {
+      const nextS = Math.min(arcs[arcs.length - 1], scan + 0.5);
+      if (redCrawl(w, t, routeTileAt(w, v, scan), routeTileAt(w, v, nextS), t.time) !== RED_CRAWL) continue;
+      const d = scan + 0.5 - IDM_STOP_LINE - (routeS + myHalf);
       if (d < -0.15) continue; // past the line: clear the junction
       stopDist = Math.max(0, d);
       break;
+    }
     }
   }
 
@@ -488,7 +570,12 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   let nv = Math.max(0, vv + a * h);
   if (stopDist < IDM_STOP_ZERO && nv < IDM_V_STOP) nv = 0;
   v.v = nv;
-  v.progress += nv * h;
+  if (arcDriven) {
+    v.arc = Math.min(arcs[arcs.length - 1], routeS + nv * h);
+    const pi = routeArcIndex(arcs, v.arc);
+    const pa = arcs[pi], arcNext = arcs[Math.min(pi + 1, arcs.length - 1)];
+    v.progress = pi + (arcNext > pa ? (v.arc - pa) / (arcNext - pa) : 0); // compatibility only
+  } else v.progress += nv * h;
 
   let brakeT = Math.min(1, Math.max(0, -a / BRAKE_REF));
   if (nv < IDM_V_STOP && (stopping || leadGap < IDM_QUEUE_GAP)) brakeT = Math.max(brakeT, 0.9);
@@ -758,7 +845,43 @@ export function roundCorners(pts: Float32Array, tiles: number): Float32Array {
  * migrated from tile indices to lane arc length.
  */
 export function routePath(w: World, tiles: number[]): Float32Array {
-  return snapToCentrelines(w, tiles, smoothPath(w, tiles));
+  const base = snapToCentrelines(w, tiles, smoothPath(w, tiles));
+  const layouts = junctionsOf(w).byNode;
+  if (!layouts.size || base.length < 6) return base;
+  const out: number[] = [base[0], base[1]];
+  // A route is still tile-indexed for A*, but its physical polyline owns node
+  // traversal.  Replace the one centre sample closest to a node by its legal
+  // lane connector, choosing the connector whose endpoints best match travel.
+  for (let i = 1; i + 1 < base.length / 2; i++) {
+    const x = base[i * 2], z = base[i * 2 + 1];
+    const ax = x - base[i * 2 - 2], az = z - base[i * 2 - 1];
+    const bx = base[i * 2 + 2] - x, bz = base[i * 2 + 3] - z;
+    const al = Math.hypot(ax, az) || 1, bl = Math.hypot(bx, bz) || 1;
+    let best: { points: { x: number; z: number }[]; score: number } | undefined;
+    for (const l of layouts.values()) {
+      if ((l.centre.x - x) ** 2 + (l.centre.z - z) ** 2 > 1.1 * 1.1) continue;
+      for (const c of l.connectors) {
+        const p0 = c.points[0], pn = c.points[c.points.length - 1];
+        const cinx = c.points[Math.min(1, c.points.length - 1)].x - p0.x;
+        const cinz = c.points[Math.min(1, c.points.length - 1)].z - p0.z;
+        const coutx = pn.x - c.points[Math.max(0, c.points.length - 2)].x;
+        const coutz = pn.z - c.points[Math.max(0, c.points.length - 2)].z;
+        const il = Math.hypot(cinx, cinz) || 1, ol = Math.hypot(coutx, coutz) || 1;
+        const score = (ax * cinx + az * cinz) / (al * il) + (bx * coutx + bz * coutz) / (bl * ol)
+          - 0.08 * (Math.hypot(p0.x - x, p0.z - z) + Math.hypot(pn.x - x, pn.z - z));
+        if (!best || score > best.score) best = { points: c.points, score };
+      }
+    }
+    if (best && best.score > 1.2) {
+      for (let k = 0; k < best.points.length; k++) {
+        const p = best.points[k];
+        const lx = out[out.length - 2], lz = out[out.length - 1];
+        if ((p.x - lx) ** 2 + (p.z - lz) ** 2 > 1e-5) out.push(p.x, p.z);
+      }
+    } else out.push(x, z);
+  }
+  out.push(base[base.length - 2], base[base.length - 1]);
+  return new Float32Array(out);
 }
 
 // ---------------------------------------------------------------- simulation
@@ -878,7 +1001,7 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
     if (blocked) continue;
     t.vehicles.push({
       id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts,
-      progress: 0, speedFactor: 1, v: ROAD_SPEED[w.road[a]] * 0.55, vf: 0.86 + t.rng() * 0.24,
+      progress: 0, arc: 0, arcs: routeArcLengths(pts), speedFactor: 1, v: ROAD_SPEED[w.road[a]] * 0.55, vf: 0.86 + t.rng() * 0.24,
       vmax: vmaxAt(pts), brake: 0, blink: 0, seed: t.rng() * BLINK_PERIOD, stuck: false,
     });
     return;
@@ -938,6 +1061,13 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     t.sigRev = w.graphRevision ?? 0;
     t.sigNodes = signalNodes(w);
     t.sigByTile = indexSignals(w, t.sigNodes);
+    t.adaptiveSignals.clear(); t.signalQueues.clear();
+    for (const sn of t.sigNodes) {
+      // Two opposition groups are the established signal contract. A node
+      // with one effective pair retains its old fixed timing by omitting a controller.
+      if (sn.arms.length > 2) t.adaptiveSignals.set(sn.id, newAdaptiveSignal(2, signalPhaseAt(sn.id, t.time)));
+      t.signalQueues.set(sn.id, [0, 0]);
+    }
   }
 
   // IDM substeps: explicit Euler is stable only for h well under the headway.
@@ -955,6 +1085,7 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
       buckets.next[k] = buckets.head[v.tiles[at]];
       buckets.head[v.tiles[at]] = k;
     }
+    updateAdaptiveSignals(w, t, h);
     for (let k = 0; k < t.vehicles.length; k++) stepVehicle(w, t, k, h, weather);
   }
 
