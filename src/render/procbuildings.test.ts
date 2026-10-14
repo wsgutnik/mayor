@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { KIT_STOREY, bayLayout, checkFacade } from "./facade";
 import { checkGeometry, geometryFor } from "./procgeo";
-import { checkProceduralBuilding, HERO_HEIGHT_CAP, PROC_TRIANGLE_CAP, proceduralBuilding, STANDARD_HEIGHT_CAP } from "./procbuildings";
+import { checkConstructionParts, checkProceduralBuilding, constructionParts, HERO_HEIGHT_CAP, PROC_TRIANGLE_CAP, proceduralBuilding, STANDARD_HEIGHT_CAP } from "./procbuildings";
 
 describe("procedural multi-cell buildings", () => {
   it("pins kit scale and preserves the Blender kit for 1x1 lots", () => {
@@ -18,5 +18,10 @@ describe("procedural multi-cell buildings", () => {
   it("uses non-sliver closed roof geometry and valid facade bays", () => {
     for (const shape of ["box","gable","hip","wedge"] as const) expect(checkGeometry(geometryFor(shape).geometry)).toBe(true);
     expect(checkFacade(bayLayout(2))).toBe(true);
+  });
+  it("keeps staged construction inside its site envelope (crane included)", () => {
+    const lot = { id: 7, w: 3, d: 3, zone: 2, level: 3 };
+    const b = proceduralBuilding(lot)!;
+    for (const p of [0, .25, .75, 1]) expect(checkConstructionParts(constructionParts(b, lot, p), lot)).toBe(true);
   });
 });

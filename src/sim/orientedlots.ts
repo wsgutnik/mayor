@@ -97,7 +97,7 @@ function markLot(b: ZoneBlock, lot: OrientedLot): void {
 
 function withPose(b: ZoneBlock, lot: Omit<OrientedLot, "cx" | "cz" | "yaw" | "tiles">): OrientedLot {
   const pose = lotPose(b, lot);
-  return { ...lot, ...pose, tiles: [] };
+  return { ...lot, build: lot.build ?? 1, ...pose, tiles: [] };
 }
 
 function nextIdAfter(keep: readonly OrientedLot[] | undefined): number {
@@ -184,7 +184,7 @@ export function planOrientedLots(set: ZoneBlockSet, opts: PlanOpts): OrientedLot
     const b = blockOf(set, old);
     if (!b) continue;
     if (!shapeFits(b, old.row, old.col, old.w, old.d, old.zone, old.level)) continue;
-    const lot = withPose(b, { id: old.id, seg: old.seg, side: old.side, block: old.block, row: old.row, col: old.col, w: old.w, d: old.d, zone: old.zone, level: old.level });
+    const lot = withPose(b, { id: old.id, seg: old.seg, side: old.side, block: old.block, row: old.row, col: old.col, w: old.w, d: old.d, zone: old.zone, level: old.level, build: old.build });
     markLot(b, lot);
     lots.push(lot);
   }

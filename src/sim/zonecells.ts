@@ -54,6 +54,8 @@ export interface OrientedLot {
   w: number; d: number;
   zone: ZoneType;
   level: number;              // 0 empty, 1..3
+  /** Build progress; absent only in pre-construction saves and treated as complete. */
+  build?: number;
   /** Derived pose: centre and yaw such that a model's +z faces the road. Recomputed from the block, never saved. */
   cx: number; cz: number; yaw: number;
   /** Mirror: tile indices whose centre lies inside the lot's rectangle (at least 1). Derived. */

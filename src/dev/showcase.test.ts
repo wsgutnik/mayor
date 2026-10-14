@@ -35,7 +35,7 @@ describe("dev showcase", () => {
     expect(seen.city!.world.roundabouts.length).toBe(1);
     // Default light is the low day sun, and the camera starts on the first case.
     expect(seen.tod).toBe(SHOWCASE_TOD.day);
-    expect(api.list()).toEqual([...SHOWCASE_CASES, "overview"]);
+    expect(api.list()).toEqual([...SHOWCASE_CASES, "building-house-2x2", "building-shop-4x2", "building-office-3x3", "overview"]);
   });
 
   it("exposes one fixed preset per case plus overview", () => {

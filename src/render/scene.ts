@@ -35,6 +35,7 @@ import { LodSorter } from "./lod";
 import { QUALITY_PROFILE, qualityForPixelCap } from "../prefs";
 import { configureKitTextures } from "./kit-materials";
 import { setWindowNight } from "./window-light";
+import { ProcBuildingsRenderer } from "./procbuildings-renderer";
 import { nodeArms, signalNodes, signalPhase } from "../sim/roads";
 import { PROP_KINDS, PropKind, planProps } from "../sim/props";
 import { PROP_TINT, propGeometry } from "./props";
@@ -252,6 +253,7 @@ export class CityRenderer {
   private winMat!: THREE.MeshLambertMaterial;
   private plainMat!: THREE.MeshLambertMaterial;
   private bMeshes = new Map<string, THREE.InstancedMesh>();
+  private procBuildings: ProcBuildingsRenderer | null = null;
   private fMeshes = new Map<number, THREE.InstancedMesh>();
   private sized: THREE.Object3D[] = [];
   /** Kit models from Blender (public/models/NN.glb), loaded once and shared across map swaps. */
@@ -297,6 +299,10 @@ export class CityRenderer {
       if (this.roadMesh) this.rebuildRoads();
     }, () => { /* atlas missing: keep the vertex-colour path */ });
     this.scene.background = new THREE.Color("#a9c8e8");
+    if (new URLSearchParams(window.location.search).get("procBuildings") === "1") {
+      this.procBuildings = new ProcBuildingsRenderer();
+      this.scene.add(this.procBuildings.group);
+    }
     this.scene.fog = new THREE.FogExp2("#a9c8e8", 0.0042);
     this.hemi = new THREE.HemisphereLight("#ffffff", "#6b7a5a", 1.35);
     this.scene.add(this.hemi);
@@ -937,6 +943,8 @@ export class CityRenderer {
         if (z === 3 && lot.level >= 2) {
           smoke.push({ x: c.x + 0.22, y: hLot + (lot.level === 3 ? 0.95 : 0.7), z: c.z - 0.2, strength: lot.level === 3 ? 0.8 : 0.5 });
         }
+        const useProc = !!this.procBuildings && "cx" in lot && lot.w * lot.d >= 4;
+        if (useProc) continue; // committed in one static pool pass after all lots are inspected.
         const look = pickLotEntry(z, lot.level, plan.area, tileHash(Math.floor(c.x) + 17, Math.floor(c.z) + 29));
         const mesh = this.bMeshes.get(`${z}-${look.level}-${look.index}`);
         if (mesh) {
@@ -949,6 +957,10 @@ export class CityRenderer {
           }
         }
       }
+    }
+    if (this.procBuildings) {
+      const placed = (w.olots ?? []).map((lot) => ({ ...lot, groundY: heightAt(w, lot.cx, lot.cz) }));
+      this.procBuildings.rebuild(placed);
     }
     this.zones.count = nz;
     this.zones.instanceMatrix.needsUpdate = true;

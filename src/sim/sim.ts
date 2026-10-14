@@ -708,6 +708,8 @@ export function refreshLots(s: CityState): void {
 }
 
 export function setOLotLevel(w: World, lot: OrientedLot, level: number): void {
+  if (level > lot.level) lot.build = 0;
+  else if (level === 0) lot.build = 1;
   lot.level = level;
   const set = getZoneBlocks(w);
   const b = set.blocks.get(blockKey(lot));
@@ -1365,6 +1367,16 @@ export function step(s: CityState): void {
     : new Set((lotsReadyToBuild(w, getBlocks(w), w.lots) as WorldLot[]).map((l) => l.id));
   const lots = oriented ? (w.olots ?? []) : w.lots;
   for (const lot of lots) {
+    // Construction is deliberately simulation-time, not render-time: saves and
+    // replay get the same site on every machine. Thirty daily ticks is short
+    // enough to be legible while retaining several visible stages.
+    if (oriented) {
+      const o = lot as OrientedLot;
+      if (o.level > 0 && (o.build ?? 1) < 1) {
+        o.build = Math.min(1, (o.build ?? 0) + 1 / 30);
+        changed = true;
+      }
+    }
     const d = demandOf[lot.zone];
     const lvl = lot.level;
     // A building needs its services on every tile of its footprint.

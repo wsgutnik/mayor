@@ -18,6 +18,8 @@ import {
 
 export type ShowcaseZoom = "close" | "game";
 export type ShowcaseTod = "day" | "night";
+export type BuildingShowcaseCase = "building-house-2x2" | "building-shop-4x2" | "building-office-3x3";
+const BUILDING_CASES: BuildingShowcaseCase[] = ["building-house-2x2", "building-shop-4x2", "building-office-3x3"];
 
 /** Fable hours mapped to Mayor tod (0..1): low sun 16.2h, night 21h. */
 export const SHOWCASE_TOD: Record<ShowcaseTod, number> = {
@@ -49,7 +51,7 @@ export interface ShowcaseStats {
 
 export interface ShowcaseApi {
   /** Jump the camera to a case preset (default zoom: close). */
-  go: (name: ShowcaseCaseName | "overview", zoom?: ShowcaseZoom) => ShowcasePreset;
+  go: (name: ShowcaseCaseName | BuildingShowcaseCase | "overview", zoom?: ShowcaseZoom) => ShowcasePreset;
   /** All preset names, cases first, then overview. */
   list: () => string[];
   /** Switch light: day (low sun) or night. */
@@ -69,16 +71,28 @@ const GAME = { dist: 38, pitch: 0.9, yaw: 0.65 };
 
 export function initShowcase(deps: Deps): ShowcaseApi {
   const { state, focusOf } = buildShowcaseWorld();
+  // Three isolated oriented lots are deliberately direct fixtures: this dev-only
+  // staging hook keeps the road showcase deterministic while exposing B5 forms.
+  state.world.zoning = "oriented";
+  state.world.olots = [
+    { id: 9001, seg: 0, side: 1, block: 0, row: 0, col: 0, w: 2, d: 2, zone: 1, level: 2, build: 1, cx: 15, cz: 82, yaw: 0, tiles: [] },
+    { id: 9002, seg: 0, side: 1, block: 0, row: 0, col: 0, w: 4, d: 2, zone: 2, level: 2, build: 1, cx: 45, cz: 82, yaw: 0, tiles: [] },
+    { id: 9003, seg: 0, side: 1, block: 0, row: 0, col: 0, w: 3, d: 3, zone: 2, level: 3, build: 1, cx: 75, cz: 82, yaw: 0, tiles: [] },
+  ];
   deps.useCity(state);
   deps.setTod(SHOWCASE_TOD.day);
 
-  const presetFor = (name: ShowcaseCaseName | "overview", zoom: ShowcaseZoom): ShowcasePreset => {
+  const presetFor = (name: ShowcaseCaseName | BuildingShowcaseCase | "overview", zoom: ShowcaseZoom): ShowcasePreset => {
     if (name === "overview") {
       return { name, title: "full grid", x: 49.5, z: 40.5, dist: 120, pitch: 1.3, yaw: 0 };
     }
-    const f = focusOf[name];
+    const staged: Record<BuildingShowcaseCase, { x: number; z: number; title: string }> = {
+      "building-house-2x2": { x: 15, z: 82, title: "2×2 house" }, "building-shop-4x2": { x: 45, z: 82, title: "4×2 shop / industrial" }, "building-office-3x3": { x: 75, z: 82, title: "3×3 office / mixed" },
+    };
+    if (name in staged) { const f = staged[name as BuildingShowcaseCase]; const frame = zoom === "game" ? GAME : CLOSE; return { name, title: f.title, x: f.x, z: f.z, ...frame }; }
+    const f = focusOf[name as ShowcaseCaseName];
     const frame = zoom === "game" ? GAME : CLOSE;
-    return { name, title: SHOWCASE_TITLES[name], x: f.x, z: f.z, ...frame };
+    return { name, title: SHOWCASE_TITLES[name as ShowcaseCaseName], x: f.x, z: f.z, ...frame };
   };
 
   const diagnose = (): Omit<ShowcaseStats, "cases" | "drawCalls" | "triangles"> => {
@@ -125,7 +139,7 @@ export function initShowcase(deps: Deps): ShowcaseApi {
 
   const api: ShowcaseApi = {
     go: (name, zoom = "close") => {
-      if (name !== "overview" && !SHOWCASE_CASES.includes(name as ShowcaseCaseName)) {
+      if (name !== "overview" && !SHOWCASE_CASES.includes(name as ShowcaseCaseName) && !BUILDING_CASES.includes(name as BuildingShowcaseCase)) {
         throw new Error(`unknown showcase preset "${name}"; see __showcase.list()`);
       }
       const p = presetFor(name, zoom);
@@ -137,7 +151,7 @@ export function initShowcase(deps: Deps): ShowcaseApi {
       rig.apply();
       return p;
     },
-    list: () => [...SHOWCASE_CASES, "overview"],
+    list: () => [...SHOWCASE_CASES, ...BUILDING_CASES, "overview"],
     setTod: (tod) => {
       const v = SHOWCASE_TOD[tod];
       if (v === undefined) throw new Error(`setTod wants "day" or "night", got "${tod}"`);
