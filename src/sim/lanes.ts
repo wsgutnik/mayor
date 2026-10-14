@@ -36,7 +36,10 @@ export function laneOffsets(a: Pick<LaneArm, "end" | "type" | "oneWay" | "dir">,
   if (oneWay && incoming !== ((a.end === "b") === (dir === 1))) return [];
   // At end b, a→b (negative side) enters; at end a b→a (positive side) enters.
   const wantNeg = incoming ? a.end === "b" : a.end === "a";
-  return all.filter(x => wantNeg ? x < 0 : x > 0);
+  // World z points south, so +offset in the segment frame is the RIGHT of a->b
+  // (heading east, right-hand = +z). Right-hand traffic therefore travels on
+  // the positive side when entering at end b, and on the negative side at a.
+  return all.filter(x => wantNeg ? x > 0 : x < 0);
 }
 /** Segment offsets use the a→b frame; arm offsets use the outward frame. */
 export function armOffset(a: Pick<LaneArm, "end">, segmentOffset: number): number {

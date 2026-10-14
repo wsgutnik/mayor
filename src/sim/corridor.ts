@@ -14,7 +14,7 @@ export interface RoadProfile {
   setback: number;
   drawHalf: number;
   lanes: number;
-  /** Signed lane-centre offsets (tiles, negative = right of a→b); right-hand traffic. */
+  /** Signed lane-centre offsets (tiles; +z is south, so POSITIVE = right of a→b); right-hand traffic. */
   laneCentres: number[];
   /** Half width of the centre median (avenue only); 0 otherwise. */
   medianHalf: number;

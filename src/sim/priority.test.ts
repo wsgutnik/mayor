@@ -206,9 +206,9 @@ describe("main road wins", () => {
     const { s, ey, l, t, w } = avenueNode(false);
     const tab = t.prioNodes.get(l.nodeId)!.table;
     expect(streetYieldsToAvenue(l, tab)).toBeGreaterThan(0);
-    // Avenue westbound straight vs the stem turning onto the avenue eastbound.
-    const av = car(s, 1, idx(w, 36, ey), idx(w, 6, ey), 3.5, 3.5);
-    const st = car(s, 2, idx(w, 22, ey + 10), idx(w, 36, ey), 2, 1.2);
+    // Right-hand lanes: avenue eastbound straight vs the stem turning left across it.
+    const av = car(s, 1, idx(w, 6, ey), idx(w, 36, ey), 3.5, 3.5);
+    const st = car(s, 2, idx(w, 22, ey + 10), idx(w, 6, ey), 2, 1.2);
     expect(tab.conflict[routeMovesOf(av.pts)!.conn[0] * tab.k + routeMovesOf(st.pts)!.conn[0]]).toBe(1);
     t.vehicles.push(av, st);
     let minStem = Infinity;
@@ -336,9 +336,10 @@ describe("one-way arm", () => {
     expect(l.connectors.some((c) => c.outArm === stem)).toBe(false);
     const t = newTraffic(w.size);
     tickTraffic(s, t, 0);
-    // The stem car turns into the through car's lane: a merge conflict.
-    const through = car(s, 1, idx(w, 6, ey), idx(w, 38, ey), 2.5, 2);
-    const st = car(s, 2, idx(w, 22, ey + 10), idx(w, 38, ey), 2, 1.5);
+    // Right-hand lanes: the stem car turns left across the eastbound lane and
+    // merges into the westbound through car's lane: a merge conflict.
+    const through = car(s, 1, idx(w, 38, ey), idx(w, 6, ey), 2.5, 2);
+    const st = car(s, 2, idx(w, 22, ey + 10), idx(w, 6, ey), 2, 1.5);
     const a = routeMovesOf(through.pts)!.conn[0], b = routeMovesOf(st.pts)!.conn[0];
     expect(l.connectors[b].inArm).toBe(stem);
     expect(tab.conflict[a * tab.k + b]).toBe(1);
