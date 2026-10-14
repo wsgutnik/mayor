@@ -44,6 +44,11 @@
       "minimumSystemVersion": "11.0",
       "hardenedRuntime": true,
       "entitlements": "entitlements.plist"
+    },
+    "iOS": {
+      "developmentTeam": "4AFHZKZYQ6",
+      "minimumSystemVersion": "15.0",
+      "infoPlist": "Info.ios.plist"
     }
   }
 }

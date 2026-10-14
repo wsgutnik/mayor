@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mayor iOS Info.plist overlay, merged by Tauri 2 over its default Info.plist
+  (referenced from tauri.conf.json > bundle > iOS > infoPlist).
+  Landscape-only (matches the PWA manifest orientation), fullscreen on iPad,
+  status bar hidden. See docs/IOS.md.
+-->
+<plist version="1.0">
+<dict>
+	<!-- iPhone: landscape only -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- iPad: landscape only -->
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Fullscreen game: no iPad split-view, hidden status bar -->
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UIStatusBarHidden</key>
+	<true/>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<!-- No custom encryption: skips the App Store Connect export-compliance prompt -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+</dict>
+</plist>

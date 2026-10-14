@@ -9,7 +9,7 @@ Game language: pt-BR by default, with English available. Project root: this repo
 npm install
 npm run dev           # http://localhost:5173
 npx tsc --noEmit      # types; must stay clean
-npx vitest run        # tests (481); must stay green
+npx vitest run        # tests (484); must stay green
 npm run build         # types + bundle
 npm run ci            # local CI: types, tests, and build (always before merging or packaging)
 npm run package       # local CI + desktop app (Tauri); packages are always generated locally

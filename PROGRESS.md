@@ -29,10 +29,11 @@ Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with sc
 | UI-3 Zoning tools | partial | Marquee and Fill (classic and oriented, one undo entry each) |
 | 2x2 services | done | `facilityAnchors` in the world and save (optional field), placement/bulldoze/coverage/utility links from the footprint centre, one model per anchor with `/models/x2/NN.glb` or a 1.8x scaled 1x1 fallback; hospital, city hall, secondary school, thermal plant, water, metro. 2x2 models built and loaded from `models/x2/` for #21, #27, #29, #32, #34, #40 (640-940 triangles each) |
 | v2 buildings batch | done | 35 buildings have `v2` variants with `v2_lod1`/`v2_lod2` (`?visualV2=1`, manifest-gated); runtime LOD switching still open |
-| Corridor model | steps 1-2 of ADR 06 | `src/sim/corridor.ts` (RoadProfile, SegmentCorridor); junction polygons (step 3) in progress |
+| Corridor model | steps 1-2 of ADR 06, junction rendering (part of step 3) | `src/sim/corridor.ts` (RoadProfile, SegmentCorridor); junction asphalt polygon from arm edges, miter-limited acute corners, trimmed arms, kerbs wrapping corners without inner arcs; lots are not yet clipped against junction polygons |
+| Native iPad app | prepared | `tauri.conf.json` iOS section, `Info.ios.plist`, `scripts/ios-prereq-check.sh`, `docs/IOS.md`; needs full Xcode 26.1.1 and an iOS provisioning profile (not available here); rust iOS targets installed |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 481 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 484 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 

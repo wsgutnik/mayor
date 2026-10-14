@@ -14,6 +14,17 @@ Updates: when publishing a new version, increment `VERSION` in `public/sw.js`.
 
 Saving: data stays in Safari storage, which iOS may clear. Use **Menu → Export** to keep a file.
 
+## iPad/iPhone (native iOS, Tauri)
+
+Native iOS packaging is prepared but requires full Xcode, iOS signing assets, and provisioning profiles. See
+[IOS.md](IOS.md). Quick commands after prerequisites are installed:
+
+```bash
+npm run ios:init
+npm run ios:dev
+npm run ios:build
+```
+
 ## Mac
 
 ```bash

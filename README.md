@@ -2,7 +2,7 @@
 
 ![Mayor](public/ui/brand-banner.png)
 
-Mayor is an original city builder inspired by Cities: Skylines. It runs on Mac and Windows through Tauri, and on iPad as a PWA. The game ships in pt-BR by default with an English option.
+Mayor is an original city builder inspired by Cities: Skylines. It runs on Mac and Windows through Tauri, on iPad as a PWA, and has native iPad/iPhone packaging prepared through Tauri 2. The game ships in pt-BR by default with an English option.
 
 Mayor focuses on the playable city-building loop: terrain, roads, zoning, lots, utilities, traffic, transit, water, saves, and local packaging. It is not a feature-parity clone of Cities: Skylines II; it is its own small, inspectable city builder built with TypeScript, Three.js, Vite, and a pure TypeScript simulation.
 
@@ -75,7 +75,8 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 - [docs/GROWTH-PLAN.md](docs/GROWTH-PLAN.md): prioritised growth roadmap (by Muse wonder), horizons, bets and open product decisions.
 - [docs/UI-V2-PLAN.md](docs/UI-V2-PLAN.md): UI audit verified against the code and the UI cycles.
 - [docs/ASSET-ARCHITECTURE-V2.md](docs/ASSET-ARCHITECTURE-V2.md), [docs/VISUAL-UPGRADE-ROADMAP.md](docs/VISUAL-UPGRADE-ROADMAP.md), [docs/BUILDING-QUALITY-REPORT.md](docs/BUILDING-QUALITY-REPORT.md), [docs/VISUAL-ASSET-AUDIT.md](docs/VISUAL-ASSET-AUDIT.md): asset pipeline, audit and roadmap.
-- [docs/INSTALL.md](docs/INSTALL.md): iPad, Mac, and Windows installation notes.
+- [docs/INSTALL.md](docs/INSTALL.md): iPad, Mac, Windows, and native iOS installation notes.
+- [docs/IOS.md](docs/IOS.md): native iPad/iPhone build prerequisites, signing, TestFlight, and troubleshooting.
 - [docs/SIGNING.md](docs/SIGNING.md): Mac signing and notarization.
 - [docs/process/01-research.md](docs/process/01-research.md), [02-gaps.md](docs/process/02-gaps.md), [03-plan.md](docs/process/03-plan.md), [04-grids-crossings-drawing.md](docs/process/04-grids-crossings-drawing.md): research, gaps, and implementation planning.
 - [NOTICE.md](NOTICE.md): licensing, trademarks, and third-party material notices.
@@ -96,7 +97,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 | UI-1 to UI-3 (part) | done | UI scale/opacity, collapsible panels, road-build readout, Undo/Redo, snapping, road upgrade, parallel roads, zoning Marquee and Fill |
 | M22 | pending | Pedestrians, polish, and validation on real Windows and iPad hardware |
 
-Tests: 481 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
+Tests: 484 passing with `npx vitest run`. Mac build is verified; real Windows and iPad hardware are still unverified.
 
 ## License and Trademarks
 
