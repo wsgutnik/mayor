@@ -256,6 +256,8 @@ export class CityRenderer {
   private hover: THREE.Mesh;
   private raycaster = new THREE.Raycaster();
   private seenRevision = -1;
+  /** Roads are structural; zoning/growth must not re-triangulate them. */
+  private seenRoadRevision = -1;
   private dummy = new THREE.Object3D();
   private world: World;
   private winMat!: THREE.MeshLambertMaterial;
@@ -793,7 +795,10 @@ export class CityRenderer {
   private rebuild(): void {
     const w = this.world;
     this.updateTerrain();
-    this.rebuildRoads();
+    if (this.seenRoadRevision !== w.roadRevision) {
+      this.rebuildRoads();
+      this.seenRoadRevision = w.roadRevision;
+    }
     let nz = 0, nl = 0, nk = 0;
     const smoke: SmokeSource[] = [];
     const treeCounts = new Map<THREE.InstancedMesh, number>();
@@ -1303,6 +1308,7 @@ export class CityRenderer {
     this.rig.setBounds(world.size);
     this.focusEntry();
     this.seenRevision = -1;
+    this.seenRoadRevision = -1;
     this.overlaySeen = -1;
     this.overlayLvSeen = -1;
     this.covSeen = -1;

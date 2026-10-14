@@ -349,6 +349,19 @@ describe("junction builder P2", () => {
     }
   });
 
+  it("rebuilds only the dirty node one-ring", () => {
+    const { w, node } = crossWorld();
+    addSegment(w, 1, [{ x: 45.5, z: 45.5 }, { x: 52.5, z: 45.5 }]);
+    const first = junctionsOf(w);
+    const far = w.nodes.find(n => n.x === 45.5 && n.z === 45.5)!;
+    const farLayout = first.byNode.get(far.id)!;
+    addSegment(w, 1, [{ x: far.x, z: far.z }, { x: far.x + 6, z: far.z + 3 }]);
+    const second = junctionsOf(w);
+    // The centre cross has no shared segment with the edit and is reused.
+    expect(second.byNode.get(node)).toBe(first.byNode.get(node));
+    expect(second.byNode.get(far.id)).not.toBe(farLayout);
+  });
+
   it("uses the curve chord when a control point coincides with its node", () => {
     const w = blank(64);
     addSegment(w, 1, [{ x: 10.5, z: 32.5 }, { x: 50.5, z: 32.5 }]);

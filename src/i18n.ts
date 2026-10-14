@@ -124,6 +124,7 @@ const PT: Record<string, string> = {
   "{n} underpass": "{n} passagem inferior", "{n} underpasses": "{n} passagens inferiores",
   "{n} crossing": "{n} cruzamento", "{n} crossings": "{n} cruzamentos",
   "Road is too long": "Estrada longa demais", "A road needs a start and an end": "Uma estrada precisa de início e fim",
+  "Road leaves this junction too close to another road": "A estrada sai deste cruzamento perto demais de outra estrada",
   "Road would crush lots": "A estrada destruiria lotes", "Highway would strand lots": "A autoestrada deixaria lotes sem acesso",
   "Cannot upgrade a roundabout": "Não é possível converter uma rotatória", "Unknown road": "Estrada desconhecida",
   "Bus stops go on a road": "Pontos de ônibus ficam em estradas", "Not on a highway": "Não em autoestradas",

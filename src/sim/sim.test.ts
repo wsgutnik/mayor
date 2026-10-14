@@ -45,6 +45,14 @@ describe("world", () => {
 });
 
 describe("tools", () => {
+  it("refuses an approach leaving a node within five degrees of an arm", () => {
+    const s = newCity(3, 64); s.money = 1e6;
+    const y = s.world.entry.y + 8;
+    expect(placeRoad(s, ROAD.STREET, [{ x: 8.5, z: y + .5 }, { x: 24.5, z: y + .5 }]).ok).toBe(true);
+    const p = planRoad(s, ROAD.STREET, [{ x: 24.5, z: y + .5 }, { x: 0.5, z: y + 1.8 }]);
+    expect(p).toMatchObject({ ok: false, reason: "Road leaves this junction too close to another road" });
+  });
+
   it("charges money and blocks when broke", () => {
     const s = newCity();
     const ey = s.world.entry.y;

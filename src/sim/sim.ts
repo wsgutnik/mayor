@@ -11,7 +11,7 @@ import {
 import { FACILITY_LINK_RADIUS } from "./networks";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
 import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
-import { addSegment, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt } from "./roads";
+import { addSegment, nodeArms, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt, SNAP_RADIUS } from "./roads";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
@@ -77,6 +77,34 @@ export const USAGE = {
 } as const;
 
 export const DAYS_PER_MONTH = 30;
+/** Junction builder's smallest stable mouth separation. */
+const MIN_JUNCTION_GAP = (5 * Math.PI) / 180;
+const MIN_JUNCTION_GAP_REASON = "Road leaves this junction too close to another road";
+
+/** Reject a new endpoint that would create a sub-5 degree mouth.  This is
+ * deliberately in planning, so preview, paired roads and placement agree. */
+function leavesNodeTooClose(w: World, pts: Pt[]): boolean {
+  // Repainting/upgrading an existing alignment is not a new mouth. This also
+  // keeps the one-way direction toggle free as documented.
+  const nearExisting = (p: Pt): boolean => w.segments.some(s =>
+    curvePoints(s.pts, 0.2).some(q => Math.hypot(q.x - p.x, q.z - p.z) < 0.25));
+  if (nearExisting(pts[0]) && nearExisting(pts[pts.length - 1])) return false;
+  for (const atStart of [true, false]) {
+    const tip = pts[atStart ? 0 : pts.length - 1];
+    const next = pts[atStart ? 1 : pts.length - 2];
+    const vx = next.x - tip.x, vz = next.z - tip.z;
+    const len = Math.hypot(vx, vz);
+    if (len < 1e-9) continue;
+    const dx = vx / len, dz = vz / len;
+    const n = w.nodes.find(n => Math.hypot(n.x - tip.x, n.z - tip.z) <= SNAP_RADIUS);
+    if (!n) continue;
+    for (const arm of nodeArms(w, n.id)) {
+      const dot = Math.max(-1, Math.min(1, dx * arm.dx + dz * arm.dz));
+      if (Math.acos(dot) < MIN_JUNCTION_GAP - 1e-9) return true;
+    }
+  }
+  return false;
+}
 export const MONTHS_PER_YEAR = 12;
 /** Longest single road segment, in tiles, so a mis-tap cannot drain the treasury. */
 const MAX_SEGMENT_TILES = 60;
@@ -258,6 +286,7 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: Ro
     ({ ok: false, reason, tiles, newTiles: 0, cost: 0, ...(crossings ? { crossings } : {}) });
   if (pts.length < 2 || pts.length > 3) return bad("A road needs a start and an end");
   if (segmentLength(pts) > MAX_SEGMENT_TILES) return bad("Road is too long");
+  if (leavesNodeTooClose(w, pts)) return bad(MIN_JUNCTION_GAP_REASON);
   const { tiles, outOfBounds } = rasterizeRoad(w, type, pts);
   if (outOfBounds) return bad("Outside the map", tiles);
   const crossings = classifyCrossings(w, type, pts, level);

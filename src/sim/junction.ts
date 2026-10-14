@@ -1387,22 +1387,67 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
 
 // ---------------------------------------------------------------- cache
 
-const junctionCache = new WeakMap<World, { rev: number; map: Map<number, JunctionLayout> }>();
+interface JunctionCache {
+  rev: number;
+  map: Map<number, JunctionLayout>;
+  /** Structural fingerprint per node.  A graph revision does not imply that
+   * every pad changed: splitting a road, for example, only disturbs its two
+   * ends and their immediate neighbours' trim budgets. */
+  sig: Map<number, string>;
+}
+const junctionCache = new WeakMap<World, JunctionCache>();
+
+function nodeSignature(w: World, id: number): string {
+  const n = nodeById(w, id);
+  if (!n) return "gone";
+  return n.segs.slice().sort((a, b) => a - b).map((sid) => {
+    const s = segById(w, sid);
+    if (!s) return `${sid}:gone`;
+    return `${sid}:${s.type}:${s.a}:${s.b}:${s.pts.map(p => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(";")}`;
+  }).join("|");
+}
+
+function oneRing(w: World, ids: Set<number>): Set<number> {
+  const out = new Set(ids);
+  for (const id of ids) {
+    const n = nodeById(w, id);
+    if (!n) continue;
+    for (const sid of n.segs) {
+      const s = segById(w, sid);
+      if (!s) continue;
+      out.add(s.a); out.add(s.b);
+    }
+  }
+  return out;
+}
 
 /**
- * Every node's layout, rebuilt wholesale when `graphRevision` moves
- * (incremental 1-ring rebuild is P7).
+ * Layouts are retained per node. On a graph mutation only changed nodes and
+ * their one-ring neighbours are rebuilt, because only those nodes share a
+ * segment trim budget. The signature scan is deliberately cheap and avoids
+ * triangulation/ring allocation on unrelated nodes.
  */
 export function junctionsOf(w: World): { graphRevision: number; byNode: Map<number, JunctionLayout> } {
   const rev = w.graphRevision ?? 0;
   const hit = junctionCache.get(w);
   if (hit && hit.rev === rev) return { graphRevision: hit.rev, byNode: hit.map };
-  const map = new Map<number, JunctionLayout>();
-  const nomsCache = new Map<number, NodeNoms>();
-  for (const n of [...w.nodes].sort((a, b) => a.id - b.id)) {
-    const l = buildJunction(w, n.id, nomsCache);
-    if (l) map.set(n.id, l);
+  const sig = new Map<number, string>();
+  const changed = new Set<number>();
+  for (const n of w.nodes) {
+    const next = nodeSignature(w, n.id);
+    sig.set(n.id, next);
+    if (!hit || hit.sig.get(n.id) !== next) changed.add(n.id);
   }
-  junctionCache.set(w, { rev, map });
+  if (hit) for (const id of hit.sig.keys()) if (!sig.has(id)) changed.add(id);
+  const dirty = oneRing(w, changed);
+  const map = hit ? new Map(hit.map) : new Map<number, JunctionLayout>();
+  for (const id of changed) if (!sig.has(id)) map.delete(id);
+  const nomsCache = new Map<number, NodeNoms>();
+  for (const id of [...dirty].sort((a, b) => a - b)) {
+    if (!sig.has(id)) continue;
+    const l = buildJunction(w, id, nomsCache);
+    if (l) map.set(id, l);
+  }
+  junctionCache.set(w, { rev, map, sig });
   return { graphRevision: rev, byNode: map };
 }
