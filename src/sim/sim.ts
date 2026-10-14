@@ -11,7 +11,7 @@ import {
 import { FACILITY_LINK_RADIUS } from "./networks";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
 import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
-import { addSegment, nearestOnSegment, nodeArms, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt, SNAP_RADIUS } from "./roads";
+import { addSegment, nearestOnSegment, nodeArms, nodeById, placementIssue, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt, SNAP_RADIUS, type PlacementIssue } from "./roads";
 import { profileOf } from "./corridor";
 import { cornerRadiusFor } from "./junction";
 import {
@@ -87,6 +87,13 @@ const MIN_JUNCTION_GAP = (5 * Math.PI) / 180;
 const MIN_JUNCTION_GAP_REASON = "Road leaves this junction too close to another road";
 
 export const TOO_CLOSE_TO_JUNCTION_REASON = "Too close to a junction";
+/** Overlap rules (docs/process/17-road-snapping.md): refused, never bent. Hints are appended by trReason. */
+export const OVERLAP_REASON = "Overlaps another road";
+export const CROSSING_ANGLE_REASON = "Crossing angle too sharp";
+export const DUPLICATE_ROAD_REASON = "Road already exists here";
+const PLACEMENT_REASON: Record<PlacementIssue, string> = {
+  overlap: OVERLAP_REASON, angle: CROSSING_ANGLE_REASON, duplicate: DUPLICATE_ROAD_REASON,
+};
 
 /**
  * Smallest distance (tiles, along the road) between an existing junction and a
@@ -419,6 +426,12 @@ function planWithSpan(
       pieces.push({ pts: part, elevation, tiles: rasterizeRoad(w, type, part).tiles });
     }
     if (!pieces.length) pieces = [{ pts, elevation: "ground", tiles }];
+  }
+  // Same-layer roads only meet at junctions (bridges and tunnels pass over/under without nodes). Each piece is
+  // checked against its own layer; the joints between a deck and its ramps are not road ends.
+  for (let i = 0; i < pieces.length; i++) {
+    const issue = placementIssue(w, type, pieces[i].pts, pieces[i].elevation, [i === 0, i === pieces.length - 1]);
+    if (issue) return bad(PLACEMENT_REASON[issue], tiles, crossings);
   }
   // A tile shared by two pieces (shore joints) is priced once, at the higher rate,
   // and counts as ground when any piece there is at grade.

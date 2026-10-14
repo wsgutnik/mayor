@@ -62,9 +62,48 @@ gap 2 → 6.12 tiles.
 out than street cells; painting at any road angle picks cells on the painted side only; painting with no road frame
 within reach is refused ("Zones must be within 4 tiles of a road").
 
+## Overlap rules (v3, owner report "esta truncando ainda um pelo outro")
+
+Owner screenshot (iPad, rainy night): a long road with two sets of lane dashes side by side (a second road lying
+slightly rotated over the first), lot kerbs and zone cells across the asphalt. Cause on main: `planRoad` validated
+ends, spacing and terrain but never the new centreline against same-layer roads, and `addSegment` only made nodes at
+transverse crossings, so a stroke drawn along, over or 0.3 tile beside an existing road was accepted as a second,
+unconnected segment. `addSegment` also skipped crossings within 0.6 of an existing node, so a road drawn straight
+through a T or cross passed it without connecting.
+
+Rules (`placementIssue` in `src/sim/roads.ts`, applied by `planRoad` to each piece against its own layer, so the
+preview, tap, keyboard, parallel pair and `placeRoad` agree; never applied by `addSegment` or the load path, so old
+saves load unchanged). First hit wins; every refusal names what to do instead (`trReason` appends the hint):
+
+| # | Rule | Reason (en / pt-BR) |
+|---|---|---|
+| 1 | Both ends within `DUPLICATE_END_TOL` = 0.3 tile of one same-layer segment's ends (either direction). Exceptions: redrawing a one-way road over itself (documented direction flip) and paving one whole segment's path with a wider class (widened in place, never doubled). | "Road already exists here" / "Já existe uma via aqui" + "use Upgrade road to change its class" |
+| 2 | An interior crossing (or a pass through an existing node) meets a same-layer road at 2-20 degrees (`MIN_CROSSING_ANGLE_DEG` = 20). | "Crossing angle too sharp" / "Ângulo de cruzamento fechado demais" + "cross at 20° or more, or end on the road to make a junction" |
+| 3 | The new centreline lies inside `D = footprintHalf(new) + footprintHalf(other)` (asphalt + kerb + sidewalk, from `profileOf`; street + street = 1.14 tiles) of a same-layer road for more than `OVERLAP_MAX_RUN` = 0.6 tile, outside the junction disc `D / sin(angle) + 0.1` of every meeting with that road. A meeting flatter than 2 degrees has no disc: that road is being run along, not joined. Samples whose nearest point is the other road's tip (end on) are rule 5/6 territory. | "Overlaps another road" / "Sobrepõe outra via" + "use Upgrade road to change its class, or draw it parallel, clear of the sidewalk" |
+| 4 | A T foot on a segment side, or an arm leaving an existing node, meets a same-layer road under 20 degrees (the 5 degree "Road leaves this junction too close to another road" check still runs first). | "Crossing angle too sharp" |
+| 5 | A free end (no node or segment within the 0.6 merge radius) stops with its asphalt + kerb inside the **side** of another road's asphalt + kerb. | "Overlaps another road" |
+| 6 | Mirror of 5: an existing dead end stops inside the side of the new road's asphalt + kerb without the new road meeting that node. | "Overlaps another road" |
+
+Graph fix (`addSegment`): a crossing within 0.6 of an existing node that is not one of the new road's own end nodes
+now cuts the new road at that node (the T becomes a cross, the cross a 5-arm node); before, the road passed through
+disconnected. On the legacy load path (saves without node ids) this heals such crossings too.
+
+Unchanged: bridges, tunnels and other layers keep crossing without nodes (rule checks use `segElevation`); the
+ground ramps of an elevated stroke are checked as ground pieces, the joints between deck and ramps are not ends.
+Zones: on main a placed road already invalidated the oriented cells under it (`applyValidity` keeps
+`drawHalf + sidewalk + 0.075` from every other ground road) and the lot planner drops lots on invalid cells (built
+ones included; there is no refund rule in the sim); tile mode zeroes zone and level under the road raster. The new
+tests assert it (no zoned cell invalid or on asphalt + kerb, no lot rectangle on it, before and after 30 steps).
+
+Cost: `placementIssue` with bounding-box pruning and exact straight segments is 0.1-1.3 ms per call on a 393-segment
+grid (the rest of `planRoad` is 4-13 ms there).
+
 ## Invariants (tests)
 
 - Every stroke end within kerb + radius attaches (or is refused with a reason): 0 dangling ends, at all three zooms.
+- Overlap (`src/sim/road-overlap.test.ts`): no pair of same-layer ground segments has footprints overlapping for
+  any length outside a shared node's junction disc; plan and place agree on every case; legacy overlapping saves
+  round-trip unchanged.
 - Attached ends lie on the centreline (< 1e-3 tile), 0 segments shorter than 1 tile, 0 node pairs within 0.05.
 - No new T closer than `teeSpacing` to an existing junction.
 - Approach angle change from snapping < 12 deg (only the end's slide onto the road); free strokes unchanged.
@@ -73,6 +112,13 @@ within reach is refused ("Zones must be within 4 tiles of a road").
 - Resolver cost: 0.27 ms per pointer event on a 313-segment grid.
 
 ## Known gaps
+
+- Overlap rules: two dead ends facing each other tip to tip closer than their footprints (the tile-paint idiom: a road
+  drawn from tile 3 next to the 3-tile entry stops 1.0 from the entry's cap) are tolerated, not refused or joined;
+  60+ existing fixtures and tile-adjacent painting rely on it, and the tile raster joins them for traffic. Their caps
+  overlap by up to 0.24 tile (street + street) or 0.35 (street + avenue).
+- A free end may still stop on another road's sidewalk band (between asphalt + kerb and the footprint) by up to
+  0.24 tile; only asphalt + kerb intrusion is refused (rule 5).
 
 - Touch has no hover: the iPad sees the snap puck only after the first tap (one-finger drag pans with the road tool).
   A press-drag-release draft on touch would show it before committing; not done here.

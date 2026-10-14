@@ -130,6 +130,12 @@ const PT: Record<string, string> = {
   "Road is too long": "Estrada longa demais", "A road needs a start and an end": "Uma estrada precisa de início e fim",
   "Road leaves this junction too close to another road": "A estrada sai deste cruzamento perto demais de outra estrada",
   "Too close to a junction": "Perto demais de um cruzamento",
+  "Overlaps another road": "Sobrepõe outra via",
+  "Crossing angle too sharp": "Ângulo de cruzamento fechado demais",
+  "Road already exists here": "Já existe uma via aqui",
+  "use Upgrade road to change its class, or draw it parallel, clear of the sidewalk": "use Melhorar via para mudar a classe, ou desenhe em paralelo, fora da calçada",
+  "cross at 20° or more, or end on the road to make a junction": "cruze a 20° ou mais, ou termine sobre a via para fazer um cruzamento",
+  "use Upgrade road to change its class": "use Melhorar via para mudar a classe",
   "Joins junction": "Liga ao cruzamento",
   "Joins road": "Liga à via",
   "{n} lots per side": "{n} lotes por lado",
@@ -221,7 +227,16 @@ export function tr(key: string, vars?: Record<string, string | number>): string 
 }
 
 /** Translate a message coming from the simulation, including its few parametrised ones. */
+/** Placement refusals carry what to do instead (docs/process/17-road-snapping.md, "Overlap rules"). */
+const REASON_HINT: Record<string, string> = {
+  "Overlaps another road": "use Upgrade road to change its class, or draw it parallel, clear of the sidewalk",
+  "Crossing angle too sharp": "cross at 20° or more, or end on the road to make a junction",
+  "Road already exists here": "use Upgrade road to change its class",
+};
+
 export function trReason(reason: string): string {
+  const hint = REASON_HINT[reason];
+  if (hint) return `${tr(reason)}: ${tr(hint)}`;
   if (lang === "en") return reason;
   const m = /^(.+) must be within 3 tiles of water$/.exec(reason);
   if (m) return `${tr(m[1])} precisa estar a até 3 trechos da água`;

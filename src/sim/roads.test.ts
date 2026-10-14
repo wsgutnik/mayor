@@ -222,7 +222,8 @@ describe("road graph", () => {
     s.money = 1e7;
     road(s, 2, [[4.5, ey + 6.5], [30.5, ey + 6.5]]);
     road(s, 1, [[12.5, ey - 2], [12.5, ey + 6.5]]);
-    road(s, 1, [[20.5, ey + 6.5], [28.5, ey + 6.5]]);
+    // (Was a street drawn along the avenue's own centreline, which doubled the road; overlaps are refused now.)
+    road(s, 1, [[20.5, ey + 6.5], [24.5, ey + 13.5]]);
     const json = serialize(s);
     const b = deserialize(json);
     expect(b.world.segments).toEqual(s.world.segments);

@@ -28,6 +28,16 @@ describe("i18n", () => {
     expect(trReason("Not enough money")).toBe("Not enough money");
   });
 
+  it("explains road overlap refusals with what to do instead, in both languages", () => {
+    setLang("pt");
+    expect(trReason("Overlaps another road")).toBe("Sobrepõe outra via: use Melhorar via para mudar a classe, ou desenhe em paralelo, fora da calçada");
+    expect(trReason("Crossing angle too sharp")).toContain("Ângulo de cruzamento fechado demais: cruze a 20°");
+    expect(trReason("Road already exists here")).toBe("Já existe uma via aqui: use Melhorar via para mudar a classe");
+    setLang("en");
+    expect(trReason("Overlaps another road")).toBe("Overlaps another road: use Upgrade road to change its class, or draw it parallel, clear of the sidewalk");
+    expect(trReason("Crossing angle too sharp")).toBe("Crossing angle too sharp: cross at 20° or more, or end on the road to make a junction");
+  });
+
   it("translates the interface-scale settings", () => {
     setLang("pt");
     expect(tr("Interface scale")).toBe("Escala da interface");

@@ -278,7 +278,8 @@ describe("road network geometry", () => {
       road(s, 1, [[4.5, ey + 0.5], [20.5, ey + 0.5]]);
       road(s, 1, [[12.5, ey - 5], [12.5, ey + 5]]);
       road(s, 5, [[24.5, ey - 4], [24.5, ey + 0.5]]);
-      road(s, 2, [[18.5, ey + 0.5], [30.5, ey + 0.5]]);
+      // The avenue continues the street from its end (it used to start 2 tiles back, lying over the street).
+      road(s, 2, [[20.5, ey + 0.5], [30.5, ey + 0.5]]);
       scenarios.push(s);
       dumpSvg("cross-and-oneway-t", s);
     }

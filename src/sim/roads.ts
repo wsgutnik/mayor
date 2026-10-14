@@ -447,8 +447,18 @@ export function addSegment(w: World, type: RoadType, pts: Pt[], opts?: AddSegmen
   for (const seg of [...w.segments]) {
     if (segElevation(seg) !== newElev) continue;
     for (const c of crossingsWith(poly, seg)) {
-      if (nearestNode(w, c.x, c.z, SNAP_RADIUS)) continue;
       if (cutAt.some((k) => dist(k.x, k.z, c.x, c.z) < SNAP_RADIUS)) continue;
+      const at = nearestNode(w, c.x, c.z, SNAP_RADIUS);
+      if (at) {
+        // Contacts at the new road's own ends already carry nodes. A crossing through any other existing node
+        // (a T or cross the new road passes straight through) cuts the new road there: roads of one layer only
+        // ever intersect at a node, never pass through a junction disconnected.
+        const head = poly[0], tail = poly[poly.length - 1];
+        if (at.id === endA?.id || at.id === endB?.id) continue;
+        if (dist(c.x, c.z, head.x, head.z) < SNAP_RADIUS || dist(c.x, c.z, tail.x, tail.z) < SNAP_RADIUS) continue;
+        if (!cutAt.some((k) => dist(k.x, k.z, at.x, at.z) < SNAP_RADIUS)) cutAt.push({ x: at.x, z: at.z });
+        continue;
+      }
       const proj = projectOnSegment(seg, c);
       const node = splitSegment(w, seg, proj.x, proj.z);
       cutAt.push({ x: node.x, z: node.z });
@@ -543,6 +553,291 @@ export function removeSegment(w: World, segId: number): boolean {
     else tryMergeNode(w, nodeId);
   }
   return true;
+}
+
+// ---------------------------------------------------------------- overlap rules (new placement only)
+
+/**
+ * Smallest angle (degrees) at which a new road may meet a road of the same layer: interior crossings, T feet on a
+ * segment side and arms leaving an existing node (docs/process/17-road-snapping.md, "Overlap rules"). Below it the
+ * two footprints run together for D / sin(angle) tiles, longer than any junction can close.
+ */
+export const MIN_CROSSING_ANGLE_DEG = 20;
+/** Longest run (tiles) a new road may lie inside another road's footprint outside a junction. */
+export const OVERLAP_MAX_RUN = 0.6;
+/** Both ends this close (tiles) to an existing segment's ends, same layer: a duplicate. */
+export const DUPLICATE_END_TOL = 0.3;
+
+/** Half the physical footprint of a road: asphalt + kerb + sidewalk (the profile's sidewalk edge). */
+export function footprintHalf(type: RoadType): number {
+  const p = profileOf(type);
+  return p.drawHalf + p.sidewalk;
+}
+
+export type PlacementIssue = "duplicate" | "overlap" | "angle";
+
+const SIN_MIN = Math.sin((MIN_CROSSING_ANGLE_DEG * Math.PI) / 180);
+/** A meeting flatter than this runs along the road it meets: judged as an overlap, not as a sharp junction. */
+const ALONG_DEG = 2;
+const DEG = 180 / Math.PI;
+
+/** Closest point of a sampled polyline to p: distance and unit tangent there. */
+function nearestOnPolyline(q: Pt[], p: Pt): { d: number; tx: number; tz: number; x: number; z: number } {
+  let bd = Infinity, tx = 1, tz = 0, bx = q[0].x, bz = q[0].z;
+  for (let i = 0; i + 1 < q.length; i++) {
+    const ax = q[i].x, az = q[i].z, vx = q[i + 1].x - ax, vz = q[i + 1].z - az;
+    const l2 = vx * vx + vz * vz;
+    if (l2 < 1e-12) continue;
+    const u = Math.max(0, Math.min(1, ((p.x - ax) * vx + (p.z - az) * vz) / l2));
+    const cx = ax + vx * u, cz = az + vz * u;
+    const d = dist(p.x, p.z, cx, cz);
+    if (d < bd) { bd = d; const l = Math.sqrt(l2); tx = vx / l; tz = vz / l; bx = cx; bz = cz; }
+  }
+  return { d: bd, tx, tz, x: bx, z: bz };
+}
+
+/** Angle between two unit directions, folded to [0, 90] degrees (a road extends both ways). */
+function lineAngle(ax: number, az: number, bx: number, bz: number): number {
+  const c = Math.abs(Math.max(-1, Math.min(1, ax * bx + az * bz)));
+  return Math.acos(c) * DEG;
+}
+
+/** A real crossing that is too sharp (flatter than ALONG_DEG is running along the road: the overlap test's call). */
+const sharpCrossing = (ang: number): boolean => ang >= ALONG_DEG && ang < MIN_CROSSING_ANGLE_DEG - 1e-6;
+
+/** Unit direction from a road end into the road (control point aware). */
+function endDir(pts: Pt[], atStart: boolean): { dx: number; dz: number } {
+  const tip = atStart ? pts[0] : pts[pts.length - 1];
+  const rest = atStart ? pts.slice(1) : pts.slice(0, -1).reverse();
+  const inner = rest.find((p) => dist(p.x, p.z, tip.x, tip.z) > 1e-6) ?? tip;
+  const l = dist(inner.x, inner.z, tip.x, tip.z) || 1;
+  return { dx: (inner.x - tip.x) / l, dz: (inner.z - tip.z) / l };
+}
+
+/**
+ * Would a new road along `pts` on layer `elevation` overlap the existing network? Pure: reads the graph, changes
+ * nothing. Rules (in order, first hit wins):
+ *  1. duplicate: both ends within DUPLICATE_END_TOL of one same-layer segment's ends (redrawing a one-way road over
+ *     itself is the documented direction flip, and paving one whole segment's path with a wider class widens it in
+ *     place; both pass);
+ *  2. angle: an interior crossing meets a same-layer road between ALONG_DEG and MIN_CROSSING_ANGLE_DEG;
+ *  3. overlap: the new centreline lies inside the summed footprints (asphalt + kerb + sidewalk) of a same-layer road
+ *     for more than OVERLAP_MAX_RUN tiles outside the junction disc (D / sin angle) of every meeting with it (a
+ *     meeting flatter than ALONG_DEG has no disc: that road is being run along, not joined);
+ *  4. angle: a T foot or an arm leaving an existing node meets a same-layer road under MIN_CROSSING_ANGLE_DEG;
+ *  5. overlap: a free (unattached) end stops with its asphalt + kerb inside the side of another road's asphalt + kerb;
+ *  6. overlap: an existing dead end stops inside the side of the new road (its cap would sit on the new asphalt).
+ * Tip to tip (two dead ends facing each other, the tile-paint idiom) is tolerated by 3, 5 and 6.
+ * `ends` marks which ends are real road ends (false for the joints between a bridge and its ground ramps).
+ * Applied by planRoad only; addSegment and the load path (old saves) never call it.
+ */
+export function placementIssue(
+  w: World, type: RoadType, pts: Pt[], elevation: Elevation = "ground", ends: [boolean, boolean] = [true, true],
+): PlacementIssue | null {
+  if (pts.length < 2 || roughLength(pts) < 0.05) return null; // paint pads join through addPad
+  const same = w.segments.filter((s) => segElevation(s) === elevation && roughLength(s.pts) >= 1e-6);
+  if (!same.length) return null;
+  const p0 = pts[0], p1 = pts[pts.length - 1];
+
+  // 1. Duplicates.
+  for (const s of same) {
+    const a = s.pts[0], b = s.pts[s.pts.length - 1];
+    const fwd = dist(p0.x, p0.z, a.x, a.z) <= DUPLICATE_END_TOL && dist(p1.x, p1.z, b.x, b.z) <= DUPLICATE_END_TOL;
+    const rev = dist(p0.x, p0.z, b.x, b.z) <= DUPLICATE_END_TOL && dist(p1.x, p1.z, a.x, a.z) <= DUPLICATE_END_TOL;
+    if (!fwd && !rev) continue;
+    if (isOneWayType(type) && s.oneWay && s.type === type && coincides(s.pts, pts)) return null; // direction flip
+    // Paving the same path with a wider class widens that one segment in place (addSegment), never doubles it.
+    if (ROAD_DRAW_WIDTH[type] > ROAD_DRAW_WIDTH[s.type] && coincides(s.pts, pts)) return null;
+    return "duplicate";
+  }
+
+  const poly = curvePoints(pts, 0.1);
+  // Only roads whose control hull comes within reach can interact (keeps the pointer-rate preview cheap).
+  const reach = footprintHalf(type) + footprintHalf(3) + SNAP_RADIUS;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
+  const inReach = (q: Pt[]): boolean => {
+    let ax = Infinity, bx = -Infinity, az = Infinity, bz = -Infinity;
+    for (const p of q) { ax = Math.min(ax, p.x); bx = Math.max(bx, p.x); az = Math.min(az, p.z); bz = Math.max(bz, p.z); }
+    return bx >= minX - reach && ax <= maxX + reach && bz >= minZ - reach && az <= maxZ + reach;
+  };
+  const local = same.filter((s) => inReach(s.pts));
+  const sampled = new Map<number, Pt[]>();
+  // Straight segments are exact as their two ends; curves are sampled every 0.1 tile.
+  const samplesOf = (s: RoadSegment): Pt[] => {
+    let q = sampled.get(s.id);
+    if (!q) { q = s.pts.length === 2 ? [s.pts[0], s.pts[1]] : curvePoints(s.pts, 0.1); sampled.set(s.id, q); }
+    return q;
+  };
+  const boxOf = (s: RoadSegment, pad: number) => {
+    let ax = Infinity, bx = -Infinity, az = Infinity, bz = -Infinity;
+    for (const p of s.pts) { ax = Math.min(ax, p.x); bx = Math.max(bx, p.x); az = Math.min(az, p.z); bz = Math.max(bz, p.z); }
+    return { ax: ax - pad, bx: bx + pad, az: az - pad, bz: bz + pad };
+  };
+  /** Points where the new road legitimately meets the network, with its direction there. */
+  const meetings: { x: number; z: number; dx: number; dz: number; node?: number; segs: number[] }[] = [];
+  /** A T foot or node arm under MIN_CROSSING_ANGLE_DEG (reported after the overlap test picks the better reason). */
+  let sharp = false;
+  const free: Pt[] = [];
+
+  // Ends: node join, T foot on a segment side, or free.
+  for (const atStart of [true, false]) {
+    if (!ends[atStart ? 0 : 1]) continue;
+    const p = atStart ? p0 : p1;
+    const { dx, dz } = endDir(pts, atStart);
+    let node = nearestNode(w, p.x, p.z, SNAP_RADIUS);
+    let foot: { seg: RoadSegment; x: number; z: number; d: number } | null = null;
+    if (!node) {
+      // Mirrors snapEnd: the nearest segment (any layer) within the merge radius takes the end.
+      for (const s of w.segments) {
+        if (roughLength(s.pts) < 1e-6) continue;
+        const box = boxOf(s, SNAP_RADIUS);
+        if (p.x < box.ax || p.x > box.bx || p.z < box.az || p.z > box.bz) continue;
+        const pr = projectOnSegment(s, p);
+        if (pr.d <= SNAP_RADIUS && (!foot || pr.d < foot.d)) foot = { seg: s, x: pr.x, z: pr.z, d: pr.d };
+      }
+      if (foot) {
+        // splitSegment reuses an end node when the foot lands within the merge radius of it.
+        for (const id of [foot.seg.a, foot.seg.b]) {
+          const n = nodeById(w, id);
+          if (n && dist(n.x, n.z, foot.x, foot.z) <= SNAP_RADIUS && (!node || dist(n.x, n.z, foot.x, foot.z) < dist(node.x, node.z, foot.x, foot.z))) node = n;
+        }
+        if (node) foot = null;
+      }
+    }
+    if (node) {
+      const segs: number[] = [];
+      for (const arm of nodeArms(w, node.id)) {
+        const seg = segById(w, arm.segId);
+        if (!seg || segElevation(seg) !== elevation) continue;
+        segs.push(seg.id);
+        const ang = Math.acos(Math.max(-1, Math.min(1, dx * arm.dx + dz * arm.dz))) * DEG;
+        if (ang < MIN_CROSSING_ANGLE_DEG - 1e-6) sharp = true;
+      }
+      meetings.push({ x: node.x, z: node.z, dx, dz, node: node.id, segs });
+    } else if (foot) {
+      if (segElevation(foot.seg) !== elevation) continue; // other layers: classifyCrossings decides
+      const t = nearestOnPolyline(samplesOf(foot.seg), foot);
+      if (lineAngle(dx, dz, t.tx, t.tz) < MIN_CROSSING_ANGLE_DEG - 1e-6) sharp = true;
+      meetings.push({ x: foot.x, z: foot.z, dx, dz, segs: [foot.seg.id] });
+    } else {
+      free.push(p);
+    }
+  }
+
+  // Interior crossings (same layer). Contacts within the merge radius of a drawn end are the end's business.
+  const hits: { x: number; z: number }[] = [];
+  for (const s of local) {
+    const q = samplesOf(s);
+    const box = boxOf(s, 0.2);
+    for (let i = 0; i + 1 < poly.length; i++) {
+      const ax = poly[i].x, az = poly[i].z, vx = poly[i + 1].x - ax, vz = poly[i + 1].z - az;
+      if (Math.max(ax, ax + vx) < box.ax || Math.min(ax, ax + vx) > box.bx || Math.max(az, az + vz) < box.az || Math.min(az, az + vz) > box.bz) continue;
+      const l2 = vx * vx + vz * vz;
+      if (l2 < 1e-12) continue;
+      for (let j = 0; j + 1 < q.length; j++) {
+        const cx = q[j].x, cz = q[j].z, ex = q[j + 1].x - cx, ez = q[j + 1].z - cz;
+        const denom = vx * ez - vz * ex;
+        if (Math.abs(denom) < 1e-9) continue;
+        const t = ((cx - ax) * ez - (cz - az) * ex) / denom;
+        const u = ((cx - ax) * vz - (cz - az) * vx) / denom;
+        if (t < -1e-3 || t > 1 + 1e-3 || u < -1e-3 || u > 1 + 1e-3) continue;
+        const x = ax + vx * t, z = az + vz * t;
+        if (dist(x, z, p0.x, p0.z) < SNAP_RADIUS) continue;
+        if (dist(x, z, p1.x, p1.z) < SNAP_RADIUS) continue;
+        if (hits.some((h) => dist(h.x, h.z, x, z) < SNAP_RADIUS)) continue;
+        const l = Math.sqrt(l2), nx = vx / l, nz = vz / l;
+        const el = Math.hypot(ex, ez) || 1;
+        const node = nearestNode(w, x, z, SNAP_RADIUS);
+        // Through an existing node: every same-layer arm there is crossed.
+        const at = node ?? { x, z };
+        const segs = [s.id];
+        if (node) {
+          for (const arm of nodeArms(w, node.id)) {
+            const seg = segById(w, arm.segId);
+            if (!seg || segElevation(seg) !== elevation) continue;
+            segs.push(seg.id);
+            if (sharpCrossing(lineAngle(nx, nz, arm.dx, arm.dz))) return "angle";
+          }
+        } else if (sharpCrossing(lineAngle(nx, nz, ex / el, ez / el))) return "angle";
+        hits.push({ x: at.x, z: at.z });
+        meetings.push({ x: at.x, z: at.z, dx: nx, dz: nz, ...(node ? { node: node.id } : {}), segs });
+      }
+    }
+  }
+
+  // Footprint overlap outside the junction discs of valid meetings.
+  const hNew = footprintHalf(type);
+  for (const s of local) {
+    const q = samplesOf(s);
+    const D = hNew + footprintHalf(s.type);
+    const discs: { x: number; z: number; r2: number }[] = [];
+    for (const m of meetings) {
+      const near = nearestOnPolyline(q, m);
+      if (near.d > D) continue;
+      // An arm of the meeting node: the true (unfolded) angle, so a straight continuation (180 deg) is a junction.
+      const armEnd = m.node === s.a ? "a" : m.node === s.b ? "b" : null;
+      let ang = lineAngle(m.dx, m.dz, near.tx, near.tz);
+      if (armEnd) {
+        const t = endTangent(s, armEnd);
+        ang = Math.acos(Math.max(-1, Math.min(1, m.dx * t.dx + m.dz * t.dz))) * DEG;
+      }
+      let r: number;
+      if (ang >= MIN_CROSSING_ANGLE_DEG - 1e-6) r = D / Math.max(SIN_MIN, Math.sin(ang / DEG)) + 0.1;
+      // A sharp junction with this very road is refused as "angle" below; its disc only keeps the overlap test
+      // from claiming it. Flatter than ALONG_DEG, or a road it does not meet, is an overlap.
+      else if (ang >= ALONG_DEG && m.segs.includes(s.id)) r = D / Math.sin(ang / DEG) + 0.1;
+      else continue;
+      discs.push({ x: m.x, z: m.z, r2: r * r });
+    }
+    let run = 0;
+    const box = boxOf(s, D);
+    for (let i = 0; i + 1 < poly.length; i++) {
+      const mx = (poly[i].x + poly[i + 1].x) / 2, mz = (poly[i].z + poly[i + 1].z) / 2;
+      if (mx < box.ax || mx > box.bx || mz < box.az || mz > box.bz) continue;
+      if (discs.some((c) => (c.x - mx) ** 2 + (c.z - mz) ** 2 < c.r2)) continue;
+      const near = nearestOnPolyline(q, { x: mx, z: mz });
+      // Beyond the other road's tip (end on, cap to cap) is not a run along it; rules 5/6 judge caps.
+      const atTip = dist(near.x, near.z, q[0].x, q[0].z) < 1e-6 || dist(near.x, near.z, q[q.length - 1].x, q[q.length - 1].z) < 1e-6;
+      if (!atTip && near.d < D - 1e-3) {
+        run += dist(poly[i].x, poly[i].z, poly[i + 1].x, poly[i + 1].z);
+        if (run > OVERLAP_MAX_RUN) return "overlap";
+      }
+    }
+  }
+
+  if (sharp) return "angle";
+  // A free end may not stop with its asphalt + kerb inside the side of another road (its cap would sit on that
+  // road's carriageway or sidewalk). Tip to tip is tolerated: tile-adjacent painting (a road drawn from tile 3 next
+  // to the 3-tile entry) leaves two dead ends 1.0 apart that the tile raster joins; see the doc's known gaps.
+  const drawNew = profileOf(type).drawHalf;
+  for (const p of free) {
+    for (const s of local) {
+      const q = samplesOf(s);
+      const near = nearestOnPolyline(q, p);
+      if (near.d >= drawNew + profileOf(s.type).drawHalf - 1e-3) continue;
+      const head = q[0], tail = q[q.length - 1];
+      const atTip = dist(near.x, near.z, head.x, head.z) < 1e-6 || dist(near.x, near.z, tail.x, tail.z) < 1e-6;
+      if (!atTip) return "overlap";
+    }
+  }
+  // 6. Mirror of 5: an existing dead end may not stop inside the side of the new road (unless the new road meets
+  // that node, which makes it a junction).
+  const metNodes = new Set(meetings.map((m) => m.node).filter((id): id is number => id !== undefined));
+  for (const n of w.nodes) {
+    if (metNodes.has(n.id)) continue;
+    if (n.x < minX - reach || n.x > maxX + reach || n.z < minZ - reach || n.z > maxZ + reach) continue;
+    const arms = nodeArms(w, n.id);
+    if (arms.length !== 1) continue;
+    const seg = segById(w, arms[0].segId);
+    if (!seg || segElevation(seg) !== elevation) continue;
+    const near = nearestOnPolyline(poly, n);
+    if (near.d >= drawNew + profileOf(seg.type).drawHalf - 1e-3) continue;
+    const head = poly[0], tail = poly[poly.length - 1];
+    const atTip = dist(near.x, near.z, head.x, head.z) < 1e-6 || dist(near.x, near.z, tail.x, tail.z) < 1e-6;
+    if (!atTip) return "overlap";
+  }
+  return null;
 }
 
 /** Do two centrelines between the same nodes follow the same path? */
