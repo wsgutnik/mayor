@@ -57,8 +57,8 @@ const BEAM_CAP = 520;
 function beamMaterial(color: THREE.ColorRepresentation): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: 0 } },
-    vertexShader: `attribute float aStrength; varying float vStrength; void main(){vStrength=aStrength;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);}`,
-    fragmentShader: `uniform vec3 uColor; varying float vStrength; void main(){vec2 q=uv*2.0-1.0; float a=pow(max(0.0,1.0-length(q)),2.0)*vStrength; if(a<0.002) discard; gl_FragColor=vec4(uColor*a,a);}`,
+    vertexShader: `attribute float aStrength; varying float vStrength; varying vec2 vUv; void main(){vStrength=aStrength;vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0);}`,
+    fragmentShader: `uniform vec3 uColor; varying float vStrength; varying vec2 vUv; void main(){vec2 q=vUv*2.0-1.0; float a=pow(max(0.0,1.0-length(q)),2.0)*vStrength; if(a<0.002) discard; gl_FragColor=vec4(uColor*a,a);}`,
     transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, toneMapped: false,
   });
 }

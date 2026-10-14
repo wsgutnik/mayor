@@ -9,7 +9,8 @@ export class StreetLightFx {
   private readonly pm: THREE.ShaderMaterial; private readonly hm: THREE.ShaderMaterial; private n = 0;
   constructor() { const p = new THREE.PlaneGeometry(2.2, 2.2); p.rotateX(-Math.PI / 2); this.pm = mat(); this.pools = new THREE.InstancedMesh(p, this.pm, CAP); const h = new THREE.PlaneGeometry(.38, .38); this.hm = mat(); this.halos = new THREE.InstancedMesh(h, this.hm, CAP); for (const m of [this.pools, this.halos]) { m.count = 0; m.frustumCulled = false; m.renderOrder = 6; } }
   begin(): void { this.n = 0; }
-  add(x: number, y: number, z: number): void { if (this.n >= CAP) return; this.pools.setMatrixAt(this.n, new THREE.Matrix4().makeTranslation(x, y + .006, z)); this.halos.setMatrixAt(this.n, new THREE.Matrix4().makeTranslation(x, y + 1.55, z)); this.n++; }
+  private readonly scratch = new THREE.Matrix4();
+  add(x: number, y: number, z: number): void { if (this.n >= CAP) return; this.pools.setMatrixAt(this.n, this.scratch.makeTranslation(x, y + .006, z)); this.halos.setMatrixAt(this.n, this.scratch.makeTranslation(x, y + 1.55, z)); this.n++; }
   end(): void { this.pools.count = this.halos.count = this.n; this.pools.instanceMatrix.needsUpdate = this.halos.instanceMatrix.needsUpdate = true; }
   setNight(night: number): void { this.pm.uniforms.uNight.value = night; this.hm.uniforms.uNight.value = night; this.pools.visible = this.halos.visible = night > .001; }
 }
