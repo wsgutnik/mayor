@@ -726,9 +726,15 @@ export function roundCorners(pts: Float32Array, tiles: number): Float32Array {
   return cur;
 }
 
-/** Vehicle route geometry: tile centres smoothed, snapped onto the road centrelines, corners rounded. */
+/**
+ * Vehicle route geometry.  Junction curvature is now owned by the derived
+ * lane graph (`lanes.ts` / `JunctionLayout.connectors`); do not blur route
+ * points here, because that cuts across the pad and defeats lane containment.
+ * The tile route remains the coarse routing index until vehicle progress is
+ * migrated from tile indices to lane arc length.
+ */
 export function routePath(w: World, tiles: number[]): Float32Array {
-  return roundCorners(snapToCentrelines(w, tiles, smoothPath(w, tiles)), tiles.length);
+  return snapToCentrelines(w, tiles, smoothPath(w, tiles));
 }
 
 // ---------------------------------------------------------------- simulation

@@ -55,6 +55,18 @@ lines), `connectors` (lane to lane Hermite splines + hull), `lotAnchors` (where 
 6. Dead end: `square` cap (flat asphalt end, kerb and sidewalk wrap it as a U with outer fillets of kerb + sidewalk;
    no asphalt semicircle, no arc inside the road) or `bulb` cul-de-sac.
 7. Connectors: Hermite from lane centre at the in-arm markings trim to the out-arm's, tangents 0.55 x chord.
+
+### P7 lane-graph amendment (implemented)
+
+`src/sim/lanes.ts` derives lane connectors from the final, budgeted asphalt
+ring, not from road tiles.  Tile is 8 m.  For each legal inbound/outbound lane
+pair it samples a cubic Bézier with handles `min(0.46 * chord, 2.0)` tiles and
+`clamp(ceil(chord / 0.2), 3, 14)` pieces.  A candidate is retained only when
+every sample lies inside the asphalt polygon and its discrete curvature is at
+most `2 / min(laneWidth)`.  Straight movements rank-match proportionally;
+outer lanes own near turns; ordinary junctions reject U-turns.  The same pass
+exports per-inbound-lane turn sets for arrow marking consumers.  This is
+derived, unsaved data and is bounded by arms² × lanes² × 14 samples.
 8. Mixed classes: the larger radius wins; the avenue median ends at the crosswalk, never in the polygon.
 9. Short segments: R shrinks linearly when `segLength < 2t`; below ~0.6 tile the node merges (middle).
 

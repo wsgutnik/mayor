@@ -25,6 +25,7 @@ import {
 } from "./world";
 import { nodeArms, nodeById, segById } from "./roads";
 import { corridorsOf, profileOf } from "./corridor";
+import { buildLaneConnectors, type LaneArrow, type LaneConnector } from "./lanes";
 
 // ---------------------------------------------------------------- constants
 
@@ -148,6 +149,10 @@ export interface JunctionLayout {
   stopLines: MarkingQuad[];
   guides: MarkingQuad[];
   clearZones: Pt[][];
+  /** Derived drivable centre paths, keyed by arm and lane; never saved. */
+  connectors: LaneConnector[];
+  /** Allowed turn arrows for each inbound lane; exported for road markings. */
+  laneArrows: LaneArrow[];
   hash: string;
   diagnostics: JunctionDiagnostic[];
 }
@@ -695,7 +700,7 @@ export function buildJunction(
   }
   const base: Omit<JunctionLayout, "kind" | "template" | "arms" | "asphalt" | "kerbOuter" | "sidewalkOuter" | "boundary" | "fillets" | "lotAnchors" | "hash"> = {
     nodeId, centre: { x: cx, z: cz }, excludedArms: excluded,
-    crosswalks: [], stopLines: [], guides: [], clearZones: [], diagnostics: diags,
+    crosswalks: [], stopLines: [], guides: [], clearZones: [], connectors: [], laneArrows: [], diagnostics: diags,
   };
 
   // --- no ground arms: pad node (P5) or non-ground node.
@@ -1114,6 +1119,14 @@ export function buildJunction(
     asphalt: rings[0], kerbOuter: rings[1], sidewalkOuter: rings[2], boundary: rings[3],
     fillets, lotAnchors: buildAnchors(cx, cz, ground, rings[3]), hash: "",
   };
+  // Ported lane graph is derived from the exact post-budget pad, never the
+  // tile raster.  This keeps every accepted vehicle path inside asphalt.
+  const laneGraph = buildLaneConnectors(layout.centre, layout.arms.map(a => ({
+    segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz,
+    trim: Math.max(a.trimNeg.asphalt, a.trimPos.asphalt),
+  })), layout.asphalt);
+  layout.connectors = laneGraph.connectors;
+  layout.laneArrows = laneGraph.arrows;
   layout.hash = hashLayout(layout);
   return layout;
 }

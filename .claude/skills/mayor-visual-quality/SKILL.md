@@ -48,3 +48,7 @@ keep the arc and chamfer to the miter limit; sidewalk continuous around every co
 Facade textures are neutral (the palette tints them); AI swatches go through `blender/apply_ai_textures.py`
 (seamless, mean-matched, <= 1.5 MB). Buildings: front -Y, base z=0, inside the tile, <= 1400 triangles, glow_* windows,
 rear and side facades detailed, v2 variants through the registry (never replace base models).
+
+Procedural building generators may serve multi-cell lots. They use the oriented-lot frame (base y=0, front +Z), stay
+inside the lot, are deterministic and allocation-free during rebuild, and carry the same <= 1400 triangle limit plus
+headless no-gap/no-overlap/no-sliver invariants as Blender assets. One-cell lots remain Blender-kit buildings.
