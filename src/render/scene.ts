@@ -6,6 +6,12 @@ import {
   facilityAnchorAt, facilityFootprint,
 } from "../sim/world";
 import { CameraRig } from "./camera";
+import { ROAD_LIFT } from "./roads";
+import { bakeVehicleSurface, pitchFor, shadowProxy, type BakedVehicle } from "./vehicle-surface";
+import { createVehicleMaterial, vehicleUniforms } from "./vehicle-material";
+import { boxOf, paintOf } from "./vehicle-palette";
+import { shadowBias } from "./shadow-tuning";
+import { CONTACT_DARK, ContactShadows } from "./vehicle-fx";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
 import { lotFrontTile, lotInstances } from "./lots";
@@ -92,6 +98,14 @@ const BOAT_PROPS = ["boat_motor", "boat_sail", "boat_ferry"];
 
 /** Minimum time between full scene rebuilds. */
 const REBUILD_GAP_MS = 80;
+/** Instances per vehicle look (bodies and their shadow proxies share the buffer). */
+const VEHICLE_CAP = 320;
+/** Grounding decals: every visible vehicle and transit mover gets one. */
+const CONTACT_CAP = 512;
+/** Flat-quad basis: quad X (width) → +Z, quad Y (length) → +X, normal → +Y. */
+const DECAL_FLAT = new THREE.Matrix4().makeBasis(
+  new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0),
+);
 
 const hash = (x: number, y: number) => {
   let h = (x * 374761393 + y * 668265263) | 0;
@@ -141,6 +155,29 @@ export class CityRenderer {
   private propWaiters = new Map<string, ((m: LoadedModel) => void)[]>();
   private vehMeshes = new Map<string, THREE.InstancedMesh>();
   private vehReady = new Set<string>();
+  /** One shared PBR material for every baked look; bodies never cast (proxies do). */
+  private vehicleMaterial!: THREE.MeshStandardMaterial;
+  private vehProxy = new Map<string, THREE.InstancedMesh>();
+  private vehBaked = new Map<string, BakedVehicle>();
+  private vehDims = new Map<string, { halfLen: number; width: number }>();
+  /** Shadow role per vehicle object: 0 body, 1 proxy, 2 grounding decal. */
+  private vehShadowKind = new Map<THREE.Object3D, number>();
+  private contact!: ContactShadows;
+  private lastBiasSpan = -1;
+  private lastBiasRes = -1;
+  // updateVehicles scratch: cleared or overwritten every frame, never reallocated.
+  private vehCounts = new Map<THREE.InstancedMesh, number>();
+  private vehCol = new THREE.Color();
+  private vehE = new THREE.Euler(0, 0, 0, "YZX");
+  private vehQ = new THREE.Quaternion();
+  private vehV = new THREE.Vector3();
+  private vehS = new THREE.Vector3();
+  private vehM = new THREE.Matrix4();
+  private decM = new THREE.Matrix4();
+  private decR = new THREE.Matrix4();
+  private decS = new THREE.Vector3();
+  private leanX = 0;
+  private leanZ = 0;
   private boatMeshes = new Map<string, THREE.InstancedMesh>();
   private boatReady = new Set<string>();
   private boats: { x: number; z: number; a: number; speed: number; turn: number; prop: string; phase: number }[] = [];
@@ -245,12 +282,14 @@ export class CityRenderer {
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
     // Soft sun shadows over the area around the camera target (see render()); the map size follows the quality level.
+    // PCFSoft was removed in three 0.186 (warns + falls back); PCF with a texel-derived radius replaces it.
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.03;
+    this.sun.shadow.radius = 4;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.buildRain();
@@ -300,15 +339,47 @@ export class CityRenderer {
     this.noiseTex = makeNoiseTexture(128);
     this.ambience = new Ambience(this.scene);
     this.ambience.setMapSize(this.world.size);
+    this.vehicleMaterial = createVehicleMaterial();
+    const proxyMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+    proxyMat.name = "vehicle/shadow_proxy";
     const fallback = new THREE.BoxGeometry(0.01, 0.01, 0.01);
     for (const name of VEHICLE_PROPS) {
-      const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), 320);
+      const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), VEHICLE_CAP);
       m.count = 0;
       m.frustumCulled = false;
+      m.castShadow = false;
+      m.receiveShadow = true;
       this.scene.add(m);
       this.vehMeshes.set(name, m);
-      this.useProp(name, (model) => { m.geometry = model.geometry; m.material = model.materials; this.vehReady.add(name); });
+      this.vehShadowKind.set(m, 0);
+      // Shadow-only stand-in sharing the body's instance buffer, so posing it is free.
+      const proxy: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, proxyMat, VEHICLE_CAP);
+      proxy.instanceMatrix = m.instanceMatrix;
+      proxy.count = 0;
+      proxy.frustumCulled = false;
+      proxy.castShadow = true;
+      proxy.receiveShadow = false;
+      this.scene.add(proxy);
+      this.vehProxy.set(name, proxy);
+      this.vehShadowKind.set(proxy, 1);
+      this.useProp(name, (model) => {
+        const baked = bakeVehicleSurface(model, VEHICLE_CAP);
+        m.geometry = baked.geometry;
+        m.material = this.vehicleMaterial;
+        proxy.geometry = shadowProxy(baked.geometry);
+        baked.geometry.computeBoundingBox();
+        const bb = baked.geometry.boundingBox!;
+        this.vehDims.set(name, {
+          halfLen: (bb.max.x - bb.min.x) / 2,
+          width: bb.max.z - bb.min.z,
+        });
+        this.vehBaked.set(name, baked);
+        this.vehReady.add(name);
+      });
     }
+    this.contact = new ContactShadows(CONTACT_CAP);
+    this.scene.add(this.contact.mesh);
+    this.vehShadowKind.set(this.contact.mesh, 2);
     for (const name of BOAT_PROPS) {
       const m: THREE.InstancedMesh = new THREE.InstancedMesh(fallback, new THREE.MeshLambertMaterial({ color: "#ffffff" }), 16);
       m.count = 0;
@@ -1178,39 +1249,96 @@ export class CityRenderer {
     this.traffic = t;
   }
 
+  /** Ground height under one vehicle sample point: deck tiles ride the deck, else terrain. */
+  private vehicleSampleY(layer: number, dh: number, x: number, z: number): number {
+    const w = this.world;
+    if (layer === 1) {
+      const ix = Math.floor(x), iz = Math.floor(z);
+      if (ix >= 0 && iz >= 0 && ix < w.size && iz < w.size) {
+        const h = w.deckH[iz * w.size + ix];
+        if (!Number.isNaN(h)) return h;
+      }
+      if (!Number.isNaN(dh)) return dh;
+    }
+    return heightAt(w, x, z);
+  }
+
+  /**
+   * Put one vehicle on the road: a baked single-material look when its GLB is ready,
+   * else the old box. Body colour goes to the aPaint instance attribute, so glass,
+   * tyres and lamps never take the paint (F1). Sizes jitter stably per id.
+   */
+  private placeVehicle(
+    name: string, id: number, x: number, z: number, hx: number, hz: number,
+    r: number, g: number, b: number, r2: number, g2: number, b2: number,
+    boxW: number, boxH: number, boxD: number, boxLift: number,
+    baseY: number, pitch: number, lightsOn: number, dark: number,
+  ): void {
+    const glb = this.vehReady.has(name);
+    const mesh = glb ? this.vehMeshes.get(name)! : this.vehicleMesh;
+    const c = this.vehCounts.get(mesh) ?? 0;
+    if (c >= mesh.instanceMatrix.count) return;
+    // Stable per-id size jitter, zero cost.
+    let h = (Math.imul(id + 0x9e3779b9, 2654435761) ^ 0x85ebca6b) >>> 0;
+    const j1 = (h % 1000) / 1000;
+    h = (Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0);
+    const j2 = (h % 1000) / 1000;
+    h = (Math.imul(h ^ (h >>> 16), 0x27d4eb2f) >>> 0);
+    const j3 = (h % 1000) / 1000;
+    const yaw = -Math.atan2(hz, hx);
+    this.vehE.set(0, yaw, pitch);
+    this.vehQ.setFromEuler(this.vehE);
+    this.vehV.set(x, baseY + (glb ? ROAD_LIFT + 0.001 : boxLift), z);
+    if (glb) this.vehS.set(1 + (j1 - 0.5) * 0.055, 1 + (j3 - 0.5) * 0.045, 1 + (j2 - 0.5) * 0.04);
+    else this.vehS.set(boxW, boxH, boxD);
+    this.vehM.compose(this.vehV, this.vehQ, this.vehS);
+    mesh.setMatrixAt(c, this.vehM);
+    if (glb) {
+      const baked = this.vehBaked.get(name)!;
+      const ap = baked.aPaint.array, aq = baked.aPaint2.array, at = baked.aState.array;
+      ap[c * 3] = r; ap[c * 3 + 1] = g; ap[c * 3 + 2] = b;
+      aq[c * 3] = r2; aq[c * 3 + 1] = g2; aq[c * 3 + 2] = b2;
+      // Brake and blink render state land with the P1-A sim; until then, lamps follow the hour.
+      at[c * 3] = lightsOn; at[c * 3 + 1] = 0; at[c * 3 + 2] = 0;
+    } else {
+      mesh.setColorAt(c, this.vehCol.setRGB(r, g, b));
+    }
+    this.vehCounts.set(mesh, c + 1);
+    // Grounding decal: same yaw and pitch, flat under the body, leaning off-sun.
+    const dims = this.vehDims.get(name);
+    const len = glb && dims ? dims.halfLen * 2 : boxW;
+    const wid = glb && dims ? dims.width : boxD;
+    this.decM.makeRotationY(yaw);
+    this.decR.makeRotationZ(pitch);
+    this.decM.multiply(this.decR);
+    this.decM.multiply(DECAL_FLAT);
+    this.decS.set(wid * 1.7, len * 1.26, 1);
+    this.decM.scale(this.decS);
+    this.decM.setPosition(x + this.leanX * wid, baseY + ROAD_LIFT + 0.002, z + this.leanZ * wid);
+    this.contact.add(this.decM, dark);
+  }
+
   private updateVehicles(): void {
     const t = this.traffic;
     if (!t) return;
-    const d = this.dummy;
-    const col = new THREE.Color();
-    const CAR = ["#e8eef5", "#d0453a", "#3a6fd0", "#2c2f36", "#e0b43a", "#58a86a", "#8a8f98", "#f2f2f2"];
-    const counts = new Map<THREE.InstancedMesh, number>();
-    /** Put one vehicle on the road: a Blender model when its GLB is ready, else the old box. */
-    const place = (name: string, x: number, z: number, hx: number, hz: number, tint: THREE.Color, boxScale: [number, number, number], boxLift: number, baseY: number) => {
-      const glb = this.vehReady.has(name);
-      const mesh = glb ? this.vehMeshes.get(name)! : this.vehicleMesh;
-      const c = counts.get(mesh) ?? 0;
-      if (c >= mesh.instanceMatrix.count) return;
-      d.position.set(x, baseY + (glb ? 0.07 : boxLift), z);
-      d.rotation.set(0, -Math.atan2(hz, hx), 0);
-      if (glb) d.scale.setScalar(1); else d.scale.set(boxScale[0], boxScale[1], boxScale[2]);
-      d.updateMatrix();
-      mesh.setMatrixAt(c, d.matrix);
-      mesh.setColorAt(c, tint);
-      counts.set(mesh, c + 1);
-    };
-    const heading = (pts: Float32Array, i: number, f: number, lane: number) => {
-      const ax = pts[i * 2], az = pts[i * 2 + 1], bx = pts[i * 2 + 2], bz = pts[i * 2 + 3];
-      let hx = bx - ax, hz = bz - az;
-      const l = Math.hypot(hx, hz) || 1;
-      hx /= l; hz /= l;
-      return { x: ax + (bx - ax) * f - hz * lane, z: az + (bz - az) * f + hx * lane, hx, hz };
-    };
+    this.vehCounts.clear();
+    this.contact.begin();
+    const lightsOn = Math.min(1, this.nightGlow);
+    vehicleUniforms.uLampExposure.value = this.renderer.toneMappingExposure || 1;
+    const envI = this.scene.environmentIntensity ?? 1;
+    vehicleUniforms.uEnvComp.value = envI < 1 && envI > 0.05 ? Math.min(1.5, 1 / envI) : 1;
+    // Contact decals lean away from the sun so they merge into the cast shadow.
+    const sun = this.sunDir;
+    const hl = Math.hypot(sun.x, sun.z);
+    const lean = Math.min(0.55, (hl / Math.max(0.08, sun.y)) * 0.16);
+    if (hl > 1e-4) { this.leanX = (-sun.x / hl) * lean; this.leanZ = (-sun.z / hl) * lean; }
+    else { this.leanX = 0; this.leanZ = 0; }
     const w = this.world;
     const tx = this.rig.target.x, tz = this.rig.target.z;
-    const vd2 = this.lodDist * this.lodDist;
-    const lodV = this.lodEnabled;
-    for (const v of t.vehicles) {
+    const lod = this.lodEnabled ? this.lodDist : 1e9;
+    const vd1 = lod * lod, vd2 = vd1 * 2.56, vdMax = vd1 * 6.25;
+    for (let k = 0; k < t.vehicles.length; k++) {
+      const v = t.vehicles[k];
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
       // Layer decides height: tunnel hidden, deck rides deckH, ground stays low even under a deck.
@@ -1218,36 +1346,107 @@ export class CityRenderer {
       const rt = v.tiles[vi];
       const layer = v.layers ? v.layers[vi] : (isTunnelTile(w, rt) ? 2 : w.roadDeck[rt] && !w.roadSurface[rt] ? 1 : 0);
       if (layer === 2) continue;
-      const p = heading(v.pts, i, v.progress - i, v.kind === 1 ? 0.12 : 0.1);
+      const pts = v.pts;
+      const i2 = i * 2;
+      const ax = pts[i2], az = pts[i2 + 1];
+      const segX = pts[i2 + 2] - ax, segZ = pts[i2 + 3] - az;
+      const segL = Math.hypot(segX, segZ) || 1;
+      const hx = segX / segL, hz = segZ / segL;
+      const lane = v.kind === 1 ? 0.12 : 0.1;
+      const px = ax + segX * (v.progress - i) - hz * lane;
+      const pz = az + segZ * (v.progress - i) + hx * lane;
+      const dx = px - tx, dz = pz - tz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > vdMax) continue;
+      // Stable per-id thinning, never a frame counter: half past lodDist, a quarter past 1.6×.
+      if (d2 > vd2 ? (v.id & 3) !== 0 : d2 > vd1 && (v.id & 1) !== 0) continue;
       const dh = w.deckH[rt];
-      const baseY = layer === 1 && !Number.isNaN(dh) ? dh : heightAt(w, p.x, p.z);
-      if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
-      if (v.kind === 1) {
-        place(pickLook(TRUCK_LOOKS, v.id), p.x, p.z, p.hx, p.hz, col.set("#f0f0f0"), [0.58, 0.24, 0.26], 0.17, baseY);
+      const baseY = layer === 1 && !Number.isNaN(dh) ? dh : heightAt(w, px, pz);
+      const truck = v.kind === 1;
+      const look = truck ? pickLook(TRUCK_LOOKS, v.id) : pickLook(CAR_MODELS, v.id);
+      const dims = this.vehDims.get(look);
+      const s = (dims ? dims.halfLen * 2 : truck ? 0.58 : 0.42) * 0.4;
+      const pitch = pitchFor(
+        this.vehicleSampleY(layer, dh, px + hx * s, pz + hz * s),
+        this.vehicleSampleY(layer, dh, px - hx * s, pz - hz * s),
+        s * 2,
+      );
+      const d = Math.sqrt(d2);
+      const dark = CONTACT_DARK * (1 - Math.min(1, Math.max(0, (d - lod) / (lod * 0.5))));
+      if (truck) {
+        const p = boxOf(v.id), q = boxOf(v.id + 5);
+        this.placeVehicle(look, v.id, px, pz, hx, hz, p[0], p[1], p[2], q[0], q[1], q[2],
+          0.58, 0.24, 0.26, 0.17, baseY, pitch, lightsOn, dark);
       } else {
-        place(pickLook(CAR_MODELS, v.id), p.x, p.z, p.hx, p.hz, col.set(CAR[(v.id * 7) % CAR.length]), [0.42, 0.17, 0.22], 0.17, baseY);
+        const p = paintOf(v.id), q = boxOf(v.id);
+        this.placeVehicle(look, v.id, px, pz, hx, hz, p[0], p[1], p[2], q[0], q[1], q[2],
+          0.42, 0.17, 0.22, 0.17, baseY, pitch, lightsOn, dark);
       }
     }
-    for (const v of t.transit) {
+    for (let k = 0; k < t.transit.length; k++) {
+      const v = t.transit[k];
       const i = Math.min(v.tiles.length - 2, Math.floor(v.progress));
       if (i < 0) continue;
       const vi = Math.min(v.tiles.length - 1, Math.floor(v.progress));
       const rt = v.tiles[vi];
       const layer = v.layers ? v.layers[vi] : (isTunnelTile(w, rt) ? 2 : w.roadDeck[rt] && !w.roadSurface[rt] ? 1 : 0);
       if (layer === 2) continue;
-      const p = heading(v.pts, i, Math.min(1, v.progress - i), v.kind === "bus" ? 0.14 : 0);
+      const pts = v.pts;
+      const i2 = i * 2;
+      const ax = pts[i2], az = pts[i2 + 1];
+      const segX = pts[i2 + 2] - ax, segZ = pts[i2 + 3] - az;
+      const segL = Math.hypot(segX, segZ) || 1;
+      const hx = segX / segL, hz = segZ / segL;
+      const bus = v.kind === "bus";
+      const px = ax + segX * Math.min(1, v.progress - i) - hz * (bus ? 0.14 : 0);
+      const pz = az + segZ * Math.min(1, v.progress - i) + hx * (bus ? 0.14 : 0);
+      const dx = px - tx, dz = pz - tz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > vdMax) continue;
+      if (d2 > vd2 ? (v.id & 3) !== 0 : d2 > vd1 && (v.id & 1) !== 0) continue;
       const dh = w.deckH[rt];
-      const baseY = layer === 1 && !Number.isNaN(dh) ? dh : heightAt(w, p.x, p.z);
-      if (lodV && (p.x - tx) * (p.x - tx) + (p.z - tz) * (p.z - tz) > vd2) continue;
-      place(v.kind === "bus" ? pickLook(BUS_LOOKS, v.id) : "train", p.x, p.z, p.hx, p.hz, col.set(v.color),
-        v.kind === "bus" ? [0.8, 0.26, 0.28] : [1.2, 0.3, 0.4], v.kind === "bus" ? 0.22 : 0.3, baseY);
+      const baseY = layer === 1 && !Number.isNaN(dh) ? dh : heightAt(w, px, pz);
+      const look = bus ? pickLook(BUS_LOOKS, v.id) : "train";
+      const dims = this.vehDims.get(look);
+      const s = (dims ? dims.halfLen * 2 : bus ? 0.8 : 1.2) * 0.4;
+      const pitch = pitchFor(
+        this.vehicleSampleY(layer, dh, px + hx * s, pz + hz * s),
+        this.vehicleSampleY(layer, dh, px - hx * s, pz - hz * s),
+        s * 2,
+      );
+      const d = Math.sqrt(d2);
+      const dark = CONTACT_DARK * (1 - Math.min(1, Math.max(0, (d - lod) / (lod * 0.5))));
+      const line = this.vehCol.set(v.color);
+      const q = boxOf(v.id);
+      if (bus) {
+        this.placeVehicle(look, v.id, px, pz, hx, hz, line.r, line.g, line.b, q[0], q[1], q[2],
+          0.8, 0.26, 0.28, 0.22, baseY, pitch, lightsOn, dark);
+      } else {
+        this.placeVehicle(look, v.id, px, pz, hx, hz, line.r, line.g, line.b, q[0], q[1], q[2],
+          1.2, 0.3, 0.4, 0.3, baseY, pitch, lightsOn, dark);
+      }
     }
-    for (const m of [this.vehicleMesh, ...this.vehMeshes.values()]) {
-      m.count = counts.get(m) ?? 0;
-      m.instanceMatrix.needsUpdate = true;
-      if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    const vm = this.vehicleMesh;
+    vm.count = this.vehCounts.get(vm) ?? 0;
+    vm.instanceMatrix.needsUpdate = true;
+    if (vm.instanceColor) vm.instanceColor.needsUpdate = true;
+    for (const entry of this.vehMeshes) {
+      const m = entry[1];
+      const n = this.vehCounts.get(m) ?? 0;
+      m.count = n;
+      this.vehProxy.get(entry[0])!.count = n;
+      if (n > 0) {
+        m.instanceMatrix.needsUpdate = true;
+        const baked = this.vehBaked.get(entry[0]);
+        if (baked) {
+          baked.aPaint.needsUpdate = true;
+          baked.aPaint2.needsUpdate = true;
+          baked.aState.needsUpdate = true;
+        }
+      }
     }
-    d.rotation.set(0, 0, 0);
+    this.contact.end();
+    if (this.overlayLayer === UNDERGROUND_LAYER) this.contact.mesh.visible = false;
   }
 
   /**
@@ -1309,6 +1508,13 @@ export class CityRenderer {
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || flat.has(o)) return;
+      const vk = this.vehShadowKind.get(o);
+      if (vk !== undefined) {
+        // Bodies never cast (their 24-tri proxies do); decals neither cast nor receive.
+        m.castShadow = vk === 1;
+        m.receiveShadow = vk === 0;
+        return;
+      }
       if (o === this.terrain || o === this.roadMesh) { m.receiveShadow = true; m.castShadow = false; return; }
       if ((o as THREE.InstancedMesh).isInstancedMesh) { m.castShadow = true; m.receiveShadow = true; }
     });
@@ -1353,6 +1559,8 @@ export class CityRenderer {
     this.stopMesh.visible = !on;
     this.vehicleMesh.visible = !on;
     for (const m of this.vehMeshes.values()) m.visible = !on;
+    for (const m of this.vehProxy.values()) m.visible = !on;
+    this.contact.mesh.visible = !on;
     for (const m of this.boatMeshes.values()) m.visible = !on;
     this.metroMesh.visible = !on;
     this.warnMesh.visible = !on;
@@ -1699,6 +1907,16 @@ export class CityRenderer {
     if (Math.abs(sc.right - span) > 0.5) {
       sc.left = -span; sc.right = span; sc.top = span; sc.bottom = -span; sc.near = 1; sc.far = 220;
       sc.updateProjectionMatrix();
+    }
+    // Bias follows the texel footprint (span runs 8→60 tiles with zoom); recompute on change only.
+    const shadowRes = this.sun.shadow.mapSize.x;
+    if (span !== this.lastBiasSpan || shadowRes !== this.lastBiasRes) {
+      this.lastBiasSpan = span;
+      this.lastBiasRes = shadowRes;
+      const tune = shadowBias(span, shadowRes, sc.near, sc.far);
+      this.sun.shadow.bias = tune.bias;
+      this.sun.shadow.normalBias = tune.normalBias;
+      this.sun.shadow.radius = tune.radius;
     }
     // Height-flavoured fog: thin haze from high above, thicker at street level.
     const fog = this.scene.fog as THREE.FogExp2;

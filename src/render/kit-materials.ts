@@ -102,6 +102,13 @@ function kitMaterial(src: THREE.Material, table: Patterns): THREE.Material {
     mat.emissive = new THREE.Color("#ffffff");
     mat.emissiveMap = texture("window_glow");
     mat.emissiveIntensity = 0;
+  } else if (name === "glow_head" || name === "glow_tail" || name === "glow_sign") {
+    // F3: the shared rebuild dropped the GLB's emissiveFactor, leaving black, so the
+    // night pass raised emissiveIntensity to no effect. Recover it from the palette hex.
+    // glow_red/amber/green are NOT in the pattern table (phase-driven signal heads stay
+    // dark here; procedural spheres show the phase), and glow_lamp is warmed by scene.ts.
+    mat.emissive = new THREE.Color(hex);
+    mat.emissiveIntensity = 0;
   }
   materials.set(name, mat);
   return mat;
