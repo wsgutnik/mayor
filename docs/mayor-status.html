@@ -147,7 +147,7 @@
       <h1 id="headline"></h1>
       <p id="summary"></p>
     </div>
-    <div class="stamp"><span class="label">Atualizado</span><b id="updated"></b></div>
+    <div class="stamp"><span class="label">Atualizado</span><b id="updated"></b><span class="label" style="display:block;margin-top:10px">Versão</span><b id="version"></b></div>
   </header>
 
   <section style="display:flex;flex-direction:column;gap:14px">
@@ -229,12 +229,13 @@ npm run dev</pre>
 <script>
   /* Para atualizar a página a cada etapa: edite só este objeto e republique. */
   const DATA = {
-    updated: "2026-10-13",
-    headline: "M28 e Interface V2 (UI-1, UI-2, UI-3 parcial) no main; instaladores m29 gerados.",
-    summary: "O jogo está jogável e estável (pontes passam energia, subsolo iluminado). A frente atual é a qualidade visual dos 40 prédios: auditoria concluída, prédios de referência em produção. A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
-    screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
+    updated: "2026-10-14",
+    version: "v0.1.0-m34 publicada · m35 em preparação",
+    headline: "M34 publicado; junções, faixas e tráfego em andamento; m35 em preparação.",
+    summary: "O jogo segue jogável e a release 0.1.0 (M34) está publicada como pré-release no GitHub, com o dmg de Apple Silicon assinado e notarizado e o PWA do iPad. Desde a última versão desta página, o foco foi nas vias: construtor de junções com anel de calçada, becos sem saída quadrados, faixas de pedestres, linhas de retenção, setas e cantos com limite de mitra; grafo de faixas com conectores; semáforos por ângulo e adaptativos ligados ao tráfego; seguimento IDM com equilíbrio. Veículos ganharam geometria única, pintura e luzes (714 para 110 chamadas de desenho). O ambiente tem HDRI com iluminação indireta que escurece à noite e dez texturas CC0. O zoneamento ganhou validade de 9 pontos, células trapezoidais, resolução de sobreposição por prioridade e um empacotador de lotes por programação dinâmica. A revisão adversarial do Opus achou 15 falhas; as correções estão em commits recentes, mas três achados seguem sem correção. Faltam regras de prioridade sem semáforo, faixas que persistam através das junções e medições de desempenho em Mac, Windows e iPad.",
+    screenshot: { src: "img/m34-junctions.jpg", caption: "Junção avenida + rua do construtor novo: calçada contínua, canteiro, faixas de pedestres, linhas de retenção, setas de faixa e texturas CC0 (captura de 2026-10-14)." },
     milestones: [
-      { id: "N1", name: "Corredor viário e nós", desc: "Perfil de via e corredor por trecho (ADR 06), polígono de junção com cantos agudos limitados, braços aparados, meio-fios que contornam os cantos e sem arcos dentro do asfalto. Lotes ainda não são recortados pelo polígono.", status: "active" },
+      { id: "N1", name: "Corredor viário e nós", desc: "Perfil de via e corredor por trecho (ADR 06), polígono de junção com cantos agudos limitados e mistura de larguras, braços unidos abaixo de 5°, calçada em anel, becos sem saída quadrados, faixas de pedestres, linhas de retenção, guias e setas. Lotes ainda não são recortados pelo polígono.", status: "active" },
       { id: "UI2", name: "Construtor de vias e zoneamento", desc: "Desfazer/Refazer, snapping de ângulo e comprimento, upgrade de via no lugar, via paralela, zoneamento por retângulo e preenchimento. Faltam densidades e visualização de lotes.", status: "active" },
       { id: "UI1", name: "Interface V2 · ciclo 1", desc: "Escala e opacidade da interface, painéis recolhíveis e persistentes (tecla H), leitura de custo, extensão e inclinação ao desenhar estradas. Plano em docs/UI-V2-PLAN.md.", status: "done" },
       { id: "V1", name: "Auditoria visual (ciclo 1)", desc: "Inventário dos 40 prédios e 67 props, exportação estrita no Blender, manifesto, registro de variantes, prévias em dois ângulos. PR #1.", status: "done" },
@@ -261,23 +262,44 @@ npm run dev</pre>
       { id: "M20", name: "Render", desc: "Terreno em camadas com texturas HD, sombras, tone mapping, LOD e níveis de qualidade.", status: "done" },
       { id: "M21", name: "Vias e sinalização", desc: "Mão única, rotatória, semáforos com fases e props de calçada.", status: "done" },
       { id: "M22", name: "Acabamento", desc: "Pedestres, polimento e validação em Windows e iPad.", status: "todo" },
-      { id: "M27", name: "Zoneamento orientado", desc: "Blocos por segmento e lotes com yaw livre, atrás de uma preferência; virada do padrão pendente.", status: "done" },
-      { id: "M23", name: "Pontes e túneis", desc: "Estradas cruzam água e colinas por ponte ou túnel, sem nivelar o terreno.", status: "done" }
+      { id: "M27", name: "Zoneamento orientado", desc: "Blocos por segmento, lotes com yaw livre, validade de 9 pontos, células trapezoidais, resolução de sobreposição e empacotador de lotes por programação dinâmica; padrão desde o P9.", status: "done" },
+      { id: "M23", name: "Pontes e túneis", desc: "Estradas cruzam água e colinas por ponte ou túnel, sem nivelar o terreno.", status: "done" },
+      { id: "M34", name: "Release 0.1.0 (M34)", desc: "Mac Apple Silicon com dmg assinado e notarizado (Developer ID), PWA do iPad em zip e SHA256SUMS; pré-release no GitHub.", status: "done" },
+      { id: "R2", name: "Veículos, ambiente e texturas", desc: "Veículo com geometria única, pintura e luzes; HDRI com iluminação indireta que escurece à noite; dez texturas CC0 do Fable Cities; janelas acesas por janela e lotes com plantas e terraplanagem.", status: "done" },
+      { id: "J1", name: "Construtor de junções", desc: "Anel de calçada, becos sem saída quadrados, faixas de pedestres, linhas de retenção, guias e setas; regras de prioridade sem semáforo pendentes.", status: "active" },
+      { id: "L1", name: "Faixas e conectores", desc: "Grafo de faixas com conectores e setas nos braços; os veículos ainda não seguem a faixa através das junções.", status: "active" },
+      { id: "T1", name: "Tráfego e semáforos", desc: "Seguimento IDM com equilíbrio; semáforos por ângulo e adaptativos ligados ao tráfego; sem prioridade de cruzamento.", status: "active" },
+      { id: "P1", name: "Prédios procedurais", desc: "Experimentais e desligados (?procBuildings=1); rejeitados visualmente e aguardam revisão.", status: "todo" },
+      { id: "M35", name: "Release 0.1.0 (M35)", desc: "Em preparação: instaladores locais com as junções, faixas e tráfego desta rodada.", status: "active" },
     ],
     checks: [
-      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; 460 testes passando no main; instalador de Mac (ad hoc, 20 MB) e PWA do iPad (13 MB) gerados localmente" },
-      { ok: true, text: "Build do Blender com --strict falha de verdade (limite de triângulos, tile, números sem modelo, substituição não declarada)" },
-      { ok: false, text: "Desempenho dos ativos novos não medido em Mac, Windows nem iPad; limites de LOD são hipóteses" },
-      { ok: true, text: "339 testes passando, incluindo leitura de todos os GLB, limites do tile, orçamento de triângulos, zoneamento orientado e redes por camada" },
-      { ok: true, text: "Checagem de tipos e build de produção sem erros (npm run ci, local)" },
+      { ok: true, text: "Auditoria estrita dos ativos: 40 prédios, 67 props, 0 erros e 0 avisos; build do Blender com --strict falha de verdade (limite de triângulos, tile, números sem modelo, substituição não declarada)" },
+      { ok: true, text: "Release 0.1.0 (M34) publicada como pré-release no GitHub: dmg assinado e notarizado com stapler, zip do PWA do iPad e SHA256SUMS (2026-10-14)" },
+      { ok: true, text: "tsc limpo; 714 testes em 85 arquivos, com 711 passando e 2 pendentes (todo)" },
+      { ok: false, text: "Teste de desempenho do 128×128 (limite de 40 ms) falhou na suíte completa, com 58 ms, e passa isolado; medir de novo sem carga" },
+      { ok: true, text: "Revisão adversarial do Opus (docs/process/13-review-opus-1.md, base bcfc67a): correções nos commits a9c5ce4, cfad6d3, 39be81b e 65a8cd5, segundo as mensagens dos commits" },
+      { ok: false, text: "Achados do Opus sem correção pelas mensagens dos commits: F10 (quinas em trechos retos), F13 e F14 (ambiente e compensação dos veículos); custo de reconstrução (F8) não medido de novo" },
+      { ok: false, text: "Desempenho dos ativos, das junções e dos veículos não medido em Mac, Windows nem iPad; limites de LOD são hipóteses" },
+      { ok: false, text: "Prioridade sem semáforo (ceder passagem e parada) não implementada; veículos não seguem a faixa através das junções" },
+      { ok: false, text: "Prédios procedurais rejeitados visualmente: desligados atrás de ?procBuildings=1 e não entregues" },
       { ok: true, text: "Energia, água e esgoto atravessam pontes e túneis (fluxo por camada); vista Subsolo iluminada também à noite" },
       { ok: true, text: "Jogado no navegador: salvar, nova cidade, carregar, noite e chuva (save de 88 KB)" },
-      { ok: true, text: "App de Mac compilado (Mayor.app, 10 MB; dmg, 3 MB) e aberto por 6 s sem falhar (ainda com o ícone antigo)" },
       { ok: false, text: "Service worker não pôde ser registrado no navegador embutido daqui; só a lógica foi testada, com fakes" },
-      { ok: false, text: "Windows e iPad reais ainda não testados; Developer ID e notarização aguardam o certificado (docs/SIGNING.md)" },
+      { ok: false, text: "Windows e iPad reais ainda não testados. App Store bloqueada: só Command Line Tools instalado (sem Xcode completo), e os passos da conta de desenvolvedor dependem do usuário; o instalador ad hoc segue como alternativa" },
+      { ok: true, text: "Prévia remota do iPad por túnel, protegida por senha (a senha não está nesta página)" },
       { ok: false, text: "Em aberto da revisão de jogo: sombra preta sob ponte à noite e 'asas' nas rampas (sombra suavizada, falta confirmar), fitas de tubo retorcidas no subsolo (não reproduzido), tiras de meio-fio no meio da quadra e almofadas serrilhadas no zoneamento orientado, canteiro de avenida parando antes da esquina, nível de detalhe de carros e prédios" }
     ],
     log: [
+      { date: "2026-10-14", title: "Release m34, junções, faixas e tráfego", items: [
+        "Release 0.1.0 (M34) publicada como pré-release: dmg de Apple Silicon assinado e notarizado (scripts/release-mac.sh, 22f7b35), PWA do iPad em zip e SHA256SUMS",
+        "Construtor de junções: anel de calçada, becos sem saída quadrados, faixas de pedestres, linhas de retenção, guias tracejadas e setas; cantos agudos com limite de mitra; braços unidos abaixo de 5° e junções com larguras mistas (65a8cd5, 39be81b)",
+        "Faixas com conectores e setas; semáforos por ângulo e adaptativos ligados ao tráfego; seguimento IDM com equilíbrio; veículos com geometria única, pintura e luzes (714 para 110 chamadas de desenho)",
+        "Zoneamento: validade de 9 pontos, células trapezoidais, resolução de sobreposição por prioridade, empacotador de lotes por programação dinâmica; janelas acesas por janela; plantas e terraplanagem por lote",
+        "Ambiente: HDRI com iluminação indireta que escurece à noite; dez texturas CC0 do Fable Cities (cerca de 5,7 MB), com atribuição em NOTICE.md",
+        "Blender: passe de fachadas e telhados; infoviews v2 e padrões de interface (evento de UI, avisos, dica, legenda)",
+        "Revisão adversarial do Opus (docs/process/13-review-opus-1.md): correções em a9c5ce4, cfad6d3, 39be81b e 65a8cd5",
+        "Testes: 714 em 85 arquivos; o teste de desempenho 128×128 falhou sob carga da suíte e passa isolado"
+      ] },
       { date: "2026-10-13", title: "Nós de rua, prédios v2, serviços 2×2 e acesso remoto", items: [
         "Serviços 2×2 (hospital, prefeitura, escola secundária, estação, tratamento de água, usina) na simulação, no save opcional e com modelos próprios",
         "Auditoria de arquitetura: pesquisa de fontes (godot-road-generator, Clipper2, TM:PE) e ADR 06; perfil de via e corredor por trecho como fonte única; props passam a ficar sobre as linhas de offset",
@@ -518,6 +540,7 @@ npm run dev</pre>
   $("headline").textContent = DATA.headline;
   $("summary").textContent = DATA.summary;
   $("updated").textContent = fmtDate(DATA.updated);
+  $("version").textContent = DATA.version;
   $("shotimg").src = DATA.screenshot.src;
   $("shotcap").textContent = DATA.screenshot.caption;
 
@@ -563,7 +586,7 @@ npm run dev</pre>
   $("kpis").innerHTML = [
     [AUDIT.buildingsFound + " de 40", "prédios com GLB válido"],
     [AUDIT.propsFound, "props, veículos e plantas"],
-    [AUDIT.maxBuildingTriangles + " tris", "maior prédio (limite 450)"],
+    [AUDIT.maxBuildingTriangles + " tris", "maior prédio (limite 700)"],
     [AUDIT.errors + " / " + AUDIT.warnings, "erros / avisos da auditoria"],
   ].map((k) => '<div class="kpi"><b>' + esc(k[0]) + "</b><span>" + esc(k[1]) + "</span></div>").join("");
   document.querySelector("#atab tbody").innerHTML = BUILDINGS.map((b) =>

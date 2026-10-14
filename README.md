@@ -11,7 +11,7 @@ Mayor focuses on the playable city-building loop: terrain, roads, zoning, lots, 
 | Area | What is in the game |
 |---|---|
 | Roads and junctions | Line and Curve road drawing, streets/avenues/highways, node-based junctions with sidewalks that wrap corners, crosswalks and stop bars on asphalt, centre guide dashes, lane arrows, closed dead ends, one-way streets, roundabouts, bridges, tunnels, overpasses, underpasses, and automatic highway crossing rules. Junction geometry uses a lane graph with connectors. |
-| Traffic signals | Phases by approach angle (skewed and 5-arm junctions); a pure adaptive signal controller exists but does not drive the sim yet |
+| Traffic signals | Phases by approach angle (skewed and 5-arm junctions); an adaptive controller (3-8 s green, 2 s yellow, 1 s all-red) runs from live approach queues |
 | Zoning and lots | R/C/I zoning up to 4 lots from a road, persistent lots facing the street, 1×1 to 2×2 compound lots, empty-lot rendering, and lot validation for old saves. Street-aligned oriented lots are the default: zone cells are trapezoids on curves, overlaps are resolved by priority, and a dynamic-programming packer places the lots. The classic tile grid stays available by turning off the "Street-aligned lots" preference. Lit windows at night are per window. |
 | Procedural buildings (experimental) | Facade, recipe and roof generation, off by default. Enable with `?procBuildings=1`. Not accepted visually yet. |
 | Utilities and underground view | Water, sewage, and power flow through the road network with capacity limits; facilities connect to the nearest road; Underground view (`U`) shows pipes, valves, and flow |
@@ -113,7 +113,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 | 0.1.0 (M34) | released (pre-release tag) | macOS Apple Silicon, Developer ID signed and notarized, with an iPad PWA bundle. See the GitHub release `v0.1.0-m34` |
 | M22 | pending | Pedestrians, polish, and validation on real Windows and iPad hardware |
 
-Tests: 692 passing (2 todo, 84 files) with `npx vitest run`, as of 2026-10-14. Mac build is verified; real Windows and iPad hardware are still unverified.
+Tests: 714 passing (2 todo, 85 files) with `npx vitest run`, as of 2026-10-14. Mac build is verified; real Windows and iPad hardware are still unverified.
 
 ## License and Trademarks
 

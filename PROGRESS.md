@@ -35,7 +35,7 @@ Updated on 2026-10-14 (after the M34 release and the junction, traffic, zoning a
 | Native iPad app | prepared | `tauri.conf.json` iOS section, `Info.ios.plist`, `scripts/ios-prereq-check.sh`, `docs/IOS.md`; needs full Xcode 26.1.1 and an iOS provisioning profile (not available here); rust iOS targets installed |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 692 passing, 2 todo, 84 files (`npx vitest run`, 2026-10-14). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 714 passing, 2 todo, 85 files (`npx vitest run`, 2026-10-14). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 
@@ -135,7 +135,7 @@ Gaps, stated plainly:
 
 - Vehicles do not follow lane connectors yet. The lane graph is used by junction geometry only (gt3 in flight).
 - Unsignalised priority (yield and stop rules) is pending.
-- The adaptive signal controller exists as a pure module in `src/sim/signals.ts`; nothing in the sim calls it yet.
+- The adaptive signal controller in `src/sim/signals.ts` is held in `TrafficState` and drives running lights from live queues; unsignalised priority rules (yield-to-right, main road) are still missing.
 - Procedural buildings are rejected visually and stay behind `?procBuildings=1`, off by default, until gb3 is done.
 - The junction showcase `?showcase=1` is dev-only (`import.meta.env.DEV`); the headless gate is `src/sim/showcase-gate.test.ts`.
 - App Store release is blocked on full Xcode 26.1.1 (see `docs/IOS.md`).
