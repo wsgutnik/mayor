@@ -6,7 +6,7 @@
  * Deliberately separate from sim/catalog.ts: saves store functional IDs,
  * not visual model paths or detail levels.
  */
-export const VISUAL_V2_REFERENCE_IDS = [1, 10, 20, 21, 38] as const;
+export const VISUAL_V2_REFERENCE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 30, 31, 33, 35, 36, 37, 38, 39] as const;
 export type VisualV2ReferenceId = (typeof VISUAL_V2_REFERENCE_IDS)[number];
 export type VisualLod = 0 | 1 | 2;
 

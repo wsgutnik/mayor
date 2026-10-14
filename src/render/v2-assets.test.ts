@@ -15,7 +15,7 @@ function load(file: string): Promise<THREE.Group> {
 const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
 describe("Visual V2 reference assets (opt-in variants)", () => {
-  it("exports three LODs for each of the five reference buildings", () => {
+  it("exports three LODs for every v2 building", () => {
     for (const n of VISUAL_V2_REFERENCE_IDS) for (const lod of [0, 1, 2]) expect(existsSync(path(n, lod)), path(n, lod)).toBe(true);
   });
 

@@ -50,6 +50,390 @@
    ]
   },
   {
+   "catalogId": 2,
+   "name": "Casa Familiar",
+   "lod": 0,
+   "file": "02_lod0.glb",
+   "triangles": 594,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.602
+   ]
+  },
+  {
+   "catalogId": 2,
+   "name": "Casa Familiar",
+   "lod": 1,
+   "file": "02_lod1.glb",
+   "triangles": 210,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.55
+   ]
+  },
+  {
+   "catalogId": 2,
+   "name": "Casa Familiar",
+   "lod": 2,
+   "file": "02_lod2.glb",
+   "triangles": 102,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.55
+   ]
+  },
+  {
+   "catalogId": 3,
+   "name": "Sobrado Moderno",
+   "lod": 0,
+   "file": "03_lod0.glb",
+   "triangles": 565,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.025
+   ]
+  },
+  {
+   "catalogId": 3,
+   "name": "Sobrado Moderno",
+   "lod": 1,
+   "file": "03_lod1.glb",
+   "triangles": 180,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.95
+   ]
+  },
+  {
+   "catalogId": 3,
+   "name": "Sobrado Moderno",
+   "lod": 2,
+   "file": "03_lod2.glb",
+   "triangles": 60,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.95
+   ]
+  },
+  {
+   "catalogId": 4,
+   "name": "Vila Geminada",
+   "lod": 0,
+   "file": "04_lod0.glb",
+   "triangles": 715,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.592
+   ]
+  },
+  {
+   "catalogId": 4,
+   "name": "Vila Geminada",
+   "lod": 1,
+   "file": "04_lod1.glb",
+   "triangles": 142,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.58
+   ]
+  },
+  {
+   "catalogId": 4,
+   "name": "Vila Geminada",
+   "lod": 2,
+   "file": "04_lod2.glb",
+   "triangles": 102,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.58
+   ]
+  },
+  {
+   "catalogId": 5,
+   "name": "Pequeno Apartamento",
+   "lod": 0,
+   "file": "05_lod0.glb",
+   "triangles": 1021,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.025
+   ]
+  },
+  {
+   "catalogId": 5,
+   "name": "Pequeno Apartamento",
+   "lod": 1,
+   "file": "05_lod1.glb",
+   "triangles": 218,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.898
+   ]
+  },
+  {
+   "catalogId": 5,
+   "name": "Pequeno Apartamento",
+   "lod": 2,
+   "file": "05_lod2.glb",
+   "triangles": 50,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.87
+   ]
+  },
+  {
+   "catalogId": 6,
+   "name": "Condom\u00ednio Jardim",
+   "lod": 0,
+   "file": "06_lod0.glb",
+   "triangles": 933,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.794
+   ]
+  },
+  {
+   "catalogId": 6,
+   "name": "Condom\u00ednio Jardim",
+   "lod": 1,
+   "file": "06_lod1.glb",
+   "triangles": 244,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.755
+   ]
+  },
+  {
+   "catalogId": 6,
+   "name": "Condom\u00ednio Jardim",
+   "lod": 2,
+   "file": "06_lod2.glb",
+   "triangles": 70,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.71
+   ]
+  },
+  {
+   "catalogId": 7,
+   "name": "Torre Compacta",
+   "lod": 0,
+   "file": "07_lod0.glb",
+   "triangles": 1212,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.805
+   ]
+  },
+  {
+   "catalogId": 7,
+   "name": "Torre Compacta",
+   "lod": 1,
+   "file": "07_lod1.glb",
+   "triangles": 300,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.77
+   ]
+  },
+  {
+   "catalogId": 7,
+   "name": "Torre Compacta",
+   "lod": 2,
+   "file": "07_lod2.glb",
+   "triangles": 60,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.66
+   ]
+  },
+  {
+   "catalogId": 8,
+   "name": "Residencial Varanda",
+   "lod": 0,
+   "file": "08_lod0.glb",
+   "triangles": 892,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.945
+   ]
+  },
+  {
+   "catalogId": 8,
+   "name": "Residencial Varanda",
+   "lod": 1,
+   "file": "08_lod1.glb",
+   "triangles": 270,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.89
+   ]
+  },
+  {
+   "catalogId": 8,
+   "name": "Residencial Varanda",
+   "lod": 2,
+   "file": "08_lod2.glb",
+   "triangles": 70,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.89
+   ]
+  },
+  {
+   "catalogId": 9,
+   "name": "Edif\u00edcio Misto Local",
+   "lod": 0,
+   "file": "09_lod0.glb",
+   "triangles": 962,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.0
+   ]
+  },
+  {
+   "catalogId": 9,
+   "name": "Edif\u00edcio Misto Local",
+   "lod": 1,
+   "file": "09_lod1.glb",
+   "triangles": 140,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.864
+   ]
+  },
+  {
+   "catalogId": 9,
+   "name": "Edif\u00edcio Misto Local",
+   "lod": 2,
+   "file": "09_lod2.glb",
+   "triangles": 60,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.84
+   ]
+  },
+  {
    "catalogId": 10,
    "name": "Premium Tower",
    "lod": 0,
@@ -95,6 +479,438 @@
     0.48,
     0.0,
     2.555
+   ]
+  },
+  {
+   "catalogId": 11,
+   "name": "Loja de Conveni\u00eancia",
+   "lod": 0,
+   "file": "11_lod0.glb",
+   "triangles": 685,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.462
+   ]
+  },
+  {
+   "catalogId": 11,
+   "name": "Loja de Conveni\u00eancia",
+   "lod": 1,
+   "file": "11_lod1.glb",
+   "triangles": 346,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.377
+   ]
+  },
+  {
+   "catalogId": 11,
+   "name": "Loja de Conveni\u00eancia",
+   "lod": 2,
+   "file": "11_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.335
+   ]
+  },
+  {
+   "catalogId": 12,
+   "name": "Caf\u00e9 de Esquina",
+   "lod": 0,
+   "file": "12_lod0.glb",
+   "triangles": 729,
+   "insideTile": true,
+   "bounds": [
+    -0.488,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.452
+   ]
+  },
+  {
+   "catalogId": 12,
+   "name": "Caf\u00e9 de Esquina",
+   "lod": 1,
+   "file": "12_lod1.glb",
+   "triangles": 352,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.367
+   ]
+  },
+  {
+   "catalogId": 12,
+   "name": "Caf\u00e9 de Esquina",
+   "lod": 2,
+   "file": "12_lod2.glb",
+   "triangles": 40,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.33
+   ]
+  },
+  {
+   "catalogId": 13,
+   "name": "Mercado Local",
+   "lod": 0,
+   "file": "13_lod0.glb",
+   "triangles": 660,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.452
+   ]
+  },
+  {
+   "catalogId": 13,
+   "name": "Mercado Local",
+   "lod": 1,
+   "file": "13_lod1.glb",
+   "triangles": 316,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.367
+   ]
+  },
+  {
+   "catalogId": 13,
+   "name": "Mercado Local",
+   "lod": 2,
+   "file": "13_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.325
+   ]
+  },
+  {
+   "catalogId": 14,
+   "name": "Restaurante Urbano",
+   "lod": 0,
+   "file": "14_lod0.glb",
+   "triangles": 566,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.622
+   ]
+  },
+  {
+   "catalogId": 14,
+   "name": "Restaurante Urbano",
+   "lod": 1,
+   "file": "14_lod1.glb",
+   "triangles": 256,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.537
+   ]
+  },
+  {
+   "catalogId": 14,
+   "name": "Restaurante Urbano",
+   "lod": 2,
+   "file": "14_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.45
+   ]
+  },
+  {
+   "catalogId": 15,
+   "name": "Farm\u00e1cia de Bairro",
+   "lod": 0,
+   "file": "15_lod0.glb",
+   "triangles": 595,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.602
+   ]
+  },
+  {
+   "catalogId": 15,
+   "name": "Farm\u00e1cia de Bairro",
+   "lod": 1,
+   "file": "15_lod1.glb",
+   "triangles": 296,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.517
+   ]
+  },
+  {
+   "catalogId": 15,
+   "name": "Farm\u00e1cia de Bairro",
+   "lod": 2,
+   "file": "15_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.475
+   ]
+  },
+  {
+   "catalogId": 16,
+   "name": "Escrit\u00f3rio Compacto",
+   "lod": 0,
+   "file": "16_lod0.glb",
+   "triangles": 572,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.96
+   ]
+  },
+  {
+   "catalogId": 16,
+   "name": "Escrit\u00f3rio Compacto",
+   "lod": 1,
+   "file": "16_lod1.glb",
+   "triangles": 284,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.96
+   ]
+  },
+  {
+   "catalogId": 16,
+   "name": "Escrit\u00f3rio Compacto",
+   "lod": 2,
+   "file": "16_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.81
+   ]
+  },
+  {
+   "catalogId": 17,
+   "name": "Banco Local",
+   "lod": 0,
+   "file": "17_lod0.glb",
+   "triangles": 478,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.662
+   ]
+  },
+  {
+   "catalogId": 17,
+   "name": "Banco Local",
+   "lod": 1,
+   "file": "17_lod1.glb",
+   "triangles": 226,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.569
+   ]
+  },
+  {
+   "catalogId": 17,
+   "name": "Banco Local",
+   "lod": 2,
+   "file": "17_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.5
+   ]
+  },
+  {
+   "catalogId": 18,
+   "name": "Hotel Executivo",
+   "lod": 0,
+   "file": "18_lod0.glb",
+   "triangles": 686,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.12
+   ]
+  },
+  {
+   "catalogId": 18,
+   "name": "Hotel Executivo",
+   "lod": 1,
+   "file": "18_lod1.glb",
+   "triangles": 464,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    1.12
+   ]
+  },
+  {
+   "catalogId": 18,
+   "name": "Hotel Executivo",
+   "lod": 2,
+   "file": "18_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    1.01
+   ]
+  },
+  {
+   "catalogId": 19,
+   "name": "Shopping de Bairro",
+   "lod": 0,
+   "file": "19_lod0.glb",
+   "triangles": 658,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.582
+   ]
+  },
+  {
+   "catalogId": 19,
+   "name": "Shopping de Bairro",
+   "lod": 1,
+   "file": "19_lod1.glb",
+   "triangles": 354,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.497
+   ]
+  },
+  {
+   "catalogId": 19,
+   "name": "Shopping de Bairro",
+   "lod": 2,
+   "file": "19_lod2.glb",
+   "triangles": 30,
+   "insideTile": true,
+   "bounds": [
+    -0.47,
+    0.47,
+    -0.47,
+    0.47,
+    0.0,
+    0.41
    ]
   },
   {
@@ -194,6 +1010,582 @@
    ]
   },
   {
+   "catalogId": 22,
+   "name": "Biblioteca Municipal",
+   "lod": 0,
+   "file": "22_lod0.glb",
+   "triangles": 928,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.575
+   ]
+  },
+  {
+   "catalogId": 22,
+   "name": "Biblioteca Municipal",
+   "lod": 1,
+   "file": "22_lod1.glb",
+   "triangles": 282,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.51
+   ]
+  },
+  {
+   "catalogId": 22,
+   "name": "Biblioteca Municipal",
+   "lod": 2,
+   "file": "22_lod2.glb",
+   "triangles": 100,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.48
+   ]
+  },
+  {
+   "catalogId": 23,
+   "name": "Centro Comunit\u00e1rio",
+   "lod": 0,
+   "file": "23_lod0.glb",
+   "triangles": 736,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.535
+   ]
+  },
+  {
+   "catalogId": 23,
+   "name": "Centro Comunit\u00e1rio",
+   "lod": 1,
+   "file": "23_lod1.glb",
+   "triangles": 256,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.443
+   ]
+  },
+  {
+   "catalogId": 23,
+   "name": "Centro Comunit\u00e1rio",
+   "lod": 2,
+   "file": "23_lod2.glb",
+   "triangles": 90,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.42
+   ]
+  },
+  {
+   "catalogId": 24,
+   "name": "Delegacia",
+   "lod": 0,
+   "file": "24_lod0.glb",
+   "triangles": 1139,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.66
+   ]
+  },
+  {
+   "catalogId": 24,
+   "name": "Delegacia",
+   "lod": 1,
+   "file": "24_lod1.glb",
+   "triangles": 231,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.483
+   ]
+  },
+  {
+   "catalogId": 24,
+   "name": "Delegacia",
+   "lod": 2,
+   "file": "24_lod2.glb",
+   "triangles": 60,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.42
+   ]
+  },
+  {
+   "catalogId": 25,
+   "name": "Museu Municipal",
+   "lod": 0,
+   "file": "25_lod0.glb",
+   "triangles": 812,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.58
+   ]
+  },
+  {
+   "catalogId": 25,
+   "name": "Museu Municipal",
+   "lod": 1,
+   "file": "25_lod1.glb",
+   "triangles": 384,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.58
+   ]
+  },
+  {
+   "catalogId": 25,
+   "name": "Museu Municipal",
+   "lod": 2,
+   "file": "25_lod2.glb",
+   "triangles": 92,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.53
+   ]
+  },
+  {
+   "catalogId": 26,
+   "name": "Cl\u00ednica",
+   "lod": 0,
+   "file": "26_lod0.glb",
+   "triangles": 668,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.525
+   ]
+  },
+  {
+   "catalogId": 26,
+   "name": "Cl\u00ednica",
+   "lod": 1,
+   "file": "26_lod1.glb",
+   "triangles": 260,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.433
+   ]
+  },
+  {
+   "catalogId": 26,
+   "name": "Cl\u00ednica",
+   "lod": 2,
+   "file": "26_lod2.glb",
+   "triangles": 80,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.39
+   ]
+  },
+  {
+   "catalogId": 28,
+   "name": "Escola Prim\u00e1ria",
+   "lod": 0,
+   "file": "28_lod0.glb",
+   "triangles": 730,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.525
+   ]
+  },
+  {
+   "catalogId": 28,
+   "name": "Escola Prim\u00e1ria",
+   "lod": 1,
+   "file": "28_lod1.glb",
+   "triangles": 220,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.433
+   ]
+  },
+  {
+   "catalogId": 28,
+   "name": "Escola Prim\u00e1ria",
+   "lod": 2,
+   "file": "28_lod2.glb",
+   "triangles": 90,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.41
+   ]
+  },
+  {
+   "catalogId": 30,
+   "name": "Quartel dos Bombeiros",
+   "lod": 0,
+   "file": "30_lod0.glb",
+   "triangles": 836,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.838
+   ]
+  },
+  {
+   "catalogId": 30,
+   "name": "Quartel dos Bombeiros",
+   "lod": 1,
+   "file": "30_lod1.glb",
+   "triangles": 246,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.838
+   ]
+  },
+  {
+   "catalogId": 30,
+   "name": "Quartel dos Bombeiros",
+   "lod": 2,
+   "file": "30_lod2.glb",
+   "triangles": 70,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.48,
+    0.48,
+    0.0,
+    0.81
+   ]
+  },
+  {
+   "catalogId": 31,
+   "name": "Esta\u00e7\u00e3o de \u00d4nibus",
+   "lod": 0,
+   "file": "31_lod0.glb",
+   "triangles": 1054,
+   "insideTile": true,
+   "bounds": [
+    -0.498,
+    0.498,
+    -0.5,
+    0.48,
+    0.0,
+    0.34
+   ]
+  },
+  {
+   "catalogId": 31,
+   "name": "Esta\u00e7\u00e3o de \u00d4nibus",
+   "lod": 1,
+   "file": "31_lod1.glb",
+   "triangles": 410,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.33
+   ]
+  },
+  {
+   "catalogId": 31,
+   "name": "Esta\u00e7\u00e3o de \u00d4nibus",
+   "lod": 2,
+   "file": "31_lod2.glb",
+   "triangles": 60,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.315
+   ]
+  },
+  {
+   "catalogId": 33,
+   "name": "Terminal de Carga",
+   "lod": 0,
+   "file": "33_lod0.glb",
+   "triangles": 889,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.454
+   ]
+  },
+  {
+   "catalogId": 33,
+   "name": "Terminal de Carga",
+   "lod": 1,
+   "file": "33_lod1.glb",
+   "triangles": 412,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.425
+   ]
+  },
+  {
+   "catalogId": 33,
+   "name": "Terminal de Carga",
+   "lod": 2,
+   "file": "33_lod2.glb",
+   "triangles": 46,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.41
+   ]
+  },
+  {
+   "catalogId": 35,
+   "name": "Subesta\u00e7\u00e3o El\u00e9trica",
+   "lod": 0,
+   "file": "35_lod0.glb",
+   "triangles": 889,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.57
+   ]
+  },
+  {
+   "catalogId": 35,
+   "name": "Subesta\u00e7\u00e3o El\u00e9trica",
+   "lod": 1,
+   "file": "35_lod1.glb",
+   "triangles": 334,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.265
+   ]
+  },
+  {
+   "catalogId": 35,
+   "name": "Subesta\u00e7\u00e3o El\u00e9trica",
+   "lod": 2,
+   "file": "35_lod2.glb",
+   "triangles": 40,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.23
+   ]
+  },
+  {
+   "catalogId": 36,
+   "name": "Armaz\u00e9m Log\u00edstico",
+   "lod": 0,
+   "file": "36_lod0.glb",
+   "triangles": 997,
+   "insideTile": true,
+   "bounds": [
+    -0.49,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.429
+   ]
+  },
+  {
+   "catalogId": 36,
+   "name": "Armaz\u00e9m Log\u00edstico",
+   "lod": 1,
+   "file": "36_lod1.glb",
+   "triangles": 366,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.405
+   ]
+  },
+  {
+   "catalogId": 36,
+   "name": "Armaz\u00e9m Log\u00edstico",
+   "lod": 2,
+   "file": "36_lod2.glb",
+   "triangles": 46,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.39
+   ]
+  },
+  {
+   "catalogId": 37,
+   "name": "F\u00e1brica Leve",
+   "lod": 0,
+   "file": "37_lod0.glb",
+   "triangles": 882,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.79
+   ]
+  },
+  {
+   "catalogId": 37,
+   "name": "F\u00e1brica Leve",
+   "lod": 1,
+   "file": "37_lod1.glb",
+   "triangles": 196,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.72
+   ]
+  },
+  {
+   "catalogId": 37,
+   "name": "F\u00e1brica Leve",
+   "lod": 2,
+   "file": "37_lod2.glb",
+   "triangles": 82,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.72
+   ]
+  },
+  {
    "catalogId": 38,
    "name": "F\u00e1brica Pesada",
    "lod": 0,
@@ -239,6 +1631,54 @@
     0.48,
     0.0,
     0.95
+   ]
+  },
+  {
+   "catalogId": 39,
+   "name": "Centro de Reciclagem",
+   "lod": 0,
+   "file": "39_lod0.glb",
+   "triangles": 938,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.439
+   ]
+  },
+  {
+   "catalogId": 39,
+   "name": "Centro de Reciclagem",
+   "lod": 1,
+   "file": "39_lod1.glb",
+   "triangles": 158,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.4
+   ]
+  },
+  {
+   "catalogId": 39,
+   "name": "Centro de Reciclagem",
+   "lod": 2,
+   "file": "39_lod2.glb",
+   "triangles": 40,
+   "insideTile": true,
+   "bounds": [
+    -0.48,
+    0.48,
+    -0.5,
+    0.48,
+    0.0,
+    0.36
    ]
   }
  ]

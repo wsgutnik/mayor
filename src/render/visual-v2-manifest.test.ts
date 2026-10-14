@@ -8,7 +8,7 @@ import {
 function goodManifest() {
   return {
     schemaVersion: 1,
-    assets: [1, 10, 20, 21, 38].map(id => ({
+    assets: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 30, 31, 33, 35, 36, 37, 38, 39].map(id => ({
       catalogId: id,
       variants: [0, 1, 2].map((lod) => ({
         lod,
@@ -22,9 +22,9 @@ function goodManifest() {
 }
 
 describe("Visual V2 manifest quality gate", () => {
-  it("checks all five buildings and their three ordered LODs", () => {
+  it("checks every v2 building and their three ordered LODs", () => {
     const parsed = parseVisualV2Manifest(goodManifest());
-    expect(parsed?.assets).toHaveLength(5);
+    expect(parsed?.assets).toHaveLength(35);
     expect(parsed?.assets[2].variants.map(v => v.triangles)).toEqual([300, 200, 100]);
   });
 
@@ -61,8 +61,8 @@ describe("Visual V2 manifest quality gate", () => {
   it("does not fetch a manifest for a non-reference catalog building", async () => {
     const provider = vi.fn(async () => parseVisualV2Manifest(goodManifest()));
     const loader = vi.fn(async (url: string) => ({ url }));
-    await expect(loadManifestGatedModel(4, true, loader, provider))
-      .resolves.toEqual({ url: "/models/04.glb" });
+    await expect(loadManifestGatedModel(27, true, loader, provider))
+      .resolves.toEqual({ url: "/models/27.glb" });
     expect(provider).not.toHaveBeenCalled();
   });
 

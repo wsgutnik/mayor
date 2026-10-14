@@ -2,10 +2,40 @@
   "schemaVersion": 1,
   "referenceCatalogIds": [
     1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
     10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
     20,
     21,
-    38
+    22,
+    23,
+    24,
+    25,
+    26,
+    28,
+    30,
+    31,
+    33,
+    35,
+    36,
+    37,
+    38,
+    39
   ],
   "assets": [
     {
@@ -13,8 +43,8 @@
       "variants": [
         {
           "file": "01_lod0.glb",
-          "sha256": "7bcf6c062bb8d40f91fb7f65c84fc587582ba8802bbf494b599c886bdd80d2de",
-          "bytes": 183788,
+          "sha256": "a5566211d8341a7a3cb539d06d5e22a37e3ac9165e7ae9f8f7cf84dfafe21d8c",
+          "bytes": 183784,
           "triangles": 1551,
           "vertices": 3152,
           "meshes": 1,
@@ -63,7 +93,7 @@
         },
         {
           "file": "01_lod1.glb",
-          "sha256": "869c011409c4661e44b9e7fa22b3c00d1675103f60267f18ca5d42e6c5c27d52",
+          "sha256": "42df7fa9f0ca1d3106d649b5fd4f280e07122cc5619cfaefd889d3cea2aec74d",
           "bytes": 66972,
           "triangles": 523,
           "vertices": 1050,
@@ -123,11 +153,824 @@
       ]
     },
     {
+      "catalogId": 2,
+      "variants": [
+        {
+          "file": "02_lod0.glb",
+          "sha256": "379df4410cfe7b25b652d0dee850195d1a1996b3cfffdfee67214d004370b859",
+          "bytes": 85716,
+          "triangles": 594,
+          "vertices": 1260,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "leaf_a",
+            "leaf_c",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_red",
+            "roof_slate",
+            "slab",
+            "tree_green",
+            "trunk",
+            "wall_beige",
+            "wall_brick",
+            "wall_cream",
+            "wall_grey",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/02_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.602
+          ]
+        },
+        {
+          "file": "02_lod1.glb",
+          "sha256": "511584fbe0bf5810bae43c09819de49403c8d5b14edff0b5fbe4a6f11882b122",
+          "bytes": 33544,
+          "triangles": 210,
+          "vertices": 424,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_red",
+            "roof_slate",
+            "wall_beige",
+            "wall_cream",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/02_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.55
+          ]
+        },
+        {
+          "file": "02_lod2.glb",
+          "sha256": "7ac172dd51259705a9c2627065382420b54dd0847268f3ccbc7a8f9b3f9695b2",
+          "bytes": 19596,
+          "triangles": 102,
+          "vertices": 208,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "grass",
+            "paving",
+            "roof_red",
+            "roof_slate",
+            "wall_beige",
+            "wall_cream",
+            "wall_wood"
+          ],
+          "lod": 2,
+          "url": "/models/v2/02_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.55
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 3,
+      "variants": [
+        {
+          "file": "03_lod0.glb",
+          "sha256": "d0442de17789901526accfc09ea599a2f0613bc52632dd5aa0e94929457c53f9",
+          "bytes": 77136,
+          "triangles": 565,
+          "vertices": 1139,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "leaf_a",
+            "leaf_c",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_grey",
+            "wall_navy",
+            "wall_red",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/03_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.025
+          ]
+        },
+        {
+          "file": "03_lod1.glb",
+          "sha256": "0e6471c983e98a8ccc0cd5af4f126ed3655facfcae0cde7930b54112d5f7466c",
+          "bytes": 29876,
+          "triangles": 180,
+          "vertices": 348,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_navy",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 1,
+          "url": "/models/v2/03_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.95
+          ]
+        },
+        {
+          "file": "03_lod2.glb",
+          "sha256": "e0adb85300f947a520ae18e49acacef684f16154967459db81fc7bf858ba5830",
+          "bytes": 14064,
+          "triangles": 60,
+          "vertices": 120,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "paving",
+            "roof_flat",
+            "wall_navy",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 2,
+          "url": "/models/v2/03_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.95
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 4,
+      "variants": [
+        {
+          "file": "04_lod0.glb",
+          "sha256": "fd3003929d5a0d72327b96b71cfb1c6d39aca4f10605a6f65b19830d6d14d2d6",
+          "bytes": 90328,
+          "triangles": 715,
+          "vertices": 1506,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "leaf_a",
+            "leaf_c",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_red",
+            "roof_slate",
+            "wall_beige",
+            "wall_cream",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/04_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.592
+          ]
+        },
+        {
+          "file": "04_lod1.glb",
+          "sha256": "c185c7a848e0c91f43d1dde3a9b9ae0fc7f46ba80d29b49209fdf7eb61a54e7a",
+          "bytes": 24576,
+          "triangles": 142,
+          "vertices": 292,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "grass",
+            "paving",
+            "roof_red",
+            "roof_slate",
+            "wall_beige",
+            "wall_cream",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/04_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.58
+          ]
+        },
+        {
+          "file": "04_lod2.glb",
+          "sha256": "2224056699b3195795a23f6b730ffee00b2e1e14c70515d8df205ef02d7beb4f",
+          "bytes": 19448,
+          "triangles": 102,
+          "vertices": 208,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "grass",
+            "paving",
+            "roof_red",
+            "roof_slate",
+            "wall_beige",
+            "wall_cream",
+            "white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/04_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.58
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 5,
+      "variants": [
+        {
+          "file": "05_lod0.glb",
+          "sha256": "fae23f4c1713e44fde043bc7f2f5bddbeabf364963bfa0502d509c9278c515eb",
+          "bytes": 119380,
+          "triangles": 1021,
+          "vertices": 2091,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "leaf_a",
+            "leaf_c",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/05_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.025
+          ]
+        },
+        {
+          "file": "05_lod1.glb",
+          "sha256": "45537a69457c1f2e8c5f1f859f372aca346e414361fa8c3b31483bf88d8353e5",
+          "bytes": 33080,
+          "triangles": 218,
+          "vertices": 436,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/05_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.898
+          ]
+        },
+        {
+          "file": "05_lod2.glb",
+          "sha256": "b950cae232cd6af9b35f02ad330652ce4a122c46ac851a27ac9daee41f62e4fd",
+          "bytes": 11008,
+          "triangles": 50,
+          "vertices": 100,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick"
+          ],
+          "lod": 2,
+          "url": "/models/v2/05_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.87
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 6,
+      "variants": [
+        {
+          "file": "06_lod0.glb",
+          "sha256": "672fce75be93e6c1f0a453fe94eb6b052119baf141b63a1fdaf702f65ad85329",
+          "bytes": 116448,
+          "triangles": 933,
+          "vertices": 1905,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "leaf_a",
+            "leaf_c",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "roof_green",
+            "tree_dark",
+            "tree_green",
+            "trunk",
+            "wall_beige",
+            "wall_grey",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/06_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.794
+          ]
+        },
+        {
+          "file": "06_lod1.glb",
+          "sha256": "9cbb68f9fd93008be406a77ed2e5a6577bc686486f23cb9bfddcbf118009af2b",
+          "bytes": 35572,
+          "triangles": 244,
+          "vertices": 464,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_beige",
+            "wall_grey",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/06_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.755
+          ]
+        },
+        {
+          "file": "06_lod2.glb",
+          "sha256": "10a8a82b0cdc7430d074a0ec0dcaad6e0a6d37914569b15f49e867ee0466ec5f",
+          "bytes": 15212,
+          "triangles": 70,
+          "vertices": 140,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_beige",
+            "wall_grey",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/06_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.71
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 7,
+      "variants": [
+        {
+          "file": "07_lod0.glb",
+          "sha256": "4deedf1d6aa32b3d18d00edcd8af3cc9abf6ca9eb3d6677b965d12f6df0809a9",
+          "bytes": 132152,
+          "triangles": 1212,
+          "vertices": 2382,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "wall_grey",
+            "wall_navy",
+            "wall_white",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/07_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.805
+          ]
+        },
+        {
+          "file": "07_lod1.glb",
+          "sha256": "5a4b685a1d1ea5b0e1b4414b4e855aa3dfc088339723970b29894316ad27bb4c",
+          "bytes": 41020,
+          "triangles": 300,
+          "vertices": 581,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_grey",
+            "wall_navy",
+            "wall_white",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/07_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.77
+          ]
+        },
+        {
+          "file": "07_lod2.glb",
+          "sha256": "3dddc786366b79a84cd8932172fb35a625a0a6c1cc2ad3f0f87d58e0b2e2a349",
+          "bytes": 14060,
+          "triangles": 60,
+          "vertices": 120,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "paving",
+            "roof_flat",
+            "wall_grey",
+            "wall_navy",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/07_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.66
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 8,
+      "variants": [
+        {
+          "file": "08_lod0.glb",
+          "sha256": "a27fbc54de58f2e17de4441ac16ac734539ca47384bb4e89573dc7fd78a0e2ef",
+          "bytes": 109768,
+          "triangles": 892,
+          "vertices": 1789,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "hedge",
+            "lamp_pole",
+            "leaf_a",
+            "leaf_c",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "roof_slate",
+            "tree_green",
+            "trunk",
+            "wall_brick",
+            "wall_cream",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/08_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.945
+          ]
+        },
+        {
+          "file": "08_lod1.glb",
+          "sha256": "f0de561be199ed5624a01c962ffb534d06f897ddc26411ea34bec478dc2e87cf",
+          "bytes": 38292,
+          "triangles": 270,
+          "vertices": 528,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/08_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.89
+          ]
+        },
+        {
+          "file": "08_lod2.glb",
+          "sha256": "240e52e4c6bd930ba79d3a7442efeed4f42a1450efe912b46431d5c5db42011c",
+          "bytes": 15180,
+          "triangles": 70,
+          "vertices": 140,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream"
+          ],
+          "lod": 2,
+          "url": "/models/v2/08_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.89
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 9,
+      "variants": [
+        {
+          "file": "09_lod0.glb",
+          "sha256": "fb82e859ee8b3044e83ba9f0e8d0e476f4beced5c1cd460b66e61c453a0eee21",
+          "bytes": 113084,
+          "triangles": 962,
+          "vertices": 1885,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_green",
+            "sign_orange",
+            "sign_red",
+            "wall_brick",
+            "wall_grey",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/09_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "file": "09_lod1.glb",
+          "sha256": "dc516b0bb3ee94f221f66fc973901466591689a6cd8dcd188bffeb67f3290c89",
+          "bytes": 25432,
+          "triangles": 140,
+          "vertices": 280,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "wall_brick",
+            "wall_grey",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/09_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.864
+          ]
+        },
+        {
+          "file": "09_lod2.glb",
+          "sha256": "4a8a7ef20375ab4866ab387a891cb9fda87ff5c77b67caa55868866dcce01ccc",
+          "bytes": 14072,
+          "triangles": 60,
+          "vertices": 120,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_grey"
+          ],
+          "lod": 2,
+          "url": "/models/v2/09_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.84
+          ]
+        }
+      ]
+    },
+    {
       "catalogId": 10,
       "variants": [
         {
           "file": "10_lod0.glb",
-          "sha256": "0d8d1bf5e61f08ab512925bf50e95b261f3301bb78b27c21b30d79336cffbcf7",
+          "sha256": "ca1cd596f07603d7b48d4ae0be0078dc424e42b08adcbf58b42d8537953eb53c",
           "bytes": 263560,
           "triangles": 2489,
           "vertices": 4857,
@@ -175,7 +1018,7 @@
         },
         {
           "file": "10_lod1.glb",
-          "sha256": "a9514d1cb9226b3ebcc41af255e8110fa9e74b1e0994e95ab14ae77b707d18ff",
+          "sha256": "f7953b83ab7ac93c1ba691da08d1af76a15323e16c384b50c35c0deab93bd905",
           "bytes": 72684,
           "triangles": 597,
           "vertices": 1179,
@@ -239,12 +1082,891 @@
       ]
     },
     {
+      "catalogId": 11,
+      "variants": [
+        {
+          "file": "11_lod0.glb",
+          "sha256": "09068e6ab021b8e50586430003216dbc88620f0bd602940c2c7cafa6a8072b5b",
+          "bytes": 88124,
+          "triangles": 685,
+          "vertices": 1315,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "flower_red",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "hedge",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_orange",
+            "sign_red",
+            "slab",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/11_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.462
+          ]
+        },
+        {
+          "file": "11_lod1.glb",
+          "sha256": "fc03d9283592cedd8f8aa5fbb1c02a47d861604a213da22d7a5e7570fd161543",
+          "bytes": 49084,
+          "triangles": 346,
+          "vertices": 680,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "grass",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_orange",
+            "sign_red",
+            "slab",
+            "wall_white",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/11_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.377
+          ]
+        },
+        {
+          "file": "11_lod2.glb",
+          "sha256": "7b8393c95860bd1a416288e2234ad976f9c6ea950170b367e7b080b135b1c3dd",
+          "bytes": 7876,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "paving",
+            "roof_flat",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/11_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.335
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 12,
+      "variants": [
+        {
+          "file": "12_lod0.glb",
+          "sha256": "2016a518bdb699a3520936540536a204ba4b265420f2f30d51744ae5ba3ff5e1",
+          "bytes": 89492,
+          "triangles": 729,
+          "vertices": 1398,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "flower_red",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "hedge",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "tree_green",
+            "trunk",
+            "wall_brick",
+            "wall_cream",
+            "wall_wood"
+          ],
+          "lod": 0,
+          "url": "/models/v2/12_lod0.glb",
+          "boundsBlender": [
+            -0.488,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.452
+          ]
+        },
+        {
+          "file": "12_lod1.glb",
+          "sha256": "c1c0a782fa966d0c63cf0611f85dbfbdf746087d895deaf20ad026e3b30124ee",
+          "bytes": 47816,
+          "triangles": 352,
+          "vertices": 676,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_brick",
+            "wall_wood"
+          ],
+          "lod": 1,
+          "url": "/models/v2/12_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.367
+          ]
+        },
+        {
+          "file": "12_lod2.glb",
+          "sha256": "4b08d45e60ee0b05205a4475b9400acbe81925fc5bce62babd14019217284329",
+          "bytes": 9860,
+          "triangles": 40,
+          "vertices": 80,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick"
+          ],
+          "lod": 2,
+          "url": "/models/v2/12_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.33
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 13,
+      "variants": [
+        {
+          "file": "13_lod0.glb",
+          "sha256": "66a519ea22332854fc15a486c91bb7e880c213c2fb94974b1cf403b9bf9c78cc",
+          "bytes": 82736,
+          "triangles": 660,
+          "vertices": 1285,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "flower_red",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "hedge",
+            "lamp_pole",
+            "leaf_c",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_green",
+            "slab",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 0,
+          "url": "/models/v2/13_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.452
+          ]
+        },
+        {
+          "file": "13_lod1.glb",
+          "sha256": "d0fb69cf258a6689591ce0dd0f3bc40af4908962e02896e65d578abee690a976",
+          "bytes": 42660,
+          "triangles": 316,
+          "vertices": 620,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "grass",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_green",
+            "slab",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/13_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.367
+          ]
+        },
+        {
+          "file": "13_lod2.glb",
+          "sha256": "f4dda3e8e5be15dc34caf90d0662773824e590e6a0654e1a9eb06cf2a728dfef",
+          "bytes": 7868,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "paving",
+            "roof_flat",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/13_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.325
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 14,
+      "variants": [
+        {
+          "file": "14_lod0.glb",
+          "sha256": "4d418d3078df9e40054914f7fe180e203a43f3df2e3307afdb4e5a5ba01ea3a2",
+          "bytes": 68576,
+          "triangles": 566,
+          "vertices": 1089,
+          "meshes": 1,
+          "materials": [
+            "black",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "hedge",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_cream",
+            "wall_wood"
+          ],
+          "lod": 0,
+          "url": "/models/v2/14_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.622
+          ]
+        },
+        {
+          "file": "14_lod1.glb",
+          "sha256": "3dda16b5594f97d9036474ff3318b596f7dc2cb98590153f1d3e57c582d01c8c",
+          "bytes": 35600,
+          "triangles": 256,
+          "vertices": 500,
+          "meshes": 1,
+          "materials": [
+            "black",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_wood"
+          ],
+          "lod": 1,
+          "url": "/models/v2/14_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.537
+          ]
+        },
+        {
+          "file": "14_lod2.glb",
+          "sha256": "01381ddd9f0947df5c507318fab7fa47d860dda1dec95daace8ecda762ca4db5",
+          "bytes": 6820,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "paving",
+            "roof_flat",
+            "wall_wood"
+          ],
+          "lod": 2,
+          "url": "/models/v2/14_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.45
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 15,
+      "variants": [
+        {
+          "file": "15_lod0.glb",
+          "sha256": "d02575178e0f5a4423937029d50ba431b1ef57a9b1ecab8c0726d8a863deeb56",
+          "bytes": 76336,
+          "triangles": 595,
+          "vertices": 1135,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "flower_red",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "hedge",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_red",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/15_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.602
+          ]
+        },
+        {
+          "file": "15_lod1.glb",
+          "sha256": "8ccfef295ffc35fb861f8fe02d1ac7ae9756a1eea6a2e39fc3d2165c68a8067b",
+          "bytes": 40756,
+          "triangles": 296,
+          "vertices": 580,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "grass",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_red",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/15_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.517
+          ]
+        },
+        {
+          "file": "15_lod2.glb",
+          "sha256": "1c555356871980148f838c7275dd449e0dd795141e5a1c76295c50e35c0bf688",
+          "bytes": 7868,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "paving",
+            "roof_flat",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/15_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.475
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 16,
+      "variants": [
+        {
+          "file": "16_lod0.glb",
+          "sha256": "d4f4226d3f2eccbaf16a883c35e11fe95e1c7fb797b5d984db05450858de73de",
+          "bytes": 72152,
+          "triangles": 572,
+          "vertices": 1109,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "slab",
+            "wall_beige",
+            "wall_grey",
+            "wall_white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/16_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.96
+          ]
+        },
+        {
+          "file": "16_lod1.glb",
+          "sha256": "b613a45762fdc98947f775b3e7c463619375a86b0325e9ea5d293be3eae184d7",
+          "bytes": 42528,
+          "triangles": 284,
+          "vertices": 556,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "slab",
+            "wall_beige",
+            "wall_grey",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/16_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.96
+          ]
+        },
+        {
+          "file": "16_lod2.glb",
+          "sha256": "d8b6ac9c7755ef8eed4cf401d0333597d32a6b438264ec76cc93a987b1d3d032",
+          "bytes": 7872,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "paving",
+            "roof_flat",
+            "wall_grey",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/16_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.81
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 17,
+      "variants": [
+        {
+          "file": "17_lod0.glb",
+          "sha256": "1104fb71995ee208728c446d08c4da7b958d02a4190d911412ec5dad52c0d774",
+          "bytes": 61532,
+          "triangles": 478,
+          "vertices": 901,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "hedge",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "slab",
+            "wall_grey",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/17_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.662
+          ]
+        },
+        {
+          "file": "17_lod1.glb",
+          "sha256": "6c4f7c36284e0687989e08ee12eb8f1bd3e048f51b80f272bbfbcac348d41788",
+          "bytes": 30728,
+          "triangles": 226,
+          "vertices": 440,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_flat",
+            "slab",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/17_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.569
+          ]
+        },
+        {
+          "file": "17_lod2.glb",
+          "sha256": "4e6a0a5201cb0f1044634f1d9e256f569a37db734e4a63b340109d0d386d8bd0",
+          "bytes": 6776,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "paving",
+            "roof_flat",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/17_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.5
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 18,
+      "variants": [
+        {
+          "file": "18_lod0.glb",
+          "sha256": "0abb3df3b6d3b385f5b48edd9d621588d15949784eb59e989424acd241858100",
+          "bytes": 79876,
+          "triangles": 686,
+          "vertices": 1324,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "slab",
+            "wall_grey",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/18_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.12
+          ]
+        },
+        {
+          "file": "18_lod1.glb",
+          "sha256": "bcecb580409648abac133bb1101ecf0f94367cb55a420366ee8ab43bbbf141e4",
+          "bytes": 57224,
+          "triangles": 464,
+          "vertices": 916,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "slab",
+            "wall_grey",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 1,
+          "url": "/models/v2/18_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            1.12
+          ]
+        },
+        {
+          "file": "18_lod2.glb",
+          "sha256": "368bf083fce5c95a4d81ff7d10395c9f49948fac63fbaa5a760b06217acf18c7",
+          "bytes": 7872,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "paving",
+            "roof_flat",
+            "wall_grey",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/18_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            1.01
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 19,
+      "variants": [
+        {
+          "file": "19_lod0.glb",
+          "sha256": "d4719dc38bde78345fe98288ec02593db50944143f33880457c9a97ad8b83329",
+          "bytes": 78916,
+          "triangles": 658,
+          "vertices": 1260,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_orange",
+            "sign_red",
+            "slab",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/19_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.582
+          ]
+        },
+        {
+          "file": "19_lod1.glb",
+          "sha256": "b4ce7e3075dab5e3198b32b8d2ed8e04bdd52e12396bdeac8ab7bcdd8e7ca813",
+          "bytes": 49208,
+          "triangles": 354,
+          "vertices": 696,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_orange",
+            "sign_red",
+            "slab",
+            "wall_white",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/19_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.497
+          ]
+        },
+        {
+          "file": "19_lod2.glb",
+          "sha256": "886fd6d5ea062901d6f76b72a0baf0c81d5facac82ac48174bd27a9ab9b02312",
+          "bytes": 6816,
+          "triangles": 30,
+          "vertices": 60,
+          "meshes": 1,
+          "materials": [
+            "paving",
+            "roof_flat",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/19_lod2.glb",
+          "boundsBlender": [
+            -0.47,
+            0.47,
+            -0.47,
+            0.47,
+            0.0,
+            0.41
+          ]
+        }
+      ]
+    },
+    {
       "catalogId": 20,
       "variants": [
         {
           "file": "20_lod0.glb",
-          "sha256": "69a16437e33393c729465a1b0c625cf18a93e7b886b7703a0afbd777d049cbb1",
-          "bytes": 200124,
+          "sha256": "675cf04511c2eb8dd221db04e2bb47b6c1be17da81fe96146416fe82bf069362",
+          "bytes": 200120,
           "triangles": 1907,
           "vertices": 3756,
           "meshes": 1,
@@ -282,7 +2004,7 @@
         },
         {
           "file": "20_lod1.glb",
-          "sha256": "e50311feeb958330b6b08d3ed2300ca2c20a6e69fbbb18b83002fbc804933525",
+          "sha256": "8ae189f22dabd8b93ca04812445a69f9ec8ebbf388bc2f106b1b07953e970706",
           "bytes": 54980,
           "triangles": 477,
           "vertices": 950,
@@ -339,7 +2061,7 @@
       "variants": [
         {
           "file": "21_lod0.glb",
-          "sha256": "9a9c2186b13e47f64d20f5f7454ee5eb2eb930f47371b6ca96389393ae311111",
+          "sha256": "efeb931ab85b7d1464e8421dd49b915247744c9867b82769fc020dc2ee2a01ed",
           "bytes": 270308,
           "triangles": 2434,
           "vertices": 4802,
@@ -395,7 +2117,7 @@
         },
         {
           "file": "21_lod1.glb",
-          "sha256": "b488707dc5b486a1893f9040e0e27d61c6f3d2d3f547634f2d4f19c35813c661",
+          "sha256": "37d001cbb2ad11869854b6812eaa44ad20d113ddd5eb9d660e7b7055aa02eac5",
           "bytes": 85580,
           "triangles": 653,
           "vertices": 1274,
@@ -466,11 +2188,1225 @@
       ]
     },
     {
+      "catalogId": 22,
+      "variants": [
+        {
+          "file": "22_lod0.glb",
+          "sha256": "5993cfc0d078a6d46a71f9a868e561e33c0f500d45976a7886d4a3981f675205",
+          "bytes": 105588,
+          "triangles": 928,
+          "vertices": 1813,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/22_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.575
+          ]
+        },
+        {
+          "file": "22_lod1.glb",
+          "sha256": "bf7e1051bcef62f6aae9340be78f4b432091a87fe10b1942af701bf9b3dc6c1a",
+          "bytes": 38312,
+          "triangles": 282,
+          "vertices": 544,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream"
+          ],
+          "lod": 1,
+          "url": "/models/v2/22_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.51
+          ]
+        },
+        {
+          "file": "22_lod2.glb",
+          "sha256": "b62b2eb37773eefc1540dd12b9bb177b406f841724f41fed3d2d760279d7560b",
+          "bytes": 16940,
+          "triangles": 100,
+          "vertices": 200,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_brick"
+          ],
+          "lod": 2,
+          "url": "/models/v2/22_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.48
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 23,
+      "variants": [
+        {
+          "file": "23_lod0.glb",
+          "sha256": "7bbac92069693294ca7b1aeafe816d3c2924d4efe7644217a3ae82167e620e2e",
+          "bytes": 90612,
+          "triangles": 736,
+          "vertices": 1433,
+          "meshes": 1,
+          "materials": [
+            "bench_wood",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "wall_cream",
+            "wall_green",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/23_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.535
+          ]
+        },
+        {
+          "file": "23_lod1.glb",
+          "sha256": "705727a14a7b560f74027f1033f49dd5c9a98684220bd407eb5a2a075e056a58",
+          "bytes": 37740,
+          "triangles": 256,
+          "vertices": 496,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "wall_cream",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 1,
+          "url": "/models/v2/23_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.443
+          ]
+        },
+        {
+          "file": "23_lod2.glb",
+          "sha256": "ead5e63da34e3db275bb1cc2cd9508e8136709bc2f3f47bb34502d61017f1464",
+          "bytes": 17048,
+          "triangles": 90,
+          "vertices": 180,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_cream",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 2,
+          "url": "/models/v2/23_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.42
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 24,
+      "variants": [
+        {
+          "file": "24_lod0.glb",
+          "sha256": "28a62d87e3b9544c5a8fc16d42ea8e8d3551ebee7814a3ddd063b2f4a829224a",
+          "bytes": 124380,
+          "triangles": 1139,
+          "vertices": 2224,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_green",
+            "wall_grey",
+            "wall_navy",
+            "wall_white",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/24_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.66
+          ]
+        },
+        {
+          "file": "24_lod1.glb",
+          "sha256": "9c4de3dccaf6d27a46f8ce67042346043865df221af7a327c4024b6818a74ebc",
+          "bytes": 35624,
+          "triangles": 231,
+          "vertices": 442,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal",
+            "paving",
+            "roof_flat",
+            "sign_green",
+            "wall_grey",
+            "wall_navy",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/24_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.483
+          ]
+        },
+        {
+          "file": "24_lod2.glb",
+          "sha256": "b1247040abaef79313cb1b2749ba27fd0d577b1f81c012ea9c20e055e51fa036",
+          "bytes": 13004,
+          "triangles": 60,
+          "vertices": 120,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "paving",
+            "roof_flat",
+            "wall_navy",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/24_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.42
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 25,
+      "variants": [
+        {
+          "file": "25_lod0.glb",
+          "sha256": "0bbb49ecbe483ecf015677728a65634b8f6f2f57586788ef959b904a190de668",
+          "bytes": 95044,
+          "triangles": 812,
+          "vertices": 1539,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "grass",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "roof_slate",
+            "sign_red",
+            "wall_cream",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/25_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.58
+          ]
+        },
+        {
+          "file": "25_lod1.glb",
+          "sha256": "edf56d74516626a2c5135ba30efa4d0ec8b985376b76dcf93e7c32f354d0ee8d",
+          "bytes": 48644,
+          "triangles": 384,
+          "vertices": 706,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_flat",
+            "roof_slate",
+            "wall_cream",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/25_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.58
+          ]
+        },
+        {
+          "file": "25_lod2.glb",
+          "sha256": "5673334fc390aa7bbc7b5d507e0799170a010f6bacab93c374f2010d4475a09d",
+          "bytes": 17596,
+          "triangles": 92,
+          "vertices": 184,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "grass",
+            "paving",
+            "roof_flat",
+            "roof_slate",
+            "wall_cream"
+          ],
+          "lod": 2,
+          "url": "/models/v2/25_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.53
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 26,
+      "variants": [
+        {
+          "file": "26_lod0.glb",
+          "sha256": "01e446fa2a39f72296a847dd4f2b5fbaf70c87347bc72273cc11d2a2265ab1a6",
+          "bytes": 78664,
+          "triangles": 668,
+          "vertices": 1297,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_red",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/26_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.525
+          ]
+        },
+        {
+          "file": "26_lod1.glb",
+          "sha256": "8f6eb9da7653978d9ca0a12d36f4ba5728af3258fa20ede2bcb21afee35c63fa",
+          "bytes": 38592,
+          "triangles": 260,
+          "vertices": 504,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "sign_red",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/26_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.433
+          ]
+        },
+        {
+          "file": "26_lod2.glb",
+          "sha256": "3e5bb6835bd336dcda37775b975481c74d6eabc384971dd05bfe4e925686cd52",
+          "bytes": 15040,
+          "triangles": 80,
+          "vertices": 160,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_white",
+            "wall_wood"
+          ],
+          "lod": 2,
+          "url": "/models/v2/26_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.39
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 28,
+      "variants": [
+        {
+          "file": "28_lod0.glb",
+          "sha256": "1e7de889973c4c2c2e449c84d368956b5912d87c785d8646afd773b3e2b17593",
+          "bytes": 87152,
+          "triangles": 730,
+          "vertices": 1429,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_blue",
+            "roof_flat",
+            "sign_blue",
+            "sign_orange",
+            "sign_red",
+            "wall_brick",
+            "wall_cream",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/28_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.525
+          ]
+        },
+        {
+          "file": "28_lod1.glb",
+          "sha256": "62894084e61ed459f3112d93777ed1996dc1fa2be2daf6f627dfafdeaf7b2041",
+          "bytes": 33628,
+          "triangles": 220,
+          "vertices": 424,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "grass",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "wall_brick",
+            "wall_cream",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/28_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.433
+          ]
+        },
+        {
+          "file": "28_lod2.glb",
+          "sha256": "7526f53dedce91dc7a46ff69f94f183a59d6813e85d31fb15623bd7e1fef01f8",
+          "bytes": 16132,
+          "triangles": 90,
+          "vertices": 180,
+          "meshes": 1,
+          "materials": [
+            "concrete",
+            "grass",
+            "paving",
+            "roof_flat",
+            "wall_brick",
+            "wall_cream"
+          ],
+          "lod": 2,
+          "url": "/models/v2/28_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.41
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 30,
+      "variants": [
+        {
+          "file": "30_lod0.glb",
+          "sha256": "ebb2b73ff9804f3d8da689037b62485860c5724268ee0befb450b86f2e976f22",
+          "bytes": 98248,
+          "triangles": 836,
+          "vertices": 1629,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_brick",
+            "wall_cream",
+            "wall_red",
+            "wall_white",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/30_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.838
+          ]
+        },
+        {
+          "file": "30_lod1.glb",
+          "sha256": "b5d4d43c26b5faf9ae9280750835adabf8e1dedace20834b5e702018d79df2db",
+          "bytes": 40220,
+          "triangles": 246,
+          "vertices": 480,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "sign_red",
+            "slab",
+            "wall_brick",
+            "wall_red",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/30_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.838
+          ]
+        },
+        {
+          "file": "30_lod2.glb",
+          "sha256": "395b49b17455b6e26196a19fc0ab4022fa2b912770f6e7e7b9418ed9fe7f6a85",
+          "bytes": 16052,
+          "triangles": 70,
+          "vertices": 140,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "wall_brick",
+            "wall_red",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/30_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.48,
+            0.48,
+            0.0,
+            0.81
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 31,
+      "variants": [
+        {
+          "file": "31_lod0.glb",
+          "sha256": "5db8ab908341e10ff0a39030e47a391a122ecf621ff7e99ad70d9794702b9ef9",
+          "bytes": 123020,
+          "triangles": 1054,
+          "vertices": 1972,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "bench_wood",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "lamp_pole",
+            "metal_dark",
+            "paving",
+            "rim",
+            "roof_dark",
+            "roof_flat",
+            "sign_blue",
+            "sign_green",
+            "sign_orange",
+            "slab",
+            "tire",
+            "tree_dark",
+            "tree_green",
+            "trunk",
+            "wall_cream",
+            "wall_navy",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/31_lod0.glb",
+          "boundsBlender": [
+            -0.498,
+            0.498,
+            -0.5,
+            0.48,
+            0.0,
+            0.34
+          ]
+        },
+        {
+          "file": "31_lod1.glb",
+          "sha256": "0be8b174d0982d63448ac93867063114ad05248386fdf6c2b11e21d47bb4b1f4",
+          "bytes": 53480,
+          "triangles": 410,
+          "vertices": 820,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal_dark",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "slab",
+            "wall_cream",
+            "wall_navy",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/31_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.33
+          ]
+        },
+        {
+          "file": "31_lod2.glb",
+          "sha256": "a19207a896e5f0909ccab7dc83f0248a1f7ea54cd018811e76aa7602e9fba214",
+          "bytes": 13848,
+          "triangles": 60,
+          "vertices": 120,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "paving",
+            "roof_dark",
+            "roof_flat",
+            "slab",
+            "wall_cream"
+          ],
+          "lod": 2,
+          "url": "/models/v2/31_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.315
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 33,
+      "variants": [
+        {
+          "file": "33_lod0.glb",
+          "sha256": "35bb9ddcb26ea10074102dfa890de962b4b6c2f94b6a2096e5ecea68706be6a3",
+          "bytes": 107884,
+          "triangles": 889,
+          "vertices": 1731,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_lamp",
+            "glow_window",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "roof_flat",
+            "roof_slate",
+            "sign_blue",
+            "sign_orange",
+            "slab",
+            "wall_beige",
+            "wall_blue",
+            "wall_cream",
+            "wall_green",
+            "wall_grey",
+            "wall_red",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/33_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.454
+          ]
+        },
+        {
+          "file": "33_lod1.glb",
+          "sha256": "1d788df04f7e332d05411df5329c10692381c857ebb493cfc8e78afa704028f5",
+          "bytes": 54752,
+          "triangles": 412,
+          "vertices": 826,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "roof_flat",
+            "roof_slate",
+            "slab",
+            "wall_beige",
+            "wall_grey",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/33_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.425
+          ]
+        },
+        {
+          "file": "33_lod2.glb",
+          "sha256": "65471d45d498cbc7ee756327a278104c6286fcafffba8b0251862d3db947ba84",
+          "bytes": 11944,
+          "triangles": 46,
+          "vertices": 94,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "roof_flat",
+            "roof_slate",
+            "wall_beige",
+            "wall_grey"
+          ],
+          "lod": 2,
+          "url": "/models/v2/33_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.41
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 35,
+      "variants": [
+        {
+          "file": "35_lod0.glb",
+          "sha256": "37edbd1ec144451117b959191838ef1aa75ee35741f2c941a6d79d07a8f26974",
+          "bytes": 95772,
+          "triangles": 889,
+          "vertices": 1688,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glow_lamp",
+            "glow_window",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "wall_cream",
+            "wall_grey",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/35_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.57
+          ]
+        },
+        {
+          "file": "35_lod1.glb",
+          "sha256": "3ffc948d4d06118c03e365d3592f0723cb19caf48ebcc23c7f2d5da8d01ed50e",
+          "bytes": 43340,
+          "triangles": 334,
+          "vertices": 626,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "paving",
+            "roof_flat",
+            "sign_blue",
+            "wall_cream",
+            "wall_grey",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/35_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.265
+          ]
+        },
+        {
+          "file": "35_lod2.glb",
+          "sha256": "a832a0d2576267fd61d5b49e43f4a0ca07765a9ce2052efb28bb0a9875ed8862",
+          "bytes": 9844,
+          "triangles": 40,
+          "vertices": 80,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "paving",
+            "roof_flat",
+            "wall_grey"
+          ],
+          "lod": 2,
+          "url": "/models/v2/35_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.23
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 36,
+      "variants": [
+        {
+          "file": "36_lod0.glb",
+          "sha256": "9bf994fcb7563990468273ef2e56d96b58440b3c13cee5d393b15559caa77472",
+          "bytes": 112856,
+          "triangles": 997,
+          "vertices": 1923,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "roof_blue",
+            "roof_flat",
+            "sign_blue",
+            "sign_orange",
+            "sign_red",
+            "tree_green",
+            "trunk",
+            "wall_cream",
+            "wall_white",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/36_lod0.glb",
+          "boundsBlender": [
+            -0.49,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.429
+          ]
+        },
+        {
+          "file": "36_lod1.glb",
+          "sha256": "699f696d1f57c9134cef861ec95a6b7e089165d3d86797a417af8f148e7d7520",
+          "bytes": 48348,
+          "triangles": 366,
+          "vertices": 730,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_blue",
+            "glass_dark",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "roof_blue",
+            "roof_flat",
+            "wall_cream",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/36_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.405
+          ]
+        },
+        {
+          "file": "36_lod2.glb",
+          "sha256": "28cf8f8075fef33fe4d4ab200a7aaf912931d8471085f37aa19eda33c4d8e27b",
+          "bytes": 11760,
+          "triangles": 46,
+          "vertices": 90,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "roof_blue",
+            "roof_flat",
+            "wall_cream",
+            "wall_white"
+          ],
+          "lod": 2,
+          "url": "/models/v2/36_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.39
+          ]
+        }
+      ]
+    },
+    {
+      "catalogId": 37,
+      "variants": [
+        {
+          "file": "37_lod0.glb",
+          "sha256": "bf897db1a2f307d0a7a7a278cf22c8762d5afcf49ddadd582e0bab956d500d12",
+          "bytes": 98596,
+          "triangles": 882,
+          "vertices": 1676,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "roof_dark",
+            "roof_flat",
+            "roof_slate",
+            "sign_orange",
+            "sign_red",
+            "wall_beige",
+            "wall_brick",
+            "wall_grey",
+            "wall_wood",
+            "white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/37_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.79
+          ]
+        },
+        {
+          "file": "37_lod1.glb",
+          "sha256": "85bdc6cc250bb6c9bce2266bfacd62dc72943a3ca6345241700a009bfa87cd67",
+          "bytes": 33688,
+          "triangles": 196,
+          "vertices": 376,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "roof_dark",
+            "roof_flat",
+            "roof_slate",
+            "wall_beige",
+            "wall_brick",
+            "wall_grey",
+            "white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/37_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.72
+          ]
+        },
+        {
+          "file": "37_lod2.glb",
+          "sha256": "0fb01862b37127bb487adb429466e4138d1c9a7ba9c598348ddae7fbaccf2dc5",
+          "bytes": 17196,
+          "triangles": 82,
+          "vertices": 155,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "roof_dark",
+            "roof_flat",
+            "roof_slate",
+            "wall_beige",
+            "wall_brick",
+            "wall_grey"
+          ],
+          "lod": 2,
+          "url": "/models/v2/37_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.72
+          ]
+        }
+      ]
+    },
+    {
       "catalogId": 38,
       "variants": [
         {
           "file": "38_lod0.glb",
-          "sha256": "1205da55d8a8e2f2af4f49e062db8802ad5253856211472067af3c3d0bc119cc",
+          "sha256": "056a62fb02b2e4cdf35cf042124edbe748463963769d1475e43594b131745641",
           "bytes": 341736,
           "triangles": 3426,
           "vertices": 6471,
@@ -520,7 +3456,7 @@
         },
         {
           "file": "38_lod1.glb",
-          "sha256": "0aee8dc9bba01e23a40c7d27d285436a4b8fecd54e4c5bcb1bdc6c58ab1ff04c",
+          "sha256": "25adb6247a4690f33f41fa777258e337d20a580b0aa324d0c2fc5f136ccfa8db",
           "bytes": 147516,
           "triangles": 1351,
           "vertices": 2585,
@@ -590,11 +3526,108 @@
           ]
         }
       ]
+    },
+    {
+      "catalogId": 39,
+      "variants": [
+        {
+          "file": "39_lod0.glb",
+          "sha256": "3d659a13edb9fbf492f50deea4b79202ca370357921a3d1a48734ffb155063aa",
+          "bytes": 103732,
+          "triangles": 938,
+          "vertices": 1789,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_lamp",
+            "glow_sign",
+            "glow_window",
+            "lamp_pole",
+            "metal",
+            "metal_dark",
+            "roof_flat",
+            "sign_blue",
+            "sign_green",
+            "sign_orange",
+            "wall_cream",
+            "wall_green",
+            "wall_white"
+          ],
+          "lod": 0,
+          "url": "/models/v2/39_lod0.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.439
+          ]
+        },
+        {
+          "file": "39_lod1.glb",
+          "sha256": "cfa360069c01d427f8facb78a5eebb7b04a8d673ed8a994e2f4e783f03c2301d",
+          "bytes": 27584,
+          "triangles": 158,
+          "vertices": 304,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "glass_dark",
+            "glow_sign",
+            "glow_window",
+            "metal",
+            "metal_dark",
+            "roof_flat",
+            "wall_cream",
+            "wall_green",
+            "wall_white"
+          ],
+          "lod": 1,
+          "url": "/models/v2/39_lod1.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.4
+          ]
+        },
+        {
+          "file": "39_lod2.glb",
+          "sha256": "62b10ecc2cac665054033ba4031b88f03987b90b3574a450be3009d6bc62c55a",
+          "bytes": 9868,
+          "triangles": 40,
+          "vertices": 80,
+          "meshes": 1,
+          "materials": [
+            "asphalt",
+            "concrete",
+            "roof_flat",
+            "wall_cream",
+            "wall_green"
+          ],
+          "lod": 2,
+          "url": "/models/v2/39_lod2.glb",
+          "boundsBlender": [
+            -0.48,
+            0.48,
+            -0.5,
+            0.48,
+            0.0,
+            0.36
+          ]
+        }
+      ]
     }
   ],
   "summary": {
-    "assetCount": 15,
-    "buildingCount": 5,
-    "totalBytes": 1796472
+    "assetCount": 105,
+    "buildingCount": 35,
+    "totalBytes": 6229252
   }
 }

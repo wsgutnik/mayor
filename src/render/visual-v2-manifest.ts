@@ -7,7 +7,7 @@ import { firstLoadableModel, legacyBuildingUrl, visualV2Url } from "./visual-v2"
  * This is a packaging/quality gate, not a cryptographic runtime hash check.
  */
 export const VISUAL_V2_MANIFEST_URL = "/models/v2/asset-manifest.json";
-const REFERENCE_IDS = [1, 10, 20, 21, 38] as const;
+const REFERENCE_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 30, 31, 33, 35, 36, 37, 38, 39] as const;
 const SHA256 = /^[0-9a-f]{64}$/;
 
 interface V2Variant {

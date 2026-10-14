@@ -10,7 +10,7 @@ import {
 
 describe("Visual V2 reference asset resolver", () => {
   it("declares only the five approved reference catalog IDs", () => {
-    expect(VISUAL_V2_REFERENCE_IDS).toEqual([1, 10, 20, 21, 38]);
+    expect(VISUAL_V2_REFERENCE_IDS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 30, 31, 33, 35, 36, 37, 38, 39]);
   });
 
   it("keeps all existing building paths when the preview flag is off", () => {
@@ -28,8 +28,8 @@ describe("Visual V2 reference asset resolver", () => {
         visualV2Url(id, 0), legacyBuildingUrl(id),
       ]);
     }
-    expect(buildingModelCandidates(2, true)).toEqual(["/models/02.glb"]);
-    expect(visualV2Url(2, 0)).toBeNull();
+    expect(buildingModelCandidates(27, true)).toEqual(["/models/27.glb"]);
+    expect(visualV2Url(27, 0)).toBeNull();
   });
 
   it("rejects invalid catalog IDs rather than fetching fabricated paths", () => {

@@ -11,7 +11,7 @@ import struct
 import sys
 from pathlib import Path
 
-IDS = (1, 10, 20, 21, 38)
+IDS = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 30, 31, 33, 35, 36, 37, 38, 39)
 LODS = (0, 1, 2)
 
 
@@ -104,7 +104,7 @@ def audit_directory(directory):
     expected = {(n, lod) for n in IDS for lod in LODS}
     observed = {(x.get("catalogId"), x.get("lod")) for x in entries}
     if observed != expected or len(entries) != len(expected):
-        raise AssetError("Blender build report must contain exactly the expected 15 unique ID/LOD pairs")
+        raise AssetError(f"Blender build report must contain exactly the expected {len(expected)} unique ID/LOD pairs")
     indexed = {(x["catalogId"], x["lod"]): x for x in entries}
     assets = []
     for n in IDS:
@@ -129,7 +129,7 @@ def audit_directory(directory):
             raise AssetError(f"{n:02d}: LOD triangle counts must decrease from near to far")
         assets.append({"catalogId": n, "variants": variants})
     return {"schemaVersion": 1, "referenceCatalogIds": list(IDS), "assets": assets,
-            "summary": {"assetCount": 15, "buildingCount": 5,
+            "summary": {"assetCount": len(IDS) * len(LODS), "buildingCount": len(IDS),
                         "totalBytes": sum(v["bytes"] for a in assets for v in a["variants"])}}
 
 
