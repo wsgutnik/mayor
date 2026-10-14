@@ -72,10 +72,11 @@ derived, unsaved data and is bounded by arms² × lanes² × 14 samples.
 
 ## Invariants (asserted by `checkJunction` and the test suite)
 
-Close approaches use a minimum 5° mouth gap.  Below it the renderer treats
-the gap as merged; no ring may use a negative trim, and every emitted ring is
-simple.  A mixed-width offset tangent behind its node is replaced by the
-budgeted chamfer station.  Kerb-band triangulation is accepted only when its
+Close approaches use a minimum 5° mouth gap.  Below it the two arms share ONE
+merged mouth (see "Amendment P8 — mouth assembly"); no recorded trim may be
+negative, and every emitted ring is simple.  A mixed-width tangent behind its
+node is NOT clamped: the wider arm's edge continues straight past the node to
+the fillet (P8 item 3).  Kerb-band triangulation is accepted only when its
 triangle area differs from `outer - inner` by at most `max(0.02, 5%)`; an
 invalid band is drawn below the asphalt patch.
 
@@ -131,9 +132,12 @@ Consequences (stated so no implementer re-derives them):
   neighbouring mouth on acute wedges, while the miter is a single consistent
   corner. (The asphalt layer itself chamfers below R 0.2.)
   Mixed-profile corners (unequal kerbs) cannot share one tangent circle: each
-  layer solves its own centre from its own edge lines with
-  `ρ = R − max(Δa, Δb)` (Δ = layer lateral minus asphalt lateral), and trims
-  are recorded per layer (07:23 already provides for per-layer trims).
+  layer solves its own circle tangent to its own edge lines, and trims are
+  recorded per layer (07:23 already provides for per-layer trims). The
+  centre is fixed by P8 item 5 (foot of the inner centre on the layer's edge
+  bisector), which superseded `ρ = R − max(Δa, Δb)` from own offset lines:
+  on a 10° avenue/street wedge that centre slid 0.115 toward the node and the
+  kerb tip pierced the asphalt.
 
 Lane model (settles the S1-4 "no lane model" gap for P1):
 
@@ -204,7 +208,7 @@ connector-pair enumeration is available — until P4 the full R applies).
    spike clamp with code `concave-clamped`; P2 implementation proved the
    miter geometrically unsound for bends and replaced it. The code is
    retired.)
-6. Minimum gap: arms closer than 3° emit `min-gap-merged` and the corner uses
+6. Minimum gap (superseded by P8 item 1: 5°, one merged mouth): arms closer than 3° emit `min-gap-merged` and the corner uses
    the wider arm's edge (no sliver wedge). Gaps < 0.02 rad that are exact
    duplicates keep the incumbent skip but must diagnose.
 7. The old per-node `miterLimit = clamp(radius + 1.5·fillet, 0.85, 1.8)` is NOT
@@ -327,6 +331,77 @@ chamfered reflex).
 - Performance fixture (for P7): the skill hard-case set × 10 rotations, seeded
   RNG, `buildJunction` and `checkJunction` timed separately; the "100 nodes <
   10 ms" budget is measured on that fixture, warm cache.
+
+### Amendment P8 — mouth assembly (2026-10-14, reviewer findings F4/F5)
+
+Replaces the clamped-trim corner fallback and the 3° merge rule. Implemented
+in `buildJunction` (`src/sim/junction.ts`), tested in
+`src/sim/junction-mixed.test.ts`. Units are tiles; h = asphaltHalf,
+Δ_L = layer offset minus h (kerb, kerb + sidewalk, + clearance).
+
+1. **Mouth units.** Arms are angle-sorted. A run of arms whose consecutive gaps
+   are below `MERGE_GAP` = 5° is ONE unit with one mouth (diagnostic
+   `min-gap-merged`, one per merged gap; fillet kind `merged`). Its mouth
+   line is perpendicular to the bisector of the run's extreme arms. Its
+   flanks are member arms' own edges: the widest member on each side (ties:
+   the angular extreme), widened until every member's edge meets the mouth
+   line between the flanks. Every member's per-side trim is the station
+   where that edge meets the mouth line, so the narrower arm's ribbon starts
+   ON the merged mouth (each trim point lies on the ring exactly). A unit that
+   holds every arm (two arms 2° apart) closes round the back of the node with
+   concentric arcs of radius h + Δ_L centred on the node.
+2. **Corners in angular order** between consecutive units: corner (u, v) uses
+   u's CCW flank edge and v's CW flank edge, each offset by its OWN h + R
+   (R = max of the two class radii). Mixed-width tangent stations are
+   `tA(R) = (h_b + R + (h_a + R) cos θ) / sin θ` (tB symmetric), linear in R
+   with slope `(1 + cos θ) / sin θ`; the budget solve inverts exactly that
+   (equal widths reduce to `(h + R) cot(θ/2)`). Only a positive nominal
+   station consumes its segment allowance.
+3. **Signed stations (T-like continuation).** For an obtuse wide/narrow
+   corner the wider arm's tangent can lie behind the node (negative station:
+   cos θ < −(h_n + R)/(h_w + R), about θ > 134° avenue/street). The wider
+   arm's edge then continues straight past the node to the fillet; it is
+   provably outside the narrower arm's strip and inside the corner wedge.
+   Diagnostic `trim-clamped` "edge continued d past node"; the recorded
+   trim is the station clamped to 0 and the fillet keeps the signed pair
+   (`JunctionFillet.tA/tB`, used by `checkJunction` for tangency).
+4. **Unit mouth = max over its two corners (>= 0), chained outward over
+   layers; every layer's across-edge is floored at the inner layer's actual
+   across-edge** (mitered layers included). A single arm that is the wider
+   side of a straight width step and whose corners all stay below the cap
+   depth μ = max(kerb + sidewalk, 0.1) (the P0.7 dead-end B, budget-limited)
+   gets its mouth raised to μ and both side trims raised to it: a zero mouth
+   would fold the step back along the mouth line.
+5. **Outer layers of an arc corner**: the circle tangent to the layer's two
+   edge lines whose centre is the foot of the inner layer's centre on their
+   bisector (exactly concentric with radius R − Δ for equal Δ), accepted
+   only when `|O_L − O_inner| + ρ_L <= ρ_inner` and ρ_L >= 0.05. Otherwise
+   the layer miters at its edge intersection, unless that point is buried in
+   the inner layer's tip polygon or lies behind the node; then the inner
+   chord is offset outward by Δ_L and clipped to the layer's edges
+   (diagnostic "offset chamfer"). A miter is ONE vertex (the intersection
+   itself), and a mouth corner at a chain end's own station reuses that point.
+6. **Straight gaps (|θ − π| < 0.09).** Width step at the node plane. The wider
+   arm's outer layers wrap the step face: they continue σ_L = Δ_L(wide) past
+   the node before stepping in, so a kerb or sidewalk band never collapses
+   onto the asphalt step. Equal offsets on the convex side of a kinked joint
+   share one corner at the edge intersection.
+7. **Budget order (unchanged, now exact for mixed widths):** shrink R
+   (`radius-shrunk`), floor 0.2, then chamfer at the clamped stations
+   (`chamfered-corner`), then the mouth-fit miter. No silent negative trim:
+   `checkJunction` rejects any recorded trim < 0.
+8. **Checker tolerance.** Two independently 1e-3-rounded rings drift apart by
+   up to 2 · 0.5e-3 · √2 = 1.414e-3 on shared-station edges (asphalt and kerb
+   mouths of a diagonal arm), so nesting and mouth checks use 1.5e-3
+   (tangency stays at 2e-3, P0.6).
+
+Measured (headless): the reviewer sweep (avenue + street pair 4–45°, all
+classes 2–4°) is clean; the matrix avenue + one street / + street pair at
+4, 6, 10, 20, 30, 45, 60, 90°, both sides and mirrored, merged 2/3/4° for six
+class mixes, short arms 1.2/2/5 tiles, and hard cases every 9° all give
+simple, nested, CCW rings whose ear-clipped area equals ring area within
+1e-6. Known limit: nodes with sub-tile segments AND several acute wedges can
+still self-intersect (7 of 1144 random-network nodes, all pre-existing).
 
 ## Visual acceptance (day and night, game zoom and close up)
 

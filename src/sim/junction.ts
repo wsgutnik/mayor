@@ -106,6 +106,12 @@ export interface JunctionFillet {
   /** Arc sweep (radians, signed) and sample steps; 0 when not an arc. */
   sweep: number;
   steps: number;
+  /** Signed asphalt stations of the corner points on arm a / arm b (the
+   * tangent points of an arc, chamfer ends, or 0 at a ray start). Negative
+   * when the wider arm's edge continues past the node to the fillet; the
+   * recorded arm trims are these clamped to >= 0. */
+  tA: number;
+  tB: number;
 }
 
 export interface LotAnchor {
@@ -196,19 +202,25 @@ function segsTouch(p1: Pt, p2: Pt, p3: Pt, p4: Pt, eps: number): boolean {
   return false;
 }
 
+/** Stacked quantisation of two independently 1e-3-rounded rings: each vertex
+ * moves <= 0.5e-3 per axis (0.707e-3), so a vertex and an edge of the other
+ * ring drift apart by up to 1.414e-3 on collinear (shared-station) edges,
+ * e.g. the asphalt and kerb mouths of a diagonal arm. */
+const NEST_TOL = 1.5e-3;
+
 /**
  * True when two edges from DIFFERENT layers properly cross with more than
- * 1e-3 clearance on both straddles. Contacts and sub-grid crossings are
+ * NEST_TOL clearance on both straddles. Contacts and sub-grid crossings are
  * legal nesting: mouth/back edges share stations across layers, and the
- * independent 1e-3 quantisation wobbles them by up to ~0.0007 — below the
- * representation precision, like the vertex check's own 1e-3 tolerance.
+ * independent quantisation of the two rings wobbles them apart.
  */
+
 function edgesProperCross(p1: Pt, p2: Pt, p3: Pt, p4: Pt): boolean {
   const d1 = orient(p3, p4, p1), d2 = orient(p3, p4, p2);
   const d3 = orient(p1, p2, p3), d4 = orient(p1, p2, p4);
   const lb = Math.hypot(p4.x - p3.x, p4.z - p3.z) || 1;
   const la = Math.hypot(p2.x - p1.x, p2.z - p1.z) || 1;
-  const t = 1e-3;
+  const t = NEST_TOL;
   const s1 = (d1 / lb > t && d2 / lb < -t) || (d1 / lb < -t && d2 / lb > t);
   const s2 = (d3 / la > t && d4 / la < -t) || (d3 / la < -t && d4 / la > t);
   return s1 && s2;
@@ -311,32 +323,100 @@ function armsAt(w: World, nodeId: number): { ground: JArm[]; excluded: ExcludedA
 }
 
 interface Gap {
+  /** Arm indices (into ground) of the corner: a = i (CCW start), b = j. */
   i: number;
   j: number;
+  /** Unit indices (reduced gaps only; raw gaps carry -1). */
+  ui: number;
+  uj: number;
   gap: number;
   kind: FilletKind;
   sideA: -1 | 1;
   sideB: -1 | 1;
 }
 
+/**
+ * Gap from arm i CCW to arm j. `self` marks the single-unit wrap (a group
+ * holding every arm): the gap is a full turn from the CCW flank's left side
+ * round the back to the CW flank's right side.
+ */
+function gapBetween(arms: JArm[], i: number, j: number, self = false): Gap {
+  let g = arms[j].angle - arms[i].angle;
+  if (self) {
+    while (g <= 1e-9) g += 2 * Math.PI;
+  } else {
+    while (g < 0) g += 2 * Math.PI;
+  }
+  const mid = arms[i].angle + g / 2;
+  const ix = Math.cos(mid), iz = Math.sin(mid);
+  let sideA = ((-arms[i].dz * ix + arms[i].dx * iz) >= 0 ? 1 : -1) as -1 | 1;
+  let sideB = ((-arms[j].dz * ix + arms[j].dx * iz) >= 0 ? 1 : -1) as -1 | 1;
+  if (self && g > 2 * Math.PI - 1e-6) { sideA = 1; sideB = -1; }
+  const kind: FilletKind =
+    !self && g < MERGE_GAP ? "merged"
+    : Math.abs(g - Math.PI) < STRAIGHT_TOL ? "straight"
+    : g < Math.PI ? "convex" : "reflex";
+  return { i, j, ui: -1, uj: -1, gap: g, kind, sideA, sideB };
+}
+
 function gapsOf(arms: JArm[]): Gap[] {
   const n = arms.length;
   const out: Gap[] = [];
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    let g = arms[j].angle - arms[i].angle;
-    while (g <= 0) g += 2 * Math.PI;
-    const mid = arms[i].angle + g / 2;
-    const ix = Math.cos(mid), iz = Math.sin(mid);
-    const sideA = ((-arms[i].dz * ix + arms[i].dx * iz) >= 0 ? 1 : -1) as -1 | 1;
-    const sideB = ((-arms[j].dz * ix + arms[j].dx * iz) >= 0 ? 1 : -1) as -1 | 1;
-    const kind: FilletKind =
-      g < MERGE_GAP ? "merged"
-      : Math.abs(g - Math.PI) < STRAIGHT_TOL ? "straight"
-      : g < Math.PI ? "convex" : "reflex";
-    out.push({ i, j, gap: g, kind, sideA, sideB });
-  }
+  for (let i = 0; i < n; i++) out.push(gapBetween(arms, i, (i + 1) % n, n === 1));
   return out;
+}
+
+/**
+ * A mouth unit: one arm, or a run of arms whose consecutive gaps are below
+ * MERGE_GAP (min-gap-merged). A merged unit has ONE mouth line, perpendicular
+ * to its bisector (vx, vz); its flanks are member arms' own edges: the CW
+ * flank's right edge faces the previous unit, the CCW flank's left edge the
+ * next. Flanks start as the widest members (ties: the angular extremes) and
+ * are widened by buildJunction until every member edge meets the mouth line
+ * between them (so every member's ribbon starts ON the merged mouth).
+ */
+interface Unit {
+  arms: number[];
+  cw: number;
+  ccw: number;
+  merged: boolean;
+  vx: number;
+  vz: number;
+}
+
+function unitsOf(arms: JArm[], raw: Gap[]): Unit[] {
+  const n = arms.length;
+  if (n === 0) return [];
+  const brk = raw.findIndex((g) => g.kind !== "merged");
+  // Start right after a non-merged gap so a run never wraps; with no merged
+  // wrap gap this is arm 0 and the ring order matches the unmerged layout.
+  const start = n > 1 && raw[n - 1].kind === "merged" && brk >= 0 ? (brk + 1) % n : 0;
+  const groups: number[][] = [];
+  for (let t = 0; t < n; t++) {
+    const idx = (start + t) % n;
+    const prev = raw[(idx - 1 + n) % n];
+    if (t === 0 || (brk >= 0 && prev.kind !== "merged")) groups.push([idx]);
+    else groups[groups.length - 1].push(idx);
+  }
+  return groups.map((g) => {
+    const first = arms[g[0]], last = arms[g[g.length - 1]];
+    let vx = first.dx + last.dx, vz = first.dz + last.dz;
+    const vl = Math.hypot(vx, vz);
+    if (vl < 1e-9) { vx = first.dx; vz = first.dz; } else { vx /= vl; vz /= vl; }
+    const widest = Math.max(...g.map((k) => arms[k].h));
+    const wide = g.filter((k) => arms[k].h >= widest - 1e-9);
+    return { arms: g, cw: wide[0], ccw: wide[wide.length - 1], merged: g.length > 1, vx, vz };
+  });
+}
+
+/** Gaps between consecutive units: gap u runs from unit u's CCW flank to
+ * unit u+1's CW flank (indexed by its start unit). */
+function unitGaps(arms: JArm[], units: Unit[]): Gap[] {
+  return units.map((u, ui) => {
+    const uj = (ui + 1) % units.length;
+    const g = gapBetween(arms, u.ccw, units[uj].cw, units.length === 1);
+    return { ...g, ui, uj };
+  });
 }
 
 // ---------------------------------------------------------------- corners
@@ -387,7 +467,12 @@ function segLength(w: World, seg: RoadSegment): number {
  * is budgeted once here and once from its neighbour; without the cache every
  * lookup recomputes arms, gaps and nominals). */
 interface NodeNoms {
-  ground: JArm[]; excluded: ExcludedArm[]; gaps: Gap[]; noms: Nominal[];
+  ground: JArm[]; excluded: ExcludedArm[];
+  /** Raw arm-to-arm gaps (classification, fillet list, merge detection). */
+  raw: Gap[];
+  units: Unit[];
+  /** Unit-to-unit gaps (the corners actually built) and their nominals. */
+  gaps: Gap[]; noms: Nominal[];
 }
 function getNoms(w: World, nodeId: number, cache?: Map<number, NodeNoms>): NodeNoms | null {
   const hit = cache?.get(nodeId);
@@ -395,9 +480,11 @@ function getNoms(w: World, nodeId: number, cache?: Map<number, NodeNoms>): NodeN
   const node = nodeById(w, nodeId);
   if (!node) return null;
   const { ground, excluded } = armsAt(w, nodeId);
-  const gaps = gapsOf(ground);
+  const raw = gapsOf(ground);
+  const units = unitsOf(ground, raw);
+  const gaps = ground.length >= 2 ? unitGaps(ground, units) : raw;
   const noms = gaps.map((g) => nominalCorner(node.x, node.z, ground[g.i], ground[g.j], g));
-  const out: NodeNoms = { ground, excluded, gaps, noms };
+  const out: NodeNoms = { ground, excluded, raw, units, gaps, noms };
   cache?.set(nodeId, out);
   return out;
 }
@@ -460,10 +547,21 @@ function finalizeConvex(
 ): FinalCorner {
   const R = Math.max(a.R, b.R);
   if (nom.tA <= allowA + 1e-9 && nom.tB <= allowB + 1e-9) {
-    return { rEff: R, chamfered: false, tA: Math.max(0, nom.tA), tB: Math.max(0, nom.tB), ox: nom.ox, oz: nom.oz };
+    // Signed: a negative station is the wider arm's edge continuing past
+    // the node to the fillet (recorded trims clamp to >= 0 later).
+    return { rEff: R, chamfered: false, tA: nom.tA, tB: nom.tB, ox: nom.ox, oz: nom.oz };
   }
-  const tanH = Math.tan(g.gap / 2);
-  const rEff = Math.min(R, allowA * tanH - a.h, allowB * tanH - b.h);
+  // Mixed-width tangent stations are linear in R (own offset per arm):
+  //   tA(R) = (h_b + R + (h_a + R) cos θ) / sin θ, tB symmetric, slope
+  //   (1 + cos θ) / sin θ > 0. Equal widths reduce to (h + R) cot(θ/2).
+  // Only a positive nominal station consumes its segment's allowance (a
+  // tangent behind the node continues the wider arm's edge instead).
+  const sn = Math.sin(g.gap), cs = Math.cos(g.gap);
+  const solveR = (allow: number, hOwn: number, hOther: number): number =>
+    (allow * sn - hOther - hOwn * cs) / (1 + cs);
+  let rEff = R;
+  if (nom.tA > allowA + 1e-9) rEff = Math.min(rEff, solveR(allowA, a.h, b.h));
+  if (nom.tB > allowB + 1e-9) rEff = Math.min(rEff, solveR(allowB, b.h, a.h));
   if (rEff >= R_FLOOR) {
     diags.push({ code: "radius-shrunk", detail: `arms ${a.segId}/${b.segId} R ${R.toFixed(2)}->${rEff.toFixed(3)}` });
     const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
@@ -475,8 +573,8 @@ function finalizeConvex(
     if (o) {
       return {
         rEff, chamfered: false,
-        tA: Math.max(0, (o.x - cx - nax * a.h) * a.dx + (o.z - cz - naz * a.h) * a.dz),
-        tB: Math.max(0, (o.x - cx - nbx * b.h) * b.dx + (o.z - cz - nbz * b.h) * b.dz),
+        tA: (o.x - cx - nax * a.h) * a.dx + (o.z - cz - naz * a.h) * a.dz,
+        tB: (o.x - cx - nbx * b.h) * b.dx + (o.z - cz - nbz * b.h) * b.dz,
         ox: o.x, oz: o.z,
       };
     }
@@ -503,7 +601,9 @@ function arcPoints(
   while (d <= -Math.PI) d += 2 * Math.PI;
   while (d > Math.PI) d -= 2 * Math.PI;
   const sweep = dirSign * Math.abs(d);
-  const steps = Math.max(1, Math.ceil(Math.abs(sweep) / arcStepMax(r)));
+  // 0.5% margin: the checker re-derives the sagitta from quantised r and
+  // sweep, which must not tip a step sized exactly at the bound over it.
+  const steps = Math.max(1, Math.ceil(Math.abs(sweep) / (arcStepMax(r) * 0.995)));
   const pts: Pt[] = [];
   for (let k = 0; k <= steps; k++) {
     const a = a0 + (sweep * k) / steps;
@@ -555,6 +655,30 @@ function finalizeRing(pts: Pt[]): Pt[] {
   if (clean.length > 1) {
     const f = clean[0], l = clean[clean.length - 1];
     if (f.x === l.x && f.z === l.z) clean.pop();
+  }
+  // Quantisation can turn two nearly coincident constructed points (a miter
+  // point and its edge station, a mouth corner and a chain end) into a
+  // 1e-3 spike A,B,A or a collinear backtrack. Drop such zero-area
+  // excursions until none remain (never touches a proper corner).
+  for (let changed = true; changed && clean.length > 3;) {
+    changed = false;
+    for (let i = 0; i < clean.length && clean.length > 3; i++) {
+      const n = clean.length;
+      const a = clean[(i - 1 + n) % n], b = clean[i], c = clean[(i + 1) % n];
+      const cr = (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+      const back = (b.x - a.x) * (c.x - b.x) + (b.z - a.z) * (c.z - b.z) < 0;
+      if (a.x === c.x && a.z === c.z) {
+        clean.splice(i, 1);
+        clean.splice(i % clean.length, 1);
+        changed = true;
+        break;
+      }
+      if (Math.abs(cr) < 1e-12 && back) {
+        clean.splice(i, 1);
+        changed = true;
+        break;
+      }
+    }
   }
   if (clean.length >= 3 && signedArea(clean) < 0) clean.reverse();
   return clean;
@@ -693,12 +817,14 @@ export function buildJunction(
   if (excluded.length > 0) {
     diags.push({ code: "layer-excluded", detail: `segs ${excluded.map((e) => e.segId).join(",")}` });
   }
-  // Copies: the builder reclassifies degenerate gaps ("merged") below, which
-  // must not leak into the cached nominals.
-  const gaps = nn.gaps.map((g) => ({ ...g }));
+  // Raw arm-to-arm gaps: classification, the fillet list and merge detection.
+  const gaps = nn.raw;
   for (const g of gaps) {
     if (g.kind === "merged") {
-      diags.push({ code: "min-gap-merged", detail: `gap ${g.i}-${g.j} ${((g.gap * 180) / Math.PI).toFixed(2)}deg` });
+      diags.push({
+        code: "min-gap-merged",
+        detail: `segs ${ground[g.i].segId}/${ground[g.j].segId} ${((g.gap * 180) / Math.PI).toFixed(2)}deg: one mouth`,
+      });
     }
   }
   const base: Omit<JunctionLayout, "kind" | "template" | "arms" | "asphalt" | "kerbOuter" | "sidewalkOuter" | "boundary" | "fillets" | "lotAnchors" | "hash"> = {
@@ -771,7 +897,7 @@ export function buildJunction(
       fillets: gaps.map((g, k) => ({
         gapIndex: k, aSeg: ground[g.i].segId, bSeg: ground[g.j].segId,
         kind: g.kind, theta: q(g.gap), rNominal: 0, rEff: 0,
-        chamfered: false, centre: null, sweep: 0, steps: 0,
+        chamfered: false, centre: null, sweep: 0, steps: 0, tA: 0, tB: 0,
       })),
       lotAnchors: [], hash: "",
     };
@@ -779,308 +905,496 @@ export function buildJunction(
     return layout;
   }
 
-  // --- bend / transition / junction: nominals, budget, per-layer corners.
-  const noms = nn.noms.map((n) => ({ ...n }));
-  gaps.forEach((g, k) => {
-    if (!noms[k].ok) {
-      g.kind = "merged";
-      noms[k] = { tA: 0, tB: 0, ox: cx, oz: cz, ok: true };
-      diags.push({ code: "trim-clamped", detail: `gap ${k} degenerate` });
-    }
+  // --- bend / transition / junction: mouth units, corners, budget, rings.
+  //
+  // Mouth assembly (07 "Mouth assembly" recipe):
+  //  1. arms closer than MERGE_GAP fold into one unit with ONE mouth line
+  //     (perpendicular to the unit bisector, flanked by member edges);
+  //  2. corners between consecutive units in angular order: the offset-line
+  //     intersection of the left unit's CCW flank edge and the right unit's CW
+  //     flank edge, each at its OWN half-width (+R). Tangent stations are
+  //     signed: a negative station continues the wider arm's edge straight
+  //     past the node (T-like) instead of being clamped into a fold;
+  //  3. a unit's mouth is the max over its two corners (>= 0), raised to the
+  //     cap depth mu when the unit is the wider side of a straight width step
+  //     (a zero mouth would fold the step back along the mouth line);
+  //  4. budgets shrink R (floor 0.2) and then chamfer; each fallback is
+  //     diagnosed. Recorded trims are the per-side stations clamped to >= 0.
+  const units: Unit[] = nn.units.map((u) => ({ ...u, arms: [...u.arms] }));
+  const unitOf = new Map<number, number>();
+  units.forEach((u, ui) => u.arms.forEach((k) => unitOf.set(k, ui)));
+  const segOf = (k: number): RoadSegment => segById(w, ground[k].segId)!;
+  const nbrOf = (k: number): number => {
+    const s = segOf(k);
+    return ground[k].end === "a" ? s.b : s.a;
+  };
+  /** Edge point of arm k: station t (into the segment), lateral side*off. */
+  const E = (k: number, side: number, t: number, off: number): Pt => ({
+    x: cx + ground[k].dx * t - ground[k].dz * side * off,
+    z: cz + ground[k].dz * t + ground[k].dx * side * off,
   });
-  const allowA = new Map<number, number>();
-  const allowB = new Map<number, number>();
-  gaps.forEach((g, k) => {
-    if (g.kind !== "convex") return;
-    const a = ground[g.i], b = ground[g.j];
-    const segA = segById(w, a.segId)!, segB = segById(w, b.segId)!;
-    const nbrA = a.end === "a" ? segA.b : segA.a;
-    const nbrB = b.end === "a" ? segB.b : segB.a;
-    const flipA = (g.sideA === 1 ? -1 : 1) as -1 | 1;
-    const flipB = (g.sideB === 1 ? -1 : 1) as -1 | 1;
-    allowA.set(k, allowance(segLength(w, segA), noms[k].tA, nbrA === nodeId ? 0 : nominalTrimAt(w, nbrA, a.segId, flipA, nomsCache), ribbonReserve(w, nodeId, nbrA, nomsCache)));
-    allowB.set(k, allowance(segLength(w, segB), noms[k].tB, nbrB === nodeId ? 0 : nominalTrimAt(w, nbrB, b.segId, flipB, nomsCache), ribbonReserve(w, nodeId, nbrB, nomsCache)));
+  /** Station along arm k where its side edge (offset off) meets unit u's
+   * mouth line, which sits at bisector station M. */
+  const onMouth = (u: Unit, k: number, side: number, off: number, M: number): number => {
+    const a = ground[k];
+    const dv = a.dx * u.vx + a.dz * u.vz;
+    const nv = (-a.dz * u.vx + a.dx * u.vz) * side;
+    return (M - off * nv) / dv;
+  };
+  const projV = (u: Unit, p: Pt): number => (p.x - cx) * u.vx + (p.z - cz) * u.vz;
+  // Cap depth per unit (the dead-end B of P0.7), within the segment budget.
+  const mu = units.map((u) => {
+    let m = Infinity;
+    for (const k of u.arms) {
+      const a = ground[k];
+      const nom = Math.max(a.kerb + a.sidewalk, 0.1);
+      const nbr = nbrOf(k);
+      const tN = nbr === nodeId ? 0
+        : Math.max(nominalTrimAt(w, nbr, a.segId, 1, nomsCache), nominalTrimAt(w, nbr, a.segId, -1, nomsCache));
+      const al = allowance(segLength(w, segOf(k)), nom, tN, ribbonReserve(w, nodeId, nbr, nomsCache));
+      m = Math.min(m, Math.max(0.02, Math.min(nom, al)));
+    }
+    return q(m);
   });
 
   interface GapFinal {
     rNom: number; rEff: number; chamfered: boolean;
     tA: number; tB: number; mx: number; mz: number;
   }
-  const finals: GapFinal[] = gaps.map((g, k) => {
-    const a = ground[g.i], b = ground[g.j];
-    if (g.kind === "convex") {
-      const f = finalizeConvex(cx, cz, a, b, g, noms[k], allowA.get(k)!, allowB.get(k)!, diags);
-      return { rNom: Math.max(a.R, b.R), rEff: f.rEff, chamfered: f.chamfered, tA: f.tA, tB: f.tB, mx: f.ox, mz: f.oz };
-    }
-    return { rNom: 0, rEff: 0, chamfered: false, tA: 0, tB: 0, mx: cx, mz: cz };
-  });
+  interface Solved {
+    gaps: Gap[];
+    finals: GapFinal[];
+    layerData: CornerPts[][];
+    /** Per unit per layer: arm station (single) or bisector station (merged). */
+    mouth: number[][];
+    forced: boolean[];
+    diags: JunctionDiagnostic[];
+  }
 
-  const layerData: CornerPts[][] = LAYERS.map(() => []);
-  gaps.forEach((g, k) => {
-    const a = ground[g.i], b = ground[g.j], f = finals[k];
-    const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
-    const nbx = -b.dz * g.sideB, nbz = b.dx * g.sideB;
-    const E = (arm: JArm, nx: number, nz: number, t: number, off: number): Pt => ({
-      x: cx + arm.dx * t + nx * off,
-      z: cz + arm.dz * t + nz * off,
+  const solve = (): Solved => {
+    const sd: JunctionDiagnostic[] = [];
+    const ug = unitGaps(ground, units);
+    const noms = ug.map((g) => nominalCorner(cx, cz, ground[g.i], ground[g.j], g));
+    ug.forEach((g, k) => {
+      if (!noms[k].ok) {
+        g.kind = "straight";
+        noms[k] = { tA: 0, tB: 0, ox: cx, oz: cz, ok: true };
+        sd.push({ code: "trim-clamped", detail: `gap ${k} degenerate` });
+      }
     });
-    LAYERS.forEach((L, li) => {
-      const offA = L.off(a), offB = L.off(b);
-      if (f && (g.kind === "straight" || g.kind === "merged")) {
-        layerData[li].push({ eA: E(a, nax, naz, 0, offA), eB: E(b, nbx, nbz, 0, offB), tA: 0, tB: 0, interior: [], sweep: 0, steps: 0, ox: cx, oz: cz, rho: 0, miter: false });
-        return;
+    const allowA = new Map<number, number>();
+    const allowB = new Map<number, number>();
+    ug.forEach((g, k) => {
+      if (g.kind !== "convex") return;
+      const a = ground[g.i], b = ground[g.j];
+      const nbrA = nbrOf(g.i), nbrB = nbrOf(g.j);
+      const flipA = (g.sideA === 1 ? -1 : 1) as -1 | 1;
+      const flipB = (g.sideB === 1 ? -1 : 1) as -1 | 1;
+      allowA.set(k, allowance(segLength(w, segOf(g.i)), noms[k].tA, nbrA === nodeId ? 0 : nominalTrimAt(w, nbrA, a.segId, flipA, nomsCache), ribbonReserve(w, nodeId, nbrA, nomsCache)));
+      allowB.set(k, allowance(segLength(w, segOf(g.j)), noms[k].tB, nbrB === nodeId ? 0 : nominalTrimAt(w, nbrB, b.segId, flipB, nomsCache), ribbonReserve(w, nodeId, nbrB, nomsCache)));
+    });
+    const finals: GapFinal[] = ug.map((g, k) => {
+      const a = ground[g.i], b = ground[g.j];
+      if (g.kind === "convex") {
+        const f = finalizeConvex(cx, cz, a, b, g, noms[k], allowA.get(k)!, allowB.get(k)!, sd);
+        return { rNom: Math.max(a.R, b.R), rEff: f.rEff, chamfered: f.chamfered, tA: f.tA, tB: f.tB, mx: f.ox, mz: f.oz };
       }
-      if (g.kind === "reflex") {
-        // Inner arc tangent at both ray starts (trims stay 0); asymmetric
-        // corners and degenerate radii chamfer straight across.
-        const P0 = E(a, nax, naz, 0, offA);
-        const P1 = E(b, nbx, nbz, 0, offB);
-        const sym = a.h === b.h && a.kerb === b.kerb && a.sidewalk === b.sidewalk;
-        const chamfer = (): void => {
-          layerData[li].push({ eA: P0, eB: P1, tA: 0, tB: 0, interior: [], sweep: 0, steps: 0, ox: cx, oz: cz, rho: 0, miter: false });
-        };
-        if (!sym) {
-          if (li === 0) diags.push({ code: "chamfered-corner", detail: "asymmetric reflex" });
-          chamfer();
-          return;
-        }
-        const o = lineHit(P0.x, P0.z, nax, naz, P1.x, P1.z, nbx, nbz);
-        const r0 = o ? Math.hypot(P0.x - o.x, P0.z - o.z) : 0;
-        const r1 = o ? Math.hypot(P1.x - o.x, P1.z - o.z) : 0;
-        if (!o || Math.abs(r0 - r1) > 1e-6 || r0 < LAYER_MIN_RADIUS) {
-          diags.push({ code: "chamfered-corner", detail: `layer ${L.name} reflex r ${r0.toFixed(3)}` });
-          chamfer();
-          return;
-        }
-        const dir = pickSweepDir(o.x, o.z, r0, P0, P1, cx, cz, true);
-        const arc = arcPoints(o.x, o.z, r0, P0, P1, dir);
-        layerData[li].push({
-          eA: P0, eB: P1, tA: 0, tB: 0, interior: arc.pts.slice(1, -1),
-          sweep: arc.sweep, steps: arc.steps, ox: o.x, oz: o.z, rho: r0, miter: false,
-        });
-        return;
-      }
-      // Convex: the asphalt layer arcs (or chamfers at its budgeted trims);
-      // outer layers arc while their radius allows, else MITER along their
-      // own edges (a chamfer at asphalt stations would swing past the
-      // neighbouring mouth on acute wedges).
-      const rho = f.chamfered ? 0 : f.rEff - Math.max(offA - a.h, offB - b.h);
-      if (li === 0) {
-        if (!f.chamfered) {
-          const o = lineHit(
-            cx + nax * (offA + rho), cz + naz * (offA + rho), a.dx, a.dz,
-            cx + nbx * (offB + rho), cz + nbz * (offB + rho), b.dx, b.dz,
-          );
-          if (o) {
-            const fA = footOnLine(o, cx + nax * offA, cz + naz * offA, a.dx, a.dz);
-            const fB = footOnLine(o, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
-            const tA = q((fA.x - cx - nax * offA) * a.dx + (fA.z - cz - naz * offA) * a.dz);
-            const tB = q((fB.x - cx - nbx * offB) * b.dx + (fB.z - cz - nbz * offB) * b.dz);
-            // An asymmetric outer offset can put the mathematical tangent
-            // behind a node.  It is not a usable trim: use the budgeted
-            // chamfer/miter stations instead of folding the ring backwards.
-            if (tA < 0 || tB < 0) {
-              diags.push({ code: "trim-clamped", detail: `layer ${L.name} tangent behind node` });
-              layerData[li].push({
-                eA: E(a, nax, naz, q(f.tA), offA), eB: E(b, nbx, nbz, q(f.tB), offB),
-                tA: q(f.tA), tB: q(f.tB), interior: [], sweep: 0, steps: 0,
-                ox: f.mx, oz: f.mz, rho: 0, miter: false,
-              });
-              return;
+      return { rNom: 0, rEff: 0, chamfered: false, tA: 0, tB: 0, mx: cx, mz: cz };
+    });
+
+    const layerData: CornerPts[][] = LAYERS.map(() => []);
+    ug.forEach((g, k) => {
+      const ia = g.i, ib = g.j;
+      const a = ground[ia], b = ground[ib], f = finals[k];
+      const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
+      const nbx = -b.dz * g.sideB, nbz = b.dx * g.sideB;
+      const flat = (eA: Pt, eB: Pt, tA: number, tB: number, miter = false, interior: Pt[] = []): CornerPts =>
+        ({ eA, eB, tA, tB, interior, sweep: 0, steps: 0, ox: cx, oz: cz, rho: 0, miter });
+      LAYERS.forEach((L, li) => {
+        const offA = L.off(a), offB = L.off(b);
+        if (g.kind === "straight" || g.kind === "merged") {
+          // Width step at the node plane. The wider arm's outer layers wrap
+          // the step face: they continue sigma (that arm's layer offset beyond
+          // its asphalt) past the node before stepping in, so a kerb or
+          // sidewalk band never collapses onto the asphalt step.
+          let sA = 0, sB = 0;
+          if (offA > offB + 1e-9) { sA = -(offA - a.h); sB = offA - a.h; }
+          else if (offB > offA + 1e-9) { sB = -(offB - b.h); sA = offB - b.h; }
+          else if (g.gap < Math.PI - 1e-6) {
+            // Equal offsets on the convex side of a kinked straight joint: one
+            // shared corner at the edge-line intersection (tiny positive
+            // stations), never two ray-start points poking past a mouth.
+            const m = lineHit(cx + nax * offA, cz + naz * offA, a.dx, a.dz, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
+            if (m) {
+              sA = Math.max(0, q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz));
+              sB = Math.max(0, q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz));
             }
-            const eA = E(a, nax, naz, tA, offA);
-            const eB = E(b, nbx, nbz, tB, offB);
-            const dir = pickSweepDir(o.x, o.z, rho, eA, eB, cx, cz, false);
-            const arc = arcPoints(o.x, o.z, rho, eA, eB, dir);
-            layerData[li].push({
-              eA, eB, tA, tB, interior: arc.pts.slice(1, -1),
-              sweep: arc.sweep, steps: arc.steps, ox: o.x, oz: o.z, rho, miter: false,
-            });
+          }
+          layerData[li].push(flat(E(ia, g.sideA, sA, offA), E(ib, g.sideB, sB, offB), sA, sB));
+          return;
+        }
+        if (g.kind === "reflex") {
+          // Inner arc tangent at both ray starts (trims stay 0); asymmetric
+          // corners and degenerate radii chamfer straight across. A unit that
+          // is alone at its node (its own neighbour) wraps round the back of
+          // the node centre.
+          const P0 = E(ia, g.sideA, 0, offA);
+          const P1 = E(ib, g.sideB, 0, offB);
+          const sym = ia === ib || (a.h === b.h && a.kerb === b.kerb && a.sidewalk === b.sidewalk);
+          if (!sym) {
+            if (li === 0) sd.push({ code: "chamfered-corner", detail: "asymmetric reflex" });
+            layerData[li].push(flat(P0, P1, 0, 0));
             return;
           }
+          const o = ia === ib ? { x: cx, z: cz } : lineHit(P0.x, P0.z, nax, naz, P1.x, P1.z, nbx, nbz);
+          const r0 = o ? Math.hypot(P0.x - o.x, P0.z - o.z) : 0;
+          const r1 = o ? Math.hypot(P1.x - o.x, P1.z - o.z) : 0;
+          if (!o || Math.abs(r0 - r1) > 1e-6 || r0 < LAYER_MIN_RADIUS) {
+            sd.push({ code: "chamfered-corner", detail: `layer ${L.name} reflex r ${r0.toFixed(3)}` });
+            layerData[li].push(flat(P0, P1, 0, 0));
+            return;
+          }
+          let dir: -1 | 1;
+          if (ia === ib) {
+            const mid = a.angle + g.gap / 2;
+            dir = 1;
+            for (const s of [-1, 1] as const) {
+              const pts = arcPoints(o.x, o.z, r0, P0, P1, s).pts;
+              const m = pts[Math.floor(pts.length / 2)];
+              if ((m.x - o.x) * Math.cos(mid) + (m.z - o.z) * Math.sin(mid) > 0) { dir = s; break; }
+            }
+          } else {
+            dir = pickSweepDir(o.x, o.z, r0, P0, P1, cx, cz, true);
+          }
+          const arc = arcPoints(o.x, o.z, r0, P0, P1, dir);
+          layerData[li].push({
+            eA: P0, eB: P1, tA: 0, tB: 0, interior: arc.pts.slice(1, -1),
+            sweep: arc.sweep, steps: arc.steps, ox: o.x, oz: o.z, rho: r0, miter: false,
+          });
+          return;
         }
-        layerData[li].push({
-          eA: E(a, nax, naz, q(f.tA), offA), eB: E(b, nbx, nbz, q(f.tB), offB),
-          tA: q(f.tA), tB: q(f.tB), interior: [], sweep: 0, steps: 0, ox: f.mx, oz: f.mz, rho: 0, miter: false,
-        });
-        return;
-      }
-      if (!f.chamfered && rho >= LAYER_MIN_RADIUS) {
-        const o = lineHit(
-          cx + nax * (offA + rho), cz + naz * (offA + rho), a.dx, a.dz,
-          cx + nbx * (offB + rho), cz + nbz * (offB + rho), b.dx, b.dz,
-        );
-        if (o) {
+        // Convex. Each layer solves its own centre from its own edge lines
+        // (rho = rEff - max layer delta, P0.1). Stations are signed: the wider
+        // arm of an obtuse mixed corner meets the fillet behind the node and
+        // its edge simply continues there (never folded, never clamped).
+        const rho = f.chamfered ? 0 : f.rEff - Math.max(offA - a.h, offB - b.h);
+        const arcAt = (r: number): CornerPts | null => {
+          const o = lineHit(
+            cx + nax * (offA + r), cz + naz * (offA + r), a.dx, a.dz,
+            cx + nbx * (offB + r), cz + nbz * (offB + r), b.dx, b.dz,
+          );
+          if (!o) return null;
           const fA = footOnLine(o, cx + nax * offA, cz + naz * offA, a.dx, a.dz);
           const fB = footOnLine(o, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
           const tA = q((fA.x - cx - nax * offA) * a.dx + (fA.z - cz - naz * offA) * a.dz);
           const tB = q((fB.x - cx - nbx * offB) * b.dx + (fB.z - cz - nbz * offB) * b.dz);
-          if (tA < 0 || tB < 0) {
-            diags.push({ code: "trim-clamped", detail: `layer ${L.name} tangent behind node` });
-            layerData[li].push({
-              eA: E(a, nax, naz, q(f.tA), offA), eB: E(b, nbx, nbz, q(f.tB), offB),
-              tA: q(f.tA), tB: q(f.tB), interior: [], sweep: 0, steps: 0,
-              ox: f.mx, oz: f.mz, rho: 0, miter: false,
-            });
+          const eA = E(ia, g.sideA, tA, offA);
+          const eB = E(ib, g.sideB, tB, offB);
+          // A convex fillet sweeps pi - theta < pi: always the short arc.
+          let d = Math.atan2(eB.z - o.z, eB.x - o.x) - Math.atan2(eA.z - o.z, eA.x - o.x);
+          while (d <= -Math.PI) d += 2 * Math.PI;
+          while (d > Math.PI) d -= 2 * Math.PI;
+          const arc = arcPoints(o.x, o.z, r, eA, eB, d < 0 ? -1 : 1);
+          return {
+            eA, eB, tA, tB, interior: arc.pts.slice(1, -1),
+            sweep: arc.sweep, steps: arc.steps, ox: o.x, oz: o.z, rho: r, miter: false,
+          };
+        };
+        if (li === 0) {
+          const c = f.chamfered ? null : arcAt(rho);
+          if (c) {
+            for (const [t, s] of [[c.tA, a.segId], [c.tB, b.segId]] as const) {
+              if (t < 0) sd.push({ code: "trim-clamped", detail: `seg ${s} edge continued ${(-t).toFixed(3)} past node` });
+            }
+            layerData[li].push(c);
             return;
           }
-          const eA = E(a, nax, naz, tA, offA);
-          const eB = E(b, nbx, nbz, tB, offB);
-          const dir = pickSweepDir(o.x, o.z, rho, eA, eB, cx, cz, false);
-          const arc = arcPoints(o.x, o.z, rho, eA, eB, dir);
-          layerData[li].push({
-            eA, eB, tA, tB, interior: arc.pts.slice(1, -1),
-            sweep: arc.sweep, steps: arc.steps, ox: o.x, oz: o.z, rho, miter: false,
-          });
+          const tA = q(f.tA), tB = q(f.tB);
+          layerData[li].push({ ...flat(E(ia, g.sideA, tA, offA), E(ib, g.sideB, tB, offB), tA, tB), ox: f.mx, oz: f.mz });
           return;
         }
+        // Outer layer arc: the circle tangent to this layer's two edge lines
+        // whose centre is the foot of the inner layer's centre on their
+        // bisector (exactly concentric, radius rho, when both arms share the
+        // layer delta). Accepted only inside the inner layer's disc, so the
+        // band never crosses back into the inner surface; an acute mixed
+        // wedge would otherwise slide its centre by delta / sin(theta).
+        const prev = layerData[li - 1][k];
+        if (!f.chamfered && !prev.miter && prev.steps > 0 && prev.rho > 0) {
+          const K = lineHit(cx + nax * offA, cz + naz * offA, a.dx, a.dz, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
+          let ux = a.dx + b.dx, uz = a.dz + b.dz;
+          const ul = Math.hypot(ux, uz);
+          if (K && ul > 1e-9) {
+            ux /= ul; uz /= ul;
+            const dK = (prev.ox - K.x) * ux + (prev.oz - K.z) * uz;
+            const o = { x: K.x + ux * dK, z: K.z + uz * dK };
+            const r = (o.x - cx - nax * offA) * nax + (o.z - cz - naz * offA) * naz;
+            const inside = Math.hypot(o.x - prev.ox, o.z - prev.oz) + r <= prev.rho + 1e-9;
+            if (r >= LAYER_MIN_RADIUS && inside) {
+              const fA = footOnLine(o, cx + nax * offA, cz + naz * offA, a.dx, a.dz);
+              const fB = footOnLine(o, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
+              const tA = q((fA.x - cx - nax * offA) * a.dx + (fA.z - cz - naz * offA) * a.dz);
+              const tB = q((fB.x - cx - nbx * offB) * b.dx + (fB.z - cz - nbz * offB) * b.dz);
+              const eA = E(ia, g.sideA, tA, offA), eB = E(ib, g.sideB, tB, offB);
+              let d = Math.atan2(eB.z - o.z, eB.x - o.x) - Math.atan2(eA.z - o.z, eA.x - o.x);
+              while (d <= -Math.PI) d += 2 * Math.PI;
+              while (d > Math.PI) d -= 2 * Math.PI;
+              const arc = arcPoints(o.x, o.z, r, eA, eB, d < 0 ? -1 : 1);
+              layerData[li].push({
+                eA, eB, tA, tB, interior: arc.pts.slice(1, -1),
+                sweep: arc.sweep, steps: arc.steps, ox: o.x, oz: o.z, rho: r, miter: false,
+              });
+              return;
+            }
+          }
+        }
+        const m = lineHit(
+          cx + nax * offA, cz + naz * offA, a.dx, a.dz,
+          cx + nbx * offB, cz + nbz * offB, b.dx, b.dz,
+        );
+        const mtA = m ? q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz) : 0;
+        const mtB = m ? q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz) : 0;
+        // A miter is only sound outside the inner layer: on an acute wedge
+        // whose inner corner is chamfered (or a small arc) beyond the inner
+        // edges' crossing, the outer miter point can sit inside the inner
+        // surface's tip. Then the inner chord is offset instead.
+        let buried = false;
+        if (m) {
+          const ip = layerData[li - 1][k];
+          const pA = a.h + (li > 1 ? LAYERS[li - 1].off(a) - a.h : 0);
+          const pB = b.h + (li > 1 ? LAYERS[li - 1].off(b) - b.h : 0);
+          const xin = lineHit(cx + nax * pA, cz + naz * pA, a.dx, a.dz, cx + nbx * pB, cz + nbz * pB, b.dx, b.dz);
+          if (xin && !ip.miter) {
+            const tip = [xin, ip.eA, ...ip.interior, ip.eB];
+            buried = Math.abs(signedArea(tip)) > 1e-9 && pointInRing(m, tip);
+          }
+        }
+        if (m && mtA >= 0 && mtB >= 0 && !buried) {
+          sd.push({ code: "chamfered-corner", detail: `layer ${L.name} miter rho ${rho.toFixed(3)}` });
+          // A miter is ONE vertex: both ends are the edge intersection itself
+          // (separately rounded stations would leave a 1e-3 kink there).
+          layerData[li].push({ ...flat({ x: m.x, z: m.z }, { x: m.x, z: m.z }, mtA, mtB, true), ox: m.x, oz: m.z });
+          return;
+        }
+        // No sound miter: either the miter sits behind the node (obtuse mixed
+        // corner: wider arm behind the node, far out on the narrower one) or
+        // it is buried in the inner layer's tip (acute wedge chamfered past
+        // its edge crossing). Offset the asphalt chord outward by the layer's
+        // band instead, clipped to this layer's edges.
+        const base0 = layerData[0][k];
+        let ux = base0.eB.x - base0.eA.x, uz = base0.eB.z - base0.eA.z;
+        const ul = Math.hypot(ux, uz);
+        let placed = false;
+        if (ul > 1e-6) {
+          ux /= ul; uz /= ul;
+          let mx = -uz, mz = ux;
+          if ((base0.eA.x - cx) * mx + (base0.eA.z - cz) * mz < 0) { mx = -mx; mz = -mz; }
+          const dl = Math.max(offA - a.h, offB - b.h);
+          const px = base0.eA.x + mx * dl, pz = base0.eA.z + mz * dl;
+          const hA = lineHit(px, pz, ux, uz, cx + nax * offA, cz + naz * offA, a.dx, a.dz);
+          const hB = lineHit(px, pz, ux, uz, cx + nbx * offB, cz + nbz * offB, b.dx, b.dz);
+          if (hA && hB) {
+            const sA = q((hA.x - cx - nax * offA) * a.dx + (hA.z - cz - naz * offA) * a.dz);
+            const sB = q((hB.x - cx - nbx * offB) * b.dx + (hB.z - cz - nbz * offB) * b.dz);
+            sd.push({ code: "chamfered-corner", detail: `layer ${L.name} offset chamfer (${buried ? "miter buried" : "miter behind node"})` });
+            layerData[li].push(flat(E(ia, g.sideA, sA, offA), E(ib, g.sideB, sB, offB), sA, sB));
+            placed = true;
+          }
+        }
+        if (!placed) {
+          sd.push({ code: "trim-clamped", detail: `layer ${L.name} miter degenerate` });
+          const tA = q(f.tA), tB = q(f.tB);
+          layerData[li].push({ ...flat(E(ia, g.sideA, tA, offA), E(ib, g.sideB, tB, offB), tA, tB), ox: f.mx, oz: f.mz });
+        }
+      });
+    });
+
+    // Mouth stations per unit per layer (arc/chamfer/straight layers; mitered
+    // layers route via their own miter stations), chained outward-monotonic:
+    // an outer across-edge must never cut an inner along-edge.
+    const U = units.length;
+    const forced = units.map(() => false);
+    const computeMouth = (): number[][] => units.map((u, ui) => {
+      const out = LAYERS.map(() => 0);
+      const gIn = (ui - 1 + U) % U, gOut = ui;
+      if (u.merged) {
+        LAYERS.forEach((_, li) => {
+          let M = li === 0 ? mu[ui] : out[li - 1];
+          M = Math.max(M, projV(u, layerData[li][gIn].eB), projV(u, layerData[li][gOut].eA));
+          out[li] = M;
+        });
+        return out;
       }
-      diags.push({ code: "chamfered-corner", detail: `layer ${L.name} miter rho ${rho.toFixed(3)}` });
+      LAYERS.forEach((_, li) => {
+        let own = 0;
+        if (!layerData[li][gOut].miter) own = Math.max(own, layerData[li][gOut].tA);
+        if (!layerData[li][gIn].miter) own = Math.max(own, layerData[li][gIn].tB);
+        out[li] = Math.max(own, li > 0 ? out[li - 1] : 0);
+      });
+      const k = u.arms[0];
+      const step = [ug[gIn], ug[gOut]].some((g) =>
+        g.kind === "straight" && ground[g.i === k ? g.j : g.i].h < ground[k].h - 1e-9);
+      // Any corner station counts here, mitered ones included: an arm whose
+      // mitered corner already reaches past mu has a real mouth.
+      const reach = Math.max(0, layerData[0][gOut].tA, layerData[0][gIn].tB);
+      forced[ui] = step && out[0] < mu[ui] - 1e-9 && reach < mu[ui] - 1e-9;
+      if (forced[ui]) for (let li = 0; li < out.length; li++) out[li] = Math.max(out[li], mu[ui]);
+      return out;
+    });
+    let mouth = computeMouth();
+    /** Mouth station along arm k (its side edge) for the unit holding it. */
+    const mouthSt = (ui: number, k: number, side: number, li: number): number =>
+      units[ui].merged ? onMouth(units[ui], k, side, LAYERS[li].off(ground[k]), mouth[ui][li]) : mouth[ui][li];
+
+    // Fit check, iterated to a fixed point: a convex corner whose flanking
+    // mouths would cross strictly inside the road (or whose trim point swings
+    // past the neighbour mouth line) cannot host mouths at its trims, so the
+    // layer miters instead (single corner at the edge intersection, flagged
+    // when over allowance).
+    const miterCorner = (g: Gap, k: number, li: number): void => {
+      const a = ground[g.i], b = ground[g.j];
+      const offA = LAYERS[li].off(a), offB = LAYERS[li].off(b);
+      const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
+      const nbx = -b.dz * g.sideB, nbz = b.dx * g.sideB;
       const m = lineHit(
         cx + nax * offA, cz + naz * offA, a.dx, a.dz,
         cx + nbx * offB, cz + nbz * offB, b.dx, b.dz,
-      );
-      if (!m) {
-        diags.push({ code: "trim-clamped", detail: `layer ${L.name} miter degenerate` });
-        layerData[li].push({
-          eA: E(a, nax, naz, q(f.tA), offA), eB: E(b, nbx, nbz, q(f.tB), offB),
-          tA: q(f.tA), tB: q(f.tB), interior: [], sweep: 0, steps: 0, ox: f.mx, oz: f.mz, rho: 0, miter: false,
-        });
-        return;
-      }
-      const mtA = q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz);
-      const mtB = q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz);
-      layerData[li].push({
-        eA: E(a, nax, naz, mtA, offA), eB: E(b, nbx, nbz, mtB, offB), tA: mtA, tB: mtB,
-        interior: [{ x: m.x, z: m.z }], sweep: 0, steps: 0, ox: m.x, oz: m.z, rho: 0, miter: true,
-      });
-    });
-  });
-
-  // Mouth stations per arm per layer for the arc/chamfer/straight layers:
-  // own trims, chained outward-monotonic (an outer across-edge must never
-  // cut an inner along-edge at mixed-profile mouths). Mitered layers route
-  // via their own miter stations instead.
-  const computeMouth = (): number[][] => {
-    const ownMax: number[][] = ground.map(() => LAYERS.map(() => 0));
-    gaps.forEach((g, k) => {
-      LAYERS.forEach((_, li) => {
-        if (layerData[li][k].miter) return;
-        ownMax[g.i][li] = Math.max(ownMax[g.i][li], layerData[li][k].tA);
-        ownMax[g.j][li] = Math.max(ownMax[g.j][li], layerData[li][k].tB);
-      });
-    });
-    const mouth: number[][] = ground.map(() => LAYERS.map(() => 0));
-    ground.forEach((_a, idx) => {
-      LAYERS.forEach((_, li) => {
-        const prev = li > 0 ? mouth[idx][li - 1] : 0;
-        mouth[idx][li] = Math.max(ownMax[idx][li], prev);
-      });
-    });
-    return mouth;
-  };
-  let mouth = computeMouth();
-
-  // Fit check, iterated to a fixed point: a convex corner whose flanking
-  // mouths would cross strictly inside the road (or whose trim point swings
-  // past the neighbour mouth line) cannot host mouths at its trims — pushing
-  // the mouths out traces past the edge-line miter into an X-cross, so the
-  // layer miters instead (single corner at the edge intersection, trims from
-  // the miter projections, flagged when over allowance). Miters fit by
-  // construction (mouths touch exactly at the shared miter vertex).
-  const miterCorner = (g: Gap, k: number, li: number): void => {
-    const a = ground[g.i], b = ground[g.j];
-    const offA = LAYERS[li].off(a), offB = LAYERS[li].off(b);
-    const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
-    const nbx = -b.dz * g.sideB, nbz = b.dx * g.sideB;
-    const m = lineHit(
-      cx + nax * offA, cz + naz * offA, a.dx, a.dz,
-      cx + nbx * offB, cz + nbz * offB, b.dx, b.dz,
-    ) ?? { x: cx, z: cz };
-    const tA = Math.max(0, q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz));
-    const tB = Math.max(0, q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz));
-    layerData[li][k] = {
-      eA: { x: cx + a.dx * tA + nax * offA, z: cz + a.dz * tA + naz * offA },
-      eB: { x: cx + b.dx * tB + nbx * offB, z: cz + b.dz * tB + nbz * offB },
-      tA, tB, interior: [{ x: m.x, z: m.z }], sweep: 0, steps: 0, ox: m.x, oz: m.z, rho: 0, miter: true,
+      ) ?? { x: cx, z: cz };
+      const tA = q((m.x - cx - nax * offA) * a.dx + (m.z - cz - naz * offA) * a.dz);
+      const tB = q((m.x - cx - nbx * offB) * b.dx + (m.z - cz - nbz * offB) * b.dz);
+      layerData[li][k] = {
+        eA: { x: m.x, z: m.z }, eB: { x: m.x, z: m.z },
+        tA, tB, interior: [], sweep: 0, steps: 0, ox: m.x, oz: m.z, rho: 0, miter: true,
+      };
     };
-  };
-  for (let round = 0; round < gaps.length + 1; round++) {
-    let converted = false;
-    gaps.forEach((g, k) => {
-      if (g.kind !== "convex") return;
-      const a = ground[g.i], b = ground[g.j];
-      LAYERS.forEach((L, li) => {
-        const c = layerData[li][k];
-        if (c.miter) return;
-        const offA = L.off(a), offB = L.off(b);
-        const mA = mouth[g.i][li], mB = mouth[g.j][li];
-        // Mouth lines cross strictly inside both spans?
-        const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
-        const nbx = -b.dz * g.sideB, nbz = b.dx * g.sideB;
-        // Solve C+d_a*mA+n_a*v = C+d_b*mB+n_b*u for (v,u).
-        const ex = b.dx * mB - a.dx * mA, ez = b.dz * mB - a.dz * mA;
-        const det = nax * -nbz - naz * -nbx;
-        let cross = false;
-        if (Math.abs(det) > 1e-9) {
-          const v = (ex * -nbz - ez * -nbx) / det;
-          const u = (nax * ez - naz * ex) / det;
-          cross = Math.abs(v) < offA - 1e-3 && Math.abs(u) < offB - 1e-3;
-        }
-        // Either trim point strictly past the neighbour mouth line in-span?
-        const sEbOnA = (c.eB.x - cx) * a.dx + (c.eB.z - cz) * a.dz;
-        const lEbOnA = (c.eB.x - cx) * -a.dz + (c.eB.z - cz) * a.dx;
-        const sEaOnB = (c.eA.x - cx) * b.dx + (c.eA.z - cz) * b.dz;
-        const lEaOnB = (c.eA.x - cx) * -b.dz + (c.eA.z - cz) * b.dx;
-        const swing = (sEbOnA > mA + 1e-3 && Math.abs(lEbOnA) < offA - 1e-3) ||
-          (sEaOnB > mB + 1e-3 && Math.abs(lEaOnB) < offB - 1e-3);
-        if (!cross && !swing) return;
-        miterCorner(g, k, li);
-        converted = true;
-        if (li === 0) {
-          finals[k].chamfered = true;
-          const overA = layerData[0][k].tA - (allowA.get(k) ?? 0);
-          const overB = layerData[0][k].tB - (allowB.get(k) ?? 0);
-          const over = Math.max(overA, overB);
-          diags.push({
-            code: "chamfered-corner",
-            detail: `arms ${a.segId}/${b.segId} miter unfittable mouths` +
-              (over > 1e-9 ? ` (over allowance by ${over.toFixed(3)})` : ""),
-          });
-        } else {
-          diags.push({ code: "chamfered-corner", detail: `layer ${L.name} miter unfittable mouths` });
-        }
+    for (let round = 0; round < ug.length + 1; round++) {
+      let converted = false;
+      ug.forEach((g, k) => {
+        if (g.kind !== "convex") return;
+        const a = ground[g.i], b = ground[g.j];
+        LAYERS.forEach((L, li) => {
+          const c = layerData[li][k];
+          if (c.miter) return;
+          const offA = L.off(a), offB = L.off(b);
+          const mA = mouthSt(g.ui, g.i, g.sideA, li), mB = mouthSt(g.uj, g.j, g.sideB, li);
+          const nax = -a.dz * g.sideA, naz = a.dx * g.sideA;
+          const nbx = -b.dz * g.sideB, nbz = b.dx * g.sideB;
+          // Solve C+d_a*mA+n_a*v = C+d_b*mB+n_b*u for (v,u).
+          const ex = b.dx * mB - a.dx * mA, ez = b.dz * mB - a.dz * mA;
+          const det = nax * -nbz - naz * -nbx;
+          let cross = false;
+          if (Math.abs(det) > 1e-9) {
+            const v = (ex * -nbz - ez * -nbx) / det;
+            const u = (nax * ez - naz * ex) / det;
+            cross = Math.abs(v) < offA - 1e-3 && Math.abs(u) < offB - 1e-3;
+          }
+          const sEbOnA = (c.eB.x - cx) * a.dx + (c.eB.z - cz) * a.dz;
+          const lEbOnA = (c.eB.x - cx) * -a.dz + (c.eB.z - cz) * a.dx;
+          const sEaOnB = (c.eA.x - cx) * b.dx + (c.eA.z - cz) * b.dz;
+          const lEaOnB = (c.eA.x - cx) * -b.dz + (c.eA.z - cz) * b.dx;
+          const swing = (sEbOnA > mA + 1e-3 && Math.abs(lEbOnA) < offA - 1e-3) ||
+            (sEaOnB > mB + 1e-3 && Math.abs(lEaOnB) < offB - 1e-3);
+          if (!cross && !swing) return;
+          miterCorner(g, k, li);
+          converted = true;
+          if (li === 0) {
+            finals[k].chamfered = true;
+            const overA = layerData[0][k].tA - (allowA.get(k) ?? 0);
+            const overB = layerData[0][k].tB - (allowB.get(k) ?? 0);
+            const over = Math.max(overA, overB);
+            sd.push({
+              code: "chamfered-corner",
+              detail: `arms ${a.segId}/${b.segId} miter unfittable mouths` +
+                (over > 1e-9 ? ` (over allowance by ${over.toFixed(3)})` : ""),
+            });
+          } else {
+            sd.push({ code: "chamfered-corner", detail: `layer ${L.name} miter unfittable mouths` });
+          }
+        });
       });
-    });
-    if (!converted) break;
-    mouth = computeMouth();
-  }
+      if (!converted) break;
+      mouth = computeMouth();
+    }
+    return { gaps: ug, finals, layerData, mouth, forced, diags: sd };
+  };
 
-  const fillets: JunctionFillet[] = [];
-  gaps.forEach((g, k) => {
-    const a = ground[g.i], b = ground[g.j], f = finals[k];
-    const al = layerData[0][k];
+  // Merged flanks: every member edge must meet the mouth line between the
+  // two flanks (so each member's ribbon starts ON the mouth). Widen and
+  // re-solve until it holds.
+  let S = solve();
+  for (let iter = 0; iter < 4; iter++) {
+    let changed = false;
+    units.forEach((u, ui) => {
+      if (!u.merged) return;
+      const M = S.mouth[ui][0];
+      const lat = (k: number, side: number): number => {
+        const p = E(k, side, onMouth(u, k, side, ground[k].h, M), ground[k].h);
+        return (p.x - cx) * -u.vz + (p.z - cz) * u.vx;
+      };
+      let lo = lat(u.cw, -1), hi = lat(u.ccw, 1), cw = u.cw, ccw = u.ccw;
+      for (const k of u.arms) {
+        const l1 = lat(k, -1), l2 = lat(k, 1);
+        if (l1 < lo - 1e-4) { lo = l1; cw = k; }
+        if (l2 > hi + 1e-4) { hi = l2; ccw = k; }
+      }
+      if (cw !== u.cw || ccw !== u.ccw) { u.cw = cw; u.ccw = ccw; changed = true; }
+    });
+    if (!changed) break;
+    S = solve();
+  }
+  diags.push(...S.diags);
+  const { finals, layerData, mouth } = S;
+  const ugaps = S.gaps;
+
+  const fillets: JunctionFillet[] = gaps.map((rg, r) => {
+    if (rg.kind === "merged") {
+      return {
+        gapIndex: r, aSeg: ground[rg.i].segId, bSeg: ground[rg.j].segId, kind: "merged", theta: q(rg.gap),
+        rNominal: 0, rEff: 0, chamfered: false, centre: null, sweep: 0, steps: 0, tA: 0, tB: 0,
+      };
+    }
+    const k = unitOf.get(rg.i)!;
+    const g = ugaps[k], f = finals[k], al = layerData[0][k];
     const arch = g.kind === "convex" ? !f.chamfered && al.steps > 0 : g.kind === "reflex" && al.steps > 0;
-    fillets.push({
-      gapIndex: k, aSeg: a.segId, bSeg: b.segId, kind: g.kind, theta: q(g.gap),
+    return {
+      gapIndex: r, aSeg: ground[g.i].segId, bSeg: ground[g.j].segId, kind: g.kind, theta: q(g.gap),
       rNominal: g.kind === "convex" ? q(f.rNom) : 0,
       rEff: g.kind === "convex" ? q(f.rEff) : g.kind === "reflex" ? q(al.rho) : 0,
       chamfered: (g.kind === "convex" || g.kind === "reflex") && !arch,
       centre: arch ? qpt({ x: al.ox, z: al.oz }) : null,
-      sweep: q(al.sweep), steps: al.steps,
-    });
+      sweep: q(al.sweep), steps: al.steps, tA: q(al.tA), tB: q(al.tB),
+    };
   });
 
   const trimMap = new Map<string, JunctionTrimSet>();
-  gaps.forEach((g, k) => {
-    const setA = trimMap.get(`${g.i}:${g.sideA}`) ?? emptyTrims();
-    const setB = trimMap.get(`${g.j}:${g.sideB}`) ?? emptyTrims();
-    LAYERS.forEach((L, li) => {
-      setA[L.name] = q(layerData[li][k].tA);
-      setB[L.name] = q(layerData[li][k].tB);
+  const setTrim = (k: number, side: number, li: number, v: number): void => {
+    const key = `${k}:${side}`;
+    const set = trimMap.get(key) ?? emptyTrims();
+    set[LAYERS[li].name] = q(Math.max(0, v));
+    trimMap.set(key, set);
+  };
+  ugaps.forEach((g, k) => {
+    LAYERS.forEach((_, li) => {
+      if (!units[g.ui].merged) setTrim(g.i, g.sideA, li, layerData[li][k].tA);
+      if (!units[g.uj].merged) setTrim(g.j, g.sideB, li, layerData[li][k].tB);
     });
-    trimMap.set(`${g.i}:${g.sideA}`, setA);
-    trimMap.set(`${g.j}:${g.sideB}`, setB);
+  });
+  units.forEach((u, ui) => {
+    if (u.merged) {
+      for (const k of u.arms) for (const side of [-1, 1]) {
+        LAYERS.forEach((L, li) => setTrim(k, side, li, onMouth(u, k, side, L.off(ground[k]), mouth[ui][li])));
+      }
+    } else if (S.forced[ui]) {
+      // The ribbon ends on the raised mouth (both sides): no sliver between.
+      // Trims only ever rise to the mouth here.
+      const k = u.arms[0];
+      for (const side of [-1, 1]) {
+        LAYERS.forEach((L, li) => {
+          const cur = trimMap.get(`${k}:${side}`)?.[L.name] ?? 0;
+          setTrim(k, side, li, Math.max(cur, mouth[ui][li]));
+        });
+      }
+    }
   });
   const arms: JunctionArm[] = ground.map((a, idx) => ({
     segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz, angle: a.angle,
@@ -1107,32 +1421,49 @@ export function buildJunction(
     }
   }
 
+  // Actual across-edge station per unit per layer: an outer layer's
+  // across-edge never sits inside the inner layer's (mitered layers included).
+  const acrossAt: number[][] = units.map(() => LAYERS.map(() => 0));
   const rings = LAYERS.map((L, li) => {
     if (L.name === "kerb" && ground.every((a) => a.kerb === 0)) return [];
     if (L.name === "sidewalk" && ground.every((a) => a.sidewalk === 0)) return [];
     const off = (idx: number): number => L.off(ground[idx]);
     const pts: Pt[] = [];
     layerData[li].forEach((c, k) => {
-      const g = gaps[k];
+      const g = ugaps[k];
       pts.push(qpt(c.eA));
       for (const p of c.interior) pts.push(qpt(p));
       pts.push(qpt(c.eB));
+      const nk = (k + 1) % layerData[li].length;
+      const nc = layerData[li][nk];
+      const gn = ugaps[nk];
+      const u = units[g.uj];
+      if (u.merged) {
+        // One merged mouth: out along the CW flank's edge to the mouth line,
+        // across it, back along the CCW flank's edge.
+        // A mouth corner that coincides with the chain end IS that point.
+        const M = mouth[g.uj][li];
+        pts.push(qpt(Math.abs(M - projV(u, c.eB)) < 1e-9 ? c.eB
+          : E(g.j, g.sideB, onMouth(u, g.j, g.sideB, off(g.j), M), off(g.j))));
+        pts.push(qpt(Math.abs(M - projV(u, nc.eA)) < 1e-9 ? nc.eA
+          : E(gn.i, gn.sideA, onMouth(u, gn.i, gn.sideA, off(gn.i), M), off(gn.i))));
+        return;
+      }
       // Mouth step on the shared arm, routed via the arm's mouth station:
       // along the low-side edge out, across at the station. (Equal trims
       // collapse to a straight mouth via dedupe.)
-      const nk = (k + 1) % layerData[li].length;
-      const nc = layerData[li][nk];
-      const arm = ground[g.j];
       const tB = c.tB, tA = nc.tA;
       const miterStep = c.miter || nc.miter;
-      const needStep = gaps[nk].sideA !== g.sideB &&
-        (miterStep ? Math.abs(tB - tA) > 1e-9 : mouth[g.j][li] > Math.min(tB, tA) + 1e-9);
-      if (needStep) {
-        const mx = miterStep ? Math.max(tB, tA) : mouth[g.j][li];
-        const nB = { x: -arm.dz * g.sideB, z: arm.dx * g.sideB };
-        const nA = { x: -arm.dz * gaps[nk].sideA, z: arm.dx * gaps[nk].sideA };
-        pts.push(qpt({ x: cx + arm.dx * mx + nB.x * off(g.j), z: cz + arm.dz * mx + nB.z * off(g.j) }));
-        pts.push(qpt({ x: cx + arm.dx * mx + nA.x * off(g.j), z: cz + arm.dz * mx + nA.z * off(g.j) }));
+      const floor = Math.max(S.forced[g.uj] ? mouth[g.uj][0] : 0, li > 0 ? acrossAt[g.uj][li - 1] : 0);
+      const mx = Math.max(miterStep ? Math.max(tB, tA, 0) : mouth[g.uj][li], floor);
+      if (gn.sideA !== g.sideB && mx > Math.min(tB, tA) + 1e-9) {
+        // A mouth corner at the chain end's own station IS that point (a
+        // recomputed copy would round to a neighbouring grid point).
+        pts.push(qpt(Math.abs(mx - tB) < 1e-9 ? c.eB : E(g.j, g.sideB, mx, off(g.j))));
+        pts.push(qpt(Math.abs(mx - tA) < 1e-9 ? nc.eA : E(g.j, gn.sideA, mx, off(g.j))));
+        acrossAt[g.uj][li] = mx;
+      } else {
+        acrossAt[g.uj][li] = Math.max(tB, tA);
       }
     });
     return finalizeRing(pts);
@@ -1247,7 +1578,7 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
   for (let k = 1; k < nonEmpty.length; k++) {
     const [ni, inner] = nonEmpty[k - 1], [no, outer] = nonEmpty[k];
     for (const p of inner) {
-      if (distToRing(p, outer) <= 1e-3) continue;
+      if (distToRing(p, outer) <= NEST_TOL) continue;
       if (!pointInRing(p, outer)) { err(`${ni} vertex outside ${no}`); break; }
     }
     let crossed = false;
@@ -1274,12 +1605,15 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
           z: cz + a.dz * t + a.dx * side * h,
         };
         const d = distToRing(e, l.asphalt);
-        if (d > 1e-3) err(`mouth seg ${a.segId} side ${side}: edge point ${d.toFixed(4)} off the asphalt ring`);
+        // Quantisation stack: trim rounding (0.5e-3) plus ring-vertex rounding
+        // (0.707e-3) at a single-vertex miter corner.
+        if (d > NEST_TOL) err(`mouth seg ${a.segId} side ${side}: edge point ${d.toFixed(4)} off the asphalt ring`);
       }
       for (const s of [a.trimNeg, a.trimPos]) {
         for (const v of [s.asphalt, s.kerb, s.sidewalk, s.boundary]) {
           if (!Number.isFinite(v)) { err(`seg ${a.segId}: trim not finite`); break; }
           if (Math.abs(v * 1000 - Math.round(v * 1000)) > 1e-6) err(`seg ${a.segId}: trim off the 1e-3 grid`);
+          if (v < 0) err(`seg ${a.segId}: negative trim ${v}`);
         }
       }
     }
@@ -1295,11 +1629,16 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
     while (dAB <= 0) dAB += 2 * Math.PI;
     const mid = Math.abs(dAB - f.theta) < 1e-3 ? A.angle + f.theta / 2 : A.angle - f.theta / 2;
     const ix = Math.cos(mid), iz = Math.sin(mid);
-    const sideA = (-A.dz * ix + A.dx * iz) >= 0 ? 1 : -1;
-    const sideB = (-B.dz * ix + B.dx * iz) >= 0 ? 1 : -1;
+    let sideA = (-A.dz * ix + A.dx * iz) >= 0 ? 1 : -1;
+    let sideB = (-B.dz * ix + B.dx * iz) >= 0 ? 1 : -1;
+    // A unit alone at its node wraps a full turn from its left to its right.
+    if (f.theta > 2 * Math.PI - 1e-2) { sideA = 1; sideB = -1; }
     const hA = profileOf(A.type).asphaltHalf, hB = profileOf(B.type).asphaltHalf;
-    const tA = (sideA < 0 ? A.trimNeg : A.trimPos).asphalt;
-    const tB = (sideB < 0 ? B.trimNeg : B.trimPos).asphalt;
+    // Corner stations come from the fillet (signed): a trim is clamped to
+    // >= 0 and a raised mouth may sit past the tangent point.
+    const tA = f.tA;
+    const tB = f.tB;
+    if (!Number.isFinite(tA) || !Number.isFinite(tB)) { err("fillet stations not finite"); continue; }
     const nax = -A.dz * sideA, naz = A.dx * sideA;
     const nbx = -B.dz * sideB, nbz = B.dx * sideB;
     const eA = { x: cx + A.dx * tA + nax * hA, z: cz + A.dz * tA + naz * hA };
