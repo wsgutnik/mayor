@@ -143,6 +143,44 @@ const PT: Record<string, string> = {
   "Residents": "Moradores", "Level": "Nível", "Upkeep": "Manutenção", "Footprint": "Área", "Radius": "Raio", "Close": "Fechar",
   // road-build readout
   "Cost": "Custo", "Length": "Comprimento", "Slope": "Inclinação",
+  // toasts and bell
+  "Notifications": "Notificações", "Clear all": "Limpar tudo", "Dismiss": "Dispensar",
+  "Close notifications": "Fechar notificações", "All quiet — no notifications yet.": "Tudo quieto — sem notificações.",
+  "Free": "Grátis",
+  // onboarding guide
+  "Getting started": "Primeiros passos", "Dismiss the guide": "Dispensar o guia",
+  "Draw your first road": "Desenhe sua primeira estrada", "Zone homes beside it": "Zoneie casas ao lado",
+  "Let the clock run": "Deixe o relógio correr", "Watch them move in": "Veja os moradores chegarem",
+  "Roads is the first button below. Open it, then drag across the ground — everything in a city grows along a street.": "Estradas é o primeiro botão abaixo. Abra e arraste pelo chão — tudo na cidade cresce ao longo de uma rua.",
+  "Open Zones, take Residential, and drag over the ground next to your road.": "Abra Zonas, escolha Residencial e arraste pelo chão ao lado da estrada.",
+  "Nothing is built while time crawls. Push the speed to 2× up in the clock — the plots start building straight away.": "Nada é construído com o tempo parado. Aumente a velocidade para 2× no relógio — os lotes começam a construir na hora.",
+  "Buildings rise on each plot, then residents arrive. The RCI bars top-left tell you what to zone next.": "Prédios sobem em cada lote e os moradores chegam. As barras RCI no canto mostram o que zonear em seguida.",
+  "Road tool ready. Drag across the ground to lay it, and release to build.": "Ferramenta de estrada pronta. Arraste pelo chão para traçar e solte para construir.",
+  "That is the whole loop": "Esse é o ciclo todo",
+  "Road, zone, let time run. Watch the RCI bars and add services as people arrive.": "Estrada, zona, deixe o tempo correr. Acompanhe as barras RCI e adicione serviços com a chegada do povo.",
+  // infoview legend
+  "Power coverage": "Cobertura de energia", "Water coverage": "Cobertura de água", "Sewage coverage": "Cobertura de esgoto",
+  "Garbage coverage": "Cobertura de lixo", "Police coverage": "Cobertura policial", "Fire coverage": "Cobertura de bombeiros",
+  "Health coverage": "Cobertura de saúde", "Education coverage": "Cobertura de educação", "Park coverage": "Cobertura de parques",
+  "Transit coverage": "Cobertura de transporte", "Culture coverage": "Cobertura de cultura",
+  "Buildings the power grid reaches. Hatched blocks need supply.": "Prédios alcançados pela rede elétrica. Quarteirões hachurados precisam de fornecimento.",
+  "Buildings the water network reaches. Hatched blocks need supply.": "Prédios alcançados pela rede de água. Quarteirões hachurados precisam de fornecimento.",
+  "Buildings the sewage network drains. Hatched blocks need supply.": "Prédios drenados pela rede de esgoto. Quarteirões hachurados precisam de atendimento.",
+  "Buildings the garbage service collects. Hatched blocks need a landfill.": "Prédios atendidos pela coleta. Quarteirões hachurados precisam de um aterro.",
+  "Share of buildings the police reach. Hatched blocks need a station.": "Parcela dos prédios alcançada pela polícia. Quarteirões hachurados precisam de uma delegacia.",
+  "Share of buildings the fire service reaches. Hatched blocks need a station.": "Parcela dos prédios alcançada pelos bombeiros. Quarteirões hachurados precisam de um posto.",
+  "Share of buildings with health cover. Hatched blocks need a clinic.": "Parcela dos prédios com saúde. Quarteirões hachurados precisam de uma clínica.",
+  "Share of buildings with education. Hatched blocks need a school.": "Parcela dos prédios com educação. Quarteirões hachurados precisam de uma escola.",
+  "Share of buildings near a park. Hatched blocks want green space.": "Parcela dos prédios perto de um parque. Quarteirões hachurados querem área verde.",
+  "Share of buildings near a stop or station. Hatched blocks need transit.": "Parcela dos prédios perto de ponto ou estação. Quarteirões hachurados precisam de transporte.",
+  "Share of buildings with culture. Hatched blocks need a venue.": "Parcela dos prédios com cultura. Quarteirões hachurados precisam de um espaço cultural.",
+  "How full each road is, green (free) to red (jammed).": "Ocupação de cada via, de verde (livre) a vermelho (congestionada).",
+  "Desirability per tile, from services, parks and industry.": "Atratividade por trecho, por serviços, parques e indústria.",
+  "Not reached": "Sem alcance", "Fully served": "Totalmente atendido",
+  "Free flow": "Fluxo livre", "Congested": "Congestionado", "Low value": "Valor baixo", "High value": "Valor alto",
+  "City average": "Média da cidade", "Facilities": "Instalações", "Capacity": "Capacidade", "Supply": "Oferta",
+  "Vehicles": "Veículos", "Congestion": "Congestionamento", "Happiness": "Felicidade", "Riders": "Passageiros",
+  "Close info view": "Fechar mapa",
 };
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -160,6 +198,11 @@ export function detectLang(): Lang {
 
 export function setLang(l: Lang): void { lang = l; }
 export function getLang(): Lang { return lang; }
+
+/** True when the pt-BR table translates `key` (new UI strings assert this in tests). */
+export function hasTranslation(key: string): boolean {
+  return PT[key] !== undefined;
+}
 
 /** Translate `key`, filling `{name}` placeholders. Unknown keys pass through unchanged. */
 export function tr(key: string, vars?: Record<string, string | number>): string {

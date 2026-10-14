@@ -13,6 +13,7 @@ import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
 import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
+import { cityEvents } from "./ui/events";
 import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
 import { exitAngle, loadRoadSnap, saveRoadSnap, snapPoint, snapToRoadTile, type RoadSnapOptions } from "./ui/road-snap";
@@ -79,13 +80,14 @@ function makeHud(): Hud {
     if (t !== "road") cancelDraft();
     refreshHint();
     refreshZoneHint();
+    cityEvents.emit("tool:changed");
   },
   onZoneMode: (m) => {
     zoneMode = m;
     cancelDraft();
     refreshZoneHint();
   },
-  onSpeed: (s) => { speed = s; hud.setSpeed(s); },
+  onSpeed: (s) => { speed = s; hud.setSpeed(s); cityEvents.emit("time:speed"); },
   onTax: (r) => { state.taxRate = r; },
   onOverlay: (layer) => { overlay = layer; renderer.setOverlay(layer); },
   onRoad: (t, m, lvl) => { roadType = t; roadMode = m; if (lvl) roadLevel = lvl; cancelDraft(); refreshHint(); },
@@ -112,17 +114,17 @@ function makeHud(): Hud {
     saveRoadParallel(o);
     refreshDraftPoint();
   },
-  onMenu: () => menu.toggle(),
+  onMenu: () => { menu.toggle(); hud.tooltip.suspend(menu.isOpen); },
   onCreateLine: () => {
     const kind = tool === "metroline" ? "metro" : "bus";
     const res = attempt(() => createLine(state, kind, lineDraft));
-    if (res.ok) { hud.showToast(tr("Line created")); cancelDraft(); } else hud.showToast(trReason(res.reason));
+    if (res.ok) { hud.notify("success", tr("Line created")); cancelDraft(); } else hud.notify("error", trReason(res.reason));
   },
   onLineVehicles: (id, delta) => {
     const line = state.world.lines.find((l) => l.id === id);
     if (!line) return;
     const res = attempt(() => setLineVehicles(state, id, line.vehicles + delta));
-    if (!res.ok) hud.showToast(trReason(res.reason));
+    if (!res.ok) hud.notify("error", trReason(res.reason));
   },
   onRemoveLine: (id) => {
     if (!state.world.lines.some((l) => l.id === id)) return;
@@ -183,7 +185,7 @@ function restoreSnapshot(snap: string, msg: string): void {
 function rebuildHud(): void {
   hud.destroy();
   hud = makeHud();
-  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, snap: snapOpts, parallel: parallelOpts, tips: prefs.tips, zoneMode });
+  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, snap: snapOpts, parallel: parallelOpts, tips: prefs.tips, zoneMode, overlay });
   cancelDraft();
   menu.raise();
   menu.refresh();
@@ -208,7 +210,9 @@ function swapCity(next: CityState): void {
   inspector.hide();
   renderer.setHover(null);
   seenFires = state.fires;
+  seenPop = state.population;
   lastMonthSaved = Math.floor(state.day / 30);
+  hud.onCitySwapped();
 }
 
 /** Fetch an official map and start a city on it. */
@@ -223,7 +227,7 @@ async function startMap(id: string): Promise<void> {
     useCity(newCityFromMap(data, listing.terrain));
     hud.showToast(getLang() === "pt" ? listing.name : listing.nameEn);
   } catch {
-    hud.showToast(tr("Could not load the map"));
+    hud.notify("error", tr("Could not load the map"));
   }
 }
 
@@ -233,13 +237,13 @@ const menu = new Menu(app, {
   info: (slot) => slotInfo(slot),
   onSave: (n) => {
     const r = saveTo(String(n), state);
-    hud.showToast(r.ok ? tr("Saved to slot {n}", { n }) : trReason(r.reason));
+    hud.notify(r.ok ? "success" : "error", r.ok ? tr("Saved to slot {n}", { n }) : trReason(r.reason));
   },
   onLoad: (slot) => {
     const r = loadFrom(slot);
-    if (r.ok) { useCity(r.state); hud.showToast(tr("City loaded")); } else hud.showToast(trReason(r.reason));
+    if (r.ok) { useCity(r.state); hud.notify("success", tr("City loaded")); } else hud.notify("error", trReason(r.reason));
   },
-  onNew: (seed, biome) => { useCity(newCity(seed, 96, biome)); hud.showToast(tr("New city, seed {n}", { n: seed })); },
+  onNew: (seed, biome) => { useCity(newCity(seed, 96, biome)); hud.notify("success", tr("New city, seed {n}", { n: seed })); },
   onNewMap: (id) => { void startMap(id); },
   getPrefs: () => prefs,
   onPrefs: (p) => {
@@ -252,10 +256,10 @@ const menu = new Menu(app, {
     hud.setTips(p.tips);
     if (langChanged) rebuildHud();
   },
-  onExport: () => { exportFile(state); hud.showToast(tr("Save file downloaded")); },
+  onExport: () => { exportFile(state); hud.notify("success", tr("Save file downloaded")); },
   onImport: async (file) => {
     const r = await importFile(file);
-    if (r.ok) { useCity(r.state); hud.showToast(tr("City imported")); } else hud.showToast(trReason(r.reason));
+    if (r.ok) { useCity(r.state); hud.notify("success", tr("City imported")); } else hud.notify("error", trReason(r.reason));
   },
 });
 
@@ -263,7 +267,7 @@ const menu = new Menu(app, {
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => { navigator.serviceWorker.register("/sw.js").catch(() => {}); });
 }
-if (slotInfo(AUTOSAVE)) setTimeout(() => hud.showToast(tr("Autosave found: open the menu to continue")), 800);
+if (slotInfo(AUTOSAVE)) setTimeout(() => hud.notify("warning", tr("Autosave found: open the menu to continue")), 800);
 
 const lineTool = () => tool === "busline" || tool === "metroline";
 const placing = () => tool === "road" || lineTool() || tool === "roundabout";
@@ -455,7 +459,7 @@ function stampInterchangeAt(cx: number, cy: number): void {
   const cxp = (tile % w.size) + 0.5, czp = ((tile / w.size) | 0) + 0.5;
   const ramps = diamondRamps(cxp, czp, dirOf(hwSeg.pts), dirOf(crossSeg.pts));
   const cost = Math.round(ramps.reduce((a, r) => a + segmentLength(r), 0) * 22);
-  if (state.money < cost) { hud.showToast(trReason("Not enough money")); return; }
+  if (state.money < cost) { hud.notify("error", trReason("Not enough money")); return; }
   history.push(serialize(state));
   for (const ramp of ramps) addSegment(w, 4, ramp);
   rebuildRoadRaster(w);
@@ -464,7 +468,7 @@ function stampInterchangeAt(cx: number, cy: number): void {
   w.coverageDirty = true;
   w.revision++;
   refreshHistoryButtons();
-  hud.showToast(tr("Interchange"));
+  hud.notify("success", tr("Interchange"));
 }
 
 /** Move tool: a tap shows what stands on the tile. */
@@ -485,6 +489,7 @@ function onTap(cx: number, cy: number): void {
     if (!raw) return;
     const res = attempt(() => applyTool(state, "roundabout", Math.floor(raw.x), Math.floor(raw.z)));
     if (!res.ok) hud.showToast(trReason(res.reason));
+    else cityEvents.emit("roads:changed");
     return;
   }
   if (pendingInterchange) { stampInterchangeAt(cx, cy); return; }
@@ -496,7 +501,7 @@ function onTap(cx: number, cy: number): void {
     if (target) {
       const res = attempt(() => upgradeRoad(state, target.id, roadType));
       hud.hideRoadReadout();
-      if (res.ok) { refreshHint(); return; }
+      if (res.ok) { refreshHint(); cityEvents.emit("roads:changed"); return; }
       hud.showToast(trReason(res.reason));
       // Fall through: start a draft from the tap so connecting still works.
     }
@@ -545,6 +550,7 @@ function onTap(cx: number, cy: number): void {
     return placeRoad(state, roadType, twinPts, roadLevel);
   });
   if (res.ok) {
+    cityEvents.emit("roads:changed");
     // Keep drawing from the end point, like a continuous road.
     lastSegDir = exitAngle(seg.pts);
     draft = [p];
@@ -624,6 +630,7 @@ function strokeEnd(cancelled = false): void {
   if (!strokeActive) return;
   strokeActive = false;
   if (!strokeOk) history.pop();
+  else cityEvents.emit("zones:changed");
   refreshHistoryButtons();
 }
 
@@ -666,7 +673,10 @@ function doZoneFill(t: ZoneTile): void {
   }
   const res = attempt(() => applyZoneBulk(state, bulkTool, tiles));
   if (!res.ok) hud.showToast(trReason(res.reason));
-  else refreshZoneHint(preview.count, preview.cost);
+  else {
+    refreshZoneHint(preview.count, preview.cost);
+    cityEvents.emit("zones:changed");
+  }
 }
 
 /** Fill hover (desktop): live count and cost in the hint, nothing applied. */
@@ -808,6 +818,7 @@ function isEditingText(e: KeyboardEvent): boolean {
 
 // Fixed-step sim: 2 days/second at 1x.
 let seenFires = 0;
+let seenPop = state.population;
 let lastMonthSaved = Math.floor(state.day / 30);
 /** Time of day, 0..1; a full cycle takes 90 s at 1x. */
 let tod = 0.34;
@@ -831,8 +842,12 @@ function frame(now: number) {
     if (prefs.autosave) saveTo(AUTOSAVE, state);
   }
   if (state.fires !== seenFires) {
-    hud.showToast(tr("Fire! A building burned down. Build a fire station."));
+    hud.notify("warning", tr("Fire! A building burned down. Build a fire station."));
     seenFires = state.fires;
+  }
+  if (state.population > seenPop) {
+    seenPop = state.population;
+    cityEvents.emit("building:added");
   }
   hud.update(state);
   syncLots(state); // lots stay fresh for the renderer even while paused

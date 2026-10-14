@@ -5,6 +5,11 @@ import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
 import { PanelId, PanelState, loadPanelState, savePanelState, setPanelsHidden, togglePanelCollapsed } from "./panel-state";
 import type { RoadReadoutRow } from "./road-readout";
+import { cityEvents } from "./events";
+import { ToastsView, type ToastInput, type ToastTone } from "./toasts";
+import { Tooltip } from "./tooltip";
+import { LegendView } from "./legend";
+import { OnboardingCard, type OnboardingSnapshot } from "./onboarding";
 import { DEFAULT_ROAD_SNAP, type AngleSnap, type LengthSnap, type RoadSnapOptions } from "./road-snap";
 import type { ZoneMode } from "./zone-tools";
 import { DEFAULT_ROAD_PARALLEL, type ParallelGap, type ParallelSide, type RoadParallelOptions } from "./road-parallel";
@@ -171,9 +176,18 @@ export class Hud {
   private speedBtns: HTMLElement[] = [];
   private undoBtn!: HTMLButtonElement;
   private redoBtn!: HTMLButtonElement;
-  private toast!: HTMLElement;
-  private toastTimer = 0;
+  private speedSlot!: HTMLElement;
+  private demandPanel!: HTMLElement;
   private readout!: HTMLElement;
+  /** P3-B views: stacked toasts + bell, rich tooltip, infoview legend, guide card. */
+  private toasts!: ToastsView;
+  /** Shared rich tooltip (main.ts suspends it while the menu is open). */
+  tooltip!: Tooltip;
+  private legend!: LegendView;
+  private guide!: OnboardingCard;
+  private speedVal = 1;
+  private lastState: CityState | null = null;
+  private guideStarted = false;
   private budget!: HTMLElement;
   private hint!: HTMLElement;
   private finishBtn!: HTMLElement;
@@ -216,19 +230,34 @@ export class Hud {
   constructor(parent: HTMLElement, private hooks: HudHooks) {
     this.root = el("div", "hud");
     parent.appendChild(this.root);
+    this.tooltip = new Tooltip(this.root);
     this.buildTop();
     this.buildLeft();
     this.buildBottom();
     this.buildBudget();
-    this.toast = el("div", "toast");
-    this.root.appendChild(this.toast);
+    this.toasts = new ToastsView(this.root);
+    this.toasts.mountBell(this.speedSlot);
+    this.legend = new LegendView(this.leftCol, () => {
+      this.hooks.onOverlay(0);
+      this.setOverlay(0);
+    }, this.stackHideBtn);
+    this.guide = new OnboardingCard(this.root, this.leftCol, {
+      road: () => this.groupBtns.get("road") ?? null,
+      zone: () => this.groupBtns.get("zones") ?? null,
+      speed: () => this.speedBtns[2] ?? null,
+      grow: () => this.demandPanel ?? null,
+    }, cityEvents);
+    this.guide.bind(() => this.guideSnapshot());
     this.readout = el("div", "road-readout");
     this.readout.hidden = true;
     this.root.appendChild(this.readout);
   }
 
   destroy(): void {
-    clearTimeout(this.toastTimer);
+    this.toasts.destroy();
+    this.tooltip.destroy();
+    this.legend.destroy();
+    this.guide.destroy();
     this.root.remove();
   }
 
@@ -273,6 +302,7 @@ export class Hud {
     menu.setAttribute("aria-label", tr("Menu: save, load, new city"));
     menu.addEventListener("click", () => this.hooks.onMenu());
     speed.appendChild(menu);
+    this.speedSlot = speed;
     top.appendChild(speed);
     this.root.appendChild(top);
   }
@@ -290,6 +320,7 @@ export class Hud {
     const rciBtn = el("button", "svc-head toggle demand-toggle", "<span></span>");
     rciBtn.setAttribute("aria-label", tr("Demand"));
     rci.appendChild(rciBtn);
+    this.demandPanel = rci;
     this.collapsible("demand", rci, rciBtn, rciBtn.querySelector("span")!, "");
     col.appendChild(rci);
 
@@ -381,7 +412,9 @@ export class Hud {
   }
 
   private toolButton(t: ToolDef, big = false): HTMLElement {
-    const cost = t.id === "pan" || t.id === "busline" || t.id === "metroline" ? "" : `<small>$${COST[t.id as Exclude<ToolId, "pan">]}</small>`;
+    const free = t.id === "pan" || t.id === "busline" || t.id === "metroline";
+    const price = free ? 0 : COST[t.id as Exclude<ToolId, "pan">];
+    const cost = free ? "" : `<small>$${price}</small>`;
     const b = el("button", "tool", `${iconHtml(t.icon)}<span>${tr(t.label)}</span>${big ? "" : cost}`);
     b.title = tr(t.hint);
     b.addEventListener("click", () => {
@@ -389,6 +422,10 @@ export class Hud {
       this.setTool(t.id);
       this.closeFlyouts();
     });
+    this.tooltip.attach(b, () => ({
+      icon: t.icon.glyph, title: tr(t.label), desc: tr(t.hint),
+      cost: free ? undefined : price, color: t.color,
+    }));
     this.toolBtns.set(t.id, b);
     return b;
   }
@@ -400,6 +437,7 @@ export class Hud {
       this.toggleFly(name);
       onOpen?.();
     });
+    this.tooltip.attach(b, () => ({ title: tr(label), icon: icon.glyph }));
     this.groupBtns.set(name, b);
     this.flyouts.set(name, fly);
     this.root.appendChild(fly);
@@ -658,7 +696,7 @@ export class Hud {
   getZoneMode(): ZoneMode { return this.zoneMode; }
 
   /** Restore the controls after the HUD was rebuilt (language change). */
-  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; snap: RoadSnapOptions; parallel?: RoadParallelOptions; tips: boolean; zoneMode?: ZoneMode }): void {
+  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; snap: RoadSnapOptions; parallel?: RoadParallelOptions; tips: boolean; zoneMode?: ZoneMode; overlay?: OverlayLayer }): void {
     this.setSnap(opts.snap, false);
     if (opts.parallel) this.setParallel(opts.parallel, false);
     this.setRoadChoice(opts.roadType, opts.roadMode, false);
@@ -667,6 +705,7 @@ export class Hud {
     this.setTool(opts.tool);
     this.setSpeed(opts.speed);
     this.setTips(opts.tips);
+    if (opts.overlay !== undefined) this.setOverlay(opts.overlay);
     const slider = this.budget.querySelector("input")!;
     slider.value = String(Math.round(opts.taxRate * 100));
     this.budget.querySelector('[data-k="tax"]')!.textContent = `${slider.value}%`;
@@ -775,6 +814,7 @@ export class Hud {
   }
 
   setSpeed(s: number): void {
+    this.speedVal = s;
     const order = [0, 1, 2, 4];
     this.speedBtns.forEach((b, i) => b.classList.toggle("active", order[i] === s));
   }
@@ -789,6 +829,8 @@ export class Hud {
   setOverlay(layer: OverlayLayer): void {
     LAYERS.forEach((l, i) => this.layerBtns[i]?.classList.toggle("active", l.layer === layer));
     this.viewBtn.classList.toggle("active", layer !== 0);
+    if (layer) this.legend.show(layer);
+    else this.legend.hide();
   }
 
   setSky(tod: number, raining: boolean): void {
@@ -835,11 +877,15 @@ export class Hud {
     this.readout.hidden = true;
   }
 
+  /** One-line notice (kept for existing callers); lands in the bell log too. */
   showToast(msg: string): void {
-    this.toast.textContent = msg;
-    this.toast.classList.add("show");
-    clearTimeout(this.toastTimer);
-    this.toastTimer = window.setTimeout(() => this.toast.classList.remove("show"), 1800);
+    this.toasts.push({ title: msg });
+  }
+
+  /** Toned notification with an optional body. */
+  notify(kind: ToastTone, title: string, text?: string): void {
+    const input: ToastInput = text === undefined ? { kind, title } : { kind, title, text };
+    this.toasts.push(input);
   }
 
   /** Rebuild the lines list when lines or vehicle counts change. */
@@ -862,7 +908,36 @@ export class Hud {
     }
   }
 
+  /** The running city was swapped (load / new / undo): the guide re-seeds on the next frame. */
+  onCitySwapped(): void {
+    this.lastState = null;
+    this.guide.reset();
+    this.guideStarted = false;
+  }
+
+  /** World facts the guide completes on; counts are O(tiles) but run at most ~8 Hz while guiding. */
+  private guideSnapshot(): OnboardingSnapshot | null {
+    const s = this.lastState;
+    if (!s) return null;
+    let zoned = 0, buildings = 0;
+    const { zone, level } = s.world;
+    for (let i = 0; i < zone.length; i++) {
+      if (zone[i] !== 0) zoned++;
+      if (level[i] > 0) buildings++;
+    }
+    return { roads: s.world.segments.length, zoned, speed: this.speedVal, tool: this.currentTool, buildings };
+  }
+
   update(s: CityState): void {
+    this.lastState = s;
+    if (!this.guideStarted) {
+      this.guideStarted = true;
+      const snap = this.guideSnapshot();
+      if (snap) this.guide.start(snap);
+    }
+    this.legend.refresh(s);
+    this.tooltip.tick();
+    this.guide.tick(performance.now());
     const d = dateOf(s.day);
     this.dateEl.textContent = `${d.day} ${monthName(d.month)} ${d.year}`;
     this.popEl.textContent = fmt(s.population);

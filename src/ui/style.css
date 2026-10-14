@@ -82,11 +82,55 @@ body {
 .budget .row { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; }
 .budget label.row { flex-direction: column; }
 .budget input[type=range] { width: 100%; accent-color: var(--accent); }
-.toast {
-  position: absolute; top: calc(70px + var(--safe-top)); left: 50%; transform: translate(-50%, -8px);
-  background: rgba(190, 40, 30, .92); padding: 8px 14px; border-radius: 10px; opacity: 0; transition: .2s; font-weight: 600;
+/* P3-B: stacked toasts slide in top-right and auto-dismiss into the bell. */
+.toasts {
+  position: absolute; top: calc(70px + var(--safe-top)); right: 10px; z-index: 8;
+  display: flex; flex-direction: column; gap: 8px; width: min(320px, calc(100vw - 20px));
+  pointer-events: none;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast-item {
+  display: flex; gap: 10px; align-items: flex-start; pointer-events: auto; cursor: pointer;
+  background: rgb(var(--panel-rgb) / calc(var(--panel-base, 0.82) * var(--ui-panel-alpha, 1)));
+  border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  animation: toast-in .18s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateX(16px); } }
+.toast-item.leaving { opacity: 0; transform: translateX(16px); transition: .2s; }
+.toast-icon { font-size: 16px; line-height: 1.2; width: 20px; text-align: center; flex: none; }
+.tone-info .toast-icon { color: var(--accent); }
+.tone-success .toast-icon { color: var(--good); }
+.tone-warning .toast-icon { color: #f0b43a; }
+.tone-error .toast-icon { color: var(--bad); }
+.tone-milestone .toast-icon { color: #e8b35a; }
+.toast-body { flex: 1; min-width: 0; }
+.toast-title { font-weight: 600; font-size: 13px; }
+.toast-text { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.toast-close { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+/* Bell with unread badge in the top bar. */
+.bell-btn { position: relative; font-size: 16px; }
+.bell-btn.is-on { background: rgba(92,184,255,.18); }
+.bell-badge {
+  position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 99px; background: var(--bad); color: #fff; font-size: 10px; line-height: 16px; text-align: center;
+}
+.bell-badge[hidden] { display: none; }
+/* Notification centre dropdown. */
+.notif { position: absolute; top: calc(64px + var(--safe-top)); right: 10px; width: min(340px, calc(100vw - 20px)); z-index: 9; display: none; flex-direction: column; max-height: 60vh; }
+.notif.open { display: flex; }
+.notif-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
+.notif-head h3 { margin: 0; font-size: 14px; flex: 1; }
+.notif-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.notif-close { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; padding: 4px 8px; border-radius: 8px; }
+.notif-list { overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 0 6px; }
+.notif-item { display: flex; gap: 10px; padding: 8px 6px; border-radius: 8px; }
+.notif-item.unread { background: rgba(92,184,255,.08); }
+.notif-title { font-weight: 600; font-size: 13px; }
+.notif-text { color: var(--muted); font-size: 12px; }
+.notif-empty { padding: 16px 12px; color: var(--muted); font-size: 13px; text-align: center; }
+.notif-foot { padding: 8px 12px 10px; display: flex; justify-content: flex-end; }
+.notif-clear { background: rgba(255,255,255,.1); color: var(--text); border: 0; border-radius: 8px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.notif-clear:disabled { opacity: .35; cursor: default; }
 @media (max-width: 640px) {
   .stat { min-width: 0; padding: 2px 8px; }
   .demand { top: calc(64px + var(--safe-top)); }
@@ -293,7 +337,7 @@ body {
 /* UI scale (Prefs uiScale): zoom scales text, hit-testing and layout together.
  * The 3D canvas (.view) is untouched. Direct children only: .left-col zooms as
  * one block so its inner panels are never scaled twice. */
-.hud > .panel, .hud > .left-col, .hud > .toast, .hud > .hint, .hud > .finish,
+.hud > .panel, .hud > .left-col, .hud > .toasts, .hud > .rich-tip, .hud > .hint, .hud > .finish,
 .inspector, .menu { zoom: var(--ui-scale, 1); }
 /* Caps are divided by the scale so the rendered box still fits the viewport
  * at 1.4 (768x1024 iPad) and at 1.0 on 360 px phones. */
@@ -304,7 +348,8 @@ body {
 .inspector { max-height: calc((100% - 220px - var(--safe-top) - var(--safe-bottom)) / var(--ui-scale, 1)); }
 .menu { max-width: calc(100% / var(--ui-scale, 1)); max-height: calc(100% / var(--ui-scale, 1)); }
 .hint { max-width: calc((100vw - 32px) / var(--ui-scale, 1)); white-space: normal; text-align: center; }
-.toast { max-width: calc((100vw - 32px) / var(--ui-scale, 1)); text-align: center; }
+.toasts { max-width: calc((100vw - 32px) / var(--ui-scale, 1)); }
+.rich-tip { max-width: calc(min(260px, 100vw - 32px) / var(--ui-scale, 1)); }
 .finish { max-width: calc((100vw - 32px) / var(--ui-scale, 1)); }
 @media (max-width: 640px) {
   .inspector { width: calc((100vw - 20px) / var(--ui-scale, 1)); }
@@ -351,3 +396,78 @@ body {
 .toolbar { scrollbar-width: none; scroll-snap-type: x proximity; }
 .toolbar::-webkit-scrollbar { display: none; }
 .toolbar .tool { scroll-snap-align: center; flex: 0 0 auto; }
+
+/* P3-B: onboarding guide card (first in the left stack) and its pointer ring. */
+.left-col .guide-card { flex: none; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.guide-card[hidden] { display: none; }
+.onb-head { display: flex; align-items: center; gap: 8px; }
+.onb-badge {
+  width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: var(--onb, var(--accent)); color: #06121f; font-size: 12px; font-weight: 700;
+}
+.onb-kicker { flex: 1; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.onb-close { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 4px; }
+.onb-title { font-weight: 700; font-size: 14px; }
+.onb-text { font-size: 13px; color: var(--text); }
+.onb-dots { display: flex; gap: 6px; padding-top: 2px; }
+.onb-dots i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.18); }
+.onb-dots i.done { background: var(--good); }
+.onb-dots i.now { background: var(--onb, var(--accent)); }
+.guide-ring {
+  position: fixed; left: 0; top: 0; z-index: 7; display: none; pointer-events: none;
+  border: 2px solid var(--onb, var(--accent)); border-radius: 12px;
+  box-shadow: 0 0 0 2px rgba(0,0,0,.35), 0 0 18px var(--onb, var(--accent));
+}
+.guide-ring.on { display: block; }
+
+/* P3-B: one shared rich tooltip; the arrow tracks the anchor centre. */
+.rich-tip {
+  position: absolute; z-index: 10; display: none; max-width: 260px; pointer-events: none;
+  background: rgb(var(--panel-rgb) / calc(var(--panel-base, 0.82) * var(--ui-panel-alpha, 1)));
+  border: 1px solid var(--panel-border); border-radius: 12px; padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+}
+.rich-tip.visible { display: block; }
+.rich-tip::after {
+  content: ""; position: absolute; left: var(--tip-arrow-x, 50%); bottom: -6px;
+  width: 10px; height: 10px; transform: translateX(-50%) rotate(45deg);
+  background: inherit; border-right: 1px solid var(--panel-border); border-bottom: 1px solid var(--panel-border);
+}
+.rich-tip.below::after { bottom: auto; top: -6px; transform: translateX(-50%) rotate(225deg); }
+.tip-head { display: flex; align-items: center; gap: 8px; }
+.tip-icon { color: var(--tt, var(--accent)); font-size: 16px; }
+.tip-title { font-weight: 700; font-size: 13px; flex: 1; }
+.tip-key {
+  font-size: 11px; color: var(--muted); border: 1px solid var(--panel-border);
+  border-radius: 6px; padding: 1px 6px; white-space: nowrap;
+}
+.tip-desc { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.tip-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; padding-top: 4px; }
+.tip-row .k { color: var(--muted); }
+.tip-row .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+.tip-simple { font-size: 13px; }
+
+/* P3-B: infoview legend, docked in the left stack above the panel toggle. */
+.left-col .legend { position: static; width: 100%; flex: none; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.legend[hidden] { display: none; }
+.legend-head { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.legend-title { font-weight: 700; font-size: 14px; flex: 1; }
+.legend-desc { color: var(--muted); font-size: 12px; }
+.legend-bar { position: relative; height: 10px; border-radius: 6px; }
+.legend-grad { position: absolute; inset: 0; border-radius: 6px; }
+.legend-marker {
+  position: absolute; top: -3px; width: 3px; height: 16px; border-radius: 2px;
+  background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5); transform: translateX(-50%);
+}
+.legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.legend-avg { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; }
+.legend-avg span { color: var(--muted); }
+.legend-avg b { font-variant-numeric: tabular-nums; }
+.legend-avg b.good, .legend-stats .v.good { color: var(--good); }
+.legend-avg b.warn, .legend-stats .v.warn { color: #f0b43a; }
+.legend-avg b.bad, .legend-stats .v.bad { color: var(--bad); }
+.legend-stats { display: flex; flex-direction: column; gap: 3px; }
+.legend-stats .row { display: flex; justify-content: space-between; font-size: 12px; }
+.legend-stats .k { color: var(--muted); }
+.legend-stats .v { font-variant-numeric: tabular-nums; }

@@ -174,6 +174,10 @@ export interface RoadDetail {
   setAtlas(m: RoadAtlasMaps): void;
   /** Day factor 0..1 and wetness 0..1; writes existing uniforms only. */
   setDayWet(day: number, wet: number): void;
+  /** Traffic infoview tint: load-ratio texture (R8, one texel per tile) and map size. */
+  setTrafficMap(tex: THREE.Texture, mapSize: number): void;
+  /** Toggle the traffic tint without touching the texture binding. */
+  setTrafficOn(on: boolean): void;
 }
 
 /**
@@ -205,6 +209,10 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
     uTexCrosswalk: { value: white as THREE.Texture },
     uTexStopBar: { value: white as THREE.Texture },
     uTexArrow: { value: white as THREE.Texture },
+    // Traffic infoview (F11): R8 load-ratio texture sampled at world xz.
+    uTrafficTex: { value: white as THREE.Texture },
+    uTrafficOn: { value: 0 },
+    uMapSize: { value: 96 },
   };
 
   const material = new THREE.MeshStandardMaterial({
@@ -217,10 +225,12 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
       .replace("#include <common>", `#include <common>
         attribute float aClass;
         varying float vRoadClass;
-        varying vec2 vRoadUv;`)
+        varying vec2 vRoadUv;
+        varying vec2 vWorldXz;`)
       .replace("#include <uv_vertex>", `#include <uv_vertex>
         vRoadClass = aClass;
-        vRoadUv = uv;`);
+        vRoadUv = uv;
+        vWorldXz = (modelMatrix * vec4(position, 1.0)).xz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", `#include <common>
         uniform sampler2D uKerbMap, uSidewalkMap;
@@ -229,8 +239,11 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
         uniform vec3 uAvgBase, uAvgKerb, uAvgSidewalk;
         uniform vec3 uKerbColor;
         uniform float uDetailOn, uAtlasOn, uDayFactor, uWet;
+        uniform sampler2D uTrafficTex;
+        uniform float uTrafficOn, uMapSize;
         varying float vRoadClass;
-        varying vec2 vRoadUv;`)
+        varying vec2 vRoadUv;
+        varying vec2 vWorldXz;`)
       .replace("#include <map_fragment>", `
         if (uAtlasOn > 0.5 && vRoadClass > 0.5) {
           vec3 roadCol;
@@ -253,12 +266,16 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
           vec3 kerbDet = mix(texture2D(uKerbMap, vMapUv).rgb / max(uAvgKerb, vec3(0.05)),
                              texture2D(uSidewalkMap, vMapUv).rgb / max(uAvgSidewalk, vec3(0.05)), 0.6);
           diffuseColor.rgb *= mix(baseDet, kerbDet, kerbness);
+        }
+        if (uTrafficOn > 0.5 && vRoadClass > 0.5) {
+          float tLoad = texture2D(uTrafficTex, vWorldXz / uMapSize).r;
+          diffuseColor.rgb = mix(vec3(0.13, 0.62, 0.20), vec3(0.85, 0.10, 0.07), smoothstep(0.0, 1.0, tLoad));
         }`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, 0.32,
           uWet * uAtlasOn * step(0.5, vRoadClass) * step(vRoadClass, 6.5));`);
   };
-  material.customProgramCacheKey = () => "road-atlas-v1";
+  material.customProgramCacheKey = () => "road-atlas-v2";
   const v3 = (a: [number, number, number]) => new THREE.Vector3(...a);
   return {
     material,
@@ -289,6 +306,13 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
       uniforms.uDayFactor.value = day;
       uniforms.uWet.value = wet;
       applyMaterialTargets(material, wet, 0.6);
+    },
+    setTrafficMap: (tex, mapSize) => {
+      uniforms.uTrafficTex.value = tex;
+      uniforms.uMapSize.value = mapSize;
+    },
+    setTrafficOn: (on) => {
+      uniforms.uTrafficOn.value = on ? 1 : 0;
     },
   };
 }

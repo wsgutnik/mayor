@@ -24,7 +24,10 @@ import { loadManifestGatedModel } from "./visual-v2-manifest";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
-import { TrafficState, ROAD_CAPACITY } from "../sim/traffic";
+import { TrafficState } from "../sim/traffic";
+import { buildCoverageField, coverageRamp, isCoverageLayer } from "../sim/coverage-field";
+import { CoverageOverlay } from "./coverage-overlay";
+import { TrafficTint } from "./traffic-tint";
 import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 import { UndergroundView } from "./underground";
 import { createRoadDetailMaterial, loadRoadAtlas, loadRoadDetailMaps, RoadDetail } from "./road-material";
@@ -240,6 +243,11 @@ export class CityRenderer {
   private warnMesh!: THREE.InstancedMesh;
   private overlay!: THREE.InstancedMesh;
   private overlayLayer: OverlayLayer = 0;
+  /** P2-B info views: texture coverage overlay + road traffic tint (replaces per-tile instances). */
+  private covOverlay: CoverageOverlay | null = null;
+  private covSeen = -1;
+  private covBytes: Uint8Array | undefined;
+  private trafficTint: TrafficTint | null = null;
   private vehicleMesh!: THREE.InstancedMesh;
   private traffic: TrafficState | null = null;
   private frame = 0;
@@ -1297,8 +1305,10 @@ export class CityRenderer {
     this.seenRevision = -1;
     this.overlaySeen = -1;
     this.overlayLvSeen = -1;
+    this.covSeen = -1;
     // Fresh materials arrive opaque; re-ghost them when the soil is showing.
     this.setUndergroundLook(this.overlayLayer === UNDERGROUND_LAYER);
+    this.syncInfoViews();
   }
 
   /**
@@ -1345,6 +1355,7 @@ export class CityRenderer {
     this.rainOn = raining;
     this.rain.visible = raining;
     this.roadDetail.setDayWet(this.dayLevel, raining ? 1 : 0);
+    this.covOverlay?.setDim(1 - 0.8 * (1 - this.dayLevel));
   }
 
   /** Traffic whose vehicles are drawn and whose loads colour the traffic infoview. */
@@ -1640,8 +1651,37 @@ export class CityRenderer {
     this.overlayLayer = layer;
     this.overlaySeen = -1;
     this.overlayLvSeen = -1;
+    this.covSeen = -1;
     const under = layer === UNDERGROUND_LAYER;
     if (under !== wasUnder) this.setUndergroundLook(under);
+    this.syncInfoViews();
+  }
+
+  /** P2-B hook: route coverage layers to the texture overlay, traffic to the road tint. */
+  private syncInfoViews(): void {
+    const layer = this.overlayLayer;
+    const size = this.world.size;
+    if (!this.covOverlay) {
+      this.covOverlay = new CoverageOverlay(this.scene, size);
+      this.covOverlay.setDim(1 - 0.8 * (1 - this.dayLevel));
+    }
+    this.covOverlay.attach(this.terrain, size);
+    const isCover = isCoverageLayer(layer);
+    this.covOverlay.setVisible(isCover);
+    if (isCover) this.covOverlay.setColors(coverageRamp(layer));
+    const isTraffic = layer === TRAFFIC_LAYER;
+    if (isTraffic && !this.trafficTint) this.trafficTint = new TrafficTint(size);
+    if (this.trafficTint) {
+      const load = this.traffic?.load;
+      if (load) this.trafficTint.update({ size, road: this.world.road, load });
+      this.roadDetail.setTrafficMap(this.trafficTint.texture, size);
+    }
+    this.roadDetail.setTrafficOn(isTraffic);
+  }
+
+  /** P2-B hook for the visual pass: coverage overlay + traffic tint state. */
+  get infoViews(): { coverage: CoverageOverlay | null; traffic: TrafficTint | null; layer: OverlayLayer } {
+    return { coverage: this.covOverlay, traffic: this.trafficTint, layer: this.overlayLayer };
   }
 
   /** Ghost the surface over a dark soil backdrop so the pipe networks underneath read clearly. */
@@ -1701,33 +1741,41 @@ export class CityRenderer {
       }
       return;
     }
+    if (isCoverageLayer(layer)) {
+      // Texture overlay owns coverage layers: one field upload per revision, no instances.
+      this.overlaySeen = w.revision;
+      m.count = 0;
+      if (this.covSeen !== w.revision && this.covOverlay) {
+        this.covSeen = w.revision;
+        if (!this.covBytes || this.covBytes.length !== w.size * w.size * 4) {
+          this.covBytes = new Uint8Array(w.size * w.size * 4);
+        }
+        this.covOverlay.attach(this.terrain, w.size);
+        this.covOverlay.setField(buildCoverageField(w, layer, this.covBytes));
+        this.covOverlay.updateRings(this.rig.target.x, this.rig.target.z, this.rig.dist, true);
+      }
+      return;
+    }
+    if (layer === TRAFFIC_LAYER) {
+      // The road shader tints from the load texture (refreshed every 10 frames); no instances.
+      this.overlaySeen = w.revision;
+      m.count = 0;
+      return;
+    }
     this.overlaySeen = w.revision;
     this.overlayLvSeen = w.lvRevision;
-    const isValue = layer === LAND_VALUE_LAYER;
-    const isTraffic = layer === TRAFFIC_LAYER;
-    const flat = new THREE.Color(OVERLAY_COLOR[layer] ?? "#ffffff");
     const col = new THREE.Color();
     const d = this.dummy;
     let n = 0;
     for (let y = 0; y < w.size; y++) {
       for (let x = 0; x < w.size; x++) {
         const i = idx(w, x, y);
-        if (isTraffic) {
-          if (!w.road[i]) continue;
-        } else {
-          if (!isLand(w, x, y)) continue;
-          if (!isValue && !(w.cover[i] & layer)) continue;
-        }
+        if (!isLand(w, x, y)) continue;
         d.position.set(x + 0.5, tileHeight(w, x, y) + 0.12, y + 0.5);
         d.scale.set(0.98, 0.02, 0.98);
         d.updateMatrix();
         m.setMatrixAt(n, d.matrix);
-        if (isTraffic) {
-          const load = this.traffic ? this.traffic.load[i] : 0;
-          const ratio = Math.min(1.5, load / ROAD_CAPACITY[w.road[i]]);
-          col.setHSL(0.33 * (1 - Math.min(1, ratio)), 0.9, 0.5); // green (free) to red (jammed)
-        } else if (isValue) col.setHSL((w.landValue[i] / 100) * 0.33, 0.8, 0.5); // red (low) to green (high)
-        else col.copy(flat);
+        col.setHSL((w.landValue[i] / 100) * 0.33, 0.8, 0.5); // red (low) to green (high)
         m.setColorAt(n, col);
         n++;
       }
@@ -2010,7 +2058,13 @@ export class CityRenderer {
     this.updateVehicles();
     this.updateSignalColors();
     if (this.propDensitySeen >= 0 && this.propDensitySeen !== this.propDensity()) this.rebuildProps();
-    if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0) this.overlaySeen = -1;
+    const tintLoad = this.traffic?.load;
+    if (this.overlayLayer === TRAFFIC_LAYER && this.frame % 10 === 0 && this.trafficTint && tintLoad) {
+      this.trafficTint.update({ size: this.world.size, road: this.world.road, load: tintLoad });
+    }
+    if (this.covOverlay?.visible && this.frame % 4 === 0) {
+      this.covOverlay.updateRings(this.rig.target.x, this.rig.target.z, this.rig.dist);
+    }
     if (this.overlaySeen !== this.world.revision || (this.overlayLayer === LAND_VALUE_LAYER && this.overlayLvSeen !== this.world.lvRevision)) this.rebuildOverlay();
     if (this.frame % 90 === 0) this.markShadows();
     // the shadow frustum travels with the camera target and covers the visible ground at this zoom

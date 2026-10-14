@@ -1,5 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { roadLayerForColor } from "./road-material";
+import * as THREE from "three";
+import { createRoadDetailMaterial, roadLayerForColor } from "./road-material";
+
+function patched() {
+  const fallback = new THREE.DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
+  const detail = createRoadDetailMaterial(fallback);
+  const shader = {
+    uniforms: {} as Record<string, THREE.IUniform>,
+    vertexShader: THREE.ShaderLib.standard.vertexShader,
+    fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+  };
+  detail.material.onBeforeCompile!(shader as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+  return { detail, shader };
+}
+
+describe("traffic tint", () => {
+  it("samples the load texture at world xz on carriageways", () => {
+    const { shader } = patched();
+    expect(shader.vertexShader).toContain("vWorldXz");
+    expect(shader.fragmentShader).toContain("uTrafficTex");
+    expect(shader.fragmentShader).toContain("vWorldXz / uMapSize");
+    expect(shader.fragmentShader).toContain("uTrafficOn > 0.5 && vRoadClass > 0.5");
+  });
+
+  it("toggles and rebinds without recompiling", () => {
+    const { detail, shader } = patched();
+    const tex = new THREE.DataTexture(new Uint8Array(16), 4, 4, THREE.RedFormat);
+    detail.setTrafficMap(tex, 64);
+    detail.setTrafficOn(true);
+    expect(shader.uniforms.uTrafficTex.value).toBe(tex);
+    expect(shader.uniforms.uMapSize.value).toBe(64);
+    expect(shader.uniforms.uTrafficOn.value).toBe(1);
+    detail.setTrafficOn(false);
+    expect(shader.uniforms.uTrafficOn.value).toBe(0);
+  });
+
+  it("carries its own program cache key so stock materials never reuse it", () => {
+    const { detail } = patched();
+    expect(detail.material.customProgramCacheKey!()).toBe("road-atlas-v2");
+  });
+});
 
 describe("roadLayerForColor", () => {
   it("sends carriageways to the asphalt detail", () => {
