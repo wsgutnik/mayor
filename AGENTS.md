@@ -58,7 +58,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 
 - Each agent works in its own git worktree (`git worktree add /tmp/mayor-wt/<name> -b agent/<name>`), with `node_modules` symlinked.
 - Muse: `muse exec --model muse-spark-1.3 --contributor-mode on --workspace <worktree> --prompt-file <file.md>` for most work; `muse-wonder-1.0` only for planning and management (uses a lot of quota; with 429, use Codex).
-- Codex: `codex exec -m gpt-5.5 -s workspace-write -C <worktree> -o <out> - < prompt.md` (review: `-s read-only`; `gpt-5.6` is not available with a ChatGPT account).
+- Codex: `codex exec -m gpt-5.6-luna -s workspace-write -C <worktree> -o <out> - < prompt.md` (cheapest; `gpt-5.6-terra` / `gpt-5.6-sol` for harder work, `gpt-5.5` as fallback; review: `-s read-only`).
 - Prompts and logs live in `/tmp/mayor-agents/`. Results come in as patches (`git diff` from the worktree) applied with `--3way`.
 - Muse and Codex do not run browser tests; visual checks are done by the lead (`window.__city` on the dev server).
 
