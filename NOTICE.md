@@ -30,10 +30,12 @@ Three.js (MIT), Tauri (MIT or Apache-2.0), Vite, and Vitest (MIT). See `package.
 ## Third-Party Code (MIT): rawprogress/fable-cities
 
 Signal phase grouping (`src/sim/signals.ts`: opposite-pair phases, FNV-1a
-per-node desync, turn classification, angle helpers) is adapted from
-**Fable Cities**, https://github.com/rawprogress/fable-cities (commit aea8b10),
-translated to TypeScript. Ported functions carry a header comment naming the
-fable source file and function.
+per-node desync, turn classification, angle helpers) and IDM car following
+(`src/sim/traffic.ts`: `idmAccel`, curvature limits, brake/blink state, ramp
+pitch pose) are adapted from **Fable Cities**,
+https://github.com/rawprogress/fable-cities (commit aea8b10), translated to
+TypeScript. Ported functions carry a header comment naming the fable source
+file and function.
 
 MIT License — Copyright (c) 2026 raw (github.com/rawprogress)
 

@@ -1,6 +1,6 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
-import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity, layerClass, RoadLayer, curvePoints } from "./world";
+import { ROAD, World, ZONE, heightAt, idx, inBounds, isTunnelTile, TransitKind, updateConnectivity, layerClass, RoadLayer, curvePoints } from "./world";
 import { SignalInfo, signalNodes, signalPhaseAt } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
@@ -27,6 +27,20 @@ export interface Vehicle {
   progress: number;
   /** Current speed as a fraction of free flow (1 = no congestion). */
   speedFactor: number;
+  /** Current speed in tiles/s (IDM state). */
+  v: number;
+  /** Driver factor, 0.86..1.10, on free-flow speed. */
+  vf: number;
+  /** Per-point cornering limit along `pts`, tiles/s. */
+  vmax: Float32Array;
+  /** Brake lamp 0..1 (render state, smoothed). */
+  brake: number;
+  /** Indicator: ±1 while lit (sign = side, +1 left), else 0. */
+  blink: number;
+  /** Blink phase offset, game seconds. */
+  seed: number;
+  /** Held up by traffic (a leader, a red light, or a full tile): feeds congestion. */
+  stuck: boolean;
 }
 
 /** A bus or metro train looping over its line's stops. */
@@ -139,6 +153,309 @@ export function indexSignals(w: World, signals: SignalInfo[]): Map<number, Signa
     }
   }
   return out;
+}
+
+// ------------------------------------------------------- IDM car following
+//
+// Portions adapted from Fable Cities (MIT, (c) 2026 raw,
+// github.com/rawprogress/fable-cities @ aea8b10): TrafficSim.js#idmAccel and the
+// brake/blink update in #_stepVehicle, LaneNetwork.js#makePoly (curvature speed
+// limit plus the backward braking pass). Units converted per
+// docs/process/10-fable-render-port.md section 1: vehicle-relative lengths
+// ×0.0875 tile/m, accelerations ×0.405 tile/s² per m/s², headways ÷1.8.
+
+/** IDM comfortable acceleration (2.85 m/s²). */
+export const IDM_A = 1.15;
+/** IDM comfortable braking (3.30 m/s²). */
+export const IDM_B = 1.34;
+/** IDM standstill gap, centre to centre minus half lengths (2.05 m). */
+export const IDM_S0 = 0.18;
+/** IDM desired time headway (1.05 s). */
+export const IDM_T = 0.58;
+/** IDM emergency deceleration (−7.6 m/s²). */
+export const IDM_DEC = -3.08;
+/** Cornering comfort limit for v = √(a/κ) (3.4 m/s²). */
+export const IDM_LAT = 1.38;
+/** Largest stable Euler step; tickTraffic sub-steps any dt above this. */
+export const IDM_SUBSTEP = 0.1;
+/** Half vehicle length, bumper to centre: car 0.20, truck 0.30 tile. */
+export function halfLength(kind: 0 | 1): number {
+  return kind === 1 ? 0.3 : 0.2;
+}
+
+const IDM_GAP_FLOOR = 0.035;   // 0.4 m: keeps the gap term finite on contact
+const IDM_VMIN_CURVE = 0.585;  // 2.6 m/s: slowest cornering limit
+const IDM_B_ENTRY = 0.81;      // 2.0 m/s²: braking into a slower next tile
+const IDM_B_BACK = 0.65;       // 1.6 m/s²: backward vmax pass
+const IDM_STOP_LINE = 0.06;    // 0.7 m: stop line ahead of the junction tile
+const IDM_STOP_ZERO = 0.031;   // 0.35 m: snap to a stop inside this of the line
+const IDM_V_STOP = 0.135;      // 0.6 m/s: below this counts as stopped
+const IDM_SPAWN_GAP = 0.31;    // 3.5 m: extra spawn clearance
+const IDM_QUEUE_GAP = 0.79;    // 9 m: held brake lamps reach this far in a queue
+const IDM_LOOKAHEAD = 4;       // route tiles scanned for leaders and red lights
+const BRAKE_REF = 1.05;        // 2.6 m/s²: decel that reads as a full brake lamp
+const BRAKE_SMOOTH = 9;        // lamp smoothing, 1/s
+const BLINK_PERIOD = 0.94, BLINK_ON = 0.52; // indicator cycle, game seconds
+
+/**
+ * Intelligent Driver Model acceleration in tiles/s²: the free-road term plus
+ * the interaction term for one leader (`gap` centre to centre minus half
+ * lengths, `dv` closing speed). Pure and total: tiny or negative gaps clamp
+ * instead of dividing by zero.
+ */
+export function idmAccel(v: number, v0: number, gap: number, dv: number, aMax = IDM_A): number {
+  const free = 1 - Math.pow(Math.max(0, v) / Math.max(0.5, v0), 4);
+  let inter = 0;
+  if (gap < 1e8) {
+    const sStar = IDM_S0 + Math.max(0, v * IDM_T + (v * dv) / (2 * Math.sqrt(aMax * IDM_B)));
+    const g = Math.max(IDM_GAP_FLOOR, gap);
+    inter = (sStar / g) * (sStar / g);
+  }
+  return aMax * (free - inter);
+}
+
+/**
+ * Per-point cornering limit along a route in tiles/s: discrete curvature
+ * κ = 2·sin(θ/2)/|seg| gives v = √(IDM_LAT/κ), then a backward pass brakes
+ * before the apex instead of in it. Straight points stay Infinity; callers
+ * take the min with free-flow speed.
+ */
+export function vmaxAt(pts: Float32Array): Float32Array {
+  const n = pts.length / 2;
+  const out = new Float32Array(n).fill(Infinity);
+  for (let i = 1; i + 1 < n; i++) {
+    const ax = pts[i * 2] - pts[i * 2 - 2], az = pts[i * 2 + 1] - pts[i * 2 - 1];
+    const bx = pts[i * 2 + 2] - pts[i * 2], bz = pts[i * 2 + 3] - pts[i * 2 + 1];
+    const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+    if (la < 1e-6 || lb < 1e-6) continue;
+    const cos = Math.max(-1, Math.min(1, (ax * bx + az * bz) / (la * lb)));
+    const kappa = (2 * Math.sqrt(Math.max(0, (1 - cos) / 2))) / Math.max(1e-6, (la + lb) / 2);
+    if (kappa > 1e-4) out[i] = Math.max(IDM_VMIN_CURVE, Math.sqrt(IDM_LAT / kappa));
+  }
+  for (let i = n - 2; i >= 0; i--) {
+    const d = Math.hypot(pts[i * 2 + 2] - pts[i * 2], pts[i * 2 + 3] - pts[i * 2 + 1]);
+    out[i] = Math.min(out[i], Math.sqrt(out[i + 1] * out[i + 1] + 2 * IDM_B_BACK * d));
+  }
+  return out;
+}
+
+/**
+ * Turn sign at route index `at` from the cross product of the next two steps:
+ * +1 left, −1 right, 0 straight or no turn ahead (x right, z down, so a left
+ * turn reads negative). The indicator shows while the corner is within 2 tiles.
+ */
+export function turnSide(pts: Float32Array, at: number): number {
+  const n = pts.length / 2;
+  if (at < 0 || at + 2 >= n) return 0;
+  const ax = pts[(at + 1) * 2] - pts[at * 2], az = pts[(at + 1) * 2 + 1] - pts[at * 2 + 1];
+  const bx = pts[(at + 2) * 2] - pts[(at + 1) * 2], bz = pts[(at + 2) * 2 + 1] - pts[(at + 1) * 2 + 1];
+  const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+  if (la < 1e-6 || lb < 1e-6) return 0;
+  const s = (ax * bz - az * bx) / (la * lb);
+  if (s < -0.25) return 1;
+  if (s > 0.25) return -1;
+  return 0;
+}
+
+/** Road height under route index `i`: deck profile on layer 1, terrain otherwise. */
+function laneHeightAt(w: World, tiles: number[], layers: Uint8Array | undefined, pts: Float32Array, i: number): number {
+  const t = tiles[i];
+  const layer = layers ? layers[i] : isTunnelTile(w, t) ? 2 : w.roadDeck[t] && !w.roadSurface[t] ? 1 : 0;
+  const dh = w.deckH[t];
+  if (layer === 1 && !Number.isNaN(dh)) return dh;
+  return heightAt(w, pts[i * 2], pts[i * 2 + 1]);
+}
+
+/**
+ * True when route index `i` rides deck rail: layer 1 with a stamped deck, or a
+ * ramp foot where the deck sits at ground height. Ground lanes under an
+ * overpass stay ground (their deck is half a tile overhead).
+ */
+function onDeckRail(w: World, tiles: number[], layers: Uint8Array | undefined, pts: Float32Array, i: number): boolean {
+  if (i < 0 || i >= tiles.length) return false;
+  const t = tiles[i];
+  const dh = w.deckH[t];
+  if (Number.isNaN(dh)) return false;
+  const layer = layers ? layers[i] : isTunnelTile(w, t) ? 2 : w.roadDeck[t] && !w.roadSurface[t] ? 1 : 0;
+  if (layer === 1) return true;
+  if (layer !== 0) return false;
+  return Math.abs(dh - heightAt(w, pts[i * 2], pts[i * 2 + 1])) < 0.05;
+}
+
+const minmod = (a: number, b: number): number => (a * b <= 0 ? 0 : Math.abs(a) < Math.abs(b) ? a : b);
+
+/**
+ * Continuous road height along a route in tiles: deck heights interpolated
+ * between route tiles so vehicles ride ramps smoothly instead of stepping per
+ * tile, terrain elsewhere. Pure (reads world height fields only).
+ */
+export function routeHeightAt(w: World, tiles: number[], layers: Uint8Array | undefined, pts: Float32Array, progress: number): number {
+  const len = tiles.length;
+  if (!len) return 0;
+  if (len < 2 || pts.length < 4) return laneHeightAt(w, tiles, layers, pts, 0);
+  const p = Math.max(0, Math.min(len - 1, progress));
+  const i = Math.min(len - 2, Math.floor(p));
+  const f = p - i;
+  const y0 = laneHeightAt(w, tiles, layers, pts, i);
+  const y1 = laneHeightAt(w, tiles, layers, pts, i + 1);
+  // Deck runs ride a smoothstep Hermite: deckH is sampled per tile but the
+  // ribbon follows the smooth01 profile, whose peak slope is 1.5× the secant.
+  // Limited tangents (1.5×minmod) reproduce ramp cubics almost exactly, stay
+  // flat on decks, and never overshoot at joints the way Catmull-Rom does.
+  if (onDeckRail(w, tiles, layers, pts, i) && onDeckRail(w, tiles, layers, pts, i + 1)) {
+    const dm = i - 1 >= 0 ? laneHeightAt(w, tiles, layers, pts, i - 1) : y0;
+    const dp = i + 2 < len ? laneHeightAt(w, tiles, layers, pts, i + 2) : y1;
+    const m0 = 1.5 * minmod(y0 - dm, y1 - y0);
+    const m1 = 1.5 * minmod(y1 - y0, dp - y1);
+    const t2 = f * f, t3 = t2 * f;
+    return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + f) * m0 + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * m1;
+  }
+  return y0 + (y1 - y0) * f;
+}
+
+/** Nose-up-positive pitch from front/rear heights, clamped to ±0.5 rad. */
+export function pitchFromHeights(hF: number, hR: number, dist: number): number {
+  const p = Math.atan2(hF - hR, Math.max(1e-6, dist));
+  return Math.max(-0.5, Math.min(0.5, p));
+}
+
+/**
+ * Vehicle pitch along a route: heights sampled ±0.4·length about the centre,
+ * the Fable Renderer.js matrix pose (Euler YXZ there; Mayor's +X-forward
+ * models take the same angle about Z after yaw). Zero on flat ground.
+ */
+export function routePitchAt(w: World, tiles: number[], layers: Uint8Array | undefined, pts: Float32Array, progress: number, halfLen: number): number {
+  const len = tiles.length;
+  if (len < 2 || pts.length < 4) return 0;
+  const p = Math.max(0, Math.min(len - 1, progress));
+  const i = Math.min(len - 2, Math.floor(p));
+  const segLen = Math.max(1e-6, Math.hypot(pts[i * 2 + 2] - pts[i * 2], pts[i * 2 + 3] - pts[i * 2 + 1]));
+  const off = (0.8 * halfLen) / segLen;
+  return pitchFromHeights(
+    routeHeightAt(w, tiles, layers, pts, p + off),
+    routeHeightAt(w, tiles, layers, pts, p - off),
+    1.6 * halfLen,
+  );
+}
+
+/** Per-tile vehicle buckets, rebuilt every substep without allocation. */
+const buckets = { tiles: 0, head: new Int32Array(0), next: new Int32Array(0) };
+function ensureBuckets(tiles: number, vehicles: number): void {
+  if (buckets.tiles !== tiles) {
+    buckets.tiles = tiles;
+    buckets.head = new Int32Array(tiles);
+  }
+  if (buckets.next.length < vehicles) buckets.next = new Int32Array(Math.max(16, vehicles * 2));
+}
+
+/**
+ * Advance one vehicle by `h` game seconds: IDM against the nearest leader in
+ * its corridor over the next few route tiles, a virtual stopped leader at red
+ * stop lines, curvature and entry-speed limits, plus brake/blink render state.
+ * Sequential over the (stable-order) vehicle array, so a fixed seed replays
+ * exactly; neighbour speeds read the current substep in place.
+ */
+function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: number): void {
+  const v = t.vehicles[k];
+  const len = v.tiles.length;
+  if (len < 2) return;
+  const at = Math.floor(v.progress);
+  if (at >= len - 1 || at < 0) return;
+  const tile = v.tiles[at];
+  const cls = w.road[tile];
+  if (!cls) return;
+  const f = v.progress - at;
+  const ax = v.pts[at * 2], az = v.pts[at * 2 + 1];
+  const bx = v.pts[at * 2 + 2], bz = v.pts[at * 2 + 3];
+  const segLen = Math.hypot(bx - ax, bz - az) || 1;
+  const hx = (bx - ax) / segLen, hz = (bz - az) / segLen;
+  const px = ax + (bx - ax) * f, pz = az + (bz - az) * f;
+  const myHalf = halfLength(v.kind);
+  const vv = v.v ?? 0;
+
+  // Desired speed: free flow × driver × weather, capped by congestion (kept as
+  // an upper bound so balance matches the old model) and by the corner limit.
+  const vf = v.vf ?? 1;
+  const free = ROAD_SPEED[cls] * vf * weather;
+  const fCap = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
+  let v0 = Math.min(free * fCap, v.vmax ? v.vmax[at] : Infinity);
+  const ncls = w.road[v.tiles[at + 1]];
+  if (ncls) {
+    const entry = ROAD_SPEED[ncls] * vf * weather;
+    const remain = Math.max(0, at + 1 - v.progress);
+    const ve = Math.sqrt(entry * entry + 2 * IDM_B_ENTRY * remain);
+    if (ve < v0) v0 = ve;
+  }
+
+  // Leader: nearest vehicle ahead in our corridor on the next few route tiles.
+  // Same-direction only (heading dot): cross traffic and oncoming lanes pass
+  // through until the lane graph lands, as before.
+  let leadGap = Infinity, leadV = 0;
+  const { head, next } = buckets;
+  const last = Math.min(len - 1, at + IDM_LOOKAHEAD);
+  for (let j = at; j <= last; j++) {
+    for (let u = head[v.tiles[j]]; u >= 0; u = next[u]) {
+      if (u === k) continue;
+      const o = t.vehicles[u];
+      const olen = o.tiles.length;
+      if (olen < 2) continue;
+      const oat = Math.max(0, Math.min(olen - 2, Math.floor(o.progress)));
+      const of = Math.min(1, Math.max(0, o.progress - oat));
+      const oax = o.pts[oat * 2], oaz = o.pts[oat * 2 + 1];
+      const obx = o.pts[oat * 2 + 2], obz = o.pts[oat * 2 + 3];
+      const oseg = Math.hypot(obx - oax, obz - oaz) || 1;
+      const ohx = (obx - oax) / oseg, ohz = (obz - oaz) / oseg;
+      const rx = oax + (obx - oax) * of - px, rz = oaz + (obz - oaz) * of - pz;
+      const long = rx * hx + rz * hz;
+      if (long < -0.2) continue;
+      if (Math.abs(rx * hz - rz * hx) > 0.45) continue;
+      if (hx * ohx + hz * ohz < 0.3) continue;
+      const gap = long - myHalf - halfLength(o.kind);
+      if (gap < leadGap) { leadGap = gap; leadV = o.v ?? 0; }
+    }
+  }
+
+  // Red lights: a virtual stopped leader at the stop line of the first
+  // controlled tile transition ahead (replaces the old RED_CRAWL factor, but
+  // redCrawl itself still answers "may this transition proceed").
+  let stopDist = Infinity;
+  const onGround = !v.layers || v.layers[at] === 0;
+  if (onGround && t.sigNodes.length) {
+    for (let sk = 0; sk <= IDM_LOOKAHEAD && at + sk + 1 < len; sk++) {
+      if (redCrawl(w, t, v.tiles[at + sk], v.tiles[at + sk + 1], t.time) !== RED_CRAWL) continue;
+      const d = at + sk + 1 - IDM_STOP_LINE - (v.progress + myHalf);
+      if (d < -0.15) continue; // past the line: clear the junction
+      stopDist = Math.max(0, d);
+      break;
+    }
+  }
+
+  const aFree = idmAccel(vv, v0, 1e9, 0);
+  let a = aFree;
+  if (leadGap < 1e8) a = Math.min(a, idmAccel(vv, v0, leadGap, vv - leadV));
+  const stopping = stopDist < 1e8;
+  if (stopping) a = Math.min(a, idmAccel(vv, v0, stopDist + IDM_S0, vv));
+  const aInt = a;
+  a = Math.max(IDM_DEC, Math.min(IDM_A, a));
+  let nv = Math.max(0, vv + a * h);
+  if (stopDist < IDM_STOP_ZERO && nv < IDM_V_STOP) nv = 0;
+  v.v = nv;
+  v.progress += nv * h;
+
+  let brakeT = Math.min(1, Math.max(0, -a / BRAKE_REF));
+  if (nv < IDM_V_STOP && (stopping || leadGap < IDM_QUEUE_GAP)) brakeT = Math.max(brakeT, 0.9);
+  const pb = v.brake ?? 0;
+  v.brake = pb + (brakeT - pb) * Math.min(1, h * BRAKE_SMOOTH);
+
+  const side = turnSide(v.pts, at);
+  v.blink = side === 0 ? 0 : side * (((t.time + (v.seed ?? 0)) % BLINK_PERIOD) < BLINK_ON ? 1 : 0);
+  v.speedFactor = Math.max(0, Math.min(1, Math.min(fCap, nv / Math.max(1e-6, free))));
+  // Congestion means held up by traffic, not merely slow: free acceleration,
+  // cornering, and weak far interactions match (or nearly match) the
+  // interaction-free accel, so only a binding leader or signal — or a full
+  // tile — counts. This keeps the old model's meaning (and the happiness
+  // balance) while real queues now read as congestion too.
+  v.stuck = fCap < 0.6 || (nv < 0.6 * free && aInt < 0.5 * aFree);
 }
 
 // ---------------------------------------------------------------- pathfinding
@@ -482,12 +799,36 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
   const origins = kind === 0 ? t.homes : t.factories;
   const dests = kind === 0 ? t.jobs : t.shops;
   if (!origins.length || !dests.length) return;
-  const a = accessTile(w, origins[Math.floor(t.rng() * origins.length)], t.rng);
-  const b = accessTile(w, dests[Math.floor(t.rng() * dests.length)], t.rng);
-  if (a < 0 || b < 0) return;
-  const lp = findLayeredPath(w, t.load, a, b);
-  if (!lp || lp.tiles.length < 2) return;
-  t.vehicles.push({ id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts: routePath(w, lp.tiles), progress: 0, speedFactor: 1 });
+  // Up to 3 placements per demand unit (Fable tries 6 lanes); a new car joins
+  // at 55% of the lane limit, never at a standstill in moving traffic.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const a = accessTile(w, origins[Math.floor(t.rng() * origins.length)], t.rng);
+    const b = accessTile(w, dests[Math.floor(t.rng() * dests.length)], t.rng);
+    if (a < 0 || b < 0) continue;
+    const lp = findLayeredPath(w, t.load, a, b);
+    if (!lp || lp.tiles.length < 2) continue;
+    const pts = routePath(w, lp.tiles);
+    // Spawn clearance: the start point needs half + half + 0.31 tile of room.
+    const myHalf = halfLength(kind);
+    let blocked = false;
+    for (const u of t.vehicles) {
+      const ulen = u.tiles.length;
+      if (ulen < 2) continue;
+      const uat = Math.max(0, Math.min(ulen - 2, Math.floor(u.progress)));
+      if (u.tiles[uat] !== a && u.tiles[uat + 1] !== a) continue;
+      const of = Math.min(1, Math.max(0, u.progress - uat));
+      const ux = u.pts[uat * 2] + (u.pts[uat * 2 + 2] - u.pts[uat * 2]) * of;
+      const uz = u.pts[uat * 2 + 1] + (u.pts[uat * 2 + 3] - u.pts[uat * 2 + 1]) * of;
+      if (Math.hypot(ux - pts[0], uz - pts[1]) - myHalf - halfLength(u.kind) < IDM_SPAWN_GAP) { blocked = true; break; }
+    }
+    if (blocked) continue;
+    t.vehicles.push({
+      id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts,
+      progress: 0, speedFactor: 1, v: ROAD_SPEED[w.road[a]] * 0.55, vf: 0.86 + t.rng() * 0.24,
+      vmax: vmaxAt(pts), brake: 0, blink: 0, seed: t.rng() * BLINK_PERIOD, stuck: false,
+    });
+    return;
+  }
 }
 
 function moveTransit(w: World, t: TrafficState, dt: number, weather: number): void {
@@ -543,23 +884,33 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     t.sigNodes = signalNodes(w);
     t.sigByTile = indexSignals(w, t.sigNodes);
   }
-  t.time += dt;
+
+  // IDM substeps: explicit Euler is stable only for h well under the headway.
+  const weather = s.raining ? RAIN_SPEED_FACTOR : 1;
+  const steps = Math.max(1, Math.ceil(dt / IDM_SUBSTEP - 1e-9));
+  const h = dt / steps;
+  ensureBuckets(w.size * w.size, t.vehicles.length);
+  for (let step = 0; step < steps; step++) {
+    t.time += h;
+    buckets.head.fill(-1);
+    for (let k = 0; k < t.vehicles.length; k++) {
+      const v = t.vehicles[k];
+      if (v.tiles.length < 2) continue;
+      const at = Math.max(0, Math.min(v.tiles.length - 1, Math.floor(v.progress)));
+      buckets.next[k] = buckets.head[v.tiles[at]];
+      buckets.head[v.tiles[at]] = k;
+    }
+    for (let k = 0; k < t.vehicles.length; k++) stepVehicle(w, t, k, h, weather);
+  }
 
   let slow = 0;
   const alive: Vehicle[] = [];
   for (const v of t.vehicles) {
-    const at = Math.min(v.tiles.length - 1, Math.floor(v.progress));
+    const at = Math.max(0, Math.min(v.tiles.length - 1, Math.floor(v.progress)));
     const tile = v.tiles[at];
-    const cls = w.road[tile];
-    if (!cls) continue;
-    let f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
-    // Vehicles on a deck or in a tunnel ignore ground signals (M24).
-    const onGround = !v.layers || v.layers[at] === 0;
-    if (onGround && f > RED_CRAWL && t.sigNodes.length) f = Math.min(f, redCrawl(w, t, tile, v.tiles[Math.min(v.tiles.length - 1, at + 1)], t.time));
-    v.speedFactor = f;
-    if (f < 0.6) slow++;
-    v.progress += ROAD_SPEED[cls] * f * (s.raining ? RAIN_SPEED_FACTOR : 1) * dt;
+    if (!w.road[tile]) continue;
     if (v.progress >= v.tiles.length - 1) { t.completed++; continue; }
+    if (v.stuck) slow++;
     alive.push(v);
   }
   t.vehicles = alive;
