@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
+import * as fs from "node:fs";
 import { newCity, placeRoad, CityState } from "../sim/sim";
-import { cidx, heightAt } from "../sim/world";
-import { nodeArms } from "../sim/roads";
-import { buildRoadNetworkGeometry, buildStripGeometry, JUNCTION_TILE, ROAD_CLASS, ROAD_TILE_LENGTH, roadClassFor } from "./roads";
+import { cidx, heightAt, RoadType } from "../sim/world";
+import { nodeArms, nodeLayout } from "../sim/roads";
+import {
+  buildRoadNetworkGeometry, buildStripGeometry, junctionDebugGeometry,
+  JUNCTION_TILE, ROAD_CLASS, ROAD_TILE_LENGTH, roadClassFor,
+} from "./roads";
 
 const tris = (g: THREE.BufferGeometry): number =>
   (g.index ? g.index.count : g.attributes.position.count) / 3;
@@ -17,7 +21,7 @@ function flatTown(): CityState {
   return s;
 }
 
-const road = (s: CityState, type: 1 | 2 | 3, pts: [number, number][]): void => {
+const road = (s: CityState, type: RoadType, pts: [number, number][]): void => {
   const r = placeRoad(s, type, pts.map(([x, y]) => ({ x, z: y })));
   expect(r.ok).toBe(true);
 };
@@ -31,6 +35,59 @@ const finite = (g: THREE.BufferGeometry): void => {
     const n = pos.length / 3;
     for (let i = 0; i < idxAttr.count; i++) expect(idxAttr.getX(i)).toBeLessThan(n);
   }
+};
+
+const pointInPoly = (poly: { x: number; z: number }[], p: { x: number; z: number }): boolean => {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if (((a.z > p.z) !== (b.z > p.z))
+      && p.x < ((b.x - a.x) * (p.z - a.z)) / ((b.z - a.z) || 1e-12) + a.x) inside = !inside;
+  }
+  return inside;
+};
+
+const distToSeg = (p: { x: number; z: number }, a: { x: number; z: number }, b: { x: number; z: number }): number => {
+  const vx = b.x - a.x, vz = b.z - a.z;
+  const l2 = vx * vx + vz * vz;
+  const t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.z - a.z) * vz) / l2));
+  return Math.hypot(p.x - (a.x + vx * t), p.z - (a.z + vz * t));
+};
+
+const onBoundary = (poly: { x: number; z: number }[], p: { x: number; z: number }): boolean =>
+  poly.some((a, i) => distToSeg(p, a, poly[(i + 1) % poly.length]) < 2e-3);
+
+const minTriAngle = (ax: number, az: number, bx: number, bz: number, cx: number, cz: number): number => {
+  const ab = Math.hypot(ax - bx, az - bz), bc = Math.hypot(bx - cx, bz - cz), ca = Math.hypot(cx - ax, cz - az);
+  if (ab < 1e-9 || bc < 1e-9 || ca < 1e-9) return 0;
+  const angle = (x: number, y: number, z: number) =>
+    Math.acos(Math.max(-1, Math.min(1, (x * x + y * y - z * z) / (2 * x * y)))) * 180 / Math.PI;
+  return Math.min(angle(ab, ca, bc), angle(ab, bc, ca), angle(bc, ca, ab));
+};
+
+const dumpSvg = (name: string, s: CityState): void => {
+  fs.mkdirSync("/tmp/junc2", { recursive: true });
+  const chunks: string[] = [];
+  const polys: { x: number; z: number }[][] = [];
+  const lines: { x: number; z: number }[][] = [];
+  for (const node of s.world.nodes) {
+    const l = nodeLayout(s.world, node.id);
+    if (!l || l.arms.length < 2) continue;
+    const d = junctionDebugGeometry(l);
+    if (d.asphalt.length >= 3) polys.push(d.asphalt);
+    lines.push(...d.kerbs);
+  }
+  const all = [...polys.flat(), ...lines.flat()];
+  const minX = Math.min(...all.map((p) => p.x)) - 1, maxX = Math.max(...all.map((p) => p.x)) + 1;
+  const minZ = Math.min(...all.map((p) => p.z)) - 1, maxZ = Math.max(...all.map((p) => p.z)) + 1;
+  const sx = 900 / Math.max(1, maxX - minX), sz = 700 / Math.max(1, maxZ - minZ);
+  const pt = (p: { x: number; z: number }) => `${((p.x - minX) * sx).toFixed(1)},${((p.z - minZ) * sz).toFixed(1)}`;
+  chunks.push(`<svg xmlns="http://www.w3.org/2000/svg" width="900" height="700" viewBox="0 0 900 700">`);
+  chunks.push(`<rect width="900" height="700" fill="#f8f8f4"/>`);
+  for (const p of polys) chunks.push(`<polygon points="${p.map(pt).join(" ")}" fill="#3b3f46" stroke="#111" stroke-width="2"/>`);
+  for (const l of lines) chunks.push(`<polyline points="${l.map(pt).join(" ")}" fill="none" stroke="#f5f5f0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`);
+  chunks.push(`</svg>`);
+  fs.writeFileSync(`/tmp/junc2/${name}.svg`, chunks.join("\n"));
 };
 
 describe("road network geometry", () => {
@@ -129,7 +186,8 @@ describe("road network geometry", () => {
       const bx = pos[vi[1] * 3], bz = pos[vi[1] * 3 + 2];
       const cx = pos[vi[2] * 3], cz = pos[vi[2] * 3 + 2];
       const y = (pos[vi[0] * 3 + 1] + pos[vi[1] * 3 + 1] + pos[vi[2] * 3 + 1]) / 3;
-      if (Math.abs(y - gy((ax + bx + cx) / 3, (az + bz + cz) / 3) - 0.06) > 5e-4) continue;
+      const lift = y - gy((ax + bx + cx) / 3, (az + bz + cz) / 3);
+      if (Math.abs(lift - 0.06) > 5e-4 && Math.abs(lift - 0.08) > 5e-4) continue;
       // No zero-area slivers in the asphalt layer.
       expect(Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2).toBeGreaterThan(1e-9);
       tris.push([ax, az, bx, bz, cx, cz]);
@@ -150,6 +208,76 @@ describe("road network geometry", () => {
         const pz = node.z + arm.dz * d + arm.dx * 0.05;
         expect(covered(px, pz)).toBe(true);
       }
+    }
+  });
+
+  it("keeps junction kerbs on the asphalt boundary or outside it", () => {
+    const scenarios: CityState[] = [];
+    {
+      const s = flatTown(), ey = s.world.entry.y;
+      road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
+      road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
+      road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
+      scenarios.push(s);
+      dumpSvg("acute-avenue", s);
+    }
+    {
+      const s = flatTown(), ey = s.world.entry.y;
+      road(s, 1, [[30.5, ey + 10], [36.5, ey + 10]]);
+      scenarios.push(s);
+      dumpSvg("dead-end", s);
+    }
+    {
+      const s = flatTown(), ey = s.world.entry.y;
+      road(s, 1, [[4.5, ey + 0.5], [12.5, ey + 0.5]]);
+      road(s, 1, [[12.5, ey + 0.5], [20.5, ey + 2.5]]);
+      scenarios.push(s);
+      dumpSvg("bend", s);
+    }
+    {
+      const s = flatTown(), ey = s.world.entry.y;
+      road(s, 1, [[4.5, ey + 0.5], [20.5, ey + 0.5]]);
+      road(s, 1, [[12.5, ey - 5], [12.5, ey + 5]]);
+      road(s, 5, [[24.5, ey - 4], [24.5, ey + 0.5]]);
+      road(s, 2, [[18.5, ey + 0.5], [30.5, ey + 0.5]]);
+      scenarios.push(s);
+      dumpSvg("cross-and-oneway-t", s);
+    }
+    for (const s of scenarios) {
+      for (const node of s.world.nodes) {
+        const l = nodeLayout(s.world, node.id);
+        if (!l || l.arms.length < 2) continue;
+        const d = junctionDebugGeometry(l);
+        if (d.asphalt.length < 3) continue;
+        for (const line of d.kerbs) {
+          for (const p of line) {
+            expect(pointInPoly(d.asphalt, p) && !onBoundary(d.asphalt, p)).toBe(false);
+          }
+        }
+      }
+    }
+  });
+
+  it("does not emit skinny junction triangles", () => {
+    const s = flatTown();
+    const ey = s.world.entry.y;
+    road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
+    road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
+    road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
+    const gy = (x: number, z: number): number => heightAt(s.world, x, z);
+    const g = buildRoadNetworkGeometry(s.world, gy);
+    const pos = g.attributes.position.array as Float32Array;
+    const idxAttr = g.index!;
+    for (let t = 0; t < idxAttr.count; t += 3) {
+      const vi = [idxAttr.getX(t), idxAttr.getX(t + 1), idxAttr.getX(t + 2)];
+      const ax = pos[vi[0] * 3], ay = pos[vi[0] * 3 + 1], az = pos[vi[0] * 3 + 2];
+      const bx = pos[vi[1] * 3], by = pos[vi[1] * 3 + 1], bz = pos[vi[1] * 3 + 2];
+      const cx = pos[vi[2] * 3], cy = pos[vi[2] * 3 + 1], cz = pos[vi[2] * 3 + 2];
+      const lift = ((ay - gy(ax, az)) + (by - gy(bx, bz)) + (cy - gy(cx, cz))) / 3;
+      if (Math.abs(lift - 0.078) > 0.001) continue;
+      const area = Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2;
+      expect(area).toBeGreaterThan(1e-5);
+      expect(minTriAngle(ax, az, bx, bz, cx, cz)).toBeGreaterThanOrEqual(5);
     }
   });
 

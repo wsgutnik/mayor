@@ -14,6 +14,7 @@ import { fullHalf, profileOf } from "../sim/corridor";
 export const ROAD_LIFT = 0.06;
 const KERB_LIFT = ROAD_LIFT + 0.006;
 const MARK_LIFT = ROAD_LIFT + 0.004;
+const NODE_ASPHALT_LIFT = ROAD_LIFT + 0.02;
 
 const ASPHALT = "#3b3f46";
 const KERB = "#c4c7cc";
@@ -163,6 +164,36 @@ interface RibbonOpts {
   kNeg: number; kPos: number;
   eANeg: number; eAPos: number;
   eKNeg: number; eKPos: number;
+}
+
+export interface JunctionDebugGeometry {
+  asphalt: Pt[];
+  kerbs: Pt[][];
+  kerbQuads: [Pt, Pt, Pt, Pt][];
+}
+
+function pointInPoly(poly: Pt[], p: Pt): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if (((a.z > p.z) !== (b.z > p.z))
+      && p.x < ((b.x - a.x) * (p.z - a.z)) / ((b.z - a.z) || 1e-12) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+const triArea2 = (a: Pt, b: Pt, c: Pt): number =>
+  Math.abs((b.x - a.x) * (c.z - a.z) - (c.x - a.x) * (b.z - a.z));
+
+function minTriAngleDeg(a: Pt, b: Pt, c: Pt): number {
+  const side = (p: Pt, q: Pt): number => Math.hypot(p.x - q.x, p.z - q.z);
+  const ab = side(a, b), bc = side(b, c), ca = side(c, a);
+  if (ab < 1e-9 || bc < 1e-9 || ca < 1e-9) return 0;
+  const angle = (x: number, y: number, z: number): number =>
+    Math.acos(Math.max(-1, Math.min(1, (x * x + y * y - z * z) / (2 * x * y)))) * 180 / Math.PI;
+  return Math.min(angle(ab, ca, bc), angle(ab, bc, ca), angle(bc, ca, ab));
 }
 
 export const NO_TRIM: RibbonOpts = {
@@ -565,15 +596,10 @@ function zebra(
  * kerb sectors only in the gaps between the arms, so bends and junctions get rounded kerb corners without arcs
  * cutting across an arm's roadway.
  */
-function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void {
+export function junctionDebugGeometry(l: NodeLayout): JunctionDebugGeometry {
   const arms = l.arms
     .map((a, idx) => ({ a, idx, ang: Math.atan2(a.dz, a.dx) }))
     .sort((p, q) => p.ang - q.ang);
-  // A straight continuation (two arms, opposite) needs no patch.
-  if (arms.length === 2) {
-    const dot = arms[0].a.dx * arms[1].a.dx + arms[0].a.dz * arms[1].a.dz;
-    if (dot < -0.985) return;
-  }
   const cornerByA = new Map<number, (typeof l.corners)[number]>();
   for (const c of l.corners) cornerByA.set(c.aIdx, c);
   const sidePoint = (a: NodeLayoutArm, side: -1 | 1, trim: number, width = a.halfWidth): Pt => {
@@ -611,9 +637,8 @@ function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void
     const last = clean[clean.length - 1];
     if (!last || Math.hypot(last.x - p.x, last.z - p.z) > 1e-4) clean.push(p);
   }
-  if (clean.length < 3) return;
-  // Kerb strips follow the same corner fillets as the asphalt boundary, so
-  // sidewalks no longer stop bluntly at the node.
+  const kerbs: Pt[][] = [];
+  const kerbQuads: [Pt, Pt, Pt, Pt][] = [];
   for (const c of l.corners) {
     if (c.kerb <= 0) continue;
     const inner = [c.pa, ...arc(c), c.pb];
@@ -621,14 +646,43 @@ function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void
       ...arc(c, c.kerb),
       sidePoint(l.arms[c.bIdx], -1, l.arms[c.bIdx].trimA.neg, l.arms[c.bIdx].halfWidth + c.kerb)];
     const n = Math.min(inner.length, outer.length);
+    const strip: Pt[] = [];
     for (let k = 0; k + 1 < n; k++) {
       const a = inner[k], b = inner[k + 1], c0 = outer[k + 1], d = outer[k];
-      g.quad(a.x, a.z, b.x, b.z, c0.x, c0.z, d.x, d.z, KERB_LIFT + 0.012, KERB, groundY);
+      const mid = { x: (a.x + b.x + c0.x + d.x) * 0.25, z: (a.z + b.z + c0.z + d.z) * 0.25 };
+      const tooThin = triArea2(a, b, c0) < 1e-5 || triArea2(a, c0, d) < 1e-5
+        || minTriAngleDeg(a, b, c0) < 5 || minTriAngleDeg(a, c0, d) < 5;
+      if (clean.length >= 3 && (pointInPoly(clean, mid) || tooThin)) continue;
+      if (strip.length === 0) strip.push(a);
+      strip.push(b);
+      kerbQuads.push([a, b, c0, d]);
     }
+    if (strip.length > 1) kerbs.push(strip);
+  }
+  return { asphalt: clean, kerbs, kerbQuads };
+}
+
+function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void {
+  const arms = l.arms
+    .map((a, idx) => ({ a, idx, ang: Math.atan2(a.dz, a.dx) }))
+    .sort((p, q) => p.ang - q.ang);
+  // A straight continuation (two arms, opposite) needs no patch.
+  if (arms.length === 2) {
+    const dot = arms[0].a.dx * arms[1].a.dx + arms[0].a.dz * arms[1].a.dz;
+    if (dot < -0.985) return;
+  }
+  const dbg = junctionDebugGeometry(l);
+  const clean = dbg.asphalt;
+  if (clean.length < 3) return;
+  // Kerb strips follow the same corner fillets as the asphalt boundary. Strips
+  // whose band falls inside the asphalt polygon are discarded; those are
+  // concave/interior mouths and otherwise show up as pale arcs on the road.
+  for (const [a, b, c0, d] of dbg.kerbQuads) {
+    g.quad(a.x, a.z, b.x, b.z, c0.x, c0.z, d.x, d.z, KERB_LIFT + 0.012, KERB, groundY);
   }
   const discCol = atlas ? "#ffffff" : ASPHALT;
   const discCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;
-  const lift = ROAD_LIFT;
+  const lift = NODE_ASPHALT_LIFT;
   const c0 = g.vert(l.cx, groundY(l.cx, l.cz) + lift, l.cz, discCol,
     atlas ? [l.cx / JUNCTION_TILE, l.cz / JUNCTION_TILE] : undefined, discCls);
   const ids = clean.map((p) =>
