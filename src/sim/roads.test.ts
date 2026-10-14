@@ -4,7 +4,7 @@ import { deserialize, serialize } from "./save";
 import { findPath, newTraffic, tickTraffic } from "./traffic";
 import {
   armHasGreen, hasSignal, nodeArms, nodeById, nodeLayout,
-  rebuildNodes, redHold, removeSegment, signalNodes, signalPhase,
+  rebuildNodes, redHold, removeSegment, signalNodes, signalPhase, signalPhaseAt,
 } from "./roads";
 import { cidx, idx, rasterizeRoad, updateConnectivity } from "./world";
 
@@ -346,23 +346,31 @@ describe("traffic signals", () => {
     const arms = nodeArms(s.world, node);
     const ns = arms.findIndex((a) => Math.abs(a.dx) <= Math.abs(a.dz));
     const ew = arms.findIndex((a) => Math.abs(a.dx) > Math.abs(a.dz));
-    expect(armHasGreen(s.world, node, ns, 0)).toBe(true);
-    expect(armHasGreen(s.world, node, ns, 8)).toBe(false);
-    expect(armHasGreen(s.world, node, ew, 0)).toBe(false);
-    expect(armHasGreen(s.world, node, ew, 8)).toBe(true);
+    // Each node runs the same 8 s cycle on its own offset: the two groups
+    // oppose each other and flip together every 8 s.
+    for (const t of [0, 3.7, 15.9]) {
+      expect(armHasGreen(s.world, node, ns, t)).toBe(signalPhaseAt(node, t) === 0);
+      expect(armHasGreen(s.world, node, ew, t)).toBe(signalPhaseAt(node, t) === 1);
+      expect(armHasGreen(s.world, node, ns, t)).not.toBe(armHasGreen(s.world, node, ew, t));
+      expect(armHasGreen(s.world, node, ns, t + 8)).not.toBe(armHasGreen(s.world, node, ns, t));
+    }
   });
 
   it("holds traffic on red and releases on green", () => {
-    const { s } = cross();
+    const { s, node } = cross();
     const w = s.world;
     const ey = w.entry.y;
     // South of the node on the vertical avenue, heading north into it.
     const tile = idx(w, 15, ey + 1);
     expect(w.road[tile]).toBeGreaterThan(0);
-    expect(redHold(w, 0, tile, 0, -1)).toBe(false);
-    expect(redHold(w, 9, tile, 0, -1)).toBe(true);
+    // Ticks in each half of this node's own offset cycle.
+    const scans = Array.from({ length: 33 }, (_, k) => k * 0.5);
+    const tGreen = scans.find((t) => signalPhaseAt(node, t) === 0)!;
+    const tRed = scans.find((t) => signalPhaseAt(node, t) === 1)!;
+    expect(redHold(w, tGreen, tile, 0, -1)).toBe(false);
+    expect(redHold(w, tRed, tile, 0, -1)).toBe(true);
     // Driving away from the node is never held.
-    expect(redHold(w, 9, tile, 0, 1)).toBe(false);
+    expect(redHold(w, tRed, tile, 0, 1)).toBe(false);
   });
 
   it("lets traffic through a signalised crossing without deadlock", () => {

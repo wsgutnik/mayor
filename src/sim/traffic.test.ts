@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyTool, newCity, placeRoad, step, CityState } from "./sim";
 import { findPath, indexSignals, newTraffic, redCrawl, tickTraffic, ROAD_CAPACITY, ROAD_SPEED } from "./traffic";
-import { signalNodes, signalPhase } from "./roads";
+import { signalNodes, signalPhaseAt } from "./roads";
 import { ROAD, FAC, cidx, idx, updateConnectivity } from "./world";
 
 /** Dry, flat ground around the entry so layouts do not depend on the seed. */
@@ -85,7 +85,7 @@ describe("traffic simulation", () => {
     for (let x = 10; x <= 50; x += 8) line(s, ROAD.STREET, x, 7, x, 51);
     const t = newTraffic(w.size);
     t.sigNodes = signalNodes(w); t.sigByTile = indexSignals(w, t.sigNodes);
-    const brute = (tile: number, next: number, phase: 0 | 1) => {
+    const brute = (tile: number, next: number, tick: number) => {
       const hx = next % w.size - tile % w.size;
       const hz = ((next / w.size) | 0) - ((tile / w.size) | 0);
       if (!hx && !hz) return 1;
@@ -98,6 +98,7 @@ describe("traffic simulation", () => {
           const score = -(sn.arms[k].dx * hx / hl + sn.arms[k].dz * hz / hl);
           if (score > bd) { bd = score; best = k; }
         }
+        const phase = signalPhaseAt(sn.id, tick);
         if (bd > .3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return .3;
       }
       return 1;
@@ -107,8 +108,8 @@ describe("traffic simulation", () => {
     const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     for (let n = 0; n < 2000; n++) {
       const x = 1 + (rnd() * 62 | 0), y = 1 + (rnd() * 62 | 0), d = dirs[rnd() * 4 | 0];
-      const tile = idx(w, x, y), next = idx(w, x + d[0], y + d[1]), phase = signalPhase(rnd() * 40);
-      expect(redCrawl(w, t, tile, next, phase)).toBe(brute(tile, next, phase));
+      const tile = idx(w, x, y), next = idx(w, x + d[0], y + d[1]), tick = rnd() * 40;
+      expect(redCrawl(w, t, tile, next, tick)).toBe(brute(tile, next, tick));
     }
   });
 

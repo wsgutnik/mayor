@@ -3,6 +3,13 @@ import {
   Elevation, segElevation,
 } from "./world";
 import { profileOf } from "./corridor";
+import { signalGroups, signalPhaseAt } from "./signals";
+
+export {
+  classifyTurn, signalGroups, signalOffset, signalPhase, signalPhaseAt,
+  SIGNAL_CYCLE, SIGNAL_HALF, SIGNAL_OPPOSITION_TOL, TURN_STRAIGHT_MAX, TURN_UTURN_MIN,
+} from "./signals";
+export type { TurnKind } from "./signals";
 
 /** A junction (or dead end) where segment ends meet. */
 export interface RoadNode {
@@ -783,7 +790,16 @@ export function hasSignal(w: World, nodeId: number): boolean {
 }
 
 /** Snapshot of every signalised node for traffic and (later) signal props. */
-export interface SignalArm { dx: number; dz: number; ns: boolean }
+export interface SignalArm {
+  dx: number;
+  dz: number;
+  /**
+   * Phase group: true = group A (green on phase 0 of the node's own cycle).
+   * Kept as `ns`: on grid layouts group A is the N-S pair; on skewed
+   * junctions it is the opposition-paired group (see signalGroups).
+   */
+  ns: boolean;
+}
 export interface SignalInfo { id: number; x: number; z: number; arms: SignalArm[] }
 
 export function signalNodes(w: World): SignalInfo[] {
@@ -791,27 +807,26 @@ export function signalNodes(w: World): SignalInfo[] {
   for (const node of w.nodes) {
     const arms = groundArms(w, node.id);
     if (arms.length >= 4 || (arms.length === 3 && arms.some((a) => baseRoadType(a.type) === 2))) {
+      const groups = signalGroups(arms);
       out.push({
         id: node.id, x: node.x, z: node.z,
-        arms: arms.map((a) => ({ dx: a.dx, dz: a.dz, ns: Math.abs(a.dx) <= Math.abs(a.dz) })),
+        arms: arms.map((a, k) => ({ dx: a.dx, dz: a.dz, ns: groups[k] })),
       });
     }
   }
   return out;
 }
 
-/** Two-phase cycle, deterministic in `tick` (game seconds): 8 s per phase. */
-export function signalPhase(tick: number): 0 | 1 {
-  return (Math.floor(tick / 8) % 2) as 0 | 1;
-}
-
-/** Does arm `armIdx` (into nodeArms order) have green at `tick`? */
+/** Does arm `armIdx` (into nodeArms order) have green at `tick` (game seconds)? */
 export function armHasGreen(w: World, nodeId: number, armIdx: number, tick: number): boolean {
   const arms = nodeArms(w, nodeId);
   const arm = arms[armIdx];
   if (!arm || !hasSignal(w, nodeId)) return true;
-  const eastWest = Math.abs(arm.dx) > Math.abs(arm.dz);
-  return eastWest ? signalPhase(tick) === 1 : signalPhase(tick) === 0;
+  const ground = groundArms(w, nodeId);
+  const gi = ground.findIndex((g) => g.segId === arm.segId && g.end === arm.end);
+  if (gi < 0) return true; // elevated arm: deck/tunnel traffic ignores ground signals
+  const phase = signalPhaseAt(nodeId, tick);
+  return signalGroups(ground)[gi] ? phase === 0 : phase === 1;
 }
 
 /**

@@ -26,7 +26,7 @@ describe("road hot-path performance", () => {
       const start = performance.now();
       for (let n = 0; n < 260; n++) {
         const x = 10 + n % 100, y = 10 + (n * 17) % 100;
-        redCrawl(w, traffic, idx(w, x, y), idx(w, x + 1, y), (r & 1) as 0 | 1);
+        redCrawl(w, traffic, idx(w, x, y), idx(w, x + 1, y), r * 3.7);
       }
       checksMs.push(performance.now() - start);
     }

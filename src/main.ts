@@ -848,3 +848,11 @@ requestAnimationFrame(frame);
   renderer, tileHeight,
   setTod: (v: number) => { tod = v; },
 };
+
+// Dev-only junction showcase (docs/process/junction-gate.md G1): lazy-loaded
+// only when the flag is present, so normal play never pays for it.
+if (import.meta.env.DEV && new URLSearchParams(location.search).get("showcase") === "1") {
+  void import("./dev/showcase").then((m) => m.initShowcase({
+    useCity, renderer, setTod: (v: number) => { tod = v; },
+  }));
+}

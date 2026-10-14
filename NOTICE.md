@@ -27,6 +27,34 @@ by any open license.
 
 Three.js (MIT), Tauri (MIT or Apache-2.0), Vite, and Vitest (MIT). See `package.json` and `src-tauri/Cargo.toml`.
 
+## Third-Party Code (MIT): rawprogress/fable-cities
+
+Signal phase grouping (`src/sim/signals.ts`: opposite-pair phases, FNV-1a
+per-node desync, turn classification, angle helpers) is adapted from
+**Fable Cities**, https://github.com/rawprogress/fable-cities (commit aea8b10),
+translated to TypeScript. Ported functions carry a header comment naming the
+fable source file and function.
+
+MIT License — Copyright (c) 2026 raw (github.com/rawprogress)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## AI-generated texture swatches (2026-10-13)
 
 `blender/textures/*_hd.png` and `public/textures/*_hd.png` for plaster, brick, concrete, roof tile, wood, metal, paving, gravel, grass, dirt, rock, sand, asphalt, foliage, sidewalk, kerb and garden plot

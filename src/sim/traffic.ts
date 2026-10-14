@@ -1,7 +1,7 @@
 import { makeRng } from "./rng";
 import { CityState } from "./sim";
 import { ROAD, World, ZONE, idx, inBounds, TransitKind, updateConnectivity, layerClass, RoadLayer, curvePoints } from "./world";
-import { SignalInfo, signalNodes, signalPhase } from "./roads";
+import { SignalInfo, signalNodes, signalPhaseAt } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
 
@@ -87,9 +87,10 @@ const RED_CRAWL = 0.3;
 
 /**
  * 1 when the route from `tile` to `next` may proceed, RED_CRAWL when it enters
- * a signalised node against the phase. Allocation-free over the cached nodes.
+ * a signalised node against its phase. `tick` is game seconds; each node runs
+ * its own offset cycle (see signalPhaseAt). Allocation-free over cached nodes.
  */
-export function redCrawl(w: World, t: TrafficState, tile: number, next: number, phase: 0 | 1): number {
+export function redCrawl(w: World, t: TrafficState, tile: number, next: number, tick: number): number {
   const hx = (next % w.size) - (tile % w.size);
   const hz = ((next / w.size) | 0) - ((tile / w.size) | 0);
   if (hx === 0 && hz === 0) return 1;
@@ -113,6 +114,7 @@ export function redCrawl(w: World, t: TrafficState, tile: number, next: number, 
         const s = -(sn.arms[k].dx * ux + sn.arms[k].dz * uz);
         if (s > bd) { bd = s; best = k; }
       }
+      const phase = signalPhaseAt(sn.id, tick);
       if (bd > 0.3 && (sn.arms[best].ns ? phase !== 0 : phase !== 1)) return RED_CRAWL;
     }
     return 1;
@@ -542,7 +544,6 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     t.sigByTile = indexSignals(w, t.sigNodes);
   }
   t.time += dt;
-  const phase = signalPhase(t.time);
 
   let slow = 0;
   const alive: Vehicle[] = [];
@@ -554,7 +555,7 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     let f = Math.max(MIN_SPEED_FACTOR, Math.min(1, ROAD_CAPACITY[cls] / Math.max(1, t.load[tile])));
     // Vehicles on a deck or in a tunnel ignore ground signals (M24).
     const onGround = !v.layers || v.layers[at] === 0;
-    if (onGround && f > RED_CRAWL && t.sigNodes.length) f = Math.min(f, redCrawl(w, t, tile, v.tiles[Math.min(v.tiles.length - 1, at + 1)], phase));
+    if (onGround && f > RED_CRAWL && t.sigNodes.length) f = Math.min(f, redCrawl(w, t, tile, v.tiles[Math.min(v.tiles.length - 1, at + 1)], t.time));
     v.speedFactor = f;
     if (f < 0.6) slow++;
     v.progress += ROAD_SPEED[cls] * f * (s.raining ? RAIN_SPEED_FACTOR : 1) * dt;
