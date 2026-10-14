@@ -806,7 +806,11 @@ function addSegmentKeepId(w: World, type: RoadType, pts: Pt[], _id: number, fixe
 }
 
 /** Adopt saved a/b when every segment references consistent nodes. */
-function adoptNodes(w: World): boolean {
+/**
+ * Rebuild w.nodes from the segments' saved a/b ids without touching the segments (no renumbering).
+ * False (and nothing changed) when the ids are missing or inconsistent; callers then use rebuildNodes.
+ */
+export function adoptNodes(w: World): boolean {
   const byId = new Map<number, Pt[]>();
   for (const s of w.segments) {
     if (!Number.isInteger(s.a) || !Number.isInteger(s.b) || s.a <= 0 || s.b <= 0) return false;

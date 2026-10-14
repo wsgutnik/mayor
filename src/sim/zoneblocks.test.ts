@@ -34,6 +34,17 @@ function cells(set: ZoneBlockSet) {
   return out;
 }
 
+function distToLine(x: number, z: number, pts: Pt[]): number {
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz || 1;
+    const u = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / l2));
+    best = Math.min(best, Math.hypot(a.x + vx * u - x, a.z + vz * u - z));
+  }
+  return best;
+}
+
 function roundedCellTiles(set: ZoneBlockSet, w: World): Set<number> {
   return new Set(cells(set).map((c) => idx(w, Math.floor(c.x), Math.floor(c.z))));
 }
@@ -58,17 +69,25 @@ describe("oriented zone blocks", () => {
     expect(twenty.filter((b) => b.side === -1).map((b) => b.rows)).toEqual([7, 7, 6]);
   });
 
-  it("keeps four valid columns on both sides of a 45 degree street without placing centres on road tiles", () => {
+  it("keeps four valid columns on every row of both sides of a 45 degree street, all outside its sidewalk", () => {
+    // Was: "without placing centres on road tiles". The raster marks every tile the centreline touches, and on a
+    // diagonal such a tile reaches ~1.4 tiles from the centreline, so that rule rejected the depth-0 cell of every
+    // other row (the cut-off then emptied the row): the zone floated off the kerb (zone-attach.test.ts). The
+    // physical rule is the sidewalk edge: no cell corner nearer the centreline than drawHalf + sidewalk.
     const w = blank(32);
-    segment(w, [{ x: 6.5, z: 6.5 }, { x: 18.5, z: 18.5 }]);
+    const seg = segment(w, [{ x: 6.5, z: 6.5 }, { x: 18.5, z: 18.5 }]);
     const set = buildZoneBlocks(w);
     const bySide = new Map<number, Set<number>>();
+    const line = curvePoints(seg.pts, 0.25);
+    const q = new Float32Array(8);
     for (const c of cells(set)) {
       bySide.set(c.b.side, (bySide.get(c.b.side) ?? new Set()).add(c.col));
-      expect(w.roadSurface[idx(w, Math.floor(c.x), Math.floor(c.z))]).toBe(0);
+      cellCorners(c.b, c.row, c.col, q);
+      for (let k = 0; k < 4; k++) expect(distToLine(q[k * 2], q[k * 2 + 1], line)).toBeGreaterThanOrEqual(0.57 - 1e-4);
     }
     expect([...bySide.get(-1)!].sort()).toEqual([0, 1, 2, 3]);
     expect([...bySide.get(1)!].sort()).toEqual([0, 1, 2, 3]);
+    for (const b of set.blocks.values()) for (let r = 0; r < b.rows; r++) expect(b.valid[cellIndex(r, 0)]).toBe(1);
   });
 
   it("invalidates cells over a T-junction and gives the corner cell to the older segment", () => {
@@ -98,12 +117,13 @@ describe("oriented zone blocks", () => {
     const older = segment(four, [{ x: 3.5, z: 12.5 }, { x: 24.5, z: 12.5 }]);
     newer.id = 9; older.id = 2;
     const set = buildZoneBlocks(four);
-    // P0: rows sit 0.07 further out (lat0 1.0 -> 1.07), so the newer inner cell
-    // now overlaps the older inner cell and loses (older wins); the newer
-    // segment keeps its outer side.
+    // Rows sit 0.07 further out (lat0 1.07), so between streets 4 apart each depth-0 cell overlaps the rival's
+    // depth-1 cell. Contested cells go to the nearer centreline: both streets keep their depth-0 row against
+    // their own sidewalk and the 0.86-wide leftover strip lies between the backs. (Was: the older street's depth-1
+    // cell beat the newer depth-0 cell under the CS1 col band, leaving grass along the newer street's kerb.)
     expect(nearestCell(set, 10.5, 7.5, 0.75)?.seg).toBe(newer.id);
-    expect(nearestCell(set, 10.5, 9.5, 0.75)).toBeNull();
-    expect(nearestCell(set, 10.5, 10.5, 0.75)?.seg).toBe(older.id);
+    expect(nearestCell(set, 10.5, 9.5, 0.75)?.seg).toBe(newer.id);
+    expect(nearestCell(set, 10.5, 10.5, 0.75)).toBeNull();
     expect(nearestCell(set, 10.5, 11.5, 0.75)?.seg).toBe(older.id);
   });
 
@@ -212,6 +232,11 @@ describe("oriented zone blocks", () => {
       const p = cellPose(b, r, c);
       for (const d of discs) expect((p.x - d.x) ** 2 + (p.z - d.z) ** 2).toBeGreaterThanOrEqual(d.r * d.r - 1e-9);
     }
+    // The keep-out is the junction's sidewalk polygon, not the disc: across the through road from the stem the
+    // frontage continues over the node row (the disc used to cut a one-cell notch there).
+    const far = nearestCell(set, 16.5, 13.43, 0.2);
+    expect(far).not.toBeNull();
+    expect(far!.col).toBe(0);
   });
 
   it("Z1: a cell with a corner in water is invalid", () => {

@@ -4,6 +4,7 @@ import {
 import { lotPose } from "./orientedlots";
 import { rasterizeMirror } from "./mirror";
 import { buildZoneBlocks, cellIndex, nearestCell, type MigrationReport, type ZoneBlockSet } from "./zoneblocks";
+import { adoptNodes } from "./roads";
 import type { OrientedLot, Side } from "./zonecells";
 import { landmarkById, type LandmarkId } from "./landmarks";
 import {
@@ -354,6 +355,7 @@ function hydrateSavedLots(f: SaveFileV2, set: ZoneBlockSet): OrientedLot[] {
 export function migrateV1Cells(w: import("./world").World): MigrationReport {
   const oldZone = new Uint8Array(w.zone);
   const oldLevel = new Uint8Array(w.level);
+  adoptNodes(w);
   rebuildRoadRaster(w);
   const set = buildZoneBlocks(w);
   const report: MigrationReport = { moved: 0, dropped: [], lotsBroken: [] };
@@ -419,6 +421,9 @@ export function deserialize(json: string): CityState {
       const f2 = f as SaveFileV2;
       if (f2.zoning === "oriented") {
         w.zoning = "oriented";
+        // Validity reads the junction layouts, so the saved graph must be in place before the blocks are built:
+        // the nodes left over from newCity() gave wrong junctions and the lot check then cleared valid zoned cells.
+        adoptNodes(w);
         rebuildRoadRaster(w);
         const set = buildZoneBlocks(w);
         copySavedCells(f2, set);

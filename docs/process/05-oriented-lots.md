@@ -161,28 +161,62 @@ A cell is invalid when any of the following holds, tested in this order; `valid`
   the same row is the same test at sub-tile precision.
 - (b) **out of map or water**: any of the four corners outside `[0, size]²`, or `!isLand(tileOf(centre))`
   (`world.ts:238`). Today: `planLots` requires `isLand` (`blocks.ts:196`).
-- (c) **covered by a surface road or deck**: `blocksBuilding(w, tileOf(centre))` (`world.ts:644-645`) **or** the cell
-  centre is within `hw(other) + 0.45` of another zoneable or highway ground segment's centreline (so a diagonal road's
-  asphalt, which does not fill its raster tiles, still invalidates cells it crosses). Tunnels never invalidate
-  (`isTunnelTile`, `world.ts:641`).
+- (c) **road and junction surface** (Z1, rewritten in the zone-attach fix). Every cell is tested at 9 samples (centre;
+  corners and edge midpoints pulled 7 % toward the centre) against the *physical* surface, never the road raster:
+  - own segment, and any segment that continues it straight through a shared node (tangents anti-parallel within
+    `STRAIGHT_TOL`): invalid when a sample is `< drawHalf + sidewalk` from the centreline. Depth 0 therefore always
+    touches its own sidewalk;
+  - any other ground segment: invalid when a sample is `< drawHalf + sidewalk + ROAD_CLEARANCE (0.075)` from its
+    centreline. The distance uses **flat caps** at an end whose node has a junction layout (the polygon below covers
+    the node area); a round cap there removed the row across the through road from a T stem;
+  - every junction layout (`junctionsOf(w)`): invalid when a sample is inside its `sidewalkOuter` ring (asphalt, kerb
+    returns and corner sidewalk). Nodes with >= 3 ground arms but no layout fall back to the disc
+    `max(drawHalf + sidewalk + cornerR)`;
+  - the tile raster (`blocksBuilding(tileOf(centre))`) only for decks and non-ground roads (`roadSurface == 0` or
+    `roadDeck != 0`), or for every road tile when the analytic test is skipped (> 1000 ground segments). The raster
+    marks every tile a centreline touches; on a diagonal such a tile reaches ~1.4 tiles from the centreline, so the
+    old centre-tile test rejected the depth-0 cell of every other row beside its own road and the cut-off (e) then
+    emptied the row: the "zone floats off the road" defect. Tunnels never invalidate (`isTunnelTile`).
 - (d) **facility**: `w.facility[tileOf(centre)] !== 0` (today: `blocks.ts:196`, `sim.ts:460`).
 - (e) **row cut-off** ("no cell without road access", CS1's 7-iteration loop): for `col = 1..3`, if `valid[row][col-1] === 0`
-  then `valid[row][col] = 0`. Today: `blocks.ts:109-121`.
+  then `valid[row][col] = 0`. Only the cells behind the first invalid cell of a row (in depth order) are removed;
+  never the cells in front of it.
 
 Validity never depends on zone state, so painting zones never regenerates blocks (same split as today's
 `frontageCache` vs `blockCache`, `blocks.ts:220-244`).
 
 ### 1.5 Overlap and corner resolution (G-SHARE, G-OVERLAP, G-INHERIT; `CalcImpl2Patch.cs:39-293`)
 
-Run after the masks, over pairs of blocks whose `tileIndex` sets intersect (CS1 limits to blocks < 92 m apart). For
-each pair of valid cells `A`, `B` from different blocks (or the same block in a curve), with `d² = |centreA − centreB|²`:
+Final rule (Z3 + zone-attach fix, `resolveOverlaps` in `zoneblocks.ts`): a greedy independent set over every valid
+cell, sorted once by
 
-1. **Shared cell** (`d² < 0.01` tiles² *and* yaw difference a multiple of 90° within 1 %): keep the cell whose `col` is
-   smaller (nearer its road); on a tie keep the one from the block with the smaller `age`; mark the loser `valid = 0`.
-   Perfect grids resolve exactly this way, which is why corners are deterministic.
-2. **Intersecting cells** (quadrilaterals overlap by more than a sliver, `d² < 1.0` and SAT test says overlap area > 0.05):
-   a cell with `col ≤ 1` beats a cell with `col ≥ 2`; both in the same band → smaller `age` wins; same block (curve
-   self-overlap) → smaller `row` wins. Loser `valid = 0`.
+1. **depth** = `lat0 + col`, the lateral distance of the cell centre from its own centreline (exact on straight and
+   curved frames): the cell nearer its own road wins a contested area, so where two roads' blocks meet each cell
+   goes to the nearest centreline and the split follows the bisector of a wedge;
+2. ties (equal depth: two depth-0 cells in an acute wedge, the cell at an inner T corner) go to the **older segment**
+   (`age` = segment id), then side, row (`s0 + row`), col, key.
+
+A cell is kept when it does not conflict with an already kept cell: centre distance `< 0.8`, point-in-quad either
+way, or SAT overlap deeper than 1e-3 (shared edges are not overlaps). Conflicts are searched in a 5 x 5 bucket
+neighbourhood, because two overlapping unit cells on rotated frames can have centres two buckets apart (a 3 x 3
+search let overlapping lots through). Frame neighbours (same segment, side and col, `|row| <= 1` apart) never
+conflict. Because depth order visits col k-1 of a row before col k, a cell whose col k-1 neighbour is not kept is
+dropped instead of reserving space it could never use (the reservation left grass between a block and the kerb of
+the rival road). Dropped cells get 3 re-admission passes in the same order.
+
+Removed: the CS1 col band (`col <= 1` beats `col >= 2`, then wider road, then age). Under it an older road's depth-1
+cell evicted a younger road's depth-0 cell, the cut-off emptied that row, and the younger road showed grass along its
+kerb with zoned cells floating one or two cells away (the owner's Y-fork report).
+
+Consequences, all measured by `src/sim/zone-attach.test.ts` (Y fork, curve, acute 25 degree Y, T, bend):
+
+- on every road side, every frontage station whose depth-0 cell is clear of other roads and junction polygons is
+  zoned right behind the sidewalk (cover 1.000, gap 0), except stations whose depth-0 cell lost a fair tie to an
+  equally near cell of another road ("contested", reported separately: inner T corners, the tip of acute wedges);
+- no zoned cell is nearer another road's setback line than its own by more than 0.5 tile;
+- no zoned cell sample is inside any road body or junction polygon; `checkLots` reports 0 overlaps;
+- validity is independent of segment order; a save round trip keeps every zoned cell and lot.
+
 3. **Inherit zone** (`d² < 0.5625`, both `col ≤ 3`, both valid, exactly one zoned): copy the zone to the unzoned one. This
    only runs during painting (§4), not during generation, so loading a save cannot spread zones.
 
@@ -506,7 +540,12 @@ export function migrateV1Cells(w: World): MigrationReport;    // tiles -> cells 
 - **v1 → tiles** (flag off): exactly today.
 - **v2 → oriented**: segments → nodes (`rebuildNodes`, `roads.ts:918`) → `buildZoneBlocks` → copy saved cell bytes into
   blocks whose geometry matches (`rows` must equal; otherwise migrate by nearest from a temporary block built from the
-  saved rows, and report) → lots → mirror → `refreshDerived` (`sim.ts:778-788`).
+  saved rows, and report) → lots → mirror → `refreshDerived` (`sim.ts:778-788`). The nodes step is mandatory: the
+  loader calls `adoptNodes(w)` (saved a/b ids, no renumbering) before `buildZoneBlocks`, because validity reads the
+  junction layouts. Building against the nodes left over from `newCity()` gave other junctions, the saved lots then
+  contained "invalid" cells and were cleared with their zone (Y fork: 8 of 338 zoned cells lost per round trip).
+  Saved zone bytes are copied for every cell; a cell that is valid under the current rules keeps its zone, and only
+  lots containing a now-invalid cell are discarded and replanned.
 - **v2 → tiles** (flag off): read the `zone`/`level` mirror strings, rebuild lots from zoning (today's "pre-lot save"
   path, `lots.test.ts:193`). Lossy on diagonals but opens.
 - Writer: flag on → v2; flag off → v1 (unchanged). `storage.ts` untouched. `save.test.ts:63` (`v: 99` rejected) stays.
