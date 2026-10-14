@@ -77,7 +77,11 @@ describe("oriented zone blocks", () => {
     const newer = segment(w, [{ x: 12.5, z: 6.5 }, { x: 12.5, z: 12.5 }]);
     const set = buildZoneBlocks(w);
     expect(cells(set).some((c) => c.b.seg === newer.id && Math.floor(c.x) === 12 && Math.floor(c.z) === 12)).toBe(false);
-    const corner = nearestCell(set, 13.5, 11.5, 0.75);
+    // P0: street half width grew 0.50 -> 0.57, so the cell abutting the
+    // junction (13.5, 11.43) is inside the widened clearance; the first valid
+    // corner cell of the older segment is one row further out.
+    expect(nearestCell(set, 13.5, 11.5, 0.75)).toBeNull();
+    const corner = nearestCell(set, 14.5, 11.5, 0.75);
     expect(corner?.seg).toBe(older.id);
   });
 
@@ -94,7 +98,11 @@ describe("oriented zone blocks", () => {
     const older = segment(four, [{ x: 3.5, z: 12.5 }, { x: 24.5, z: 12.5 }]);
     newer.id = 9; older.id = 2;
     const set = buildZoneBlocks(four);
-    expect(nearestCell(set, 10.5, 9.5, 0.75)?.seg).toBe(newer.id);
+    // P0: rows sit 0.07 further out (lat0 1.0 -> 1.07), so the newer inner cell
+    // now overlaps the older inner cell and loses (older wins); the newer
+    // segment keeps its outer side.
+    expect(nearestCell(set, 10.5, 7.5, 0.75)?.seg).toBe(newer.id);
+    expect(nearestCell(set, 10.5, 9.5, 0.75)).toBeNull();
     expect(nearestCell(set, 10.5, 10.5, 0.75)?.seg).toBe(older.id);
     expect(nearestCell(set, 10.5, 11.5, 0.75)?.seg).toBe(older.id);
   });
@@ -103,7 +111,9 @@ describe("oriented zone blocks", () => {
     const w = blank(32);
     segment(w, [{ x: 0.5, z: 10.5 }, { x: 31.5, z: 10.5 }]);
     const s = w.size + 1;
-    for (let y = 12; y <= s - 1; y++) for (let x = 0; x < s; x++) w.heights[y * s + x] = 3;
+    // P0: col 0 sits at z = 11.57 (was 11.5); the cliff moves one corner row
+    // south so col 0 stays flat and cols 1+ stay steep, as the test intends.
+    for (let y = 13; y <= s - 1; y++) for (let x = 0; x < s; x++) w.heights[y * s + x] = 3;
     const set = buildZoneBlocks(w);
     expect(nearestCell(set, 8.5, 11.5, 0.75)).not.toBeNull();
     expect(nearestCell(set, 8.5, 12.5, 0.75)).toBeNull();

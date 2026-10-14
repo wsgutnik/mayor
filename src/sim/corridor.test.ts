@@ -35,16 +35,50 @@ describe("road corridor profiles", () => {
   it("matches the existing road constants exactly", () => {
     for (const type of TYPES) {
       const p = profileOf(type);
+      const sidewalkEdge = p.drawHalf + p.sidewalk;
       expect(p.drawHalf).toBe(ROAD_DRAW_WIDTH[type] / 2);
       expect(p.asphaltHalf).toBe(halfAsphalt(type));
       expect(p.kerb).toBe(kerbWidth(type));
-      expect(p.drawHalf + p.sidewalk + p.setback + 0.5).toBe(ROAD_TILE_WIDTH[type] / 2 + 0.5);
-      expect(p.propOffsets.hydrant).toBe(p.drawHalf + 0.14);
-      expect(p.propOffsets.bench).toBe(p.drawHalf + 0.2);
-      expect(p.propOffsets.planter).toBe(p.drawHalf + 0.2);
-      expect(p.propOffsets.streetlight).toBe(p.drawHalf + 0.2);
-      expect(p.propOffsets.signal).toBe(p.drawHalf + 0.08);
+      // P0: sidewalk lives outside drawHalf; setback floors at 0 and the
+      // setback line overflows the tile for street (0.57) and avenue (1.06).
+      expect(p.setback).toBe(Math.max(0, ROAD_TILE_WIDTH[type] / 2 - sidewalkEdge));
+      expect(p.drawHalf + p.sidewalk + p.setback).toBe(Math.max(ROAD_TILE_WIDTH[type] / 2, sidewalkEdge));
+      expect(p.propOffsets.hydrant).toBe(sidewalkEdge + 0.14);
+      expect(p.propOffsets.bench).toBe(sidewalkEdge + 0.2);
+      expect(p.propOffsets.planter).toBe(sidewalkEdge + 0.2);
+      expect(p.propOffsets.streetlight).toBe(sidewalkEdge + 0.2);
+      expect(p.propOffsets.signal).toBe(sidewalkEdge + 0.08);
     }
+  });
+
+  it("carries the P0 sidewalk widths per class", () => {
+    expect(profileOf(1).sidewalk).toBe(0.12);
+    expect(profileOf(4).sidewalk).toBe(0.12);
+    expect(profileOf(2).sidewalk).toBe(0.16);
+    expect(profileOf(5).sidewalk).toBe(0.16);
+    expect(profileOf(3).sidewalk).toBe(0);
+    expect(profileOf(1).setback).toBe(0);
+    expect(profileOf(2).setback).toBe(0);
+    expect(profileOf(3).setback).toBeCloseTo(0.1, 9);
+  });
+
+  it("places lane centres symmetrically inside the asphalt, clear of the median", () => {
+    for (const type of TYPES) {
+      const p = profileOf(type);
+      expect(p.laneCentres).toHaveLength(p.lanes);
+      expect(p.laneWidth).toBeCloseTo((2 * (p.asphaltHalf - p.medianHalf)) / p.lanes, 9);
+      for (let i = 0; i < p.laneCentres.length; i++) {
+        expect(p.laneCentres[i]).toBeCloseTo(-p.laneCentres[p.laneCentres.length - 1 - i], 9);
+        expect(Math.abs(p.laneCentres[i]) + p.laneWidth / 2).toBeLessThanOrEqual(p.asphaltHalf + 1e-9);
+        expect(Math.abs(p.laneCentres[i]) - p.laneWidth / 2).toBeGreaterThanOrEqual(p.medianHalf - 1e-9);
+      }
+    }
+    for (const [type, want] of [[1, [-0.19, 0.19]], [2, [-0.6475, -0.3225, 0.3225, 0.6475]], [3, [-1.05, -0.35, 0.35, 1.05]]] as const) {
+      const got = profileOf(type).laneCentres;
+      expect(got).toHaveLength(want.length);
+      for (let i = 0; i < want.length; i++) expect(got[i]).toBeCloseTo(want[i], 9);
+    }
+    expect(profileOf(2).medianHalf).toBe(0.16);
   });
 });
 

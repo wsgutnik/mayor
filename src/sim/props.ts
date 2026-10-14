@@ -119,7 +119,8 @@ export function planProps(w: World, density = 1): PropPlacement[] {
       continue;
     }
     const normalX = -road.dz, normalZ = road.dx;
-    const baseOff = profileOf(road.type as 1 | 2 | 3 | 4 | 5).drawHalf;
+    const prof = profileOf(road.type as 1 | 2 | 3 | 4 | 5);
+    const baseOff = prof.drawHalf + prof.sidewalk;
     placedStop: for (const side of [1, -1]) {
       const yaw = Math.atan2(-normalX * side, -normalZ * side);
       for (const shift of [0, 1.25, -1.25]) {

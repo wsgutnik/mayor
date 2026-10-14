@@ -14,6 +14,12 @@ export interface RoadProfile {
   setback: number;
   drawHalf: number;
   lanes: number;
+  /** Signed lane-centre offsets (tiles, negative = right of a→b); right-hand traffic. */
+  laneCentres: number[];
+  /** Half width of the centre median (avenue only); 0 otherwise. */
+  medianHalf: number;
+  /** Lane width: 2 * (asphaltHalf - medianHalf) / lanes. */
+  laneWidth: number;
   propOffsets: {
     streetlight: number;
     hydrant: number;
@@ -56,24 +62,53 @@ function kerbFor(type: RoadType): number {
   return b === 1 ? 0.07 : b === 2 ? 0.09 : 0;
 }
 
+function sidewalkFor(type: RoadType): number {
+  const b = baseRoadType(type);
+  return b === 1 ? 0.12 : b === 2 ? 0.16 : 0;
+}
+
+function medianHalfFor(type: RoadType): number {
+  return baseRoadType(type) === 2 ? 0.16 : 0;
+}
+
+function laneCentresFor(asphaltHalf: number, medianHalf: number, lanes: number): { centres: number[]; width: number } {
+  const width = (2 * (asphaltHalf - medianHalf)) / lanes;
+  if (medianHalf > 0) {
+    const inner = medianHalf + width / 2;
+    const outer = medianHalf + width * 1.5;
+    return { centres: [-outer, -inner, inner, outer], width };
+  }
+  const centres: number[] = [];
+  for (let i = 0; i < lanes; i++) centres.push((i - (lanes - 1) / 2) * width);
+  return { centres, width };
+}
+
 function makeProfile(type: RoadType): RoadProfile {
   const kerb = kerbFor(type);
   const asphaltHalf = ROAD_DRAW_WIDTH[type] / 2 - kerb;
   const drawHalf = ROAD_DRAW_WIDTH[type] / 2;
+  const sidewalk = sidewalkFor(type);
+  const sidewalkEdge = drawHalf + sidewalk;
+  const medianHalf = medianHalfFor(type);
+  const lanes = baseRoadType(type) === 2 ? 4 : baseRoadType(type) === 3 ? 4 : 2;
+  const { centres, width } = laneCentresFor(asphaltHalf, medianHalf, lanes);
   return {
     type,
     asphaltHalf,
     kerb,
-    sidewalk: 0,
-    setback: Math.max(0, ROAD_TILE_WIDTH[type] / 2 - drawHalf),
+    sidewalk,
+    setback: Math.max(0, ROAD_TILE_WIDTH[type] / 2 - sidewalkEdge),
     drawHalf,
-    lanes: baseRoadType(type) === 2 ? 4 : baseRoadType(type) === 3 ? 4 : 2,
+    lanes,
+    laneCentres: centres,
+    medianHalf,
+    laneWidth: width,
     propOffsets: {
-      streetlight: drawHalf + 0.2,
-      hydrant: drawHalf + 0.14,
-      bench: drawHalf + 0.2,
-      planter: drawHalf + 0.2,
-      signal: drawHalf + 0.08,
+      streetlight: sidewalkEdge + 0.2,
+      hydrant: sidewalkEdge + 0.14,
+      bench: sidewalkEdge + 0.2,
+      planter: sidewalkEdge + 0.2,
+      signal: sidewalkEdge + 0.08,
     },
   };
 }
@@ -85,12 +120,25 @@ export function profileOf(type: RoadType): RoadProfile {
 export function profileOffset(type: RoadType, name: CorridorOffsetName): number {
   const p = profileOf(type);
   if (name === "asphaltEdge") return p.asphaltHalf;
-  if (name === "kerbEdge" || name === "sidewalkEdge") return p.drawHalf;
+  if (name === "kerbEdge") return p.drawHalf;
+  if (name === "sidewalkEdge") return p.drawHalf + p.sidewalk;
   return p.drawHalf + p.sidewalk + p.setback;
 }
 
+/** Outer edge of asphalt + kerb (the drawn ribbon width). Excludes the sidewalk. */
 export function fullHalf(type: RoadType): number {
   return profileOf(type).drawHalf;
+}
+
+/** Outer edge of the sidewalk: drawHalf + sidewalk. */
+export function sidewalkEdge(type: RoadType): number {
+  const p = profileOf(type);
+  return p.drawHalf + p.sidewalk;
+}
+
+/** Vertical layer of a segment (re-export of segElevation for corridor consumers). */
+export function layerOf(seg: { elevation?: "ground" | "bridge" | "tunnel" }): "ground" | "bridge" | "tunnel" {
+  return segElevation(seg);
 }
 
 function q(n: number): number {

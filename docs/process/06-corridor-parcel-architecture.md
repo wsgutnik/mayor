@@ -1,6 +1,8 @@
 # ADR 06 — Road corridor and parcel architecture
 
 Status: accepted for incremental implementation (2026-10-13). Evidence and sources: [06-corridor-parcel-research.md](06-corridor-parcel-research.md).
+Amendment P0 accepted 2026-10-14 (junction review 07a C1-C6 reconciliation; owner decisions final).
+Where this amendment and the original text disagree, the amendment wins.
 
 ## Problem (measured)
 
@@ -43,6 +45,62 @@ geometry quantised to 1e-3 for determinism; incremental rebuild keyed by `graphR
 - props and kerbs lie on their declared offset curves;
 - vehicle polylines stay inside lane and connector polygons;
 - full rebuild equals incremental rebuild; old saves load with a migration report; rebuild within the iPad budget.
+
+## Amendment P0 — profile, arclength and parcel/junction reconciliation (2026-10-14)
+
+### P0.1 Profile (shared with 07 P0.1)
+
+`RoadProfile` is the single source of widths and carries, per road type:
+`asphaltHalf`, `kerb`, `sidewalk` (0.12 street, 0.16 avenue, 0 highway),
+`drawHalf`, `setback = max(0, ROAD_TILE_WIDTH/2 - (drawHalf + sidewalk))`,
+`lanes`, `laneCentres` (signed, right-hand traffic), `medianHalf` (0 street,
+0.16 avenue, 0 highway) and `propOffsets` measured from the centreline outside
+`sidewalkEdge = drawHalf + sidewalk`. Corridor offsets are
+`asphaltEdge = asphaltHalf`, `kerbEdge = drawHalf`,
+`sidewalkEdge = drawHalf + sidewalk`, `setbackLine = sidewalkEdge + setback`.
+Street `setbackLine` is 0.57 and avenue 1.06: both overflow the road tile by
+design, and the first lot row fronts there (mid-block) or at the junction
+`boundary` where the boundary is larger (near nodes).
+
+### P0.2 Corridor-arclength convention (C4)
+
+Every longitudinal position shared between the junction builder and parcels is
+a corridor arclength `s` from the node along the corridor centreline samples:
+trims, crosswalk/stop stations, `lotAnchor.s`, connector endpoints, frontage
+slicing origins. Chord distances are forbidden on curves; on straight arms the
+two coincide. Junction rings terminate on corridor offset-polyline points at
+matched `s`.
+
+### P0.3 Step 4 blocked on lotAnchors; boundary clipping (C1-C3)
+
+- Step 4 (parcels) is BLOCKED on junction P0-P4: it must not be implemented
+  against the step-4 `lat0` formula alone. Per arm side,
+  `lotAnchor.s >= s_boundary` (maximum corridor arclength of any `boundary`
+  vertex on that side); parcels on one segment satisfy both ends,
+  `s in [anchorA, L - anchorB]`. This changes `blocksForSegment`, not just
+  `junction.ts`: rows are truncated at the far node, and the row origin `s0`
+  becomes the anchor.
+- The clipping polygon for cells, parcels and props is the junction
+  `boundary` (07 P0.5), not the asphalt ring. Acceptance "zero
+  parcel/corridor/junction polygon intersections" means zero intersections
+  with the corridor `setbackLine` ribbons mid-block AND with `boundary` near
+  nodes.
+- Corner exception to "every parcel front edge within 1e-3 of the setback
+  distance": within `lotAnchor` of a node the boundary governs. Implementers
+  must not "fix" corner lots back onto the straight setback line.
+- Step 3 "clip cells and props against JunctionPolygon" means `boundary`;
+  props additionally respect `clearZones` (sight-triangle legs 2.5 street /
+  3.5 avenue; signal/streetlight offsets are void inside them).
+
+### P0.4 Layer and oracle notes (C5-C6)
+
+- Parcels never front highways or elevated segments. Anchors and clear zones
+  are emitted only for ground, kerbed arms; a ramp node's bridge arm
+  contributes keep-out only in its own layer and must not sterilise ground
+  frontage.
+- The zero-intersection acceptance is checked by an independent polygon oracle
+  (`polygon-clipping` in tests only, per the library choice); `checkJunction`
+  remains a self-check and cannot be the oracle for step 4.
 
 ## Library choice
 
