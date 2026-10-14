@@ -1,5 +1,6 @@
 import { FAC, World, baseRoadType, curvePoints, idx, inBounds, isLand, segElevation } from "./world";
-import { halfAsphalt, kerbWidth, nodeArms } from "./roads";
+import { nodeArms } from "./roads";
+import { corridorsOf, profileOf, profileOffset, type SegmentCorridor } from "./corridor";
 
 /** Street furniture kinds; the names double as the prop GLB file stems. */
 export const NEW_PROP_KINDS = [
@@ -34,6 +35,29 @@ const hash2 = (x: number, y: number, salt: number): number => {
 
 /** Hard cap so a dense city stays inside the instancing budget. */
 export const MAX_PROPS = 4000;
+
+function pointOnOffset(
+  corridor: SegmentCorridor | undefined, side: 1 | -1, s: number, offset: number,
+): { x: number; z: number } | null {
+  if (!corridor) return null;
+  const line = corridor.offsets.kerbEdge[side > 0 ? "left" : "right"];
+  const centre = corridor.centre;
+  if (line.length < 2 || centre.length !== line.length) return null;
+  const total = centre[centre.length - 1].s;
+  const d = Math.max(0, Math.min(total, s));
+  let i = 0;
+  while (i < centre.length - 2 && centre[i + 1].s < d) i++;
+  const span = Math.max(1e-9, centre[i + 1].s - centre[i].s);
+  const t = (d - centre[i].s) / span;
+  const x = line[i].x + (line[i + 1].x - line[i].x) * t;
+  const z = line[i].z + (line[i + 1].z - line[i].z) * t;
+  const cx = centre[i].x + (centre[i + 1].x - centre[i].x) * t;
+  const cz = centre[i].z + (centre[i + 1].z - centre[i].z) * t;
+  const ex = x - cx, ez = z - cz;
+  const el = Math.hypot(ex, ez) || 1;
+  const extra = offset - profileOffset(corridor.type, "kerbEdge");
+  return { x: x + (ex / el) * extra, z: z + (ez / el) * extra };
+}
 
 /**
  * Deterministic street-furniture plan along the road network: shelters at bus
@@ -95,15 +119,16 @@ export function planProps(w: World, density = 1): PropPlacement[] {
       continue;
     }
     const normalX = -road.dz, normalZ = road.dx;
-    const baseOff = halfAsphalt(road.type as 1 | 2 | 3 | 4 | 5) + kerbWidth(road.type as 1 | 2 | 3 | 4 | 5);
+    const baseOff = profileOf(road.type as 1 | 2 | 3 | 4 | 5).drawHalf;
     placedStop: for (const side of [1, -1]) {
       const yaw = Math.atan2(-normalX * side, -normalZ * side);
       for (const shift of [0, 1.25, -1.25]) {
         const sx = cx + normalX * side * (baseOff + 0.28) + road.dx * shift;
         const sz = cz + normalZ * side * (baseOff + 0.28) + road.dz * shift;
         if (!add(baseRoadType(road.type as 1 | 2 | 3 | 4 | 5) === 2 ? "shelter_glass" : "shelter_small", sx, sz, yaw, 53, true)) continue;
-        add("stop_sign_bus", cx + normalX * side * (baseOff + 0.08) + road.dx * shift,
-          cz + normalZ * side * (baseOff + 0.08) + road.dz * shift, yaw, 54, true);
+        const signalOff = profileOf(road.type as 1 | 2 | 3 | 4 | 5).propOffsets.signal;
+        add("stop_sign_bus", cx + normalX * side * signalOff + road.dx * shift,
+          cz + normalZ * side * signalOff + road.dz * shift, yaw, 54, true);
         break placedStop;
       }
     }
@@ -112,10 +137,15 @@ export function planProps(w: World, density = 1): PropPlacement[] {
   for (const seg of w.segments) {
     const base = baseRoadType(seg.type);
     if (base === 3 || segElevation(seg) !== "ground") continue;
+    const corridor = corridorsOf(w).bySeg.get(seg.id);
+    const prof = profileOf(seg.type);
     const pts = curvePoints(seg.pts, 0.5);
     let acc = 0;
+    let totalWalk = 0;
     for (let i = 1; i < pts.length; i++) {
-      acc += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+      const segLen = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+      acc += segLen;
+      totalWalk += segLen;
       const mx = (pts[i].x + pts[i - 1].x) / 2, mz = (pts[i].z + pts[i - 1].z) / 2;
       const vx = pts[i].x - pts[i - 1].x, vz = pts[i].z - pts[i - 1].z;
       const l = Math.hypot(vx, vz) || 1;
@@ -126,8 +156,9 @@ export function planProps(w: World, density = 1): PropPlacement[] {
       } else if (acc >= 12) { // hydrant on alternating kerbs every ~12 tiles
         acc = 0;
         const side = (out.length % 2 === 0 ? 1 : -1);
-        const off = halfAsphalt(seg.type) + kerbWidth(seg.type) + 0.14;
-        const px = mx - dz * side * off, pz = mz + dx * side * off;
+        const off = prof.propOffsets.hydrant;
+        const snapped = pointOnOffset(corridor, side, totalWalk - segLen / 2, off);
+        const px = snapped?.x ?? mx - dz * side * off, pz = snapped?.z ?? mz + dx * side * off;
         if (!nearNode(px, pz, 0.9) && keep(px, pz, 23)) out.push({ kind: "hydrant", x: px, z: pz, yaw: 0 });
       }
     }
@@ -144,8 +175,10 @@ export function planProps(w: World, density = 1): PropPlacement[] {
         walked += len;
         const dx = vx / len, dz = vz / len, mx = (pts2[i].x + pts2[i - 1].x) / 2, mz = (pts2[i].z + pts2[i - 1].z) / 2;
         const side = ((Math.floor(walked / spacing) + seg.id) & 1) ? 1 : -1;
-        const off = halfAsphalt(seg.type) + kerbWidth(seg.type) + 0.2;
-        const px = mx - dz * side * off, pz = mz + dx * side * off;
+        const off = base === 1 ? prof.propOffsets.streetlight : prof.propOffsets.planter;
+        const snapped = pointOnOffset(corridor, side, walked - len / 2, off);
+        const px = snapped?.x ?? mx - dz * side * off;
+        const pz = snapped?.z ?? mz + dx * side * off;
         const yaw = Math.atan2(dz * side, -dx * side);
         if (base === 2) {
           if (Math.floor(walked / 3) % 2 === 0) add("planter_street", px, pz, yaw, 61); // ~6 tiles

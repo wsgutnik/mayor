@@ -1,10 +1,11 @@
 import {
-  ROAD_TILE_WIDTH, baseRoadType, blocksBuilding, curvePoints, heightAt, idx, inBounds, isLand, segElevation,
+  baseRoadType, blocksBuilding, curvePoints, heightAt, idx, inBounds, isLand, segElevation,
   type Pt, type RoadSegment, type World,
 } from "./world";
 import {
   BLOCK_MAX_ROWS, CELL_DEPTH, CELL_SLOPE_LIMIT, type CellPose, type CellRef, type Side, type ZoneBlock,
 } from "./zonecells";
+import { profileOf } from "./corridor";
 
 const MIGRATE_RADIUS = 0.75;
 
@@ -66,7 +67,7 @@ function at(s: Sampled, dist: number): CellPose {
 }
 
 function roadHalfWidth(seg: RoadSegment): number {
-  return ROAD_TILE_WIDTH[seg.type] / 2;
+  return profileOf(seg.type).drawHalf + profileOf(seg.type).sidewalk + profileOf(seg.type).setback;
 }
 
 function shapeKey(b: ZoneBlock): string {

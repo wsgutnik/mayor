@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import {
-  Pt, RoadSegment, RoadType, ROAD_DRAW_WIDTH, World, baseRoadType, curvePoints,
+  Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints,
   makeDeckSampler, segElevation, DeckSampler,
 } from "../sim/world";
 import { NodeLayout, NodeLayoutArm, halfAsphalt, kerbWidth, nodeArms, nodeById, nodeLayout } from "../sim/roads";
+import { fullHalf, profileOf } from "../sim/corridor";
 
 /**
  * Junction road geometry: ribbons stop at the corner offsets and every node
@@ -219,8 +220,8 @@ function ribbon(
     g.force = null;
     return;
   }
-  const hw = type === 3 ? ROAD_DRAW_WIDTH[3] / 2 : halfAsphalt(type);
-  const kw = type === 3 ? 0 : kerbWidth(type);
+  const hw = halfAsphalt(type);
+  const kw = kerbWidth(type);
   const walk = makeWalker(samples);
   // Half-strip from the centreline to one edge, starting at arclength s0.
   const half = (
@@ -314,8 +315,8 @@ function ribbon(
     mark(-hw * 0.5, 0.012, AVE_LINE, true);
   } else {
     strip(g, samples, aMin, mEnd, 0.14, MARK_LIFT, HW_EDGE, groundY, false);
-    mark(ROAD_DRAW_WIDTH[3] * 0.25, 0.012, LINE, true);
-    mark(-ROAD_DRAW_WIDTH[3] * 0.25, 0.012, LINE, true);
+    mark(profileOf(3).drawHalf * 0.5, 0.012, LINE, true);
+    mark(-profileOf(3).drawHalf * 0.5, 0.012, LINE, true);
   }
   g.force = null;
 }
@@ -352,10 +353,6 @@ function strip(
 
 // ------------------------------------------------------------ bridges & tunnels
 
-/** Full half width of a road including kerbs (highways have none). */
-function fullHalf(type: RoadType): number {
-  return type === 3 ? ROAD_DRAW_WIDTH[3] / 2 : halfAsphalt(type) + kerbWidth(type);
-}
 
 /** Solid box with absolute heights, yawed around Y. Winding is irrelevant (the road mesh is double-sided). */
 function box(

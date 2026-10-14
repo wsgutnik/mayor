@@ -2,6 +2,7 @@ import {
   Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints, isOneWayType, rasterizeRoad, ROAD_DRAW_WIDTH,
   Elevation, segElevation,
 } from "./world";
+import { profileOf } from "./corridor";
 
 /** A junction (or dead end) where segment ends meet. */
 export interface RoadNode {
@@ -23,13 +24,12 @@ const COINCIDE_TOL = 0.35;
 
 /** Kerb width beside the asphalt, by road class (highways have no kerbs). */
 export function kerbWidth(type: RoadType): number {
-  const b = baseRoadType(type);
-  return b === 1 ? 0.07 : b === 2 ? 0.09 : 0;
+  return profileOf(type).kerb;
 }
 
 /** Half the asphalt width (drawn width minus kerbs). */
 export function halfAsphalt(type: RoadType): number {
-  return ROAD_DRAW_WIDTH[type] / 2 - kerbWidth(type);
+  return profileOf(type).asphaltHalf;
 }
 
 /** Kerb fillet radius at corners: tighter for streets, wider for avenues and highways. */

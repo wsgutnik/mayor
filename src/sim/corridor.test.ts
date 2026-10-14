@@ -1,0 +1,121 @@
+import { describe, expect, it } from "vitest";
+import { newCity, placeRoad } from "./sim";
+import { cidx, ROAD_DRAW_WIDTH, ROAD_TILE_WIDTH, type Pt, type RoadType } from "./world";
+import { halfAsphalt, kerbWidth } from "./roads";
+import { corridorsOf, profileOf, profileOffset, type CorridorOffsetName } from "./corridor";
+import { planProps } from "./props";
+
+const TYPES: RoadType[] = [1, 2, 3, 4, 5];
+
+function flat(s: ReturnType<typeof newCity>): void {
+  for (let y = 0; y <= s.world.size; y++) {
+    for (let x = 0; x <= s.world.size; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;
+  }
+}
+
+function road(s: ReturnType<typeof newCity>, type: RoadType, pts: [number, number][]): void {
+  const r = placeRoad(s, type, pts.map(([x, z]) => ({ x, z })));
+  expect(r.ok).toBe(true);
+}
+
+function distPointToSegment(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const l2 = dx * dx + dz * dz || 1;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2));
+  return Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t));
+}
+
+function distToPolyline(p: Pt, line: Pt[]): number {
+  let best = Infinity;
+  for (let i = 1; i < line.length; i++) best = Math.min(best, distPointToSegment(p, line[i - 1], line[i]));
+  return best;
+}
+
+describe("road corridor profiles", () => {
+  it("matches the existing road constants exactly", () => {
+    for (const type of TYPES) {
+      const p = profileOf(type);
+      expect(p.drawHalf).toBe(ROAD_DRAW_WIDTH[type] / 2);
+      expect(p.asphaltHalf).toBe(halfAsphalt(type));
+      expect(p.kerb).toBe(kerbWidth(type));
+      expect(p.drawHalf + p.sidewalk + p.setback + 0.5).toBe(ROAD_TILE_WIDTH[type] / 2 + 0.5);
+      expect(p.propOffsets.hydrant).toBe(p.drawHalf + 0.14);
+      expect(p.propOffsets.bench).toBe(p.drawHalf + 0.2);
+      expect(p.propOffsets.planter).toBe(p.drawHalf + 0.2);
+      expect(p.propOffsets.streetlight).toBe(p.drawHalf + 0.2);
+      expect(p.propOffsets.signal).toBe(p.drawHalf + 0.08);
+    }
+  });
+});
+
+describe("segment corridors", () => {
+  it("builds deterministic offset lines at declared distances", () => {
+    const s = newCity(7, 48);
+    flat(s);
+    road(s, 1, [[8.5, 20.5], [24.5, 20.5]]);
+    road(s, 2, [[24.5, 20.5], [32.5, 24.5], [38.5, 36.5]]);
+    const a = corridorsOf(s.world);
+    const b = corridorsOf(s.world);
+    expect(JSON.stringify([...a.bySeg])).toEqual(JSON.stringify([...b.bySeg]));
+    for (const c of a.bySeg.values()) {
+      for (const name of ["asphaltEdge", "kerbEdge", "sidewalkEdge", "setbackLine"] as CorridorOffsetName[]) {
+        const want = profileOffset(c.type, name);
+        for (const side of ["left", "right"] as const) {
+          const line = c.offsets[name][side];
+          for (let i = 0; i < line.length; i++) {
+            const d = Math.hypot(line[i].x - c.centre[i].x, line[i].z - c.centre[i].z);
+            expect(Math.abs(d - want), `${c.segId} ${name} ${side} sample ${i}`).toBeLessThanOrEqual(1e-3);
+          }
+        }
+      }
+    }
+  });
+
+  it("keeps tight curves finite", () => {
+    const s = newCity(9, 48);
+    flat(s);
+    road(s, 1, [[18.5, 18.5], [26.5, 8.5], [19.0, 18.7]]);
+    const c = [...corridorsOf(s.world).bySeg.values()].at(-1)!;
+    for (const sample of c.centre) {
+      expect(Number.isFinite(sample.x)).toBe(true);
+      expect(Number.isFinite(sample.z)).toBe(true);
+    }
+    for (const lines of Object.values(c.offsets)) {
+      for (const line of [lines.left, lines.right]) {
+        for (const p of line) {
+          expect(Number.isFinite(p.x)).toBe(true);
+          expect(Number.isFinite(p.z)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("places street-side props on their declared offset lines", () => {
+    const s = newCity(13, 64);
+    flat(s);
+    road(s, 2, [[6.5, 30.5], [50.5, 30.5]]);
+    road(s, 1, [[20.5, 10.5], [20.5, 52.5]]);
+    const corridors = [...corridorsOf(s.world).bySeg.values()];
+    const props = planProps(s.world, 1).filter((p) =>
+      p.kind === "hydrant" || p.kind === "streetlight_b" || p.kind === "planter_street");
+    expect(props.length).toBeGreaterThan(0);
+    for (const p of props) {
+      const want = p.kind === "hydrant" ? "hydrant" : p.kind === "streetlight_b" ? "streetlight" : p.kind === "bench_road" ? "bench" : "planter";
+      let best = Infinity;
+      for (const c of corridors) {
+        const off = profileOf(c.type).propOffsets[want];
+        const edge = profileOffset(c.type, "kerbEdge");
+        for (const side of ["left", "right"] as const) {
+          const shifted = c.offsets.kerbEdge[side].map((q, i) => {
+            const centre = c.centre[i];
+            const dx = q.x - centre.x, dz = q.z - centre.z;
+            const len = Math.hypot(dx, dz) || 1;
+            return { x: q.x + (dx / len) * (off - edge), z: q.z + (dz / len) * (off - edge) };
+          });
+          best = Math.min(best, distToPolyline(p, shifted));
+        }
+      }
+      expect(best, `${p.kind} at ${p.x},${p.z}`).toBeLessThanOrEqual(1e-3);
+    }
+  });
+});
