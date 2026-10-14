@@ -621,6 +621,8 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   // Right of way at unsignalised junctions: the same virtual stopped leader.
   const ps = v.prioStop;
   if (ps !== undefined && ps < stopDist) stopDist = ps;
+  const signalStop = onGround ? signalBoxStop(w, t, k, v, routeS) : Infinity;
+  if (signalStop < stopDist) stopDist = signalStop;
 
   const aFree = idmAccel(vv, v0, 1e9, 0);
   let a = aFree;
@@ -713,6 +715,38 @@ function exitBlocked(w: World, t: TrafficState, k: number, v: Vehicle, sExit: nu
     }
   }
   return false;
+}
+
+/** Keep crossing green movements out of an occupied signal box. */
+function signalBoxStop(w: World, t: TrafficState, k: number, v: Vehicle, s: number): number {
+  let m = v.moves;
+  if (m === undefined) m = v.moves = routeMovesOf(v.pts) ?? null;
+  if (!m) return Infinity;
+  const arcs = v.arcs!, half = halfLength(v.kind);
+  for (let j = v.moveAt ?? 0; j < m.n; j++) {
+    const node = m.node[j];
+    if (t.prioNodes.has(node) || !hasSignal(w, node)) continue;
+    const d = arcs[m.i0[j]] - (s + half);
+    if (d < -0.15) continue;
+    const tab = priorityTableOf(m.layouts[j]);
+    for (let q = 0; q < t.vehicles.length; q++) {
+      if (q === k) continue;
+      const o = t.vehicles[q];
+      let om = o.moves;
+      if (om === undefined) om = o.moves = routeMovesOf(o.pts) ?? null;
+      if (!om) continue;
+      const os = vehicleArc(o), oh = halfLength(o.kind);
+      for (let r = o.moveAt ?? 0; r < om.n; r++) {
+        if (om.node[r] !== node || om.layouts[r] !== m.layouts[j]) continue;
+        const oa = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
+        // Keep the reservation briefly beyond the connector: a truck's rear
+        // and a crossing car's nose can otherwise overlap at the exit taper.
+        if (os + oh <= oa[om.i0[r]] - IDM_SPAWN_GAP || os - oh >= oa[om.i1[r]] + IDM_SPAWN_GAP) continue;
+        if (tab.conflict[m.conn[j] * tab.k + om.conn[r]]) return Math.max(0, d - IDM_STOP_LINE);
+      }
+    }
+  }
+  return Infinity;
 }
 
 function updatePriority(w: World, t: TrafficState): void {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CityState, newCity, placeRoad } from "./sim";
-import { TrafficState, Vehicle, findPath, halfLength, newTraffic, routeArcLengths, routeMovesOf, routePath, tickTraffic, vmaxAt } from "./traffic";
+import { TrafficState, Vehicle, findPath, halfLength, newTraffic, pointAtRouteArc, routeArcLengths, routeMovesOf, routePath, tickTraffic, vmaxAt } from "./traffic";
 import { JunctionLayout, junctionsOf } from "./junction";
 import { hasSignal } from "./roads";
 import { ROAD, World, cidx, idx } from "./world";
@@ -433,6 +433,37 @@ describe("signalised nodes are unchanged", () => {
       for (const v of t.vehicles) expect(v.prioStop ?? Infinity).toBe(Infinity);
     }
     expect(t.completed).toBe(2);
+  });
+
+  it("never overlaps conflicting movements in a signal box", () => {
+    const s = newCity(13);
+    const ey = flat(s);
+    expect(line(s, ROAD.STREET, 4, ey, 24, ey)).toBe(true);
+    expect(line(s, ROAD.STREET, 14, ey - 8, 14, ey + 8)).toBe(true);
+    const w = s.world, l = layoutAt(w, 14, ey), tab = priorityTableOf(l);
+    const t = newTraffic(w.size); tickTraffic(s, t, 0);
+    const signal = t.sigNodes.find((sn) => sn.id === l.nodeId)!;
+    const phaseOf = (arm: number) => signal.arms.reduce((best, a, i) =>
+      a.dx * l.arms[arm].dx + a.dz * l.arms[arm].dz > signal.arms[best].dx * l.arms[arm].dx + signal.arms[best].dz * l.arms[arm].dz ? i : best, 0);
+    let a = -1, b = -1;
+    // Pick two geometrically conflicting movements released in the same phase.
+    for (let i = 0; i < tab.k && a < 0; i++) for (let j = i + 1; j < tab.k; j++) {
+      const ai = phaseOf(l.connectors[i].inArm), aj = phaseOf(l.connectors[j].inArm);
+      if (tab.conflict[i * tab.k + j] && signal.arms[ai].ns === signal.arms[aj].ns) { a = i; b = j; break; }
+    }
+    expect(a).toBeGreaterThanOrEqual(0);
+    const end = (c: number, inbound: boolean) => {
+      const arm = l.arms[inbound ? l.connectors[c].inArm : l.connectors[c].outArm];
+      return idx(w, Math.round(l.centre.x + arm.dx * 7 - 0.5), Math.round(l.centre.z + arm.dz * 7 - 0.5));
+    };
+    t.vehicles.push(car(s, 1, end(a, true), end(a, false), 2, 2), car(s, 2, end(b, true), end(b, false), 2, 2));
+    for (let i = 0; i < 600 && t.vehicles.length > 1; i++) {
+      tickTraffic(s, t, 0.05);
+      if (t.vehicles.length < 2) break;
+      const x = pointAtRouteArc(t.vehicles[0].pts, t.vehicles[0].arcs!, t.vehicles[0].arc!).x - pointAtRouteArc(t.vehicles[1].pts, t.vehicles[1].arcs!, t.vehicles[1].arc!).x;
+      const z = pointAtRouteArc(t.vehicles[0].pts, t.vehicles[0].arcs!, t.vehicles[0].arc!).z - pointAtRouteArc(t.vehicles[1].pts, t.vehicles[1].arcs!, t.vehicles[1].arc!).z;
+      expect(Math.hypot(x, z)).toBeGreaterThanOrEqual(halfLength(0) * 2);
+    }
   });
 });
 
