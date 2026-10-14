@@ -53,8 +53,10 @@ export function lotKerb(lot: Footprint & Pick<WorldLot, "facing" | "depthFromRoa
   // Only a lot whose front edge sits on the road gets a kerb strip; deeper lots would show a floating bar.
   if (lot.depthFromRoad !== 0) return null;
   const { dx, dy } = lot.facing;
-  if (dy !== 0) return { x: lot.x + lot.w / 2, z: dy > 0 ? lot.y + lot.h : lot.y, w: lot.w, d: 0.12 };
-  if (dx !== 0) return { x: dx > 0 ? lot.x + lot.w : lot.x, z: lot.y + lot.h / 2, w: 0.12, d: lot.h };
+  // Centred 0.06 inside the front edge (like orientedKerb): the strip stays on the lot, never on the road's sidewalk.
+  const IN = 0.06;
+  if (dy !== 0) return { x: lot.x + lot.w / 2, z: dy > 0 ? lot.y + lot.h - IN : lot.y + IN, w: lot.w, d: 0.12 };
+  if (dx !== 0) return { x: dx > 0 ? lot.x + lot.w - IN : lot.x + IN, z: lot.y + lot.h / 2, w: 0.12, d: lot.h };
   return null;
 }
 
@@ -92,8 +94,9 @@ export function orientedModelCells(f: LotFrame): { x: number; z: number }[] {
  * the front edge is +d/2; measured on a diagonal-and-curve test city, +d/2 is the nearer edge for every lot.
  */
 export function orientedKerb(f: LotFrame): { x: number; z: number; len: number; yaw: number } {
-  // The strip is 0.12 deep and centred on this line: pull it inside the lot so it never overlaps the road's own kerb.
-  const p = rotateCell(f, 0, f.d / 2 - 0.07);
+  // The strip is 0.12 deep and centred on this line: pull it inside the lot so it never overlaps the road's own kerb
+  // (front face 0.015 behind the lot edge, the band zone validity keeps off junction rings: 05 §1.8).
+  const p = rotateCell(f, 0, f.d / 2 - 0.075);
   return { x: p.x, z: p.z, len: f.w, yaw: f.yaw };
 }
 

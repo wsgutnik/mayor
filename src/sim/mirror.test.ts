@@ -80,6 +80,9 @@ describe("oriented tile mirror", () => {
         if (b.valid[i]) { b.zone[i] = ZONE.RES; b.level[i] = 2; }
       }
     }
+    // zinv: placeRoad now reconciles immediately (lots no longer left dirty), so cells poked behind the tools' back
+    // must be flagged like every zone tool does.
+    s.world.lotsDirty = true;
     syncLots(s);
     const before = s.world.zone.reduce((n, z) => n + (z ? 1 : 0), 0);
     expect(placeRoad(s, ROAD.STREET, [{ x: 12.5, z: ey - 10.5 }, { x: 12.5, z: ey - 2.5 }]).ok).toBe(true);

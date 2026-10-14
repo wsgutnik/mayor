@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
+import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, reconcileZones, setZoningMode, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
 import { History } from "./sim/history";
 import { deserialize, serialize } from "./sim/save";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
@@ -209,7 +209,8 @@ function useCity(next: CityState): void {
 /** Swap the running city: renderer, traffic, drafts, selection and inspector all reset. Undo/redo reuse this so a restore looks exactly like a load. */
 function swapCity(next: CityState): void {
   state = next;
-  state.world.zoning = prefs.zoning;   // the oriented model is opt-in until the cutover (docs/process/05-oriented-lots.md)
+  // The player's zoning model applies to every loaded city; switching migrates zones instead of dropping them (05 §1.8).
+  setZoningMode(state, prefs.zoning);
   traffic = newTraffic(state.world.size);
   renderer.setWorld(state.world);
   renderer.setTraffic(traffic);
@@ -481,6 +482,9 @@ function stampInterchangeAt(cx: number, cy: number): void {
   history.push(serialize(state));
   for (const ramp of ramps) addSegment(w, 4, ramp);
   rebuildRoadRaster(w);
+  // New ramps cover ground: zones there go, like every other road edit (05 §1.8).
+  w.roadRevision++; w.zoneRevision++; w.obstacleRevision++; w.lotsDirty = true;
+  reconcileZones(state);
   state.money -= cost;
   state.monthExpenses += cost;
   w.coverageDirty = true;

@@ -18,6 +18,7 @@ import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
 import { rasterizeMirror } from "./mirror";
+import { lotRectOnRoad, roadSurface, tileOnRoad } from "./roadsurface";
 import { lotsReady, planOrientedLots } from "./orientedlots";
 import { evolveOrientedLot } from "./lot-evolution";
 import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
@@ -511,17 +512,14 @@ export function placeRoad(s: CityState, type: RoadType, pts: Pt[], level: RoadLe
   // endpoints snap to the same node, so the elevated middle joins its approaches.
   for (const piece of pieces) addSegment(w, type, piece.pts, { elevation: piece.elevation });
   rebuildRoadRaster(w);
-  if (w.zoning === "oriented") {
-    w.obstacleRevision++;
-    w.lotsDirty = true;
-    refreshOrientedLots(s);
-  }
+  // Cells and tiles under (or now cut off by) the new road lose their zone right away (05 §1.8).
+  dirtyRoads(w);
+  reconcileZones(s);
   // Utility networks run under the roads, so new tarmac can light new buildings.
   w.coverageDirty = true;
   updateCoverage(w);
   s.money -= plan.cost;
   s.monthExpenses += plan.cost;
-  dirtyRoads(w);
   w.revision++;
   return { ok: true };
 }
@@ -691,16 +689,13 @@ export function upgradeRoad(s: CityState, segmentId: number, newType: RoadType):
       if (stop.kind === "bus" && now.has(stop.tile) && !kept.has(stop.tile)) removeStopAt(w, stop.tile);
     }
   }
-  if (w.zoning === "oriented") {
-    w.obstacleRevision++;
-    w.lotsDirty = true;
-    refreshOrientedLots(s);
-  }
+  // A wider class covers more ground: revalidate every cell/tile against the new footprint (05 §1.8).
+  dirtyRoads(w);
+  reconcileZones(s);
   w.coverageDirty = true;
   updateCoverage(w);
   s.money -= plan.cost;
   s.monthExpenses += plan.cost;
-  dirtyRoads(w);
   w.revision++;
   return { ok: true };
 }
@@ -827,17 +822,36 @@ export function setOLotLevel(w: World, lot: OrientedLot, level: number): void {
   rasterizeMirror(w, set, w.olots ?? []);
 }
 
+/**
+ * Slack for a lot's rigid rectangle against the sidewalk edge: 0.005 tile (4 cm), below drawing precision. On the
+ * outer side of a curve the straight front edge of a 2-4 row lot dips toward the kerb line (chord sagitta);
+ * refusing any dip left every outer-curve row unlotted (zone-attach "curve": coverage 1.0 -> 0.83). Half the
+ * oracle's 0.01 (checkZoneInvariant), so what the exact gate accepts the oracle accepts too.
+ */
+const LOT_SURFACE_EPS = 0.005;
+
 export function refreshOrientedLots(s: CityState): void {
   const w = s.world;
   const set = getZoneBlocks(w);
   const keep = w.olots ?? [];
-  const lots = planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep, seed: s.rngState });
+  // A lot is drawn as one rigid rectangle (pads, kerb, ground plan, building): it must stay off the road (05 §1.8).
+  // The planner asks only for lots on curved frames; the surface is built on first use (cached per graph revision).
+  let surface: ReturnType<typeof roadSurface> | undefined;
+  const rectOk = (p: { cx: number; cz: number; yaw: number; w: number; d: number }): boolean =>
+    !lotRectOnRoad(surface ??= roadSurface(w), p.cx, p.cz, p.w, p.d, p.yaw, LOT_SURFACE_EPS);
+  const lots = planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep, seed: s.rngState, rectOk });
   const keptIds = new Set(keep.map((lot) => lot.id));
+  // New lots get fresh ids above every id ever issued. The remap is built first and applied to the cells in one
+  // pass: renaming in place let a renamed lot's cells be renamed again by the next lot (5 -> 6, then 6 -> 7), so a
+  // lot's cells pointed at another lot (rule 3: ids never collide).
+  const remap = new Map<number, number>();
   for (const lot of lots) if (!keptIds.has(lot.id) && lot.id < w.nextOLotId) {
-    const oldId = lot.id;
+    remap.set(lot.id, w.nextOLotId);
     lot.id = w.nextOLotId++;
-    const b = set.blocks.get(blockKey(lot));
-    if (b) for (let i = 0; i < b.lot.length; i++) if (b.lot[i] === oldId) b.lot[i] = lot.id;
+  }
+  if (remap.size) for (const b of set.blocks.values()) for (let i = 0; i < b.lot.length; i++) {
+    const to = remap.get(b.lot[i]);
+    if (to !== undefined) b.lot[i] = to;
   }
   for (const lot of lots) w.nextOLotId = Math.max(w.nextOLotId, lot.id + 1);
   w.olots = lots;
@@ -905,11 +919,100 @@ function lotsOutOfSync(w: World): boolean {
 
 /** Rebuild lots when stale; cheap to call every frame and every step. */
 export function syncLots(s: CityState): void {
-  if (s.world.zoning === "oriented") {
-    if (s.world.lotsDirty || !s.world.olots) refreshOrientedLots(s);
+  const w = s.world;
+  if (w.zoning === "oriented") {
+    const cells = w.cells as unknown as ZoneBlockSet | undefined;
+    const stale = !cells || cells.graphRevision !== w.graphRevision || (cells as { obstacleRevision?: number }).obstacleRevision !== w.obstacleRevision;
+    if (w.lotsDirty || !w.olots || stale) reconcileZones(s);
     return;
   }
-  if (s.world.lotsDirty || lotsOutOfSync(s.world)) refreshLots(s);
+  if (w.lotsDirty || lotsOutOfSync(w)) reconcileZones(s);
+}
+
+/**
+ * Clear zone state the current geometry no longer allows: every cell that is not valid loses its zone, level and lot
+ * (validity is the only authority on where zoning may exist; migrateCells and old saves can leave bytes behind).
+ * Returns the number of cells scrubbed.
+ */
+function scrubCells(set: ZoneBlockSet): number {
+  let n = 0;
+  for (const b of set.blocks.values()) for (let i = 0; i < b.valid.length; i++) {
+    if (b.valid[i] || (!b.zone[i] && !b.level[i] && b.lot[i] < 0)) continue;
+    b.zone[i] = 0; b.level[i] = 0; b.lot[i] = -1; n++;
+  }
+  return n;
+}
+
+/**
+ * Tile mode: a zoned tile is legal only on dry land without a road, facility or drawn asphalt/kerb (which on
+ * diagonals, curves and off-centre avenues covers tiles the raster does not mark) and within the zoning depth of a
+ * road. Everything else is cleared (CS1: zones vanish under and beside removed roads). Returns the count.
+ */
+function scrubTiles(w: World): number {
+  const surface = roadSurface(w, "kerb");
+  const front = getFrontage(w);
+  let n = 0;
+  for (let i = 0; i < w.zone.length; i++) {
+    if (!w.zone[i] && !w.level[i]) continue;
+    const x = i % w.size, y = (i / w.size) | 0;
+    if (!blocksBuilding(w, i) && !w.facility[i] && isLand(w, x, y) && front.road[i] >= 0 && !tileOnRoad(surface, x, y)) continue;
+    w.zone[i] = 0; w.level[i] = 0; n++;
+  }
+  return n;
+}
+
+/**
+ * The single zone/road reconciliation point (docs/process/05-oriented-lots.md §1.8). Every road mutation (place,
+ * upgrade, bulldoze, roundabout, interchange), every zone or obstacle mutation and every load ends here, so after
+ * each operation:
+ *  - oriented: only valid cells hold zone state; lots are planned from valid zoned cells only; the tile mirror
+ *    (zone/level/lotAt/lots) is rewritten from those cells and lots, so no road tile is zoned;
+ *  - tiles: no zoned tile lies on a road, a facility, water or the road surface, or beyond the zoning depth, and lots
+ *    are rebuilt from what is left.
+ * Idempotent; cheap when nothing changed (blocks are cached by graph/obstacle revision).
+ */
+/**
+ * Switch a running city between the zoning models without losing zones (main.ts applies the player's preference on
+ * every load/new city). tiles -> oriented moves each zoned tile to its nearest valid cell (like migrateV1Cells);
+ * oriented -> tiles keeps the mirror. Either way the result is reconciled.
+ */
+export function setZoningMode(s: CityState, mode: World["zoning"]): void {
+  const w = s.world;
+  if (w.zoning === mode) return;
+  if (mode === "oriented") {
+    const oldZone = Uint8Array.from(w.zone), oldLevel = Uint8Array.from(w.level);
+    w.zoning = "oriented";
+    w.cells = undefined;
+    w.olots = [];
+    w.obstacleRevision++;
+    const set = getZoneBlocks(w);
+    for (let t = 0; t < oldZone.length; t++) {
+      if (!oldZone[t]) continue;
+      const ref = nearestCell(set, (t % w.size) + 0.5, ((t / w.size) | 0) + 0.5, 0.75);
+      const b = ref ? set.blocks.get(blockKey(ref)) : undefined;
+      if (!ref || !b) continue;
+      const i = cellIndex(ref.row, ref.col);
+      if (b.zone[i]) continue;
+      b.zone[i] = oldZone[t]; b.level[i] = oldLevel[t];
+    }
+  } else {
+    w.zoning = "tiles";
+  }
+  w.zoneRevision++;
+  w.lotsDirty = true;
+  reconcileZones(s);
+  w.revision++;
+}
+
+export function reconcileZones(s: CityState): void {
+  const w = s.world;
+  if (w.zoning === "oriented") {
+    scrubCells(getZoneBlocks(w));
+    refreshOrientedLots(s);
+    return;
+  }
+  if (scrubTiles(w)) w.zoneRevision++;
+  refreshLots(s);
 }
 
 export interface ZoneBrush { radius: 0 | 1 | 2 }
@@ -931,6 +1034,10 @@ function refsAround(set: ZoneBlockSet, ref: CellRef, radius: number): CellRef[] 
 
 export function applyZoneAt(s: CityState, zone: ZoneType | 0, x: number, z: number, brush: ZoneBrush = { radius: 0 }): ToolResult {
   const w = s.world;
+  // Tile mode has no cells: the brush paints the tile under the point through the tile tool (same rules, same lots).
+  if (w.zoning === "tiles") {
+    return applyTool(s, zone === 0 ? "bulldoze" : zone === ZONE.RES ? "res" : zone === ZONE.COM ? "com" : "ind", Math.floor(x), Math.floor(z));
+  }
   const set = getZoneBlocks(w);
   const picked = nearestCell(set, x, z, 0.75);
   if (!picked) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
@@ -958,7 +1065,7 @@ export function applyZoneAt(s: CityState, zone: ZoneType | 0, x: number, z: numb
   w.lotsDirty = true;
   w.coverageDirty = true;
   w.revision++;
-  refreshOrientedLots(s);
+  reconcileZones(s);
   return { ok: true };
 }
 
@@ -967,17 +1074,9 @@ export function bulldozeAt(s: CityState, x: number, z: number): ToolResult {
   const tx = Math.floor(x), ty = Math.floor(z);
   if (!inBounds(w, tx, ty)) return { ok: false, reason: "Outside the map" };
   const tile = idx(w, tx, ty);
-  if (w.road[tile] || w.facility[tile]) {
-    const mode = w.zoning;
-    w.zoning = "tiles";
-    const result = applyTool(s, "bulldoze", tx, ty);
-    w.zoning = mode;
-    if (result.ok) {
-      w.obstacleRevision++;
-      w.lotsDirty = true;
-      refreshOrientedLots(s);
-    }
-    return result;
+  if (w.road[tile] || w.facility[tile] || w.zoning === "tiles") {
+    // applyTool removes roads and facilities in both modes and reconciles the zones itself.
+    return applyTool(s, "bulldoze", tx, ty);
   }
   const set = getZoneBlocks(w);
   const ref = nearestCell(set, x, z, 0.75);
@@ -998,7 +1097,7 @@ export function bulldozeAt(s: CityState, x: number, z: number): ToolResult {
   w.lotsDirty = true;
   w.coverageDirty = true;
   w.revision++;
-  refreshOrientedLots(s);
+  reconcileZones(s);
   return { ok: true };
 }
 
@@ -1032,6 +1131,11 @@ export function placeRoundabout(s: CityState, x: number, y: number): ToolResult 
   if (s.money < COST.roundabout) return { ok: false, reason: "Not enough money" };
   if (!stampRoundabout(w, nodeId)) return { ok: false, reason: "Roundabouts need a junction with at least 3 arms" };
   rebuildRoadRaster(w);
+  // The ring and the re-pointed arms cover new ground: zones there go (05 §1.8).
+  dirtyRoads(w);
+  reconcileZones(s);
+  w.coverageDirty = true;
+  updateCoverage(w);
   s.money -= COST.roundabout;
   s.monthExpenses += COST.roundabout;
   w.revision++;
@@ -1135,6 +1239,11 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
       w.level[i] = 0;
       if (hadFacility) clearFacilityAt(w, i);
     }
+    // A removed road strands the zones it served; a removed facility frees cells (05 §1.8).
+    if (hadRoad || hadFacility) {
+      if (hadFacility) w.obstacleRevision++;
+      reconcileZones(s);
+    }
     if (w.coverageDirty) updateCoverage(w);
     w.revision++;
     return { ok: true };
@@ -1170,6 +1279,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (type === FAC.METRO) registerMetroStation(w, i);
     w.coverageDirty = true;
     dirtyObstacles(w);
+    if (w.zoning === "oriented") reconcileZones(s);
     updateCoverage(w);
     s.money -= cost;
     s.monthExpenses += cost;
@@ -1185,7 +1295,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   } else {
     if (w.zoning === "oriented") return applyZoneAt(s, ZONE_OF_TOOL[tool], x + 0.5, y + 0.5, { radius: 0 });
     const z = ZONE_OF_TOOL[tool];
-    if (blocksBuilding(w, i)) return { ok: false, reason: "Tile is a road" };
+    // The drawn road (asphalt, kerb, sidewalk) covers more than its raster on diagonals and curves (05 §1.8).
+    if (blocksBuilding(w, i) || tileOnRoad(roadSurface(w, "kerb"), x, y)) return { ok: false, reason: "Tile is a road" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
     if (w.zone[i] === z) return { ok: true };
     // Zoning hugs the street grid: a tile needs street frontage within ZONE_DEPTH, like blocks in Cities: Skylines.
@@ -1220,6 +1331,7 @@ export function isFillOpenTile(w: World, tool: ZoneBulkTool, x: number, y: numbe
   const i = idx(w, x, y);
   if (!isLand(w, x, y) || blocksBuilding(w, i) || w.facility[i]) return false;
   if (tool === "bulldoze") return w.zone[i] !== 0;
+  if (w.zoning === "tiles" && tileOnRoad(roadSurface(w, "kerb"), x, y)) return false;
   if (w.zone[i] !== 0 && w.zone[i] !== ZONE_OF_TOOL[tool]) return false;
   return getFrontage(w).road[i] >= 0;
 }
@@ -1256,6 +1368,7 @@ function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: numb
     return out;
   }
   const frontage = tool === "bulldoze" ? null : getFrontage(w);
+  const surface = roadSurface(w, "kerb");
   let already = 0;
   for (const t of tiles) {
     if (!inBounds(w, t.x, t.y)) { fail("Outside the map"); continue; }
@@ -1266,7 +1379,7 @@ function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: numb
       continue;
     }
     if (!isLand(w, t.x, t.y)) { fail("Cannot build on water"); continue; }
-    if (blocksBuilding(w, i)) { fail("Tile is a road"); continue; }
+    if (blocksBuilding(w, i) || tileOnRoad(surface, t.x, t.y)) { fail("Tile is a road"); continue; }
     if (w.facility[i]) { fail("Tile is occupied"); continue; }
     if (w.zone[i] === ZONE_OF_TOOL[tool]) { already++; continue; }
     if (frontage!.road[i] < 0) { fail("Zones must be within 4 tiles of a road"); continue; }
@@ -1346,7 +1459,7 @@ export function applyZoneBulk(s: CityState, tool: ZoneBulkTool, tiles: readonly 
   s.money -= cost;
   s.monthExpenses += cost;
   w.revision++;
-  if (oriented) refreshOrientedLots(s);
+  if (oriented) reconcileZones(s);
   return { ok: true };
 }
 

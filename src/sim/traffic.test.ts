@@ -66,8 +66,9 @@ function town(seed = 5) {
   s.money = 1e7;
   line(s, ROAD.AVENUE, 3, ey, 28, ey);
   for (let x = 4; x < 28; x++) {
-    applyTool(s, "res", x, ey - 1); // the avenue occupies rows ey..ey+1
-    applyTool(s, x < 18 ? "com" : "ind", x, ey + 2);
+    // zinv: the avenue's raster is rows ey..ey+1 but its drawn asphalt (centreline ey + 0.5, 0.9 half width) covers
+    // 0.4 of row ey - 1, so homes can no longer sit there; all lots front the south row ey + 2 instead.
+    applyTool(s, x < 14 ? "res" : x < 21 ? "com" : "ind", x, ey + 2);
   }
   for (let i = 0; i < s.world.zone.length; i++) if (s.world.zone[i]) s.world.level[i] = 2;
   s.population = 600;

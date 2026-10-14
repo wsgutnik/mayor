@@ -451,7 +451,8 @@ describe("free-form roads", () => {
     flat(t);
     addUtilities(t);
     placeRoad(t, ROAD.AVENUE, [{ x: 3.5, z: ey + 0.5 }, { x: 12.5, z: ey + 0.5 }]);
-    for (let x = 4; x < 12; x++) applyTool(t, "res", x, ey - 1); // avenue covers rows ey..ey+1
+    // zinv: the avenue's raster is rows ey..ey+1 but its drawn asphalt covers 0.4 of row ey - 1: serve the south row.
+    for (let x = 4; x < 12; x++) applyTool(t, "res", x, ey + 2);
     for (let d = 0; d < 300; d++) step(t);
     expect(t.world.level.reduce((n, l) => n + l, 0)).toBeGreaterThan(0);
   });

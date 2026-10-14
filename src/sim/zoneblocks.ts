@@ -10,10 +10,31 @@ import { profileOf } from "./corridor";
 import { STRAIGHT_TOL, cornerRadiusFor, junctionsOf } from "./junction";
 
 const MIGRATE_RADIUS = 0.75;
+/**
+ * |cos| of the largest angle between an old cell's road and the new cell's road for migration (15 degrees). Splits,
+ * merges and small reshapes keep the direction; a road built across a zoned block does not, and CS1 clears the cells
+ * it covers instead of re-zoning the new road's own cells (05 §1.6, §1.8): without this, a diagonal drawn through a
+ * zoned area came out dotted with rotated zoned cells and lots copied from the old grid.
+ */
+const MIGRATE_ALIGN = Math.cos((15 * Math.PI) / 180);
 /** Clearance around another road's footprint (fable 0.6m / 8). */
 const ROAD_CLEARANCE = 0.075;
 /** Corner/edge samples are pulled this fraction toward the cell centre (fable S=0.93). */
 const SAMPLE_SHRINK = 0.93;
+/**
+ * Extra corner samples, pulled only 3 % in (05 §1.8). On the trapezoids of tight curves a corner can poke into the
+ * road between the 7 % samples; corners sit exactly on the offset curve elsewhere, so this never rejects a cell on a
+ * straight road or on the outer side of a curve. Only curved rows pay for them: on a straight frame the 7 % corner
+ * gap (0.05 tile) is inside ROAD_CLEARANCE for other roads and exactly on the kerb line for the own road.
+ */
+const CORNER_SHRINK = 0.97;
+const CELL_SAMPLES = 13;
+const STRAIGHT_SAMPLES = 9;
+/**
+ * The exact ring/road tests use the cell pulled 3 % in (0.015 tile from every edge): what the renderer draws inside a
+ * cell or lot (pads inset 0.02, kerb strips 0.015 behind the front edge) never reaches that band.
+ */
+const EXACT_SHRINK = 0.97;
 /** Water level threshold matching isLand's 0.05 corner rule. */
 const WATER_H = 0.05;
 
@@ -278,7 +299,7 @@ export function junctionDiscs(w: World): { x: number; z: number; r: number }[] {
   return out;
 }
 
-interface KeepOutPoly { xs: Float64Array; zs: Float64Array; minX: number; maxX: number; minZ: number; maxZ: number }
+interface KeepOutPoly { xs: Float64Array; zs: Float64Array; minX: number; maxX: number; minZ: number; maxZ: number; mark: number }
 
 /**
  * Hard surface of every junction (05 §1.4 c): the `sidewalkOuter` ring of each node layout (asphalt, kerb returns
@@ -298,7 +319,7 @@ function junctionKeepOut(w: World): { polys: KeepOutPoly[]; discs: { x: number; 
       xs[i] = ring[i].x; zs[i] = ring[i].z;
       minX = Math.min(minX, xs[i]); maxX = Math.max(maxX, xs[i]); minZ = Math.min(minZ, zs[i]); maxZ = Math.max(maxZ, zs[i]);
     }
-    polys.push({ xs, zs, minX, maxX, minZ, maxZ });
+    polys.push({ xs, zs, minX, maxX, minZ, maxZ, mark: 0 });
   }
   const discs = junctionDiscs(w).filter((d) => {
     for (const n of w.nodes) if (n.x === d.x && n.z === d.z) return !nodes.has(n.id);
@@ -318,7 +339,7 @@ function inKeepOut(p: KeepOutPoly, x: number, z: number): boolean {
   return inside;
 }
 
-/** 9 sample points: centre, 4 corners and 4 edge midpoints pulled 7% inward (fable `_blocked`). */
+/** 13 sample points: centre, 4 corners and 4 edge midpoints pulled 7% inward (fable `_blocked`), 4 corners 3% in. */
 function cellSamples(cx: number, cz: number, corners: Float32Array, out: Float32Array): void {
   out[0] = cx; out[1] = cz;
   for (let e = 0; e < 4; e++) {
@@ -329,6 +350,8 @@ function cellSamples(cx: number, cz: number, corners: Float32Array, out: Float32
     const mx = (ax + bx) * 0.5, mz = (az + bz) * 0.5;
     out[(2 + e * 2) * 2] = cx + (mx - cx) * SAMPLE_SHRINK;
     out[(2 + e * 2) * 2 + 1] = cz + (mz - cz) * SAMPLE_SHRINK;
+    out[(9 + e) * 2] = cx + (ax - cx) * CORNER_SHRINK;
+    out[(9 + e) * 2 + 1] = cz + (az - cz) * CORNER_SHRINK;
   }
 }
 
@@ -402,7 +425,7 @@ function applyValidity(w: World, blocks: ZoneBlock[]): void {
     }
   }
   const corners = new Float32Array(8);
-  const samples = new Float32Array(18);
+  const samples = new Float32Array(CELL_SAMPLES * 2);
   for (const b of blocks) {
     const seg = segById.get(b.seg);
     if (!seg) continue;
@@ -431,7 +454,11 @@ function applyValidity(w: World, blocks: ZoneBlock[]): void {
         if (ok && !skipRoadDistance) {
           cellSamples(p.x, p.z, corners, samples);
           const cands = roadCandidates.get(ti) ?? [];
-          for (let s = 0; ok && s < 9; s++) {
+          const e = b.edge;
+          const curved = !!e && e.length >= (b.rows + 1) * 4 &&
+            e[r * 4 + 2] * e[(r + 1) * 4 + 2] + e[r * 4 + 3] * e[(r + 1) * 4 + 3] < 1 - 1e-9;
+          const nSamples = curved ? CELL_SAMPLES : STRAIGHT_SAMPLES;
+          for (let s = 0; ok && s < nSamples; s++) {
             const sx = samples[s * 2], sz = samples[s * 2 + 1];
             for (const other of cands) {
               // Own road (and its straight continuation): only the physical body (asphalt + sidewalk), so depth 0
@@ -447,12 +474,136 @@ function applyValidity(w: World, blocks: ZoneBlock[]): void {
               if ((sx - d.x) * (sx - d.x) + (sz - d.z) * (sz - d.z) < d.r * d.r) { ok = false; break; }
             }
           }
+          // Junction rings are polygons with corners: a kerb-return vertex can poke into a cell edge between the
+          // samples, so the ring is also tested exactly against the cell quad (05 §1.8).
+          if (ok) ok = !quadTouchesRings(corners, p.x, p.z, polyAt);
+          // The 9/13 samples leave 0.5-tile gaps along the cell edges, and another road's round end or a crossing
+          // centreline can bulge into the cell between them by more than ROAD_CLEARANCE: test those exactly.
+          if (ok) for (const other of cands) {
+            if (other.id === b.seg || straightOn?.has(other.id)) continue;
+            if (quadNearRoad(corners, p.x, p.z, roadSamples.get(other.id)!.pts, roadClear.get(other.id)!, keepOut.nodes.has(other.a), keepOut.nodes.has(other.b))) { ok = false; break; }
+          }
         }
         b.valid[k] = ok ? 1 : 0;
       }
       for (let c = 1; c < CELL_DEPTH; c++) if (!b.valid[cellIndex(r, c - 1)]) b.valid[cellIndex(r, c)] = 0;
     }
   }
+}
+
+function segsCross(ax: number, az: number, bx: number, bz: number, cx: number, cz: number, dx: number, dz: number): boolean {
+  const d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax), d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax);
+  const d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx), d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx);
+  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+}
+
+function pointSegDist2(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+  const vx = bx - ax, vz = bz - az, l2 = vx * vx + vz * vz;
+  const u = l2 <= 1e-12 ? 0 : Math.max(0, Math.min(1, ((px - ax) * vx + (pz - az) * vz) / l2));
+  const dx = ax + vx * u - px, dz = az + vz * u - pz;
+  return dx * dx + dz * dz;
+}
+
+const near4 = new Float32Array(8);
+/**
+ * Exact test of a cell quad (pulled EXACT_SHRINK in) against another road's swept body of half width `limit`
+ * around its sampled centreline: interior pieces are capsules; an end piece at a junction-layout node is cut flat
+ * at the node (the junction ring covers the node area, §1.4 c), so it is a rectangle there.
+ */
+function quadNearRoad(q: Float32Array, cx: number, cz: number, pts: Pt[], limit: number, flatA: boolean, flatB: boolean): boolean {
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < 4; i++) {
+    near4[i * 2] = cx + (q[i * 2] - cx) * EXACT_SHRINK;
+    near4[i * 2 + 1] = cz + (q[i * 2 + 1] - cz) * EXACT_SHRINK;
+    minX = Math.min(minX, near4[i * 2]); maxX = Math.max(maxX, near4[i * 2]);
+    minZ = Math.min(minZ, near4[i * 2 + 1]); maxZ = Math.max(maxZ, near4[i * 2 + 1]);
+  }
+  const l2 = limit * limit, n = pts.length;
+  for (let i = 1; i < n; i++) {
+    const a = pts[i - 1], b = pts[i];
+    if (Math.max(a.x, b.x) < minX - limit || Math.min(a.x, b.x) > maxX + limit ||
+      Math.max(a.z, b.z) < minZ - limit || Math.min(a.z, b.z) > maxZ + limit) continue;
+    const cutA = flatA && i === 1, cutB = flatB && i === n - 1;
+    if (cutA || cutB) {
+      // Flat end(s): the swept rectangle of this piece (SAT against the quad), plus a disc at a non-cut end.
+      if (rectOverlapsQuad(a, b, limit, near4)) return true;
+      if (!cutA && discTouchesQuad(a.x, a.z, l2, near4)) return true;
+      if (!cutB && discTouchesQuad(b.x, b.z, l2, near4)) return true;
+      continue;
+    }
+    if (pointInQuad(near4, a.x, a.z) || pointInQuad(near4, b.x, b.z)) return true;
+    for (let e = 0; e < 4; e++) {
+      const f = (e + 1) & 3;
+      const ex = near4[e * 2], ez = near4[e * 2 + 1], fx = near4[f * 2], fz = near4[f * 2 + 1];
+      if (segsCross(a.x, a.z, b.x, b.z, ex, ez, fx, fz)) return true;
+      if (pointSegDist2(ex, ez, a.x, a.z, b.x, b.z) < l2) return true;
+      if (pointSegDist2(a.x, a.z, ex, ez, fx, fz) < l2 || pointSegDist2(b.x, b.z, ex, ez, fx, fz) < l2) return true;
+    }
+  }
+  return false;
+}
+
+function discTouchesQuad(x: number, z: number, r2: number, q: Float32Array): boolean {
+  if (pointInQuad(q, x, z)) return true;
+  for (let e = 0; e < 4; e++) {
+    const f = (e + 1) & 3;
+    if (pointSegDist2(x, z, q[e * 2], q[e * 2 + 1], q[f * 2], q[f * 2 + 1]) < r2) return true;
+  }
+  return false;
+}
+
+const rect4 = new Float32Array(8);
+/** SAT: does the rectangle swept by segment a-b with half width h overlap quad q (strictly)? */
+function rectOverlapsQuad(a: Pt, b: Pt, h: number, q: Float32Array): boolean {
+  let tx = b.x - a.x, tz = b.z - a.z;
+  const l = Math.hypot(tx, tz);
+  if (l < 1e-9) return false;
+  tx /= l; tz /= l;
+  const nx = -tz * h, nz = tx * h;
+  rect4[0] = a.x + nx; rect4[1] = a.z + nz; rect4[2] = b.x + nx; rect4[3] = b.z + nz;
+  rect4[4] = b.x - nx; rect4[5] = b.z - nz; rect4[6] = a.x - nx; rect4[7] = a.z - nz;
+  for (const poly of [rect4, q]) for (let i = 0; i < 4; i++) {
+    const j = (i + 1) & 3;
+    const ax = -(poly[j * 2 + 1] - poly[i * 2 + 1]), az = poly[j * 2] - poly[i * 2];
+    let alo = Infinity, ahi = -Infinity, blo = Infinity, bhi = -Infinity;
+    for (let k = 0; k < 4; k++) {
+      const va = rect4[k * 2] * ax + rect4[k * 2 + 1] * az, vb = q[k * 2] * ax + q[k * 2 + 1] * az;
+      alo = Math.min(alo, va); ahi = Math.max(ahi, va); blo = Math.min(blo, vb); bhi = Math.max(bhi, vb);
+    }
+    if (ahi <= blo || bhi <= alo) return false;
+  }
+  return true;
+}
+
+const shrunk = new Float32Array(8);
+let ringStamp = 0;
+/** Exact overlap of a cell quad (pulled EXACT_SHRINK toward its centre) with any junction ring near it. */
+function quadTouchesRings(q: Float32Array, cx: number, cz: number, polyAt: Map<number, KeepOutPoly[]>): boolean {
+  const stamp = ++ringStamp;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < 4; i++) {
+    shrunk[i * 2] = cx + (q[i * 2] - cx) * EXACT_SHRINK;
+    shrunk[i * 2 + 1] = cz + (q[i * 2 + 1] - cz) * EXACT_SHRINK;
+    minX = Math.min(minX, shrunk[i * 2]); maxX = Math.max(maxX, shrunk[i * 2]);
+    minZ = Math.min(minZ, shrunk[i * 2 + 1]); maxZ = Math.max(maxZ, shrunk[i * 2 + 1]);
+  }
+  for (let tz = Math.floor(minZ); tz <= Math.floor(maxZ); tz++) for (let tx = Math.floor(minX); tx <= Math.floor(maxX); tx++) {
+    const near = polyAt.get(tz * 65536 + tx);
+    if (!near) continue;
+    for (const poly of near) {
+      if (poly.mark === stamp) continue;
+      poly.mark = stamp;
+      if (poly.maxX < minX || poly.minX > maxX || poly.maxZ < minZ || poly.minZ > maxZ) continue;
+      const n = poly.xs.length;
+      for (let i = 0; i < n; i++) if (pointInQuad(shrunk, poly.xs[i], poly.zs[i])) return true;
+      for (let e = 0; e < 4; e++) if (inKeepOut(poly, shrunk[e * 2], shrunk[e * 2 + 1])) return true;
+      for (let i = 0, j = n - 1; i < n; j = i++) for (let e = 0; e < 4; e++) {
+        const f = (e + 1) & 3;
+        if (segsCross(poly.xs[j], poly.zs[j], poly.xs[i], poly.zs[i], shrunk[e * 2], shrunk[e * 2 + 1], shrunk[f * 2], shrunk[f * 2 + 1])) return true;
+      }
+    }
+  }
+  return false;
 }
 
 function pointInQuad(q: Float32Array, x: number, z: number): boolean {
@@ -622,11 +773,16 @@ export function buildZoneBlocks(w: World, prev?: ZoneBlockSet): ZoneBlockSet {
   return next;
 }
 
-export function nearestCell(set: ZoneBlockSet, x: number, z: number, radius: number): CellRef | null {
+/**
+ * Nearest valid cell within `radius`. With `along` (a unit road tangent) only cells whose own road runs parallel or
+ * anti-parallel to it within MIGRATE_ALIGN count: migration must not hand a zone to a crossing road's cells.
+ */
+export function nearestCell(set: ZoneBlockSet, x: number, z: number, radius: number, along?: { tx: number; tz: number }): CellRef | null {
   let best: CellRef | null = null, bd = radius * radius;
   for (const b of set.blocks.values()) for (let r = 0; r < b.rows; r++) for (let c = 0; c < CELL_DEPTH; c++) {
     if (!b.valid[cellIndex(r, c)]) continue;
     const p = cellPose(b, r, c);
+    if (along && Math.abs(p.tx * along.tx + p.tz * along.tz) < MIGRATE_ALIGN) continue;
     const d = (p.x - x) ** 2 + (p.z - z) ** 2;
     if (d <= bd) { bd = d; best = { seg: b.seg, side: b.side, block: b.block, row: r, col: c }; }
   }
@@ -655,7 +811,7 @@ export function migrateCells(prev: ZoneBlockSet, next: ZoneBlockSet): MigrationR
       const oi = cellIndex(r, c);
       if (!old.zone[oi]) continue;
       const p = cellPose(old, r, c);
-      const ref = nearestCell(next, p.x, p.z, MIGRATE_RADIUS);
+      const ref = nearestCell(next, p.x, p.z, MIGRATE_RADIUS, p);
       if (!ref) { report.dropped.push({ seg: old.seg, side: old.side, block: old.block, row: r, col: c }); if (old.lot[oi] >= 0) lotsBroken.add(old.lot[oi]); continue; }
       const nb = blockOf(next, ref);
       if (!nb) continue;

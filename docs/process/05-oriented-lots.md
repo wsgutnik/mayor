@@ -248,6 +248,51 @@ and bulldoze also change validity ((d) above) so they must bump a new counter `w
 also keys on (today `dirtyZones` bumps `zoneRevision`, `sim.ts:423-426`; the oriented path adds the obstacle counter so
 zone painting alone still does not regenerate).
 
+### 1.8 Zone/road invariant and the single reconciliation point (task zinv)
+
+**Invariant** (checked after every operation by `checkZoneInvariant`, `src/sim/zoneinvariant.ts`): no zoned cell, lot,
+rendered pad or kerb strip touches the physical road surface; no zone state exists outside valid cells; mirror tiles
+and lots derive from valid zoned cells only; no lot overlaps another. The surface (`src/sim/roadsurface.ts`) is what
+the player sees as road: asphalt + kerb + sidewalk (`drawHalf + sidewalk`) swept along every ground centreline, cut
+flat at nodes that have a junction layout, plus every junction `sidewalkOuter` ring. Classic tile mode uses the
+`kerb` surface (asphalt + kerb, junction `kerbOuter`): a 1-tile street is drawn 1.14 tiles wide, so every tile beside
+it overlaps the sidewalk by 0.07, which classic zoning always accepted; tiles are also tested 0.1 inset because the
+kerb return of every block corner cuts ~0.08 into the corner tile. Asphalt never is accepted.
+
+**One place.** `reconcileZones(s)` (`sim.ts`) runs after every road mutation (place, upgrade, bulldoze, roundabout,
+interchange), every zone or obstacle mutation and every load (`deserialize` marks lots dirty, `refreshDerived` syncs):
+
+- oriented: cells that are not valid lose zone, level and lot (`scrubCells`), lots are replanned from valid zoned cells
+  only (kept lots must still fit, see below), and the tile mirror is rewritten from those cells and lots;
+- tiles: a zoned tile on a road, facility, water, the `kerb` surface or beyond the zoning depth loses its zone
+  (`scrubTiles`, CS1: zones vanish under and beside removed roads), then lots are rebuilt.
+
+**Validity additions (§1.4 c).** Junction rings are tested exactly against the cell quad (pulled 3 % in), not only at
+the 9 samples: a kerb-return vertex poked into cell edges between samples. Other roads are tested exactly too (capsule
+per centreline piece, rectangle for a piece ending flat at a layout node), because a round end or a crossing
+centreline bulged between samples by more than `ROAD_CLEARANCE`. Curved rows get 4 extra corner samples (3 % in): on
+the trapezoids of tight curves a corner reached the own road between the 7 % samples. Straight rows keep 9 samples
+(the corners sit exactly on the kerb line).
+
+**Lots (§2.3).** A lot is drawn as one rigid rectangle (`lotPose`: pads, kerb strip, ground plan, building). On a
+straight stretch it is exactly the union of its valid cells; on a curve it leaves that union, so the planner asks a
+footprint gate (`PlanOpts.rectOk`, exact rectangle-vs-surface test, 0.015 edge band, 0.005 slack) for curved shapes
+and skips rows no shape can use instead of ending the run there. Kept lots carry `construction` and `landmark`
+(they were dropped on every replan). New lot ids are remapped in one pass (in-place renaming re-pointed already renamed
+cells at the next lot when more lots were planned than the id gap).
+
+**Migration (§1.6).** A zoned cell migrates only to a new cell whose road runs within 15 degrees of its own (parallel
+or anti-parallel): splits, merges and small reshapes keep their zones; a road drawn across a zoned block leaves its own
+cells unzoned (CS1), instead of inheriting rotated cells and lots from the old grid.
+
+**Mode switch.** `setZoningMode` (main.ts applies the preference on every load/new city/undo) migrates tile zones to
+the nearest valid cell instead of silently dropping them.
+
+**Renderer.** Oriented lots draw only what the lot list holds (every lot is road-free by the gate). Classic lot kerb
+strips sit 0.06 inside the lot and are drawn only within 0.2 of a road's setback line and off the surface (on
+diagonals classic kerbs were drawn on tile edges up to a tile away from the ribbon). `orientedKerb` sits 0.075 behind
+the front edge (its face 0.015 inside, outside the band validity keeps off junction rings).
+
 ### 1.7 World fields (additive, `world.ts:143-207`)
 
 ```ts

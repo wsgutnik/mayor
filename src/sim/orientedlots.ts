@@ -4,7 +4,17 @@ import type { Pt, World, ZoneType } from "./world";
 import type { OrientedLot, ZoneBlock, ZoneBlockSet } from "./zonecells";
 import { CELL_DEPTH } from "./zonecells";
 
-export interface PlanOpts { rng: () => number; keep?: readonly OrientedLot[]; seed?: number }
+export interface PlanOpts {
+  rng: () => number;
+  keep?: readonly OrientedLot[];
+  seed?: number;
+  /**
+   * Footprint gate (05 §1.8): false when the lot's rigid rectangle (centre/yaw from `lotPose`, w x d, the frame every
+   * pad, kerb strip, ground rect and building is drawn in) would touch a road. On curves that rectangle leaves the
+   * union of its trapezoid cells, so valid cells alone do not keep it off the asphalt. Absent = always true.
+   */
+  rectOk?: (pose: { cx: number; cz: number; yaw: number; w: number; d: number }) => boolean;
+}
 
 const CURVE_YAW_LIMIT = Math.PI / 30; // 6 degrees.
 
@@ -85,6 +95,17 @@ function shapeFits(b: ZoneBlock, row: number, col: number, w: number, d: number,
       const i = cellIndex(r, c);
       if (!b.valid[i] || b.zone[i] !== zone || b.level[i] !== level || b.lot[i] !== -1) return false;
     }
+  }
+  return true;
+}
+
+/** True when rows row..row+w-1 and their boundary frames share one tangent (cells are exact unit squares). */
+function straightRows(b: ZoneBlock, row: number, w: number): boolean {
+  const tx = b.frame[row * 4 + 2], tz = b.frame[row * 4 + 3];
+  for (let r = row; r < row + w; r++) if (b.frame[r * 4 + 2] * tx + b.frame[r * 4 + 3] * tz < 1 - 1e-9) return false;
+  const e = b.edge;
+  if (e && e.length >= (b.rows + 1) * 4) {
+    for (let k = row; k <= row + w; k++) if (e[k * 4 + 2] * tx + e[k * 4 + 3] * tz < 1 - 1e-9) return false;
   }
   return true;
 }
@@ -181,11 +202,25 @@ export function planOrientedLots(set: ZoneBlockSet, opts: PlanOpts): OrientedLot
   for (const b of set.values()) b.lot.fill(-1);
 
   const kept = [...(opts.keep ?? [])].sort((a, b) => a.id - b.id);
+  const rectOk = (b: ZoneBlock, row: number, col: number, w: number, d: number): boolean => {
+    // On a straight stretch the rigid rectangle is exactly the union of its (valid) cells: nothing to test.
+    if (!opts.rectOk || straightRows(b, row, w)) return true;
+    const p = lotPose(b, { row, col, w, d });
+    return opts.rectOk({ cx: p.cx, cz: p.cz, yaw: p.yaw, w, d });
+  };
   for (const old of kept) {
     const b = blockOf(set, old);
     if (!b) continue;
     if (!shapeFits(b, old.row, old.col, old.w, old.d, old.zone, old.level)) continue;
-    const lot = withPose(b, { id: old.id, seg: old.seg, side: old.side, block: old.block, row: old.row, col: old.col, w: old.w, d: old.d, zone: old.zone, level: old.level, build: old.build });
+    if (!rectOk(b, old.row, old.col, old.w, old.d)) continue;
+    // Everything persistent rides along: construction schedules and landmarks were dropped here before, so any
+    // replan (every road edit, every load since zinv) silently reset buildings in progress and removed landmarks.
+    const lot = withPose(b, {
+      id: old.id, seg: old.seg, side: old.side, block: old.block, row: old.row, col: old.col, w: old.w, d: old.d,
+      zone: old.zone, level: old.level, build: old.build,
+      ...(old.construction === undefined ? {} : { construction: old.construction }),
+      ...(old.landmark === undefined ? {} : { landmark: old.landmark }),
+    });
     markLot(b, lot);
     lots.push(lot);
   }
@@ -231,22 +266,27 @@ export function planOrientedLots(set: ZoneBlockSet, opts: PlanOpts): OrientedLot
       };
       const best = new Float64Array(L + 1);
       const choice = new Int8Array(L + 1);
+      const choiceD = new Int8Array(L + 1);
       for (let p = L - 1; p >= 0; p--) {
         const want = wantAt(p);
-        let bs = -1e9, bw = 0;
+        // A row no lot shape can use (its rigid rectangle would touch a road) is skipped, never a run terminator.
+        let bs = best[p + 1], bw = 0, bd = 0;
         for (let w = 1; w <= Math.min(4, L - p); w++) {
           if (!yawOk(p, w)) continue;
-          const dd = depthAt(p, w);
+          let dd = depthAt(p, w);
+          while (dd > 1 && !rectOk(b, r + p, 0, w, dd)) dd--;
+          if (!rectOk(b, r + p, 0, w, dd)) continue;
           let sc = w * dd + best[p + w];
           if (w < rec[0] || w > rec[1]) sc -= 1.2;
           if (w === want) sc += 0.6;
-          if (sc > bs) { bs = sc; bw = w; }
+          if (bw === 0 || sc > bs) { bs = sc; bw = w; bd = dd; }
         }
-        best[p] = bs; choice[p] = bw;
+        best[p] = bs; choice[p] = bw; choiceD[p] = bd;
       }
-      for (let p = 0; p < L && choice[p];) {
+      for (let p = 0; p < L;) {
         const w = choice[p];
-        const d = Math.max(1, Math.min(depthAt(p, w), CELL_DEPTH));
+        if (!w) { p++; continue; }
+        const d = choiceD[p];
         const lot = withPose(b, { id: nextId++, seg: b.seg, side: b.side, block: b.block, row: r + p, col: 0, w, d, zone: z as ZoneType, level: lv });
         markLot(b, lot);
         lots.push(lot);

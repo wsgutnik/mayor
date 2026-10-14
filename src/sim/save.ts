@@ -431,7 +431,9 @@ export function deserialize(json: string): CityState {
         w.olots = hydrateSavedLots(f2, set);
         w.nextOLotId = Math.max(f2.nextOLotId, ...w.olots.map((l) => l.id + 1), 1);
         rasterizeMirror(w, set, w.olots);
-        w.lotsDirty = false;
+        // refreshDerived reconciles (05 §1.8): saved zone bytes on cells that are invalid under the current rules
+        // are cleared, and kept lots whose footprint now touches a road are replanned. Valid lots keep their ids.
+        w.lotsDirty = true;
       } else {
         w.lotsDirty = true;
       }

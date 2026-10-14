@@ -26,6 +26,7 @@ Updated on 2026-10-14 (after the M34 release and the junction, traffic, zoning a
 | Utilities over bridges | done | layer-aware flood: power, water and sewage cross bridges and tunnels at ramps |
 | UI-1 Interface | done | UI scale and panel opacity prefs, collapsible persistent panels (key H), road-build readout (cost, length, slope, level, reason) |
 | UI-2 Road builder | partial | Undo/Redo (snapshot history, 30 steps), snapping (angle, length, road snap, Alt bypass), upgrade a road in place (explicit toggle), parallel road helper |
+| Zone/road invariant (zinv) | done (agent, unmerged) | single `reconcileZones` after every road/zone/obstacle edit and load; physical road surface module; exact ring/road validity; lot footprint gate on curves; migration only along the same road direction; lot id remap and landmark/construction fixes; property test (200 random ops, both modes) |
 | UI-3 Zoning tools | partial | Marquee and Fill (classic and oriented, one undo entry each) |
 | 2x2 services | done | `facilityAnchors` in the world and save (optional field), placement/bulldoze/coverage/utility links from the footprint centre, one model per anchor with `/models/x2/NN.glb` or a 1.8x scaled 1x1 fallback; hospital, city hall, secondary school, thermal plant, water, metro. 2x2 models built and loaded from `models/x2/` for #21, #27, #29, #32, #34, #40 (640-940 triangles each) |
 | v2 buildings batch | done | 35 buildings have `v2` variants with `v2_lod1`/`v2_lod2` (`?visualV2=1`, manifest-gated); runtime LOD switching still open |

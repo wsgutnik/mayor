@@ -356,7 +356,8 @@ describe("traffic signals", () => {
     const w = s.world;
     const ey = w.entry.y;
     for (let x = 4; x < 14; x++) {
-      applyTool(s, "res", x, ey - 1);
+      // zinv: row ey - 1 lies 0.4 under the avenue's drawn asphalt (centreline ey + 0.5): homes front the south row.
+      applyTool(s, "res", x, ey + 2);
       applyTool(s, "com", x + 14, ey + 2);
     }
     for (let i = 0; i < w.zone.length; i++) if (w.zone[i]) w.level[i] = 2;

@@ -29,11 +29,12 @@ describe("lot layout", () => {
     ]);
   });
 
-  it("puts the kerb on the street edge, or nowhere without frontage", () => {
+  it("puts the kerb just inside the street edge, or nowhere without frontage", () => {
+    // zinv: the 0.12 strip is centred 0.06 inside the lot so it never lies on the road's sidewalk.
     expect(lotKerb({ x: 4, y: 8, w: 2, h: 1, facing: { dx: 0, dy: 1 }, depthFromRoad: 0 }))
-      .toEqual({ x: 5, z: 9, w: 2, d: 0.12 });
+      .toEqual({ x: 5, z: 8.94, w: 2, d: 0.12 });
     expect(lotKerb({ x: 4, y: 8, w: 1, h: 2, facing: { dx: -1, dy: 0 }, depthFromRoad: 0 }))
-      .toEqual({ x: 4, z: 9, w: 0.12, d: 2 });
+      .toEqual({ x: 4.06, z: 9, w: 0.12, d: 2 });
     expect(lotKerb({ x: 4, y: 8, w: 1, h: 1, facing: { dx: 0, dy: 1 }, depthFromRoad: -1 })).toBeNull();
     // a lot two tiles back from the road has no kerb of its own
     expect(lotKerb({ x: 4, y: 8, w: 1, h: 1, facing: { dx: 0, dy: 1 }, depthFromRoad: 2 })).toBeNull();
@@ -64,7 +65,8 @@ describe("lot layout", () => {
   });
 
   it("returns oriented kerb and pad transforms", () => {
-    expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 20.93, len: 3, yaw: 0 });
+    // zinv: strip centre 0.075 behind the front edge (its front face 0.015 inside the lot, off junction rings).
+    expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 20.925, len: 3, yaw: 0 });
     expect(orientedPad({ cx: 10, cz: 20, yaw: 0.5, w: 3, d: 2 })).toEqual({ x: 10, z: 20, sx: 3, sz: 2, yaw: 0.5 });
   });
 

@@ -14,7 +14,8 @@ function builtCity(): CityState {
   s.money = 1e6;
   placeRoad(s, ROAD.AVENUE, [{ x: 3.5, z: ey + 0.5 }, { x: 30.5, z: ey + 0.5 }]);
   placeRoad(s, ROAD.STREET, [{ x: 10.5, z: ey - 1 }, { x: 14, z: ey - 8 }, { x: 26.5, z: ey - 8.5 }]);
-  for (let x = 4; x < 30; x++) { applyTool(s, "res", x, ey - 1); applyTool(s, "com", x, ey + 2); }
+  // zinv: row ey - 1 lies 0.4 under the avenue's drawn asphalt (centreline ey + 0.5); ey - 2 is the first free row.
+  for (let x = 4; x < 30; x++) { applyTool(s, "res", x, ey - 2); applyTool(s, "com", x, ey + 2); }
   applyTool(s, "power", 5, ey + 5);
   applyTool(s, "busstop", 8, ey);
   applyTool(s, "busstop", 22, ey);

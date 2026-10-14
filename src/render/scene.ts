@@ -17,8 +17,9 @@ import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
 import { LANDMARKS } from "../sim/landmarks";
 import {
-  SITE_PLINTH_SHRINK, cellBaseY, lotFrontSample, lotFrontTile, lotInstances, lotYaw, padBaseY, siteLevel,
+  SITE_PLINTH_SHRINK, cellBaseY, lotFrontSample, lotFrontTile, lotInstances, lotKerb, lotYaw, padBaseY, siteLevel,
 } from "./lots";
+import { rectOnRoad, roadSurface, setbackGap } from "../sim/roadsurface";
 import { loadGlb, LoadedModel } from "./glb-models";
 import { visualV2PreviewEnabled } from "./visual-v2";
 import { loadManifestGatedModel } from "./visual-v2-manifest";
@@ -909,14 +910,19 @@ export class CityRenderer {
     // Lots: empty lots read as depth-shaded pads with a street kerb; built
     // lots hold one composed building on a shared plot, facing the street.
     const renderLots = w.zoning === "oriented" ? (w.olots ?? []) : w.lots;
+    const surface = w.zoning === "oriented" ? null : roadSurface(w, "kerb");
     for (const lot of renderLots) {
       const z = lot.zone as 1 | 2 | 3;
-      // The kerb strip belongs on a road edge: skip lots whose front is not actually a road tile.
+      // The kerb strip belongs on the road's setback line (05 §1.8): oriented lots front it by construction (col 0);
+      // a classic lot needs a road tile in front AND its strip within 0.2 tile of a setback line (diagonals: none).
       const onRoad = "cx" in lot
         ? lot.col === 0
         : (() => {
             const front = lotFrontTile(lot);
-            return !!front && inBounds(w, front.x, front.y) && w.road[idx(w, front.x, front.y)] > 0;
+            if (!front || !inBounds(w, front.x, front.y) || w.road[idx(w, front.x, front.y)] <= 0) return false;
+            const k = lotKerb(lot);
+            return !!k && !!surface && setbackGap(surface, k.x, k.z) <= 0.2 &&
+              !rectOnRoad(surface, k.x, k.z, Math.max(0.08, k.w - 0.04), Math.max(0.08, k.d - 0.02), 0, 0);
           })();
       const plan = lotInstances(lot, onRoad);
       const c = plan.centre;
