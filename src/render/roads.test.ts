@@ -175,7 +175,7 @@ describe("road network geometry", () => {
     road(s, 2, [[4.5, ey + 0.5], [28.5, ey + 0.5]]);
     road(s, 1, [[16.5, ey - 8], [16.5, ey + 8]]);
     const node = s.world.nodes.find((n) => n.segs.length >= 3)!;
-    const layout = junctionsOf(s.world).get(node.id)!;
+    const layout = junctionsOf(s.world).byNode.get(node.id)!;
     expect(layout.laneArrows.some((a) => a.turns.length > 0)).toBe(true);
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
     const g = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
