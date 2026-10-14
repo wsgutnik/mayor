@@ -1,5 +1,5 @@
 import { makeRng } from "./rng";
-import type { OrientedLot, ZoneBlockSet, ZoningMode } from "./zonecells";
+import type { ConstructionState, OrientedLot, ZoneBlockSet, ZoningMode } from "./zonecells";
 import type { RoadNode } from "./roads";
 import { updateNetworkCoverage, facilityLinks } from "./networks";
 
@@ -152,6 +152,7 @@ export interface WorldLot {
   level: number;
   /** Kerb depth of the lot's front row (0), or -1 when no street fronts it. */
   depthFromRoad: number;
+  construction?: ConstructionState;
 }
 
 export interface World {

@@ -56,11 +56,16 @@ export interface OrientedLot {
   level: number;              // 0 empty, 1..3
   /** Build progress; absent only in pre-construction saves and treated as complete. */
   build?: number;
+  construction?: ConstructionState;
   /** Derived pose: centre and yaw such that a model's +z faces the road. Recomputed from the block, never saved. */
   cx: number; cz: number; yaw: number;
   /** Mirror: tile indices whose centre lies inside the lot's rectangle (at least 1). Derived. */
   tiles: number[];
 }
+
+export type ConstructionPhase = "planned" | "excavation" | "structure" | "finishing" | "complete" | "paused" | "upgrading";
+/** Persisted per-building schedule; absent on an old save means complete. */
+export interface ConstructionState { state: ConstructionPhase; progress: number; duration: number; upgrading?: boolean }
 
 /** Derived cache: every zone block of the world, keyed by ZoneBlock.key. */
 export type ZoneBlockSet = Map<string, ZoneBlock>;

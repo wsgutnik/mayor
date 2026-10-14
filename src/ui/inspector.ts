@@ -185,7 +185,12 @@ export class Inspector {
 
     const peopleKey = peopleLabelKey(info);
     this.peopleRow.hidden = !peopleKey;
-    if (peopleKey) this.peopleRow.textContent = `${tr(peopleKey)}: ${info.people}`;
+    if (peopleKey) {
+      const d = info.demographics;
+      const demo = d ? ` · ${tr("Children")} ${d.children}, ${tr("Working age")} ${d.working}, ${tr("Seniors")} ${d.seniors}` : "";
+      const build = info.construction ? ` · ${tr("Construction")}: ${tr(info.construction.state)} ${info.construction.percent}%` : "";
+      this.peopleRow.textContent = `${tr(peopleKey)}: ${info.people}${demo}${build}`;
+    }
 
     const lv = clampLandValue(info.landValue);
     this.root.querySelector<HTMLElement>('[data-k="lv-label"]')!.textContent = tr("Land value");

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyZoneBulk, newCity, placeRoad, step, applyTool } from "./sim";
+import { applyZoneAt, applyZoneBulk, getZoneBlocks, newCity, placeRoad, step, applyTool } from "./sim";
 import { ROAD_DRAW_WIDTH, cidx, curvePoints } from "./world";
+import { cellIndex, cellPose } from "./zoneblocks";
+import { ZONE } from "./world";
+import type { ZoneBlock } from "./zonecells";
 
 /** Lots whose rotated rectangle comes closer to a road centreline than half its drawn width (sampled every 0.25 tile). */
 function overlapping(s: ReturnType<typeof newCity>): { lots: number; bad: number; ids: number[] } {
@@ -36,6 +39,21 @@ function overlapping(s: ReturnType<typeof newCity>): { lots: number; bad: number
 const MARGIN = Number(process.env.OVERLAP_MARGIN ?? -0.02);
 
 describe("oriented lots never cover road tiles", () => {
+  it("paints the nearest segment-frame cell beside a diagonal curve, not its world tile", () => {
+    const s = newCity(19, 64); s.money = 1e7; s.world.zoning = "oriented";
+    const e = s.world.entry;
+    for (let y = 0; y < s.world.size; y++) for (let x = 0; x < s.world.size; x++) s.world.heights[cidx(s.world, x, y)] = .35;
+    expect(placeRoad(s, 1, [{ x: e.x + 3.5, z: e.y + .5 }, { x: e.x + 14, z: e.y - 5 }, { x: e.x + 24.5, z: e.y + .5 }]).ok).toBe(true);
+    const set = getZoneBlocks(s.world);
+    let hit: { b: ZoneBlock; row: number; col: number; x: number; z: number } | undefined;
+    for (const b of set.blocks.values()) for (let row = 0; row < b.rows; row++) for (let col = 0; col < 4; col++) if (b.valid[cellIndex(row, col)]) {
+      const p = cellPose(b, row, col); hit = { b, row, col, x: p.x, z: p.z }; break;
+    }
+    expect(hit).toBeDefined();
+    expect(applyZoneAt(s, ZONE.RES, hit!.x + .18, hit!.z - .12).ok).toBe(true);
+    expect(hit!.b.zone[cellIndex(hit!.row, hit!.col)]).toBe(ZONE.RES);
+  });
+
   it("no lot rectangle intrudes into the asphalt of diagonal and curved streets meeting at junctions", () => {
     const s = newCity(11, 96);
     for (let y = 0; y < s.world.size; y++) for (let x = 0; x < s.world.size; x++) s.world.heights[cidx(s.world, x, y)] = 0.35;

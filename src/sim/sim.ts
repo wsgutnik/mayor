@@ -19,7 +19,7 @@ import { rasterizeMirror } from "./mirror";
 import { lotsReady, planOrientedLots } from "./orientedlots";
 import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
 import { CELL_DEPTH } from "./zonecells";
-import type { CellRef, OrientedLot, ZoneBlock } from "./zonecells";
+import type { CellRef, ConstructionPhase, ConstructionState, OrientedLot, ZoneBlock } from "./zonecells";
 export { ZONE_DEPTH } from "./blocks";
 
 export type FacilityTool =
@@ -133,6 +133,12 @@ export interface CityState {
   capacity: { res: number; com: number; ind: number };
   employed: number;
   unemployed: number;
+  ages: { children: number; working: number; seniors: number };
+  labourForce: number;
+  employmentRate: number;
+  jobsAvailable: number;
+  jobsFilled: number;
+  dependencyRatio: number;
   demand: Demand;
   utilities: Record<UtilityKey, UtilityStat>;
   /** 0..100; falls with missing services and shortages, rises with parks. */
@@ -176,6 +182,8 @@ export function newCity(seed = 1337, size = 96, biome: Biome = "plains"): CitySt
     capacity: { res: 0, com: 0, ind: 0 },
     employed: 0,
     unemployed: 0,
+    ages: { children: 0, working: 0, seniors: 0 },
+    labourForce: 0, employmentRate: 0, jobsAvailable: 0, jobsFilled: 0, dependencyRatio: 0,
     demand: { r: 0.5, c: 0.2, i: 0.2 },
     utilities: emptyUtilities(),
     happiness: 100,
@@ -693,6 +701,7 @@ export function getZoneBlocks(w: World): ZoneBlockSet {
  */
 export function refreshLots(s: CityState): void {
   const w = s.world;
+  const old = new Map(w.lots.map((l) => [`${l.x}:${l.y}:${l.w}:${l.h}:${l.zone}`, l.construction]));
   // Tools bump the road/zone revisions on every structural edit, so the cached
   // blocks are fresh here (and zone/level pokes still land correct lots: the
   // planner reads the live tile arrays and the fallback covers every zone).
@@ -707,6 +716,7 @@ export function refreshLots(s: CityState): void {
       id, x: p.x, y: p.y, w: p.w, h: p.h,
       facing: { dx: p.facing.dx, dy: p.facing.dy },
       zone: p.zone, level: w.level[idx(w, p.x, p.y)], depthFromRoad: 0,
+      construction: old.get(`${p.x}:${p.y}:${p.w}:${p.h}:${p.zone}`),
     });
     for (let y = p.y; y < p.y + p.h; y++) {
       for (let x = p.x; x < p.x + p.w; x++) w.lotAt[idx(w, x, y)] = id;
@@ -728,6 +738,7 @@ export function refreshLots(s: CityState): void {
           : { dx: 0, dy: 1 },
         zone: w.zone[i] as ZoneType, level: w.level[i],
         depthFromRoad: road >= 0 ? blocks.frontage.distance[i] : -1,
+        construction: old.get(`${x}:${y}:1:1:${w.zone[i]}`),
       });
       w.lotAt[i] = id;
     }
@@ -1275,6 +1286,48 @@ export function applyZoneBulk(s: CityState, tool: ZoneBulkTool, tiles: readonly 
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** Days are deliberately small enough that the five visible phases read at game speed. */
+export function constructionDuration(lot: WorldLot | OrientedLot, level = lot.level): number {
+  const area = "tiles" in lot ? lot.tiles.length : lot.w * lot.h;
+  return 12 + area * 4 + level * 6;
+}
+
+export function constructionPhase(progress: number, upgrading = false): ConstructionPhase {
+  if (progress >= 1) return "complete";
+  if (upgrading) return "upgrading";
+  if (progress < .12) return "planned";
+  if (progress < .32) return "excavation";
+  if (progress < .78) return "structure";
+  return "finishing";
+}
+
+export function lotDemographics(s: CityState, lot: WorldLot | OrientedLot): { residents: { children: number; working: number; seniors: number }; workers: { basic: number; secondary: number; higher: number } } {
+  const area = "tiles" in lot ? lot.tiles.length : lot.w * lot.h;
+  if (lot.zone !== ZONE.RES || !lot.level || !s.capacity.res) return { residents: { children: 0, working: 0, seniors: 0 }, workers: { basic: 0, secondary: 0, higher: 0 } };
+  const residents = Math.round(CAPACITY.res[lot.level] * area * s.population / s.capacity.res);
+  const children = Math.round(residents * .20), working = Math.round(residents * .65);
+  const seniors = Math.max(0, residents - children - working);
+  const higher = Math.round(working * (.12 + lot.level * .08));
+  const secondary = Math.round(working * .48);
+  return { residents: { children, working, seniors }, workers: { basic: Math.max(0, working - higher - secondary), secondary, higher } };
+}
+
+function beginConstruction(lot: WorldLot | OrientedLot, upgrading = false): void {
+  const c: ConstructionState = { state: upgrading ? "upgrading" : "planned", progress: 0, duration: constructionDuration(lot), ...(upgrading ? { upgrading: true } : {}) };
+  lot.construction = c;
+  if ("build" in lot) lot.build = 0;
+}
+
+function advanceConstruction(s: CityState, lot: WorldLot | OrientedLot, served: boolean): boolean {
+  const c = lot.construction;
+  if (!c || c.state === "complete") return false;
+  if (!served || s.money < 0) { c.state = "paused"; return false; }
+  c.progress = Math.min(1, c.progress + 1 / Math.max(1, c.duration));
+  c.state = constructionPhase(c.progress, c.upgrading);
+  if ("build" in lot) lot.build = c.progress;
+  return true;
+}
+
 /** Recompute capacities, utilities, happiness, population, jobs and RCI demand. */
 function recount(s: CityState): void {
   const w = s.world;
@@ -1342,10 +1395,21 @@ function recount(s: CityState): void {
   const target = res * (0.5 + 0.5 * (s.happiness / 100));
   const gap = target - s.population;
   s.population = Math.max(0, s.population + (Math.abs(gap) < 1 ? gap : gap * 0.05));
-  const workers = s.population * 0.65;
+  // Deterministic city composition. The working share intentionally remains 65%,
+  // preserving the previous economy's balance while exposing the other cohorts.
+  const children = Math.round(s.population * .20);
+  const working = Math.round(s.population * .65);
+  const seniors = Math.max(0, Math.round(s.population) - children - working);
+  s.ages = { children, working, seniors };
+  const workers = working;
   const jobs = com + ind;
   s.employed = Math.min(workers, jobs);
   s.unemployed = Math.max(0, workers - jobs);
+  s.labourForce = workers;
+  s.jobsAvailable = jobs;
+  s.jobsFilled = s.employed;
+  s.employmentRate = workers ? s.employed / workers : 0;
+  s.dependencyRatio = workers ? (children + seniors) / workers : 0;
 
   const taxPenalty = (s.taxRate - 0.1) * 4;
   const mood = (s.happiness - 70) / 150;
@@ -1396,16 +1460,6 @@ export function step(s: CityState): void {
     : new Set((lotsReadyToBuild(w, getBlocks(w), w.lots) as WorldLot[]).map((l) => l.id));
   const lots = oriented ? (w.olots ?? []) : w.lots;
   for (const lot of lots) {
-    // Construction is deliberately simulation-time, not render-time: saves and
-    // replay get the same site on every machine. Thirty daily ticks is short
-    // enough to be legible while retaining several visible stages.
-    if (oriented) {
-      const o = lot as OrientedLot;
-      if (o.level > 0 && (o.build ?? 1) < 1) {
-        o.build = Math.min(1, (o.build ?? 0) + 1 / 30);
-        changed = true;
-      }
-    }
     const d = demandOf[lot.zone];
     const lvl = lot.level;
     // A building needs its services on every tile of its footprint.
@@ -1420,8 +1474,12 @@ export function step(s: CityState): void {
       fire &&= (c & COVER.FIRE) !== 0;
     }
     const served = readyIds.has(lot.id) && power && water;
+    if (advanceConstruction(s, lot, served)) changed = true;
     if (lvl === 0) {
-      if (served && d > 0 && rng() < 0.05 * d) { oriented ? setOLotLevel(w, lot as OrientedLot, 1) : setLotLevel(w, lot as WorldLot, 1); changed = true; }
+      if (served && d > 0 && rng() < 0.05 * d) {
+        oriented ? setOLotLevel(w, lot as OrientedLot, 1) : setLotLevel(w, lot as WorldLot, 1);
+        beginConstruction(lot); changed = true;
+      }
     } else if (!served) {
       if (rng() < 0.05) { oriented ? setOLotLevel(w, lot as OrientedLot, 0) : setLotLevel(w, lot as WorldLot, 0); changed = true; }
     } else if (!fire && rng() < FIRE_CHANCE) {
@@ -1429,7 +1487,10 @@ export function step(s: CityState): void {
     } else {
       // Level 2 needs sewage; level 3 needs garbage collection and schools.
       const canUp = lvl === 1 ? sewage : garbage && edu;
-      if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl + 1) : setLotLevel(w, lot as WorldLot, lvl + 1); changed = true; }
+      if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) {
+        oriented ? setOLotLevel(w, lot as OrientedLot, lvl + 1) : setLotLevel(w, lot as WorldLot, lvl + 1);
+        beginConstruction(lot, true); changed = true;
+      }
       else if (d < -0.3 && rng() < 0.01) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl - 1) : setLotLevel(w, lot as WorldLot, lvl - 1); changed = true; }
     }
   }

@@ -673,7 +673,13 @@ export class Hud {
       <div class="row"><span>${tr("Income (last month)")}</span><b data-k="inc">$0</b></div>
       <div class="row"><span>${tr("Expenses (last month)")}</span><b data-k="exp">$0</b></div>
       <label class="row"><span>${tr("Tax rate")} <b data-k="tax">10%</b></span>
-        <input type="range" min="2" max="25" value="10"></label>`;
+        <input type="range" min="2" max="25" value="10"></label>
+      <h3>${tr("City statistics")}</h3>
+      <div class="row"><span>${tr("Children")}</span><b data-k="age-c">0</b></div>
+      <div class="row"><span>${tr("Working age")}</span><b data-k="age-w">0</b></div>
+      <div class="row"><span>${tr("Seniors")}</span><b data-k="age-s">0</b></div>
+      <div class="row"><span>${tr("Employment rate")}</span><b data-k="employment">0%</b></div>
+      <div class="row"><span>${tr("Jobs filled")}</span><b data-k="filled">0 / 0</b></div>`;
     const slider = this.budget.querySelector("input")!;
     const label = this.budget.querySelector('[data-k="tax"]')!;
     slider.addEventListener("input", () => {
@@ -985,6 +991,9 @@ export class Hud {
       ref.val.textContent = `${Math.round(v * 100)}%`;
     }
     this.lvEl.textContent = String(Math.round(s.landValue));
+    const stat = (k: string, v: string) => { const e = this.budget.querySelector<HTMLElement>(`[data-k="${k}"]`); if (e) e.textContent = v; };
+    stat("age-c", fmt(s.ages.children)); stat("age-w", fmt(s.ages.working)); stat("age-s", fmt(s.ages.seniors));
+    stat("employment", `${Math.round(s.employmentRate * 100)}%`); stat("filled", `${fmt(s.jobsFilled)} / ${fmt(s.jobsAvailable)}`);
     this.trafficFill.style.width = `${Math.min(1, s.congestion) * 100}%`;
     this.trafficVal.textContent = `${s.vehicles} ${tr("cars")}`;
     this.trafficVal.classList.toggle("neg", s.congestion > 0.4);

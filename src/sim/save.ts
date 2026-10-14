@@ -69,6 +69,7 @@ interface SaveOLot {
   zone: 1 | 2 | 3;
   level: 0 | 1 | 2 | 3;
   build?: number;
+  construction?: import("./zonecells").ConstructionState;
 }
 
 interface SaveFileV2 extends Omit<SaveFileV1, "v" | "lots" | "nextLotId"> {
@@ -147,6 +148,7 @@ export function serialize(s: CityState): string {
         id: l.id, seg: l.seg, side: l.side, block: l.block, row: l.row, col: l.col,
         w: l.w, d: l.d, zone: l.zone as 1 | 2 | 3, level: l.level as 0 | 1 | 2 | 3,
         ...(l.build === undefined ? {} : { build: l.build }),
+        ...(l.construction === undefined ? {} : { construction: l.construction }),
       })),
       nextOLotId: w.nextOLotId,
     };
@@ -224,6 +226,7 @@ function validateV1Lots(f: SaveFileV1, n: number): void {
       if (l.x < 0 || l.y < 0 || l.w < 1 || l.h < 1 || l.w > 4 || l.h > 4 || l.x + l.w > n || l.y + l.h > n) bad();
       if (!l.facing || ![-1, 0, 1].includes(l.facing.dx) || ![-1, 0, 1].includes(l.facing.dy)) bad();
       if (![1, 2, 3].includes(l.zone) || ![0, 1, 2, 3].includes(l.level)) bad();
+      if (l.construction !== undefined && (!l.construction || !["planned", "excavation", "structure", "finishing", "complete", "paused", "upgrading"].includes(l.construction.state) || !finite(l.construction.progress) || l.construction.progress < 0 || l.construction.progress > 1 || !finite(l.construction.duration) || l.construction.duration <= 0)) bad();
       if (l.depthFromRoad !== -1 && (l.depthFromRoad < 0 || l.depthFromRoad > 3)) bad();
       // footprints must not overlap
       for (let y = l.y; y < l.y + l.h; y++) for (let x = l.x; x < l.x + l.w; x++) {
@@ -261,6 +264,7 @@ function validateV2Oriented(f: SaveFileV2): void {
     if (l.row < 0 || l.col < 0 || l.w < 1 || l.d < 1 || l.w > 4 || l.d > 4 || l.row + l.w > c!.rows || l.col + l.d > 4) bad();
     if (![1, 2, 3].includes(l.zone) || ![0, 1, 2, 3].includes(l.level)) bad();
     if (l.build !== undefined && (!Number.isFinite(l.build) || l.build < 0 || l.build > 1)) bad();
+    if (l.construction !== undefined && (!l.construction || !["planned", "excavation", "structure", "finishing", "complete", "paused", "upgrading"].includes(l.construction.state) || !Number.isFinite(l.construction.progress) || l.construction.progress < 0 || l.construction.progress > 1 || !Number.isFinite(l.construction.duration) || l.construction.duration <= 0)) bad();
     for (let row = l.row; row < l.row + l.w; row++) for (let col = l.col; col < l.col + l.d; col++) {
       const key = `${l.seg}:${l.side}:${l.block}:${row}:${col}`;
       if (taken.has(key)) bad();
@@ -313,7 +317,7 @@ function hydrateSavedLots(f: SaveFileV2, set: ZoneBlockSet): OrientedLot[] {
   for (const l of f.lots) {
     const b = set.blocks.get(`${l.seg}:${l.side}:${l.block}`);
     if (!b) throw new SaveError("The save file is damaged");
-    const lot = { ...l, build: l.build ?? 1, ...lotPose(b, l), tiles: [] };
+    const lot = { ...l, build: l.build ?? l.construction?.progress ?? 1, ...lotPose(b, l), tiles: [] };
     let invalidUnderCurrentRules = false;
     for (let row = lot.row; row < lot.row + lot.w; row++) for (let col = lot.col; col < lot.col + lot.d; col++) {
       const i = cellIndex(row, col);

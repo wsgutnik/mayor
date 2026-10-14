@@ -4,6 +4,8 @@ export type Lang = "pt" | "en";
 const PT: Record<string, string> = {
   // top bar and panels
   "Population": "População", "Jobs": "Empregos", "Date": "Data", "Balance": "Saldo",
+  "City statistics": "Estatísticas da cidade", "Children": "Crianças", "Working age": "Idade ativa", "Seniors": "Idosos", "Employment rate": "Taxa de emprego", "Jobs filled": "Empregos ocupados", "Construction": "Construção",
+  "planned": "planejado", "excavation": "escavação", "structure": "estrutura", "finishing": "acabamento", "complete": "concluído", "paused": "pausado", "upgrading": "em ampliação",
   "Services": "Serviços", "Economy": "Economia", "Land value": "Valor do solo", "Traffic": "Tráfego", "Underground": "Subterrâneo",
   "Income (last month)": "Receita (mês passado)", "Expenses (last month)": "Despesas (mês passado)",
   "Tax rate": "Imposto", "cars": "carros", "none": "nenhum", "stops": "paradas", "tile": "trecho", "mo": "mês",

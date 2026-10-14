@@ -1,4 +1,4 @@
-import { CityState, CAPACITY, syncLots } from "./sim";
+import { CityState, CAPACITY, lotDemographics, syncLots } from "./sim";
 import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
 import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, facilityFootprint, idx, inBounds } from "./world";
 
@@ -32,6 +32,8 @@ export interface TileInfo {
   radius: number;
   /** Facility footprint in tiles, formatted by the UI as NxN. */
   footprint: 1 | 2;
+  construction?: { state: string; percent: number };
+  demographics?: { children: number; working: number; seniors: number; workers: number };
 }
 
 const ROAD_PT: Record<number, string> = { 1: "Rua", 2: "Avenida", 3: "Autoestrada" };
@@ -78,13 +80,19 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
     // The look and headcount belong to the whole lot; fall back to the tile when it has none yet.
     syncLots(s);
     const lotId = w.lotAt[i];
-    const lot = lotId >= 0 ? w.lots.find((l) => l.id === lotId) : undefined;
-    const area = lot ? lot.w * lot.h : 1;
-    const entry = pickLotEntry(z, lvl, area, tileHash((lot ? lot.x : x) + 17, (lot ? lot.y : y) + 29)).entry;
+    const lot = lotId >= 0 ? (w.zoning === "oriented" ? (w.olots ?? []).find((l) => l.id === lotId) : w.lots.find((l) => l.id === lotId)) : undefined;
+    const area = lot ? ("tiles" in lot ? lot.w * lot.d : lot.w * lot.h) : 1;
+    const anchorX = lot && "tiles" in lot ? lot.cx : lot ? lot.x : x;
+    const anchorY = lot && "tiles" in lot ? lot.cz : lot ? lot.y : y;
+    const entry = pickLotEntry(z, lvl, area, tileHash(Math.floor(anchorX) + 17, Math.floor(anchorY) + 29)).entry;
     const kind = z === ZONE.RES ? "res" : z === ZONE.COM ? "com" : "ind";
+    const demo = lot ? lotDemographics(s, lot) : undefined;
+    const cst = lot?.construction;
     return {
       ...base, kind: "building", ...(entry ? fromEntry(entry) : { name: label[0], nameEn: label[1] }),
       level: lvl, people: CAPACITY[kind][lvl] * area, peopleKind: z === ZONE.RES ? "residents" : "jobs",
+      construction: { state: cst?.state ?? "complete", percent: Math.round((cst?.progress ?? 1) * 100) },
+      demographics: demo ? { children: demo.residents.children, working: demo.residents.working, seniors: demo.residents.seniors, workers: demo.residents.working } : undefined,
     };
   }
   return base;
