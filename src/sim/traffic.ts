@@ -48,6 +48,8 @@ export interface Vehicle {
   seed: number;
   /** Held up by traffic (a leader, a red light, or a full tile): feeds congestion. */
   stuck: boolean;
+  /** Unsaved free-road no-motion watchdog, in simulation seconds. */
+  stuckTime?: number;
 }
 
 /** A bus or metro train looping over its line's stops. */
@@ -320,22 +322,34 @@ export function routeArcIndex(arcs: Float32Array, s: number): number {
 }
 
 /** Interpolate a route at physical distance, for connector samples and legacy polylines alike. */
-export function pointAtRouteArc(pts: Float32Array, arcs: Float32Array, s: number): { x: number; z: number; index: number; t: number } {
+export interface RouteArcPose { x: number; z: number; index: number; t: number }
+/** Allocation-free arc sampler for traffic's hot loop. */
+export function pointAtRouteArcInto(pts: Float32Array, arcs: Float32Array, s: number, out: RouteArcPose): RouteArcPose {
   const i = routeArcIndex(arcs, s);
   const a = arcs[i] || 0, b = arcs[Math.min(i + 1, arcs.length - 1)] || a;
   const t = b > a ? Math.max(0, Math.min(1, (s - a) / (b - a))) : 0;
-  return { x: pts[i * 2] + (pts[Math.min(i + 1, arcs.length - 1) * 2] - pts[i * 2]) * t, z: pts[i * 2 + 1] + (pts[Math.min(i + 1, arcs.length - 1) * 2 + 1] - pts[i * 2 + 1]) * t, index: i, t };
+  out.x = pts[i * 2] + (pts[Math.min(i + 1, arcs.length - 1) * 2] - pts[i * 2]) * t;
+  out.z = pts[i * 2 + 1] + (pts[Math.min(i + 1, arcs.length - 1) * 2 + 1] - pts[i * 2 + 1]) * t;
+  out.index = i; out.t = t;
+  return out;
+}
+/** Public convenience sampler; simulation code uses `pointAtRouteArcInto`. */
+export function pointAtRouteArc(pts: Float32Array, arcs: Float32Array, s: number): RouteArcPose {
+  return pointAtRouteArcInto(pts, arcs, s, { x: 0, z: 0, index: 0, t: 0 });
 }
 
 /** Tile below an arc position.  This deliberately keeps the existing tile buckets. */
 function routeTileAt(w: World, v: Vehicle, s: number): number {
   const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
-  const p = pointAtRouteArc(v.pts, arcs, s);
+  const p = pointAtRouteArcInto(v.pts, arcs, s, routeTilePose);
   const x = Math.max(0, Math.min(w.size - 1, Math.floor(p.x)));
   const z = Math.max(0, Math.min(w.size - 1, Math.floor(p.z)));
   const under = z * w.size + x;
   return w.road[under] ? under : v.tiles[Math.min(v.tiles.length - 1, p.index)] ?? under;
 }
+const routeTilePose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
+const stepPose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
+const leaderPose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
 
 /** Keeps old transient hand-built test vehicles valid while making arc authoritative. */
 function vehicleArc(v: Vehicle): number {
@@ -471,7 +485,7 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   const arcDriven = v.arc !== undefined;
   const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
   const routeS = vehicleArc(v);
-  const pose = pointAtRouteArc(v.pts, arcs, routeS);
+  const pose = pointAtRouteArcInto(v.pts, arcs, routeS, stepPose);
   const at = pose.index;
   if (at >= arcs.length - 1 || at < 0) return;
   const tile = routeTileAt(w, v, routeS);
@@ -512,7 +526,7 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
       if (u === k) continue;
       const o = t.vehicles[u];
       const oarcs = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
-      const op = pointAtRouteArc(o.pts, oarcs, vehicleArc(o));
+      const op = pointAtRouteArcInto(o.pts, oarcs, vehicleArc(o), leaderPose);
       const oat = Math.max(0, Math.min(oarcs.length - 2, op.index));
       const of = op.t;
       const oax = o.pts[oat * 2], oaz = o.pts[oat * 2 + 1];
@@ -521,7 +535,9 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
       const ohx = (obx - oax) / oseg, ohz = (obz - oaz) / oseg;
       const rx = oax + (obx - oax) * of - px, rz = oaz + (obz - oaz) * of - pz;
       const long = rx * hx + rz * hz;
-      if (long < -0.2) continue;
+      // A vehicle behind us is never a leader.  The old -0.2 tolerance made
+      // two close stopped cars brake one another forever.
+      if (long <= 1e-6) continue;
       if (Math.abs(rx * hz - rz * hx) > 0.45) continue;
       if (hx * ohx + hz * ohz < 0.3) continue;
       const gap = long - myHalf - halfLength(o.kind);
@@ -569,6 +585,12 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   a = Math.max(IDM_DEC, Math.min(IDM_A, a));
   let nv = Math.max(0, vv + a * h);
   if (stopDist < IDM_STOP_ZERO && nv < IDM_V_STOP) nv = 0;
+  // A deterministic backstop for numerical/contact pathologies: only a car
+  // with no leader and no red stop may be nudged after 20 game seconds.
+  if (leadGap === Infinity && stopDist === Infinity && nv < 1e-4) {
+    v.stuckTime = (v.stuckTime ?? 0) + h;
+    if (v.stuckTime >= 20) { nv = Math.min(v0, 0.3); v.stuckTime = 0; }
+  } else v.stuckTime = 0;
   v.v = nv;
   if (arcDriven) {
     v.arc = Math.min(arcs[arcs.length - 1], routeS + nv * h);

@@ -6,6 +6,7 @@ import {
 import { nodeArms, nodeById } from "../sim/roads";
 import { junctionsOf, type JunctionLayout } from "../sim/junction";
 import { profileOf, sidewalkEdge } from "../sim/corridor";
+import { inboundArmOffset } from "../sim/lanes";
 import { asIndexed, sampleRing, sameSample, triangulateBand, triangulateRing } from "./earclip";
 import type { RingSample } from "./earclip";
 
@@ -701,9 +702,8 @@ function junctionLaneArrows(g: Geo, l: JunctionLayout, groundY: GroundY): void {
     if (!arrow.turns.length) continue;
     const arm = l.arms[arrow.arm];
     if (!arm || arm.markingsSuppressed) continue;
-    // lanes.ts indexes the inbound half of the profile in signed-centre order.
-    const offsets = profileOf(arm.type).laneCentres.filter((x) => arm.end === "b" ? x < 0 : x > 0);
-    const off = offsets[arrow.lane];
+    // Connector paths and decals must use the same segment-to-arm conversion.
+    const off = inboundArmOffset(arm, arrow.lane);
     if (off === undefined) continue;
     const trim = Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt);
     // 0.6 t before the stop bar (whose centre is trim + 0.38 t), per 12 §3.5.

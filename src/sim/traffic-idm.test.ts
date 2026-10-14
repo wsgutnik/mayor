@@ -180,6 +180,17 @@ describe("IDM on a straight street", () => {
     expect(gap(t.vehicles[1], t.vehicles[0])).toBeGreaterThan(-0.05);
   });
 
+  it("does not treat a car 0.1 tile behind as a leader", () => {
+    const { s, t, tiles } = street();
+    const rear = mkCar(1, s, tiles, 3.0, 0, 1);
+    const front = mkCar(2, s, tiles, 3.1, 0, 1);
+    t.vehicles.push(rear, front);
+    for (let i = 0; i < 80; i++) tickTraffic(s, t, 0.1);
+    expect(t.vehicles).toHaveLength(2);
+    expect(t.vehicles[0].progress).toBeGreaterThan(3.0);
+    expect(t.vehicles[1].progress).toBeGreaterThan(3.1);
+  });
+
   it("signals the side of the coming turn", () => {
     const s = newCity(12);
     const ey = flat(s);

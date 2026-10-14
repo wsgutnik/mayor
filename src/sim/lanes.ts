@@ -11,7 +11,7 @@ import type { Pt, RoadType } from "./world";
 import { profileOf } from "./corridor";
 import { classifyTurn, type TurnKind } from "./signals";
 
-export interface LaneArm { segId: number; end: "a" | "b"; type: RoadType; dx: number; dz: number; trim: number }
+export interface LaneArm { segId: number; end: "a" | "b"; type: RoadType; dx: number; dz: number; trim: number; oneWay?: boolean; dir?: 1 | -1 }
 export interface LaneConnector {
   inArm: number; outArm: number; inLane: number; outLane: number;
   turn: TurnKind; points: Pt[]; curvature: number;
@@ -27,18 +27,33 @@ export function pointInPolygon(p: Pt, ring: readonly Pt[]): boolean {
   }
   return hit;
 }
-function laneOffsets(a: LaneArm, incoming: boolean): number[] {
+/** Signed segment-frame centres which legally travel in this direction. */
+export function laneOffsets(a: Pick<LaneArm, "end" | "type" | "oneWay" | "dir">, incoming: boolean): number[] {
   const all=profileOf(a.type).laneCentres;
+  const oneWay = a.oneWay ?? (a.type === 4 || a.type === 5);
+  const dir = a.dir ?? 1;
+  // a→b exits endpoint a and enters endpoint b (reversed for dir -1).
+  if (oneWay && incoming !== ((a.end === "b") === (dir === 1))) return [];
   // At end b, a→b (negative side) enters; at end a b→a (positive side) enters.
   const wantNeg = incoming ? a.end === "b" : a.end === "a";
   return all.filter(x => wantNeg ? x < 0 : x > 0);
+}
+/** Segment offsets use the a→b frame; arm offsets use the outward frame. */
+export function armOffset(a: Pick<LaneArm, "end">, segmentOffset: number): number {
+  return a.end === "a" ? segmentOffset : -segmentOffset;
+}
+/** Inbound lane centre in the outward arm frame, shared with road decals. */
+export function inboundArmOffset(a: Pick<LaneArm, "end" | "type" | "oneWay" | "dir">, lane: number): number | undefined {
+  const off = laneOffsets(a, true)[lane];
+  return off === undefined ? undefined : armOffset(a, off);
 }
 function endpoint(c: Pt, a: LaneArm, off: number): Pt {
   // Stay a hair inside the final asphalt ring.  `trim` lies on the pad/road
   // seam, and strict polygon containment intentionally rejects boundary
   // points to avoid a connector that rides a kerb after float quantisation.
   const trim = Math.max(0, a.trim - 0.012);
-  return { x:c.x+a.dx*trim-a.dz*off, z:c.z+a.dz*trim+a.dx*off };
+  const armOff = armOffset(a, off);
+  return { x:c.x+a.dx*trim-a.dz*armOff, z:c.z+a.dz*trim+a.dx*armOff };
 }
 function sampleCubic(p0: Pt, p1: Pt, p2: Pt, p3: Pt, n: number): Pt[] {
   const out: Pt[]=[];
