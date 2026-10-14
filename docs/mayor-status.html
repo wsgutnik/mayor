@@ -234,6 +234,7 @@ npm run dev</pre>
     summary: "O jogo está jogável e estável (pontes passam energia, subsolo iluminado). A frente atual é a qualidade visual dos 40 prédios: auditoria concluída, prédios de referência em produção. A revisão do M15 virou plano e os marcos M16 a M21 e M23 entraram: grafo de estradas com nós e esquinas, quadras e lotes, redes de água, esgoto e energia com vista Subsolo, água nova, render com texturas HD, sombras e LOD, mão única, rotatória, semáforos, pontes e túneis. Estradas são desenhadas por linha ou curva. M15 deu acabamento ao mundo: texturas e oclusão ambiente nos modelos, faixas de pedestres nos cruzamentos, nuvens, fumaça e doze prédios redesenhados com varandas, degraus, cercas e carros estacionados. Antes disso, o mundo ganhou detalhe: os prédios do kit, nove espécies de plantas, sete veículos, barcos, postes, vias com calçada e faixa, e uma água que corre, com profundidade, ondulação e espuma. Tudo modelado em Blender por script e exportado em GLB.",
     screenshot: { src: "img/m21-intersections.jpg", caption: "M21: avenida com canteiro, cruzamentos com faixas de pedestres, semáforos com fases, props de calçada e asfalto texturizado." },
     milestones: [
+      { id: "N1", name: "Corredor viário e nós", desc: "Perfil de via e corredor por trecho (ADR 06), polígono de junção com cantos agudos limitados, braços aparados, meio-fios que contornam os cantos e sem arcos dentro do asfalto. Lotes ainda não são recortados pelo polígono.", status: "active" },
       { id: "UI2", name: "Construtor de vias e zoneamento", desc: "Desfazer/Refazer, snapping de ângulo e comprimento, upgrade de via no lugar, via paralela, zoneamento por retângulo e preenchimento. Faltam densidades e visualização de lotes.", status: "active" },
       { id: "UI1", name: "Interface V2 · ciclo 1", desc: "Escala e opacidade da interface, painéis recolhíveis e persistentes (tecla H), leitura de custo, extensão e inclinação ao desenhar estradas. Plano em docs/UI-V2-PLAN.md.", status: "done" },
       { id: "V1", name: "Auditoria visual (ciclo 1)", desc: "Inventário dos 40 prédios e 67 props, exportação estrita no Blender, manifesto, registro de variantes, prévias em dois ângulos. PR #1.", status: "done" },
@@ -277,6 +278,14 @@ npm run dev</pre>
       { ok: false, text: "Em aberto da revisão de jogo: sombra preta sob ponte à noite e 'asas' nas rampas (sombra suavizada, falta confirmar), fitas de tubo retorcidas no subsolo (não reproduzido), tiras de meio-fio no meio da quadra e almofadas serrilhadas no zoneamento orientado, canteiro de avenida parando antes da esquina, nível de detalhe de carros e prédios" }
     ],
     log: [
+      { date: "2026-10-13", title: "Nós de rua, prédios v2, serviços 2×2 e acesso remoto", items: [
+        "Serviços 2×2 (hospital, prefeitura, escola secundária, estação, tratamento de água, usina) na simulação, no save opcional e com modelos próprios",
+        "Auditoria de arquitetura: pesquisa de fontes (godot-road-generator, Clipper2, TM:PE) e ADR 06; perfil de via e corredor por trecho como fonte única; props passam a ficar sobre as linhas de offset",
+        "Nós de rua: polígono de asfalto a partir das bordas dos braços, limite de mitra em ângulos agudos, braços aparados, meio-fios e calçadas contornando cantos, sem arcos de fillet dentro do asfalto; testes geométricos de regressão",
+        "Rotas dos veículos projetadas na linha central e com cantos arredondados; 35 prédios com variantes v2 e LODs; 17 texturas realistas geradas com Higgsfield",
+        "Acesso remoto privado: mayor.gutnikcrm.com atrás de senha por túnel nomeado do Cloudflare; preparação do app nativo do iPad (aguarda Xcode)",
+        "Plano de crescimento do jogo (docs/GROWTH-PLAN.md) e instaladores m33; 484 testes"
+      ] },
       { date: "2026-10-13", title: "Fechamento: fachadas traseiras, UI-2/UI-3 e instaladores m29", items: [
         "Fachadas traseiras e laterais dos prédios 05–37, 39 e 40 (Codex, Muse); orçamento por prédio sobe para 700 triângulos (maior: 644); build do Blender estrito sem avisos",
         "UI-2: Desfazer/Refazer por snapshots do save (30 passos), snapping configurável (Alt desliga), upgrade de via no lugar com custo e regras de rodovia, via paralela atômica",
