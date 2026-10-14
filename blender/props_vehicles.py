@@ -1,6 +1,6 @@
 """Vehicles, boats and street furniture. Vehicles drive along +X (the game rotates them); length 1 = one tile."""
 from registry import prop
-import dress_vehicles as dress
+import dress_vehicles2 as dress
 
 
 def _side_quad(m, x0, x1, y, z0, z1, side, mat):
@@ -56,7 +56,7 @@ def _mirrors(m, x, z, half_w, housing="car_body"):
     for s in (-1, 1):
         my = s * (half_w + 0.005)
         m.box(x, my, z, 0.016, 0.012, 0.014, housing, roof=housing)
-        _face_quad(m, x - 0.0088, my - 0.004, my + 0.004, z + 0.002, z + 0.012, -1, "car_glass")
+        _face_quad(m, x - 0.0088, my - 0.004, my + 0.004, z + 0.002, z + 0.012, -1, "glass_dark")
 
 
 def _door_seams(m, xs, half_w, z0, z1, handles=(), hz=None):
@@ -77,7 +77,7 @@ def _car(m, length, width, body_h, cabin_l, cabin_h, cabin_off=-0.02, wheel_r=0.
     m.box(0, 0, lift, length, width, body_h, "car_body", roof="car_body")
     # cabin with glass on all four sides and the roof in body colour
     cz = lift + body_h
-    m.box(cabin_off, 0, cz, cabin_l, width * 0.84, cabin_h, "car_glass", roof="car_body")
+    m.box(cabin_off, 0, cz, cabin_l, width * 0.84, cabin_h, "glass_dark", roof="car_body")
     # bumpers, grille, plates
     m.box(front - 0.004, 0, lift + 0.01, 0.012, width * 0.9, 0.025, "black")
     m.box(back + 0.004, 0, lift + 0.01, 0.012, width * 0.9, 0.025, "black")
@@ -137,7 +137,7 @@ def van_delivery(m):
     front, back = 0.24, -0.23
     m.box(-0.04, 0, z, 0.39, 0.184, 0.15, "car_body", roof="car_body")
     m.box(0.19, 0, z, 0.1, 0.184, 0.078, "car_body", roof="car_body")
-    m.box(0.19, 0, z + 0.078, 0.08, 0.16, 0.052, "car_glass", roof="car_body")
+    m.box(0.19, 0, z + 0.078, 0.08, 0.16, 0.052, "glass_dark", roof="car_body")
     m.box(front, 0, z + 0.005, 0.014, 0.17, 0.028, "black")
     m.box(back, 0, z + 0.005, 0.014, 0.17, 0.028, "black")
     _grille(m, front + 0.001, z + 0.032, z + 0.052, 0.08)
@@ -160,8 +160,8 @@ def car_minibus(m):
     for s in (-1, 1):
         y = s * (hw + 0.002)
         for x in (-0.17, -0.05, 0.07, 0.19):
-            _side_quad(m, x - 0.04, x + 0.04, y, z + 0.085, z + 0.145, s, "car_glass")
-    _face_quad(m, front + 0.002, -0.055, 0.055, z + 0.08, z + 0.15, +1, "car_glass")
+            _side_quad(m, x - 0.04, x + 0.04, y, z + 0.085, z + 0.145, s, "glass_dark")
+    _face_quad(m, front + 0.002, -0.055, 0.055, z + 0.08, z + 0.15, +1, "glass_dark")
     m.box(0.0, 0, z + 0.17, 0.18, 0.11, 0.022, "metal", roof="metal_dark")
     m.box(front, 0, z + 0.005, 0.014, 0.15, 0.028, "black")
     m.box(back, 0, z + 0.005, 0.014, 0.15, 0.028, "black")
@@ -203,7 +203,7 @@ def truck(m):
     r = 0.04
     lift = r * 0.8
     cab_f, back = 0.22, -0.28
-    m.box(0.12, 0, lift, 0.2, 0.19, 0.1, "car_glass", roof="car_body")           # cab
+    m.box(0.12, 0, lift, 0.2, 0.19, 0.1, "glass_dark", roof="car_body")           # cab
     m.box(0.12, 0, lift, 0.2, 0.19, 0.05, "car_body")
     m.box(-0.1, 0, lift + 0.01, 0.36, 0.2, 0.2, "car_body", roof="car_body")     # cargo box
     m.box(0, 0, lift - 0.005, 0.66, 0.15, 0.02, "metal_dark")                    # chassis
@@ -233,9 +233,9 @@ def bus(m):
     # a continuous glass strip down both sides and across the windscreen
     for s in (-1, 1):
         y = s * (W / 2 + 0.002)
-        m._quad([(-L / 2 + 0.04, y, lift + 0.09), (L / 2 - 0.04, y, lift + 0.09), (L / 2 - 0.04, y, lift + H - 0.03), (-L / 2 + 0.04, y, lift + H - 0.03)], "car_glass") if s < 0 else \
-            m._quad([(L / 2 - 0.04, y, lift + 0.09), (-L / 2 + 0.04, y, lift + 0.09), (-L / 2 + 0.04, y, lift + H - 0.03), (L / 2 - 0.04, y, lift + H - 0.03)], "car_glass")
-    m._quad([(L / 2 + 0.002, -W / 2 + 0.02, lift + 0.09), (L / 2 + 0.002, W / 2 - 0.02, lift + 0.09), (L / 2 + 0.002, W / 2 - 0.02, lift + H - 0.03), (L / 2 + 0.002, -W / 2 + 0.02, lift + H - 0.03)], "car_glass")
+        m._quad([(-L / 2 + 0.04, y, lift + 0.09), (L / 2 - 0.04, y, lift + 0.09), (L / 2 - 0.04, y, lift + H - 0.03), (-L / 2 + 0.04, y, lift + H - 0.03)], "glass_dark") if s < 0 else \
+            m._quad([(L / 2 - 0.04, y, lift + 0.09), (-L / 2 + 0.04, y, lift + 0.09), (-L / 2 + 0.04, y, lift + H - 0.03), (L / 2 - 0.04, y, lift + H - 0.03)], "glass_dark")
+    m._quad([(L / 2 + 0.002, -W / 2 + 0.02, lift + 0.09), (L / 2 + 0.002, W / 2 - 0.02, lift + 0.09), (L / 2 + 0.002, W / 2 - 0.02, lift + H - 0.03), (L / 2 + 0.002, -W / 2 + 0.02, lift + H - 0.03)], "glass_dark")
     m.box(-0.05, 0, lift + H, 0.22, 0.14, 0.03, "metal")                         # roof AC units
     m.box(0.22, 0, lift + H, 0.14, 0.12, 0.025, "metal", roof="metal_dark")
     m.box(front - 0.004, 0, lift + 0.02, 0.012, W * 0.92, 0.04, "black")         # bumpers
@@ -264,8 +264,8 @@ def train(m):
         for i in range(4):
             x0 = -L / 2 + 0.07 + i * 0.22
             pts = [(x0, y, lift + 0.1), (x0 + 0.15, y, lift + 0.1), (x0 + 0.15, y, lift + H - 0.05), (x0, y, lift + H - 0.05)]
-            m._quad(pts if s < 0 else list(reversed(pts)), "car_glass")
-    m.box(L / 2 - 0.005, 0, lift + 0.1, 0.012, W * 0.8, H - 0.16, "car_glass")
+            m._quad(pts if s < 0 else list(reversed(pts)), "glass_dark")
+    m.box(L / 2 - 0.005, 0, lift + 0.1, 0.012, W * 0.8, H - 0.16, "glass_dark")
     m.box(0, 0, lift - 0.015, L * 0.9, W * 0.7, 0.02, "metal_dark")
     m._quad([(L / 2 + 0.003, -0.07, lift + 0.03), (L / 2 + 0.003, 0.07, lift + 0.03), (L / 2 + 0.003, 0.07, lift + 0.07), (L / 2 + 0.003, -0.07, lift + 0.07)], "glow_head")
 
@@ -277,7 +277,7 @@ def boat_motor(m):
     m.box(0.16, 0, 0.0, 0.1, 0.12, 0.06, "hull_white", roof="metal")
     m.box(0.24, 0, 0.0, 0.06, 0.06, 0.05, "hull_white", roof="metal")
     m.box(0.0, 0, 0.0, 0.46, 0.172, 0.02, "hull_blue")
-    m.box(-0.04, 0, 0.07, 0.16, 0.11, 0.08, "car_glass", roof="hull_white")
+    m.box(-0.04, 0, 0.07, 0.16, 0.11, 0.08, "glass_dark", roof="hull_white")
 
 
 @prop("boat_sail")
@@ -297,8 +297,8 @@ def boat_ferry(m):
     m.box(0, 0, 0.0, 0.72, 0.22, 0.09, "hull_white", roof="metal")
     m.box(0.37, 0, 0.0, 0.1, 0.16, 0.08, "hull_white", roof="metal")
     m.box(0.0, 0, 0.0, 0.74, 0.222, 0.025, "hull_blue")
-    m.box(-0.04, 0, 0.09, 0.46, 0.17, 0.1, "car_glass", roof="hull_white")
-    m.box(-0.1, 0, 0.19, 0.26, 0.13, 0.07, "car_glass", roof="hull_white")
+    m.box(-0.04, 0, 0.09, 0.46, 0.17, 0.1, "glass_dark", roof="hull_white")
+    m.box(-0.1, 0, 0.19, 0.26, 0.13, 0.07, "glass_dark", roof="hull_white")
     m.cyl(-0.2, 0, 0.26, 0.025, 0.1, "sign_red", seg=6)
 
 

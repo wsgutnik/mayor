@@ -194,13 +194,13 @@
   {
    "n": 10,
    "name": "Torre Premium",
-   "variant": "v2_lod2",
+   "variant": "base",
    "version": 1,
    "footprint": [
     1,
     1
    ],
-   "module": "buildings_v2_b",
+   "module": "buildings_res_com",
    "tris": 504,
    "inside_tile": true,
    "bounds": [
@@ -404,13 +404,13 @@
   {
    "n": 20,
    "name": "Torre Corporativa",
-   "variant": "v2_lod2",
+   "variant": "base",
    "version": 1,
    "footprint": [
     1,
     1
    ],
-   "module": "buildings_v2_b",
+   "module": "buildings_samples",
    "tris": 374,
    "inside_tile": true,
    "bounds": [
@@ -425,13 +425,13 @@
   {
    "n": 21,
    "name": "Prefeitura",
-   "variant": "v2_lod2",
+   "variant": "base",
    "version": 1,
    "footprint": [
     1,
     1
    ],
-   "module": "buildings_v2_c",
+   "module": "buildings_civic_ind",
    "tris": 240,
    "inside_tile": true,
    "bounds": [
@@ -1085,6 +1085,106 @@
    ]
   },
   {
+   "n": 21,
+   "name": "Prefeitura",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 708,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.27
+   ]
+  },
+  {
+   "n": 27,
+   "name": "Hospital Geral",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 938,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.945
+   ]
+  },
+  {
+   "n": 29,
+   "name": "Escola Secund\u00e1ria",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 640,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.485
+   ]
+  },
+  {
+   "n": 32,
+   "name": "Esta\u00e7\u00e3o de Trem",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 850,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.5
+   ]
+  },
+  {
+   "n": 34,
+   "name": "Esta\u00e7\u00e3o de Tratamento de \u00c1gua",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 821,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.61
+   ]
+  },
+  {
    "n": 38,
    "name": "F\u00e1brica Pesada",
    "variant": "v2",
@@ -1142,6 +1242,26 @@
     0.48,
     0.0,
     0.95
+   ]
+  },
+  {
+   "n": 40,
+   "name": "Usina Termel\u00e9trica",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 665,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.28
    ]
   }
  ],

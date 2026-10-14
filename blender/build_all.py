@@ -25,6 +25,7 @@ import preview  # noqa: E402
 from registry import REGISTRY, REGISTRATIONS, OVERRIDES, PROPS, VARIANTS, undeclared_overrides  # noqa: E402
 
 TRI_LIMIT = int(os.environ.get("MAYOR_BUILDING_TRI_LIMIT", "1400"))
+X2_TRI_LIMIT = int(os.environ.get("MAYOR_X2_TRI_LIMIT", "4000"))
 
 
 def parse():
@@ -97,7 +98,7 @@ def main():
             # Second camera angle (back-left) with identical lighting and framing, for the audit.
             preview.setup_scene(top=bounds[5], azimuth_deg=145)
             preview.render(os.path.join(opts["previews"], f"{n:02d}_b.png"))
-        reg = next(r for r in reversed(REGISTRATIONS) if r["n"] == n)
+        reg = next(r for r in reversed(REGISTRATIONS) if r["n"] == n and r["variant"] == "base")
         if not ok:
             problems.append(f"#{n:02d} {name} leaves its tile or height limit: {[round(b, 3) for b in bounds]}")
         if tris > TRI_LIMIT:
@@ -119,13 +120,22 @@ def main():
         m = lib.Model(f"b{n:02d}_{variant}")
         fn(m)
         ob = m.build()
-        ok, bounds = lib.check_bounds(ob)
+        span = max(footprint)
+        if variant == "x2":
+            ok, bounds = lib.check_bounds(ob, limit=1.01, max_h=4.2)
+        else:
+            ok, bounds = lib.check_bounds(ob)
         tris = lib.triangle_count(ob)
         lib.export_glb(ob, os.path.join(vdir, f"{n:02d}.glb"))
+        if variant == "x2":
+            # Runtime convention for 2x2 service buildings: models/x2/NN.glb.
+            xdir = os.path.join(opts["out"], "x2")
+            os.makedirs(xdir, exist_ok=True)
+            shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(xdir, f"{n:02d}.glb"))
         if opts["previews"]:
-            preview.setup_scene(top=bounds[5])
+            preview.setup_scene(top=bounds[5], span=span)
             preview.render(os.path.join(opts["previews"], f"{n:02d}_{variant}.png"))
-            preview.setup_scene(top=bounds[5], azimuth_deg=145)
+            preview.setup_scene(top=bounds[5], azimuth_deg=145, span=span)
             preview.render(os.path.join(opts["previews"], f"{n:02d}_{variant}_b.png"))
         # Runtime convention (src/render/visual-v2.ts): models/v2/NN_lod{0,1,2}.glb.
         lod = {"v2": 0, "v2_lod1": 1, "v2_lod2": 2}.get(variant)
@@ -142,6 +152,8 @@ def main():
         print("VARIANT " + json.dumps(variant_manifest[-1]))
         if not ok:
             problems.append(f"variant {variant} #{n:02d} {name} leaves its tile or height limit")
+        if variant == "x2" and tris > X2_TRI_LIMIT:
+            problems.append(f"variant x2 #{n:02d} {name} has {tris} triangles (limit {X2_TRI_LIMIT})")
     if v2_report:
         with open(os.path.join(opts["out"], "v2", "build-report.json"), "w") as fh:
             json.dump({"schema": 1, "assets": sorted(v2_report, key=lambda a: (a["catalogId"], a["lod"]))}, fh, indent=1)

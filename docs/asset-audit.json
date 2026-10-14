@@ -54,7 +54,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "6e4ab2383e40",
+      "geometryHash": "e3e4cddccdda",
       "id": 1,
       "name": "Starter House",
       "category": "R1",
@@ -124,7 +124,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8c13a600f002",
+      "geometryHash": "d7946a4166db",
       "id": 2,
       "name": "Family House",
       "category": "R1",
@@ -194,7 +194,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "0a43f8c5cc85",
+      "geometryHash": "22a94ab57dac",
       "id": 3,
       "name": "Modern Townhouse",
       "category": "R2",
@@ -259,7 +259,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "0885896c82ff",
+      "geometryHash": "249731eebbc2",
       "id": 4,
       "name": "Semi-detached Villa",
       "category": "R2",
@@ -323,7 +323,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "3b1aa49f338d",
+      "geometryHash": "0b11babf2d3f",
       "id": 5,
       "name": "Small Apartment",
       "category": "R3",
@@ -336,7 +336,7 @@
     {
       "file": "06.glb",
       "kind": "building",
-      "bytes": 132012,
+      "bytes": 132016,
       "meshes": 20,
       "vertices": 2279,
       "triangles": 1160,
@@ -389,7 +389,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "63149d026fe1",
+      "geometryHash": "752bc5cda312",
       "id": 6,
       "name": "Garden Condominium",
       "category": "R3",
@@ -402,7 +402,7 @@
     {
       "file": "07.glb",
       "kind": "building",
-      "bytes": 129736,
+      "bytes": 129132,
       "meshes": 17,
       "vertices": 2299,
       "triangles": 1166,
@@ -451,7 +451,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "95a2cfff3456",
+      "geometryHash": "bfc40ef97fbc",
       "id": 7,
       "name": "Compact Tower",
       "category": "R4",
@@ -514,7 +514,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "3f9282480b45",
+      "geometryHash": "44713750bd44",
       "id": 8,
       "name": "Balcony Residence",
       "category": "R3",
@@ -527,7 +527,7 @@
     {
       "file": "09.glb",
       "kind": "building",
-      "bytes": 110164,
+      "bytes": 110168,
       "meshes": 19,
       "vertices": 1841,
       "triangles": 938,
@@ -579,7 +579,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "d447eed6ca2a",
+      "geometryHash": "193fd395fe20",
       "id": 9,
       "name": "Local Mixed-use Building",
       "category": "R4",
@@ -640,7 +640,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "d1dd715775a0",
+      "geometryHash": "7e732c4bf605",
       "id": 10,
       "name": "Premium Tower",
       "category": "R5",
@@ -653,7 +653,7 @@
     {
       "file": "11.glb",
       "kind": "building",
-      "bytes": 104800,
+      "bytes": 104796,
       "meshes": 24,
       "vertices": 1611,
       "triangles": 829,
@@ -711,7 +711,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f5c8da286d19",
+      "geometryHash": "3b2c45447cb4",
       "id": 11,
       "name": "Convenience Store",
       "category": "C1",
@@ -851,7 +851,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "884e4df62c5f",
+      "geometryHash": "326e783657ae",
       "id": 13,
       "name": "Local Market",
       "category": "C2",
@@ -864,7 +864,7 @@
     {
       "file": "14.glb",
       "kind": "building",
-      "bytes": 82228,
+      "bytes": 82372,
       "meshes": 21,
       "vertices": 1210,
       "triangles": 600,
@@ -918,7 +918,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f8141411e627",
+      "geometryHash": "f038a2bbc7be",
       "id": 14,
       "name": "Urban Restaurant",
       "category": "C2",
@@ -931,7 +931,7 @@
     {
       "file": "15.glb",
       "kind": "building",
-      "bytes": 88788,
+      "bytes": 88784,
       "meshes": 21,
       "vertices": 1346,
       "triangles": 682,
@@ -985,7 +985,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "ef7acc91dbe0",
+      "geometryHash": "6cf4b75933db",
       "id": 15,
       "name": "Neighbourhood Pharmacy",
       "category": "C1",
@@ -998,7 +998,7 @@
     {
       "file": "16.glb",
       "kind": "building",
-      "bytes": 77536,
+      "bytes": 77540,
       "meshes": 20,
       "vertices": 1133,
       "triangles": 588,
@@ -1051,7 +1051,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "4729ef8e5873",
+      "geometryHash": "2a0d0a75c173",
       "id": 16,
       "name": "Compact Office",
       "category": "C2",
@@ -1121,7 +1121,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "1d75267f86df",
+      "geometryHash": "da4d65772745",
       "id": 17,
       "name": "Local Bank",
       "category": "C2",
@@ -1184,7 +1184,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "9eacad8de298",
+      "geometryHash": "11b7ff74d857",
       "id": 18,
       "name": "Executive Hotel",
       "category": "C3",
@@ -1244,7 +1244,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "2515cb15e00d",
+      "geometryHash": "531597b25330",
       "id": 19,
       "name": "Neighbourhood Mall",
       "category": "C3",
@@ -1303,7 +1303,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "15e53e2f5ece",
+      "geometryHash": "75060963ef9f",
       "id": 20,
       "name": "Corporate Tower",
       "category": "C4",
@@ -1316,7 +1316,7 @@
     {
       "file": "21.glb",
       "kind": "building",
-      "bytes": 39756,
+      "bytes": 39748,
       "meshes": 14,
       "vertices": 476,
       "triangles": 240,
@@ -1362,7 +1362,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "ae255b57bcd7",
+      "geometryHash": "521a2f16390d",
       "id": 21,
       "name": "City Hall",
       "category": "S3",
@@ -1425,7 +1425,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "a30967b52d76",
+      "geometryHash": "41baf0fad1a6",
       "id": 22,
       "name": "Public Library",
       "category": "S2",
@@ -1490,7 +1490,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "343fa126ea58",
+      "geometryHash": "e03bc29aa4cf",
       "id": 23,
       "name": "Community Centre",
       "category": "S2",
@@ -1503,7 +1503,7 @@
     {
       "file": "24.glb",
       "kind": "building",
-      "bytes": 128144,
+      "bytes": 128140,
       "meshes": 19,
       "vertices": 2222,
       "triangles": 1133,
@@ -1555,7 +1555,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "2aa47fceaaf3",
+      "geometryHash": "4e2bc6b00b5d",
       "id": 24,
       "name": "Police Station",
       "category": "S3",
@@ -1619,7 +1619,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "d3dc1acd1960",
+      "geometryHash": "d1efd96bc7de",
       "id": 25,
       "name": "City Museum",
       "category": "S3",
@@ -1684,7 +1684,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "bc5dab8b3e99",
+      "geometryHash": "c83f53bd7e33",
       "id": 26,
       "name": "Clinic",
       "category": "S2",
@@ -1745,7 +1745,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "e9b51cd9807c",
+      "geometryHash": "dac8aab8258a",
       "id": 27,
       "name": "General Hospital",
       "category": "S4",
@@ -1811,7 +1811,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "899ed4aed99e",
+      "geometryHash": "8cca1ef10754",
       "id": 28,
       "name": "Primary School",
       "category": "S2",
@@ -1873,7 +1873,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "c08f43db6d6d",
+      "geometryHash": "36f57329dff7",
       "id": 29,
       "name": "Secondary School",
       "category": "S3",
@@ -1886,7 +1886,7 @@
     {
       "file": "30.glb",
       "kind": "building",
-      "bytes": 111960,
+      "bytes": 111964,
       "meshes": 17,
       "vertices": 1933,
       "triangles": 981,
@@ -1936,7 +1936,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "c03cb7b07871",
+      "geometryHash": "60fff6f9647d",
       "id": 30,
       "name": "Fire Station",
       "category": "S3",
@@ -2006,7 +2006,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "6c595008e0f2",
+      "geometryHash": "1cf496457292",
       "id": 31,
       "name": "Bus Station",
       "category": "T2",
@@ -2019,7 +2019,7 @@
     {
       "file": "32.glb",
       "kind": "building",
-      "bytes": 95964,
+      "bytes": 95700,
       "meshes": 25,
       "vertices": 1391,
       "triangles": 698,
@@ -2078,7 +2078,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "a34fb26c7689",
+      "geometryHash": "902b943511f7",
       "id": 32,
       "name": "Train Station",
       "category": "T3",
@@ -2091,7 +2091,7 @@
     {
       "file": "33.glb",
       "kind": "building",
-      "bytes": 125648,
+      "bytes": 125644,
       "meshes": 26,
       "vertices": 2010,
       "triangles": 1044,
@@ -2150,7 +2150,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "6cbb10e26dba",
+      "geometryHash": "5f9c63703f59",
       "id": 33,
       "name": "Cargo Terminal",
       "category": "T3",
@@ -2163,7 +2163,7 @@
     {
       "file": "34.glb",
       "kind": "building",
-      "bytes": 89736,
+      "bytes": 89744,
       "meshes": 16,
       "vertices": 1484,
       "triangles": 775,
@@ -2211,7 +2211,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "2855b6715c0c",
+      "geometryHash": "6e4b665488cb",
       "id": 34,
       "name": "Water Treatment Plant",
       "category": "U3",
@@ -2268,7 +2268,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "c93f1c87617d",
+      "geometryHash": "c157509d0dcf",
       "id": 35,
       "name": "Electrical Substation",
       "category": "U2",
@@ -2329,7 +2329,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "3bd44bd9b653",
+      "geometryHash": "7f6695229ffa",
       "id": 36,
       "name": "Logistics Warehouse",
       "category": "I1",
@@ -2392,7 +2392,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "4e0a2574f743",
+      "geometryHash": "34e4380f691a",
       "id": 37,
       "name": "Light Factory",
       "category": "I2",
@@ -2450,7 +2450,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "6c905d0f3327",
+      "geometryHash": "a58c745a140b",
       "id": 38,
       "name": "Heavy Factory",
       "category": "I4",
@@ -2511,7 +2511,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "2b41ea6b9458",
+      "geometryHash": "0e91f99c68e8",
       "id": 39,
       "name": "Recycling Centre",
       "category": "U3",
@@ -2571,7 +2571,7 @@
         ]
       },
       "lodNodes": [],
-      "geometryHash": "1092c2f3a652",
+      "geometryHash": "175d0312672c",
       "id": 40,
       "name": "Thermal Power Plant",
       "category": "U4",
@@ -2666,7 +2666,7 @@
       "vertices": 131,
       "triangles": 68,
       "materials": [
-        "car_glass",
+        "glass_dark",
         "hull_blue",
         "hull_white",
         "metal",
@@ -2707,7 +2707,7 @@
       "vertices": 100,
       "triangles": 50,
       "materials": [
-        "car_glass",
+        "glass_dark",
         "hull_blue",
         "hull_white",
         "metal"
@@ -2821,14 +2821,14 @@
     {
       "file": "props/bus.glb",
       "kind": "prop",
-      "bytes": 37412,
+      "bytes": 40136,
       "meshes": 11,
-      "vertices": 500,
-      "triangles": 278,
+      "vertices": 556,
+      "triangles": 314,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -2851,35 +2851,35 @@
       "bounds": {
         "min": [
           -0.393,
-          0,
-          -0.136
+          0.002,
+          -0.137
         ],
         "max": [
           0.3933,
           0.282,
-          0.136
+          0.137
         ],
         "dimensions": [
           0.7863,
-          0.282,
-          0.272
+          0.28,
+          0.274
         ]
       },
       "lodNodes": [],
-      "geometryHash": "c2a215a97094",
+      "geometryHash": "64d3714ac400",
       "class": "vehicle"
     },
     {
       "file": "props/bus_articulated.glb",
       "kind": "prop",
-      "bytes": 51840,
+      "bytes": 55712,
       "meshes": 11,
-      "vertices": 804,
-      "triangles": 444,
+      "vertices": 884,
+      "triangles": 496,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -2902,35 +2902,35 @@
       "bounds": {
         "min": [
           -0.5378,
-          0,
-          -0.096
+          0.0018,
+          -0.097
         ],
         "max": [
           0.5378,
           0.2648,
-          0.096
+          0.097
         ],
         "dimensions": [
           1.0756,
-          0.2648,
-          0.192
+          0.263,
+          0.194
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f3613c7d3ed5",
+      "geometryHash": "a5454ab87f0f",
       "class": "vehicle"
     },
     {
       "file": "props/bus_city.glb",
       "kind": "prop",
-      "bytes": 38756,
+      "bytes": 41472,
       "meshes": 11,
-      "vertices": 528,
-      "triangles": 292,
+      "vertices": 584,
+      "triangles": 328,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -2953,35 +2953,35 @@
       "bounds": {
         "min": [
           -0.3878,
-          0,
-          -0.096
+          0.0018,
+          -0.097
         ],
         "max": [
           0.3878,
           0.2648,
-          0.096
+          0.097
         ],
         "dimensions": [
           0.7756,
-          0.2648,
-          0.192
+          0.263,
+          0.194
         ]
       },
       "lodNodes": [],
-      "geometryHash": "adde13fc4284",
+      "geometryHash": "4cca07b04e15",
       "class": "vehicle"
     },
     {
       "file": "props/bus_coach.glb",
       "kind": "prop",
-      "bytes": 46220,
+      "bytes": 50100,
       "meshes": 11,
-      "vertices": 684,
-      "triangles": 390,
+      "vertices": 764,
+      "triangles": 442,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -3004,35 +3004,35 @@
       "bounds": {
         "min": [
           -0.4178,
-          0,
-          -0.101
+          0.002,
+          -0.102
         ],
         "max": [
           0.4178,
           0.278,
-          0.101
+          0.102
         ],
         "dimensions": [
           0.8356,
-          0.278,
-          0.202
+          0.276,
+          0.204
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f7e35a02f2f5",
+      "geometryHash": "19344c44fea1",
       "class": "vehicle"
     },
     {
       "file": "props/bus_double.glb",
       "kind": "prop",
-      "bytes": 39696,
+      "bytes": 42412,
       "meshes": 11,
-      "vertices": 548,
-      "triangles": 302,
+      "vertices": 604,
+      "triangles": 338,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -3055,35 +3055,35 @@
       "bounds": {
         "min": [
           -0.3678,
-          0,
-          -0.096
+          0.0018,
+          -0.097
         ],
         "max": [
           0.3678,
           0.3648,
-          0.096
+          0.097
         ],
         "dimensions": [
           0.7356,
-          0.3648,
-          0.192
+          0.363,
+          0.194
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f8a537140752",
+      "geometryHash": "3bd655fcd4d5",
       "class": "vehicle"
     },
     {
       "file": "props/bus_mini.glb",
       "kind": "prop",
-      "bytes": 38752,
+      "bytes": 41472,
       "meshes": 11,
-      "vertices": 528,
-      "triangles": 292,
+      "vertices": 584,
+      "triangles": 328,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -3106,35 +3106,35 @@
       "bounds": {
         "min": [
           -0.2678,
-          0,
-          -0.091
+          0.0016,
+          -0.092
         ],
         "max": [
           0.2678,
           0.2316,
-          0.091
+          0.092
         ],
         "dimensions": [
           0.5356,
-          0.2316,
-          0.182
+          0.23,
+          0.184
         ]
       },
       "lodNodes": [],
-      "geometryHash": "4b81e78a03a0",
+      "geometryHash": "447c8952aeb4",
       "class": "vehicle"
     },
     {
       "file": "props/bus_school.glb",
       "kind": "prop",
-      "bytes": 37992,
+      "bytes": 40712,
       "meshes": 10,
-      "vertices": 536,
-      "triangles": 296,
+      "vertices": 592,
+      "triangles": 332,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3155,22 +3155,22 @@
       "bounds": {
         "min": [
           -0.3178,
-          0,
-          -0.091
+          0.0018,
+          -0.092
         ],
         "max": [
           0.3978,
           0.2188,
-          0.091
+          0.092
         ],
         "dimensions": [
           0.7156,
-          0.2188,
-          0.182
+          0.217,
+          0.184
         ]
       },
       "lodNodes": [],
-      "geometryHash": "76c8b76d9a0a",
+      "geometryHash": "f7c18da9f0c5",
       "class": "vehicle"
     },
     {
@@ -3254,14 +3254,14 @@
     {
       "file": "props/car_compact.glb",
       "kind": "prop",
-      "bytes": 34456,
+      "bytes": 40588,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3281,35 +3281,35 @@
       "bounds": {
         "min": [
           -0.1578,
-          0,
-          -0.086
+          0.0016,
+          -0.0862
         ],
         "max": [
           0.1583,
-          0.1656,
-          0.086
+          0.153,
+          0.0862
         ],
         "dimensions": [
           0.3161,
-          0.1656,
-          0.172
+          0.1514,
+          0.1724
         ]
       },
       "lodNodes": [],
-      "geometryHash": "fba40ddd8ebd",
+      "geometryHash": "6480298138cc",
       "class": "vehicle"
     },
     {
       "file": "props/car_convertible.glb",
       "kind": "prop",
-      "bytes": 35280,
+      "bytes": 41412,
       "meshes": 9,
-      "vertices": 508,
-      "triangles": 282,
+      "vertices": 636,
+      "triangles": 354,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3329,35 +3329,35 @@
       "bounds": {
         "min": [
           -0.1928,
-          0,
-          -0.091
+          0.0017,
+          -0.0912
         ],
         "max": [
           0.1933,
-          0.1272,
-          0.091
+          0.1155,
+          0.0912
         ],
         "dimensions": [
           0.3861,
-          0.1272,
-          0.182
+          0.1138,
+          0.1824
         ]
       },
       "lodNodes": [],
-      "geometryHash": "eb075c6c6131",
+      "geometryHash": "e578c2543349",
       "class": "vehicle"
     },
     {
       "file": "props/car_coupe.glb",
       "kind": "prop",
-      "bytes": 35448,
+      "bytes": 41568,
       "meshes": 9,
-      "vertices": 512,
-      "triangles": 284,
+      "vertices": 640,
+      "triangles": 356,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3377,35 +3377,35 @@
       "bounds": {
         "min": [
           -0.1878,
-          0,
-          -0.09
+          0.0017,
+          -0.0902
         ],
         "max": [
           0.1883,
-          0.1432,
-          0.09
+          0.1317,
+          0.0902
         ],
         "dimensions": [
           0.3761,
-          0.1432,
-          0.18
+          0.13,
+          0.1804
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8372a32732d5",
+      "geometryHash": "39a793b94621",
       "class": "vehicle"
     },
     {
       "file": "props/car_crossover.glb",
       "kind": "prop",
-      "bytes": 34532,
+      "bytes": 40652,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3425,35 +3425,35 @@
       "bounds": {
         "min": [
           -0.2028,
-          0,
-          -0.096
+          0.0019,
+          -0.0962
         ],
         "max": [
           0.2033,
-          0.1854,
-          0.096
+          0.1701,
+          0.0962
         ],
         "dimensions": [
           0.4061,
-          0.1854,
-          0.192
+          0.1682,
+          0.1924
         ]
       },
       "lodNodes": [],
-      "geometryHash": "e67731204d26",
+      "geometryHash": "ec01a8d1767c",
       "class": "vehicle"
     },
     {
       "file": "props/car_electric.glb",
       "kind": "prop",
-      "bytes": 36776,
+      "bytes": 42900,
       "meshes": 10,
-      "vertices": 512,
-      "triangles": 284,
+      "vertices": 640,
+      "triangles": 356,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -3475,35 +3475,35 @@
       "bounds": {
         "min": [
           -0.1628,
-          0,
-          -0.086
+          0.0016,
+          -0.0862
         ],
         "max": [
           0.166,
-          0.1556,
-          0.086
+          0.1439,
+          0.0862
         ],
         "dimensions": [
           0.3288,
-          0.1556,
-          0.172
+          0.1423,
+          0.1724
         ]
       },
       "lodNodes": [],
-      "geometryHash": "9d55ff14c473",
+      "geometryHash": "271e66be238c",
       "class": "vehicle"
     },
     {
       "file": "props/car_hatch.glb",
       "kind": "prop",
-      "bytes": 34512,
+      "bytes": 40640,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3523,35 +3523,35 @@
       "bounds": {
         "min": [
           -0.1678,
-          0,
-          -0.0885
+          0.0017,
+          -0.0887
         ],
         "max": [
           0.1683,
-          0.1672,
-          0.0885
+          0.1546,
+          0.0887
         ],
         "dimensions": [
           0.3361,
-          0.1672,
-          0.177
+          0.1529,
+          0.1774
         ]
       },
       "lodNodes": [],
-      "geometryHash": "9d8ad3bd7191",
+      "geometryHash": "e164cb2ffb1d",
       "class": "vehicle"
     },
     {
       "file": "props/car_midsize.glb",
       "kind": "prop",
-      "bytes": 34520,
+      "bytes": 40648,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3571,35 +3571,35 @@
       "bounds": {
         "min": [
           -0.2028,
-          0,
-          -0.091
+          0.0017,
+          -0.0912
         ],
         "max": [
           0.2033,
-          0.1572,
-          0.091
+          0.1446,
+          0.0912
         ],
         "dimensions": [
           0.4061,
-          0.1572,
-          0.182
+          0.1429,
+          0.1824
         ]
       },
       "lodNodes": [],
-      "geometryHash": "e316144b5061",
+      "geometryHash": "51305370452f",
       "class": "vehicle"
     },
     {
       "file": "props/car_minibus.glb",
       "kind": "prop",
-      "bytes": 36140,
+      "bytes": 38856,
       "meshes": 10,
-      "vertices": 500,
-      "triangles": 278,
+      "vertices": 556,
+      "triangles": 314,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal",
@@ -3620,35 +3620,35 @@
       "bounds": {
         "min": [
           -0.3178,
-          0,
-          -0.096
+          0.0017,
+          -0.097
         ],
         "max": [
           0.3178,
           0.2192,
-          0.096
+          0.097
         ],
         "dimensions": [
           0.6356,
-          0.2192,
-          0.192
+          0.2175,
+          0.194
         ]
       },
       "lodNodes": [],
-      "geometryHash": "b8710d33d29b",
+      "geometryHash": "5bf42cd96d0d",
       "class": "vehicle"
     },
     {
       "file": "props/car_minivan.glb",
       "kind": "prop",
-      "bytes": 34512,
+      "bytes": 40648,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3668,35 +3668,35 @@
       "bounds": {
         "min": [
           -0.2128,
-          0,
-          -0.096
+          0.0018,
+          -0.0962
         ],
         "max": [
           0.2133,
-          0.1988,
-          0.096
+          0.1826,
+          0.0962
         ],
         "dimensions": [
           0.4261,
-          0.1988,
-          0.192
+          0.1808,
+          0.1924
         ]
       },
       "lodNodes": [],
-      "geometryHash": "fc6069f01af4",
+      "geometryHash": "a9b45c8e7fe4",
       "class": "vehicle"
     },
     {
       "file": "props/car_pickup.glb",
       "kind": "prop",
-      "bytes": 40348,
+      "bytes": 43068,
       "meshes": 9,
-      "vertices": 616,
-      "triangles": 336,
+      "vertices": 672,
+      "triangles": 372,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3716,35 +3716,35 @@
       "bounds": {
         "min": [
           -0.2478,
-          0,
-          -0.096
+          0.0018,
+          -0.0962
         ],
         "max": [
           0.1778,
           0.1588,
-          0.096
+          0.0962
         ],
         "dimensions": [
           0.4256,
-          0.1588,
-          0.192
+          0.157,
+          0.1924
         ]
       },
       "lodNodes": [],
-      "geometryHash": "328f21916631",
+      "geometryHash": "bb8093c39209",
       "class": "vehicle"
     },
     {
       "file": "props/car_police.glb",
       "kind": "prop",
-      "bytes": 40716,
+      "bytes": 46844,
       "meshes": 11,
-      "vertices": 572,
-      "triangles": 314,
+      "vertices": 700,
+      "triangles": 386,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3766,35 +3766,35 @@
       "bounds": {
         "min": [
           -0.2078,
-          0,
-          -0.091
+          0.0017,
+          -0.0912
         ],
         "max": [
           0.2083,
           0.1782,
-          0.091
+          0.0912
         ],
         "dimensions": [
           0.4161,
-          0.1782,
-          0.182
+          0.1765,
+          0.1824
         ]
       },
       "lodNodes": [],
-      "geometryHash": "925e1c0244ee",
+      "geometryHash": "764e45adb0a2",
       "class": "vehicle"
     },
     {
       "file": "props/car_sedan.glb",
       "kind": "prop",
-      "bytes": 34516,
+      "bytes": 40644,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3814,35 +3814,35 @@
       "bounds": {
         "min": [
           -0.2028,
-          0,
-          -0.091
+          0.0017,
+          -0.0912
         ],
         "max": [
           0.2033,
-          0.1572,
-          0.091
+          0.1446,
+          0.0912
         ],
         "dimensions": [
           0.4061,
-          0.1572,
-          0.182
+          0.1429,
+          0.1824
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f0fbe6092f82",
+      "geometryHash": "075dabdfe803",
       "class": "vehicle"
     },
     {
       "file": "props/car_station_wagon.glb",
       "kind": "prop",
-      "bytes": 38680,
+      "bytes": 44808,
       "meshes": 9,
-      "vertices": 580,
-      "triangles": 318,
+      "vertices": 708,
+      "triangles": 390,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3862,35 +3862,35 @@
       "bounds": {
         "min": [
           -0.2228,
-          0,
-          -0.0935
+          0.0017,
+          -0.0937
         ],
         "max": [
           0.2233,
-          0.175,
-          0.0935
+          0.162,
+          0.0937
         ],
         "dimensions": [
           0.4461,
-          0.175,
-          0.187
+          0.1603,
+          0.1874
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8d477d57a496",
+      "geometryHash": "21335f2c20c0",
       "class": "vehicle"
     },
     {
       "file": "props/car_suv.glb",
       "kind": "prop",
-      "bytes": 34512,
+      "bytes": 40640,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3910,35 +3910,35 @@
       "bounds": {
         "min": [
           -0.2028,
-          0,
-          -0.096
+          0.002,
+          -0.0962
         ],
         "max": [
           0.2033,
-          0.192,
-          0.096
+          0.1758,
+          0.0962
         ],
         "dimensions": [
           0.4061,
-          0.192,
-          0.192
+          0.1738,
+          0.1924
         ]
       },
       "lodNodes": [],
-      "geometryHash": "5bb8c4b6b44e",
+      "geometryHash": "d2cf2eb40506",
       "class": "vehicle"
     },
     {
       "file": "props/car_suv_long.glb",
       "kind": "prop",
-      "bytes": 38288,
+      "bytes": 44404,
       "meshes": 9,
-      "vertices": 572,
-      "triangles": 314,
+      "vertices": 700,
+      "triangles": 386,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -3958,35 +3958,35 @@
       "bounds": {
         "min": [
           -0.2378,
-          0,
-          -0.0985
+          0.002,
+          -0.0987
         ],
         "max": [
           0.2383,
-          0.2088,
-          0.0985
+          0.1922,
+          0.0987
         ],
         "dimensions": [
           0.4761,
-          0.2088,
-          0.197
+          0.1902,
+          0.1974
         ]
       },
       "lodNodes": [],
-      "geometryHash": "a52d1193b60b",
+      "geometryHash": "95a5c61f933a",
       "class": "vehicle"
     },
     {
       "file": "props/car_taxi.glb",
       "kind": "prop",
-      "bytes": 37716,
+      "bytes": 43840,
       "meshes": 10,
-      "vertices": 532,
-      "triangles": 294,
+      "vertices": 660,
+      "triangles": 366,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -4008,22 +4008,22 @@
       "bounds": {
         "min": [
           -0.2028,
-          0,
-          -0.091
+          0.0017,
+          -0.0912
         ],
         "max": [
           0.2033,
           0.1862,
-          0.091
+          0.0912
         ],
         "dimensions": [
           0.4061,
-          0.1862,
-          0.182
+          0.1845,
+          0.1824
         ]
       },
       "lodNodes": [],
-      "geometryHash": "eccbbcfb549f",
+      "geometryHash": "16ffbae86a40",
       "class": "vehicle"
     },
     {
@@ -4592,14 +4592,14 @@
     {
       "file": "props/semi_box.glb",
       "kind": "prop",
-      "bytes": 47104,
+      "bytes": 50980,
       "meshes": 10,
-      "vertices": 726,
-      "triangles": 409,
+      "vertices": 806,
+      "triangles": 461,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -4621,35 +4621,35 @@
       "bounds": {
         "min": [
           -0.52,
-          0,
+          0.0018,
           -0.1064
         ],
         "max": [
           0.4578,
           0.3088,
-          0.106
+          0.1062
         ],
         "dimensions": [
           0.9778,
-          0.3088,
-          0.2124
+          0.307,
+          0.2126
         ]
       },
       "lodNodes": [],
-      "geometryHash": "0de031711b39",
+      "geometryHash": "32967a0e3848",
       "class": "vehicle"
     },
     {
       "file": "props/semi_container.glb",
       "kind": "prop",
-      "bytes": 50216,
+      "bytes": 54092,
       "meshes": 12,
-      "vertices": 746,
-      "triangles": 419,
+      "vertices": 826,
+      "triangles": 471,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -4673,22 +4673,22 @@
       "bounds": {
         "min": [
           -0.52,
-          0,
+          0.0018,
           -0.1064
         ],
         "max": [
           0.4578,
           0.2688,
-          0.106
+          0.1062
         ],
         "dimensions": [
           0.9778,
-          0.2688,
-          0.2124
+          0.267,
+          0.2126
         ]
       },
       "lodNodes": [],
-      "geometryHash": "bf4f46c3aa33",
+      "geometryHash": "0cda3c9c5e56",
       "class": "vehicle"
     },
     {
@@ -5029,7 +5029,7 @@
       "triangles": 48,
       "materials": [
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "metal_dark"
       ],
@@ -5336,14 +5336,14 @@
     {
       "file": "props/truck.glb",
       "kind": "prop",
-      "bytes": 40992,
+      "bytes": 44676,
       "meshes": 9,
-      "vertices": 628,
-      "triangles": 356,
+      "vertices": 704,
+      "triangles": 408,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -5363,35 +5363,35 @@
       "bounds": {
         "min": [
           -0.33,
-          0,
-          -0.106
+          0.002,
+          -0.107
         ],
         "max": [
           0.33,
           0.242,
-          0.106
+          0.107
         ],
         "dimensions": [
           0.66,
-          0.242,
-          0.212
+          0.24,
+          0.214
         ]
       },
       "lodNodes": [],
-      "geometryHash": "aca49339e57c",
+      "geometryHash": "8c413efd17d7",
       "class": "vehicle"
     },
     {
       "file": "props/truck_box.glb",
       "kind": "prop",
-      "bytes": 44192,
+      "bytes": 47896,
       "meshes": 10,
-      "vertices": 668,
-      "triangles": 376,
+      "vertices": 744,
+      "triangles": 428,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -5413,35 +5413,35 @@
       "bounds": {
         "min": [
           -0.33,
-          0,
-          -0.106
+          0.002,
+          -0.1062
         ],
         "max": [
           0.33,
           0.254,
-          0.106
+          0.1062
         ],
         "dimensions": [
           0.66,
-          0.254,
-          0.212
+          0.252,
+          0.2124
         ]
       },
       "lodNodes": [],
-      "geometryHash": "0e10699c68f7",
+      "geometryHash": "174cd880eabb",
       "class": "vehicle"
     },
     {
       "file": "props/truck_cement.glb",
       "kind": "prop",
-      "bytes": 48816,
+      "bytes": 52516,
       "meshes": 11,
-      "vertices": 736,
-      "triangles": 410,
+      "vertices": 812,
+      "triangles": 462,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -5464,7 +5464,7 @@
       "bounds": {
         "min": [
           -0.34,
-          0,
+          0.002,
           -0.11
         ],
         "max": [
@@ -5474,26 +5474,26 @@
         ],
         "dimensions": [
           0.67,
-          0.252,
+          0.25,
           0.22
         ]
       },
       "lodNodes": [],
-      "geometryHash": "9a7c3bca7c1f",
+      "geometryHash": "af37c86c5bbc",
       "class": "vehicle"
     },
     {
       "file": "props/truck_flatbed.glb",
       "kind": "prop",
-      "bytes": 53596,
+      "bytes": 57296,
       "meshes": 13,
-      "vertices": 796,
-      "triangles": 440,
+      "vertices": 872,
+      "triangles": 492,
       "materials": [
         "bark",
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -5517,35 +5517,35 @@
       "bounds": {
         "min": [
           -0.33,
-          0,
-          -0.106
+          0.002,
+          -0.1062
         ],
         "max": [
           0.33,
           0.162,
-          0.106
+          0.1062
         ],
         "dimensions": [
           0.66,
-          0.162,
-          0.212
+          0.16,
+          0.2124
         ]
       },
       "lodNodes": [],
-      "geometryHash": "1e9b30828f88",
+      "geometryHash": "83717aefe0b3",
       "class": "vehicle"
     },
     {
       "file": "props/truck_garbage.glb",
       "kind": "prop",
-      "bytes": 46764,
+      "bytes": 50464,
       "meshes": 11,
-      "vertices": 696,
-      "triangles": 390,
+      "vertices": 772,
+      "triangles": 442,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -5568,35 +5568,35 @@
       "bounds": {
         "min": [
           -0.33,
-          0,
-          -0.106
+          0.002,
+          -0.1062
         ],
         "max": [
           0.33,
           0.237,
-          0.106
+          0.1062
         ],
         "dimensions": [
           0.66,
-          0.237,
-          0.212
+          0.235,
+          0.2124
         ]
       },
       "lodNodes": [],
-      "geometryHash": "9f9774de6583",
+      "geometryHash": "f9918adeb7ae",
       "class": "vehicle"
     },
     {
       "file": "props/truck_tanker.glb",
       "kind": "prop",
-      "bytes": 47708,
+      "bytes": 51408,
       "meshes": 11,
-      "vertices": 716,
-      "triangles": 400,
+      "vertices": 792,
+      "triangles": 452,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -5619,35 +5619,35 @@
       "bounds": {
         "min": [
           -0.33,
-          0,
-          -0.106
+          0.002,
+          -0.1062
         ],
         "max": [
           0.33,
           0.262,
-          0.106
+          0.1062
         ],
         "dimensions": [
           0.66,
-          0.262,
-          0.212
+          0.26,
+          0.2124
         ]
       },
       "lodNodes": [],
-      "geometryHash": "cf355357dd11",
+      "geometryHash": "35b30007a95b",
       "class": "vehicle"
     },
     {
       "file": "props/truck_utility.glb",
       "kind": "prop",
-      "bytes": 49712,
+      "bytes": 53588,
       "meshes": 12,
-      "vertices": 732,
-      "triangles": 410,
+      "vertices": 812,
+      "triangles": 462,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_sign",
         "glow_tail",
@@ -5671,35 +5671,35 @@
       "bounds": {
         "min": [
           -0.31,
-          0,
-          -0.101
+          0.002,
+          -0.1012
         ],
         "max": [
           0.31,
           0.232,
-          0.101
+          0.1012
         ],
         "dimensions": [
           0.62,
-          0.232,
-          0.202
+          0.23,
+          0.2024
         ]
       },
       "lodNodes": [],
-      "geometryHash": "8785bfab49d5",
+      "geometryHash": "5edbaebe5783",
       "class": "vehicle"
     },
     {
       "file": "props/van.glb",
       "kind": "prop",
-      "bytes": 34504,
+      "bytes": 40620,
       "meshes": 9,
-      "vertices": 492,
-      "triangles": 274,
+      "vertices": 620,
+      "triangles": 346,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal_dark",
@@ -5719,35 +5719,35 @@
       "bounds": {
         "min": [
           -0.2128,
-          0,
-          -0.096
+          0.0019,
+          -0.0962
         ],
         "max": [
           0.2133,
-          0.2204,
-          0.096
+          0.2024,
+          0.0962
         ],
         "dimensions": [
           0.4261,
-          0.2204,
-          0.192
+          0.2005,
+          0.1924
         ]
       },
       "lodNodes": [],
-      "geometryHash": "eda30599b4b4",
+      "geometryHash": "cd54d22a39da",
       "class": "vehicle"
     },
     {
       "file": "props/van_cargo.glb",
       "kind": "prop",
-      "bytes": 37080,
+      "bytes": 39804,
       "meshes": 10,
-      "vertices": 520,
-      "triangles": 288,
+      "vertices": 576,
+      "triangles": 324,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal",
@@ -5768,35 +5768,35 @@
       "bounds": {
         "min": [
           -0.1978,
-          0,
-          -0.096
+          0.0018,
+          -0.0962
         ],
         "max": [
           0.2278,
           0.1868,
-          0.096
+          0.0962
         ],
         "dimensions": [
           0.4256,
-          0.1868,
-          0.192
+          0.185,
+          0.1924
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f9c90ba12f39",
+      "geometryHash": "e3bc6a30081b",
       "class": "vehicle"
     },
     {
       "file": "props/van_delivery.glb",
       "kind": "prop",
-      "bytes": 37264,
+      "bytes": 39980,
       "meshes": 10,
-      "vertices": 524,
-      "triangles": 290,
+      "vertices": 580,
+      "triangles": 326,
       "materials": [
         "black",
         "car_body",
-        "car_glass",
+        "glass_dark",
         "glow_head",
         "glow_tail",
         "metal",
@@ -5817,22 +5817,22 @@
       "bounds": {
         "min": [
           -0.2378,
-          0,
-          -0.098
+          0.0018,
+          -0.0982
         ],
         "max": [
           0.2478,
           0.1968,
-          0.098
+          0.0982
         ],
         "dimensions": [
           0.4856,
-          0.1968,
-          0.196
+          0.195,
+          0.1964
         ]
       },
       "lodNodes": [],
-      "geometryHash": "f209e653c76f",
+      "geometryHash": "9143e5e9595c",
       "class": "vehicle"
     }
   ],
@@ -5851,7 +5851,7 @@
     },
     "totalBuildingTriangles": 30308,
     "totalBuildingVertices": 59514,
-    "totalBuildingBytes": 3730356,
+    "totalBuildingBytes": 3729632,
     "maxBuildingTriangles": 1170,
     "buildingsWithLodNodes": 0,
     "buildingsWithTextures": 0,

@@ -8,14 +8,14 @@
 | 04 | Semi-detached Villa | R2 | 687 | 1432 | 20 | 0 | 0.96 × 0.479 × 0.96 | 90.1 |
 | 05 | Small Apartment | R3 | 1030 | 2067 | 19 | 0 | 0.96 × 1.055 × 0.96 | 118.2 |
 | 06 | Garden Condominium | R3 | 1160 | 2279 | 20 | 0 | 0.96 × 0.805 × 0.96 | 128.9 |
-| 07 | Compact Tower | R4 | 1166 | 2299 | 17 | 0 | 0.96 × 1.385 × 0.96 | 126.7 |
+| 07 | Compact Tower | R4 | 1166 | 2299 | 17 | 0 | 0.96 × 1.385 × 0.96 | 126.1 |
 | 08 | Balcony Residence | R3 | 1170 | 2352 | 18 | 0 | 0.96 × 1.023 × 0.96 | 130.3 |
 | 09 | Local Mixed-use Building | R4 | 938 | 1841 | 19 | 0 | 0.96 × 0.885 × 0.96 | 107.6 |
 | 10 | Premium Tower | R5 | 504 | 1000 | 16 | 0 | 0.96 × 1.525 × 0.96 | 65.4 |
 | 11 | Convenience Store | C1 | 829 | 1611 | 24 | 0 | 0.99 × 0.308 × 0.96 | 102.3 |
 | 12 | Corner Café | C1 | 809 | 1602 | 24 | 0 | 0.9625 × 0.314 × 0.96 | 101.5 |
 | 13 | Local Market | C2 | 778 | 1563 | 24 | 0 | 0.99 × 0.313 × 0.96 | 99.7 |
-| 14 | Urban Restaurant | C2 | 600 | 1210 | 21 | 0 | 0.96 × 0.515 × 0.96 | 80.3 |
+| 14 | Urban Restaurant | C2 | 600 | 1210 | 21 | 0 | 0.96 × 0.515 × 0.96 | 80.4 |
 | 15 | Neighbourhood Pharmacy | C1 | 682 | 1346 | 21 | 0 | 0.96 × 0.535 × 0.96 | 86.7 |
 | 16 | Compact Office | C2 | 588 | 1133 | 20 | 0 | 0.96 × 0.84 × 0.96 | 75.7 |
 | 17 | Local Bank | C2 | 604 | 1190 | 23 | 0 | 0.96 × 0.565 × 0.96 | 81.9 |
@@ -33,7 +33,7 @@
 | 29 | Secondary School | S3 | 832 | 1653 | 17 | 0 | 0.96 × 0.439 × 0.96 | 96.7 |
 | 30 | Fire Station | S3 | 981 | 1933 | 17 | 0 | 0.975 × 0.868 × 0.96 | 109.3 |
 | 31 | Bus Station | T2 | 812 | 1576 | 23 | 0 | 0.975 × 0.34 × 0.96 | 99.3 |
-| 32 | Train Station | T3 | 698 | 1391 | 25 | 0 | 0.995 × 0.67 × 0.96 | 93.7 |
+| 32 | Train Station | T3 | 698 | 1391 | 25 | 0 | 0.995 × 0.67 × 0.96 | 93.5 |
 | 33 | Cargo Terminal | T3 | 1044 | 2010 | 26 | 0 | 0.98 × 0.369 × 0.9674 | 122.7 |
 | 34 | Water Treatment Plant | U3 | 775 | 1484 | 16 | 0 | 0.96 × 0.68 × 0.96 | 87.6 |
 | 35 | Electrical Substation | U2 | 591 | 1151 | 12 | 0 | 0.96 × 0.63 × 0.96 | 67.6 |
@@ -53,31 +53,31 @@
 | props/boat_motor.glb | boat | 50 | 4 | 9.7 |
 | props/boat_sail.glb | boat | 49 | 5 | 10.8 |
 | props/bollard.glb | street-furniture | 66 | 2 | 8.1 |
-| props/bus.glb | vehicle | 278 | 11 | 36.5 |
-| props/bus_articulated.glb | vehicle | 444 | 11 | 50.6 |
-| props/bus_city.glb | vehicle | 292 | 11 | 37.8 |
-| props/bus_coach.glb | vehicle | 390 | 11 | 45.1 |
-| props/bus_double.glb | vehicle | 302 | 11 | 38.8 |
-| props/bus_mini.glb | vehicle | 292 | 11 | 37.8 |
-| props/bus_school.glb | vehicle | 296 | 10 | 37.1 |
+| props/bus.glb | vehicle | 314 | 11 | 39.2 |
+| props/bus_articulated.glb | vehicle | 496 | 11 | 54.4 |
+| props/bus_city.glb | vehicle | 328 | 11 | 40.5 |
+| props/bus_coach.glb | vehicle | 442 | 11 | 48.9 |
+| props/bus_double.glb | vehicle | 338 | 11 | 41.4 |
+| props/bus_mini.glb | vehicle | 328 | 11 | 40.5 |
+| props/bus_school.glb | vehicle | 332 | 10 | 39.8 |
 | props/bush.glb | vehicle | 60 | 3 | 12.0 |
 | props/bush_flowers.glb | vehicle | 100 | 3 | 17.1 |
-| props/car_compact.glb | vehicle | 274 | 9 | 33.6 |
-| props/car_convertible.glb | vehicle | 282 | 9 | 34.5 |
-| props/car_coupe.glb | vehicle | 284 | 9 | 34.6 |
-| props/car_crossover.glb | vehicle | 274 | 9 | 33.7 |
-| props/car_electric.glb | vehicle | 284 | 10 | 35.9 |
-| props/car_hatch.glb | vehicle | 274 | 9 | 33.7 |
-| props/car_midsize.glb | vehicle | 274 | 9 | 33.7 |
-| props/car_minibus.glb | vehicle | 278 | 10 | 35.3 |
-| props/car_minivan.glb | vehicle | 274 | 9 | 33.7 |
-| props/car_pickup.glb | vehicle | 336 | 9 | 39.4 |
-| props/car_police.glb | vehicle | 314 | 11 | 39.8 |
-| props/car_sedan.glb | vehicle | 274 | 9 | 33.7 |
-| props/car_station_wagon.glb | vehicle | 318 | 9 | 37.8 |
-| props/car_suv.glb | vehicle | 274 | 9 | 33.7 |
-| props/car_suv_long.glb | vehicle | 314 | 9 | 37.4 |
-| props/car_taxi.glb | vehicle | 294 | 10 | 36.8 |
+| props/car_compact.glb | vehicle | 346 | 9 | 39.6 |
+| props/car_convertible.glb | vehicle | 354 | 9 | 40.4 |
+| props/car_coupe.glb | vehicle | 356 | 9 | 40.6 |
+| props/car_crossover.glb | vehicle | 346 | 9 | 39.7 |
+| props/car_electric.glb | vehicle | 356 | 10 | 41.9 |
+| props/car_hatch.glb | vehicle | 346 | 9 | 39.7 |
+| props/car_midsize.glb | vehicle | 346 | 9 | 39.7 |
+| props/car_minibus.glb | vehicle | 314 | 10 | 37.9 |
+| props/car_minivan.glb | vehicle | 346 | 9 | 39.7 |
+| props/car_pickup.glb | vehicle | 372 | 9 | 42.1 |
+| props/car_police.glb | vehicle | 386 | 11 | 45.7 |
+| props/car_sedan.glb | vehicle | 346 | 9 | 39.7 |
+| props/car_station_wagon.glb | vehicle | 390 | 9 | 43.8 |
+| props/car_suv.glb | vehicle | 346 | 9 | 39.7 |
+| props/car_suv_long.glb | vehicle | 386 | 9 | 43.4 |
+| props/car_taxi.glb | vehicle | 366 | 10 | 42.8 |
 | props/cyclist.glb | agent | 146 | 7 | 20.9 |
 | props/dog.glb | agent | 82 | 2 | 10.3 |
 | props/hydrant.glb | street-furniture | 100 | 2 | 11.5 |
@@ -92,8 +92,8 @@
 | props/planter_street.glb | street-furniture | 120 | 2 | 12.0 |
 | props/planter_tree.glb | street-furniture | 97 | 6 | 18.9 |
 | props/rock.glb | vegetation | 40 | 1 | 6.9 |
-| props/semi_box.glb | vehicle | 409 | 10 | 46.0 |
-| props/semi_container.glb | vehicle | 419 | 12 | 49.0 |
+| props/semi_box.glb | vehicle | 461 | 10 | 49.8 |
+| props/semi_container.glb | vehicle | 471 | 12 | 52.8 |
 | props/shelter_glass.glb | street-furniture | 100 | 5 | 16.7 |
 | props/shelter_small.glb | street-furniture | 100 | 5 | 16.6 |
 | props/stop_sign.glb | street-furniture | 67 | 3 | 9.1 |
@@ -110,13 +110,13 @@
 | props/tree_palm.glb | vegetation | 66 | 2 | 8.6 |
 | props/tree_pine.glb | vegetation | 74 | 3 | 10.5 |
 | props/tree_poplar.glb | vegetation | 58 | 3 | 10.8 |
-| props/truck.glb | vehicle | 356 | 9 | 40.0 |
-| props/truck_box.glb | vehicle | 376 | 10 | 43.2 |
-| props/truck_cement.glb | vehicle | 410 | 11 | 47.7 |
-| props/truck_flatbed.glb | vehicle | 440 | 13 | 52.3 |
-| props/truck_garbage.glb | vehicle | 390 | 11 | 45.7 |
-| props/truck_tanker.glb | vehicle | 400 | 11 | 46.6 |
-| props/truck_utility.glb | vehicle | 410 | 12 | 48.5 |
-| props/van.glb | vehicle | 274 | 9 | 33.7 |
-| props/van_cargo.glb | vehicle | 288 | 10 | 36.2 |
-| props/van_delivery.glb | vehicle | 290 | 10 | 36.4 |
+| props/truck.glb | vehicle | 408 | 9 | 43.6 |
+| props/truck_box.glb | vehicle | 428 | 10 | 46.8 |
+| props/truck_cement.glb | vehicle | 462 | 11 | 51.3 |
+| props/truck_flatbed.glb | vehicle | 492 | 13 | 56.0 |
+| props/truck_garbage.glb | vehicle | 442 | 11 | 49.3 |
+| props/truck_tanker.glb | vehicle | 452 | 11 | 50.2 |
+| props/truck_utility.glb | vehicle | 462 | 12 | 52.3 |
+| props/van.glb | vehicle | 346 | 9 | 39.7 |
+| props/van_cargo.glb | vehicle | 324 | 10 | 38.9 |
+| props/van_delivery.glb | vehicle | 326 | 10 | 39.0 |

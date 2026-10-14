@@ -27,10 +27,10 @@ Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with sc
 | UI-1 Interface | done | UI scale and panel opacity prefs, collapsible persistent panels (key H), road-build readout (cost, length, slope, level, reason) |
 | UI-2 Road builder | partial | Undo/Redo (snapshot history, 30 steps), snapping (angle, length, road snap, Alt bypass), upgrade a road in place (explicit toggle), parallel road helper |
 | UI-3 Zoning tools | partial | Marquee and Fill (classic and oriented, one undo entry each) |
-| 2x2 services | partial | `facilityAnchors` in the world and save (optional field), placement/bulldoze/coverage/utility links from the footprint centre, one model per anchor with `/models/x2/NN.glb` or a 1.8x scaled 1x1 fallback; hospital, city hall, secondary school, thermal plant, water, metro. 2x2 models in progress |
+| 2x2 services | done | `facilityAnchors` in the world and save (optional field), placement/bulldoze/coverage/utility links from the footprint centre, one model per anchor with `/models/x2/NN.glb` or a 1.8x scaled 1x1 fallback; hospital, city hall, secondary school, thermal plant, water, metro. 2x2 models built and loaded from `models/x2/` for #21, #27, #29, #32, #34, #40 (640-940 triangles each) |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 473 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 474 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 

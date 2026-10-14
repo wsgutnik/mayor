@@ -5,7 +5,7 @@ import bpy
 from mathutils import Vector
 
 
-def setup_scene(width=480, height=360, top=0.6, azimuth_deg=-35):
+def setup_scene(width=480, height=360, top=0.6, azimuth_deg=-35, span=1.0):
     sc = bpy.context.scene
     # Re-framing for a second angle must not stack lights and cameras.
     for o in [o for o in bpy.data.objects if o.name.split('.')[0] in ("sun", "cam")]:
@@ -32,7 +32,7 @@ def setup_scene(width=480, height=360, top=0.6, azimuth_deg=-35):
     cam = bpy.data.cameras.new("cam")
     cam.type = "ORTHO"
     # frame tall buildings: the view must cover the footprint diagonal and the height
-    cam.ortho_scale = max(1.75, top * 1.05 + 1.15)
+    cam.ortho_scale = max(1.75 * span, top * 1.05 + 1.15 * span)
     co = bpy.data.objects.new("cam", cam)
     # main angle (azimuth -35): from the front-right, looking down at 35 degrees (front is -Y); 145 is the back-left
     d = 4.0

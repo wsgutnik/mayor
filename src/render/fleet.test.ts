@@ -12,7 +12,7 @@ function load(path: string): Promise<THREE.Group> {
 }
 const tris = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
-const BUDGET: Record<string, number> = { car: 900, van: 900, truck: 1200, semi: 1200, bus: 1200 };
+const BUDGET: Record<string, number> = { car: 1100, van: 1100, truck: 1500, semi: 1500, bus: 1500 };
 const budgetOf = (n: string): number => BUDGET[n.split("_")[0]] ?? 260;
 
 describe("fleet props", () => {

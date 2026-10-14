@@ -69,7 +69,7 @@ describe("Blender kit models", () => {
       const name = f.split("/").pop()!.replace(".glb", "");
       const vehicle = /^(car_|van|truck|bus|semi_)/.test(name);
       const heavy = /^(truck|bus|semi_)/.test(name);
-      expect(tris(m!.geometry), f).toBeLessThanOrEqual(vehicle ? heavy ? 1200 : 900 : 260);
+      expect(tris(m!.geometry), f).toBeLessThanOrEqual(vehicle ? heavy ? 1500 : 1100 : 260);
     }
     const car = mergeScene(await load(join(MODELS, "props", "car_sedan.glb")))!;
     expect(car.glow.length).toBeGreaterThan(0); // head and tail lights

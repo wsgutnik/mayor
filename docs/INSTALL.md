@@ -41,3 +41,16 @@ The latest installer is in the private repository Releases: https://github.com/w
 (`Mayor-*-aarch64.dmg`, Apple Silicon). Local builds land in `release-out/` (`npm run package:adhoc`, then copy the dmg and zip `dist/` for the iPad PWA); they are ad hoc signed and not notarized. Open the dmg, drag Mayor to Applications, and on first launch use
 right-click > Open (the app is unsigned). Generated locally with `npm run package`. For the unsigned-app warning and
 how to notarize, see [SIGNING.md](SIGNING.md).
+
+## Private remote preview (any network)
+
+For viewing the PWA away from the Mac, `scripts/serve-gated.mjs` serves `dist/` behind one shared password (HTTP Basic
+auth) and a Cloudflare named tunnel publishes it:
+
+```bash
+npm run build
+MAYOR_GATE_PASSWORD=<password> node scripts/serve-gated.mjs dist 8766
+cloudflared tunnel --config ~/.cloudflared/mayor.yml run mayor      # ingress: <host> -> http://127.0.0.1:8766
+```
+
+The password is read from the environment and never stored in the repository.

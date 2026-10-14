@@ -6,7 +6,7 @@ transport pack (third_party/mayor-transport-pack); automatic decimation of those
 so the shapes are rebuilt here from boxes, within the triangle budgets.
 """
 from registry import prop
-from dress_vehicles import (
+from dress_vehicles2 import (
     car as _car,
     cargo_bed_ribs as _cargo_bed_ribs,
     door_seams as _door_seams,
@@ -93,7 +93,7 @@ def car_pickup(m):
     hw = 0.09
     front, back = 0.17, -0.24
     m.box(0.07, 0, z, 0.2, 0.18, 0.075, "car_body", roof="car_body")                # cab + hood
-    m.box(0.05, 0, z + 0.075, 0.1, 0.15, 0.055, "car_glass", roof="car_body")
+    m.box(0.05, 0, z + 0.075, 0.1, 0.15, 0.055, "glass_dark", roof="car_body")
     m.box(-0.14, 0, z, 0.2, 0.18, 0.04, "car_body", roof="car_body")                # bed floor
     for sy in (-1, 1):
         m.box(-0.14, sy * 0.085, z + 0.04, 0.2, 0.012, 0.04, "car_body", roof="car_body")
@@ -114,7 +114,7 @@ def _cab_truck(m, r, cab_x, cab_l, cab_h, w):
     z = r * 0.8
     front = cab_x + cab_l / 2
     m.box(cab_x, 0, z, cab_l, w, cab_h * 0.55, "car_body", roof="car_body")
-    m.box(cab_x, 0, z + cab_h * 0.55, cab_l * 0.9, w * 0.9, cab_h * 0.45, "car_glass", roof="car_body")
+    m.box(cab_x, 0, z + cab_h * 0.55, cab_l * 0.9, w * 0.9, cab_h * 0.45, "glass_dark", roof="car_body")
     _glass_pillars(m, (cab_x + cab_l * 0.05,), w * 0.45, z + cab_h * 0.58, z + cab_h * 0.96)
     m.box(front, 0, z + 0.005, 0.014, w * 0.92, 0.028, "black")                     # bumper
     _grille(m, front + 0.001, z + 0.032, z + 0.052, w * 0.5)
@@ -135,7 +135,7 @@ def van_cargo(m):
     front, back = 0.22, -0.19
     m.box(-0.02, 0, z, 0.34, 0.18, 0.14, "car_body", roof="car_body")
     m.box(0.17, 0, z, 0.1, 0.18, 0.075, "car_body", roof="car_body")
-    m.box(0.17, 0, z + 0.075, 0.08, 0.16, 0.05, "car_glass", roof="car_body")
+    m.box(0.17, 0, z + 0.075, 0.08, 0.16, 0.05, "glass_dark", roof="car_body")
     _glass_pillars(m, (0.17,), 0.08, z + 0.083, z + 0.12)
     m.box(front, 0, z + 0.005, 0.014, 0.165, 0.028, "black")                        # bumpers
     m.box(back, 0, z + 0.005, 0.014, 0.165, 0.028, "black")
@@ -242,7 +242,7 @@ def _tractor(m, r, x0):
     glass_f = x0 + 0.165
     m.box(x0 + 0.1, 0, z, 0.22, 0.2, 0.08, "car_body", roof="car_body")
     m.box(x0 + 0.04, 0, z + 0.08, 0.1, 0.2, 0.1, "car_body", roof="car_body")         # sleeper
-    m.box(x0 + 0.13, 0, z + 0.08, 0.07, 0.18, 0.06, "car_glass", roof="car_body")
+    m.box(x0 + 0.13, 0, z + 0.08, 0.07, 0.18, 0.06, "glass_dark", roof="car_body")
     _glass_pillars(m, (x0 + 0.11,), 0.09, z + 0.087, z + 0.132)
     m.box(x0 + 0.04, 0, z - 0.004, 0.34, 0.14, 0.02, "metal_dark")
     m.box(front, 0, z + 0.005, 0.014, 0.184, 0.028, "black")                        # bumper
@@ -291,8 +291,8 @@ def _bus(m, length, h, w=0.17, r=0.036, x0=0.0, decks=1, nose=0.0):
     band_h = 0.07 if decks == 1 else 0.055
     for d in range(decks):
         zz = z + 0.07 + d * (h - 0.02) / decks
-        m.box(x0, 0, zz, length * 0.94, w + 0.004, band_h, "car_glass", roof="car_glass")
-    m.box(x0 + length / 2 - 0.004, 0, z + 0.05, 0.012, w * 0.7, 0.05, "car_glass")  # windscreen
+        m.box(x0, 0, zz, length * 0.94, w + 0.004, band_h, "glass_dark", roof="glass_dark")
+    m.box(x0 + length / 2 - 0.004, 0, z + 0.05, 0.012, w * 0.7, 0.05, "glass_dark")  # windscreen
     return z
 
 
@@ -378,8 +378,8 @@ def bus_coach(m):
     hw = 0.09
     m.box(0.0, 0, z, 0.82, 0.18, 0.06, "car_body", roof="car_body")                    # luggage hold
     m.box(0.0, 0, z + 0.06, 0.82, 0.18, 0.15, "car_body", roof="car_body")
-    m.box(0.0, 0, z + 0.09, 0.78, 0.184, 0.075, "car_glass", roof="car_glass")
-    m.box(0.41, 0, z + 0.09, 0.012, 0.15, 0.09, "car_glass")
+    m.box(0.0, 0, z + 0.09, 0.78, 0.184, 0.075, "glass_dark", roof="glass_dark")
+    m.box(0.41, 0, z + 0.09, 0.012, 0.15, 0.09, "glass_dark")
     _bus_front(m, 0.41, z, hw, sign=False)
     _face_quad(m, 0.4125, -0.05, 0.05, z + 0.185, z + 0.205, +1, "glow_sign")          # destination sign
     _bus_rear(m, -0.41, z, hw)
