@@ -22,7 +22,7 @@ import bpy  # noqa: E402
 
 import lib  # noqa: E402
 import preview  # noqa: E402
-from registry import REGISTRY, REGISTRATIONS, OVERRIDES, PROPS, VARIANTS, undeclared_overrides  # noqa: E402
+from registry import REGISTRY, REGISTRATIONS, OVERRIDES, PROPS, VARIANTS, LANDMARKS, undeclared_overrides  # noqa: E402
 
 TRI_LIMIT = int(os.environ.get("MAYOR_BUILDING_TRI_LIMIT", "1400"))
 # Multi-cell assets are drawn once per lot, not once per tile.  Keep the 2x2
@@ -35,6 +35,8 @@ X2_TRI_LIMIT = int(os.environ.get("MAYOR_X2_TRI_LIMIT", "4000"))
 EVOLVED_X2_TRI_LIMIT = int(os.environ.get("MAYOR_EVOLVED_X2_TRI_LIMIT", "1400"))
 EVOLVED_X2_IDS = set(range(1, 21)) | set(range(36, 41))
 X4_TRI_LIMIT = int(os.environ.get("MAYOR_X4_TRI_LIMIT", "2800"))
+LANDMARK_X2_TRI_LIMIT = int(os.environ.get("MAYOR_LANDMARK_X2_TRI_LIMIT", "1400"))
+LANDMARK_X4_TRI_LIMIT = int(os.environ.get("MAYOR_LANDMARK_X4_TRI_LIMIT", "2800"))
 
 
 def parse():
@@ -183,6 +185,30 @@ def main():
     if v2_report:
         with open(os.path.join(opts["out"], "v2", "build-report.json"), "w") as fh:
             json.dump({"schema": 1, "assets": sorted(v2_report, key=lambda a: (a["catalogId"], a["lod"]))}, fh, indent=1)
+    landmark_manifest = []
+    for slug, (name, fn, footprint) in sorted(LANDMARKS.items()):
+        ldir = os.path.join(opts["out"], "landmarks")
+        os.makedirs(ldir, exist_ok=True)
+        lib.clear(); m = lib.Model(slug); fn(m); ob = m.build()
+        limit = 1.01 if footprint == (2, 2) else 2.01
+        max_h = 4.2 if footprint == (2, 2) else 6.2
+        ok, bounds = lib.check_bounds(ob, limit=limit, max_h=max_h)
+        tris = lib.triangle_count(ob)
+        lib.export_glb(ob, os.path.join(ldir, f"{slug}.glb"))
+        if opts["previews"]:
+            preview.setup_scene(top=bounds[5], span=max(footprint))
+            preview.render(os.path.join(opts["previews"], f"{slug}.png"))
+            preview.setup_scene(top=bounds[5], azimuth_deg=145, span=max(footprint))
+            preview.render(os.path.join(opts["previews"], f"{slug}_b.png"))
+        item = {"slug": slug, "name": name, "footprint": list(footprint), "tris": tris,
+                "inside_footprint": ok, "bounds": [round(b, 3) for b in bounds]}
+        landmark_manifest.append(item); print("LANDMARK " + json.dumps(item))
+        if not ok: problems.append(f"landmark {slug} leaves its footprint or height limit")
+        tri_limit = LANDMARK_X2_TRI_LIMIT if footprint == (2, 2) else LANDMARK_X4_TRI_LIMIT
+        if tris > tri_limit: problems.append(f"landmark {slug} has {tris} triangles (limit {tri_limit})")
+    if opts["only"] is None:
+        with open(os.path.join(opts["out"], "landmarks", "manifest.json"), "w") as fh:
+            json.dump({"schema": 1, "assets": landmark_manifest}, fh, indent=1)
     if opts["only"] is None or "props" in sys.argv:
         pdir = os.path.join(opts["out"], "props")
         os.makedirs(pdir, exist_ok=True)

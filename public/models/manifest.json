@@ -913,7 +913,7 @@
     2,
     2
    ],
-   "tris": 776,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -993,7 +993,7 @@
     2,
     2
    ],
-   "tris": 776,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1073,7 +1073,7 @@
     2,
     2
    ],
-   "tris": 776,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1153,7 +1153,7 @@
     2,
     2
    ],
-   "tris": 776,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1233,7 +1233,7 @@
     2,
     2
    ],
-   "tris": 792,
+   "tris": 1358,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1253,7 +1253,7 @@
     4,
     4
    ],
-   "tris": 2494,
+   "tris": 2766,
    "inside_tile": true,
    "bounds": [
     -1.98,
@@ -1333,7 +1333,7 @@
     2,
     2
    ],
-   "tris": 792,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1413,7 +1413,7 @@
     2,
     2
    ],
-   "tris": 1164,
+   "tris": 1358,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1493,7 +1493,7 @@
     2,
     2
    ],
-   "tris": 792,
+   "tris": 778,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1573,7 +1573,7 @@
     2,
     2
    ],
-   "tris": 1164,
+   "tris": 1358,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1653,7 +1653,7 @@
     2,
     2
    ],
-   "tris": 1164,
+   "tris": 1358,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1673,7 +1673,7 @@
     4,
     4
    ],
-   "tris": 2494,
+   "tris": 2766,
    "inside_tile": true,
    "bounds": [
     -1.98,
@@ -1753,7 +1753,7 @@
     2,
     2
    ],
-   "tris": 483,
+   "tris": 489,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1833,7 +1833,7 @@
     2,
     2
    ],
-   "tris": 483,
+   "tris": 489,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1913,7 +1913,7 @@
     2,
     2
    ],
-   "tris": 483,
+   "tris": 489,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -1993,7 +1993,7 @@
     2,
     2
    ],
-   "tris": 483,
+   "tris": 489,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2073,7 +2073,7 @@
     2,
     2
    ],
-   "tris": 483,
+   "tris": 489,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2153,7 +2153,7 @@
     2,
     2
    ],
-   "tris": 495,
+   "tris": 785,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2161,7 +2161,7 @@
     -1.0,
     0.98,
     0.0,
-    0.905
+    0.954
    ]
   },
   {
@@ -2233,7 +2233,7 @@
     2,
     2
    ],
-   "tris": 495,
+   "tris": 785,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2241,7 +2241,7 @@
     -1.0,
     0.98,
     0.0,
-    0.945
+    0.994
    ]
   },
   {
@@ -2313,7 +2313,7 @@
     2,
     2
    ],
-   "tris": 495,
+   "tris": 785,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2321,7 +2321,7 @@
     -1.0,
     0.98,
     0.0,
-    1.205
+    1.254
    ]
   },
   {
@@ -2333,7 +2333,7 @@
     4,
     4
    ],
-   "tris": 1192,
+   "tris": 1320,
    "inside_tile": true,
    "bounds": [
     -1.98,
@@ -2413,7 +2413,7 @@
     2,
     2
    ],
-   "tris": 483,
+   "tris": 489,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2493,7 +2493,7 @@
     2,
     2
    ],
-   "tris": 495,
+   "tris": 785,
    "inside_tile": true,
    "bounds": [
     -0.98,
@@ -2501,7 +2501,7 @@
     -1.0,
     0.98,
     0.0,
-    1.405
+    1.454
    ]
   },
   {
@@ -2513,7 +2513,7 @@
     4,
     4
    ],
-   "tris": 1192,
+   "tris": 1320,
    "inside_tile": true,
    "bounds": [
     -1.98,

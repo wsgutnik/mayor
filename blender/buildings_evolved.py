@@ -36,7 +36,13 @@ def _block(m: Model, x, y, w, d, h, wall, style, floors, cols, roof="roof_flat",
 
 def _res_x2(m: Model, n, wall, h, tower=False):
     _site(m, 2)
-    _block(m, 0, .10, 1.34 if tower else 1.54, 1.22, h, wall, "apartment", 3 if h < 1 else 5, 6, balconies=True)
+    # Offset upper wing breaks the old single-box silhouette; corner piers and
+    # alternating balcony decks turn the bay rhythm into readable massing.
+    _block(m, 0, .14, 1.54, 1.22, min(h, .72), wall, "apartment", 3, 6, balconies=True)
+    if tower:
+        _block(m, .16, .25, 1.08, .84, h, wall, "apartment", 4, 4, balconies=True)
+        m.box(-.46, .42, .75, .18, .20, h - .69, "wall_beige", roof="roof_flat")
+    m.awning(0, -.48, .24, .50, mat="sign_green" if n % 2 else "sign_orange")
     _entry(m, .42, -.78)
     _plant(m, .38, .34, h + .055)
     m.tree(-.72, .72, .62); m.tree(.72, .72, .62, dark=True)
@@ -46,6 +52,9 @@ def _retail_x2(m: Model, n, wall, h, office=False):
     _site(m, 2)
     _block(m, 0, .08, 1.62, 1.25, h, wall, "curtain" if office else "retail", 4 if office else 2, 8)
     m.box(0, -.56, .04, 1.48, .10, .18, "glass_blue")
+    for x in (-.52, 0, .52): m.awning(x, -.55, .25, .38, mat="sign_orange" if x == 0 else "sign_green")
+    if office:
+        _block(m, .18, .22, .92, .78, h + .18, wall, "curtain", 5, 5)
     _entry(m, .46, -.80, sign="glow_sign")
     _plant(m, -.38, .34, h + .055)
     m.tree(.76, .68, .58)
@@ -85,7 +94,10 @@ def _tower_x4(m: Model, n, wall, height, office=False):
     _site(m, 4)
     # Podium is broad but inset; tower setback makes the silhouette legible.
     _block(m, 0, .24, 3.38, 2.82, .42, "wall_cream", "retail", 1, 12)
-    _block(m, 0, .35, 1.72, 1.54, height, wall, "curtain" if office else "apartment", 8, 8, balconies=not office)
+    _block(m, 0, .35, 1.72, 1.54, height * .72, wall, "curtain" if office else "apartment", 5, 6, balconies=not office)
+    _block(m, .18, .45, 1.25, 1.12, height, wall, "curtain" if office else "apartment", 6, 5, balconies=not office)
+    m.box(-.62, .55, height * .72 + .03, .30, .34, height * .28, "wall_beige", roof="roof_flat")
+    m.box(0, .35, height + .04, .74, .62, .018, "grass", roof="grass")
     _entry(m, .60, -1.46, sign="glow_sign" if office else None)
     _plant(m, -.42, .35, height + .055); _plant(m, .34, .35, height + .055)
     for x, y in [(-1.55,-1.30),(1.55,-1.30),(-1.56,1.35),(1.56,1.35)]: m.tree(x, y, .72, dark=x > 0)

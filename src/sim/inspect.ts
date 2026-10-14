@@ -1,6 +1,7 @@
 import { CityState, CAPACITY, lotDemographics, syncLots } from "./sim";
 import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
 import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, facilityFootprint, idx, inBounds } from "./world";
+import { landmarkById } from "./landmarks";
 
 /** Utilities served through the road network have no radius to report. */
 const NETWORKED = new Set<FacilityKind>([FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.SUBSTATION]);
@@ -88,8 +89,9 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
     const kind = z === ZONE.RES ? "res" : z === ZONE.COM ? "com" : "ind";
     const demo = lot ? lotDemographics(s, lot) : undefined;
     const cst = lot?.construction;
+    const landmark = landmarkById(lot && "cx" in lot ? lot.landmark : undefined);
     return {
-      ...base, kind: "building", ...(entry ? fromEntry(entry) : { name: label[0], nameEn: label[1] }),
+      ...base, kind: "building", ...(landmark ? { name: landmark.name, nameEn: landmark.nameEn, category: "Landmark", use: `Raio ${landmark.radius} · +${landmark.landValue} valor`, useEn: `Radius ${landmark.radius} · +${landmark.landValue} value` } : entry ? fromEntry(entry) : { name: label[0], nameEn: label[1] }),
       level: lvl, people: CAPACITY[kind][lvl] * area, peopleKind: z === ZONE.RES ? "residents" : "jobs",
       construction: { state: cst?.state ?? "complete", percent: Math.round((cst?.progress ?? 1) * 100) },
       demographics: demo ? { children: demo.residents.children, working: demo.residents.working, seniors: demo.residents.seniors, workers: demo.residents.working } : undefined,

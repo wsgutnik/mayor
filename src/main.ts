@@ -820,6 +820,7 @@ function isEditingText(e: KeyboardEvent): boolean {
 let seenFires = 0;
 let seenPop = state.population;
 let lastMonthSaved = Math.floor(state.day / 30);
+cityEvents.on("landmark:appeared", (d) => { if (d) hud.notify("milestone", tr("Landmark appeared"), tr("A new landmark rises at {name}.", { name: d.name })); });
 /** Time of day, 0..1; a full cycle takes 90 s at 1x. */
 let tod = 0.34;
 let acc = 0;

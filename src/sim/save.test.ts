@@ -179,6 +179,18 @@ describe("save and load", () => {
     expect(serialize(a).length).toBeLessThan(400_000);
   });
 
+  it("round-trips known landmark ids and harmlessly drops unknown future ids", () => {
+    const a = orientedCity();
+    const lot = a.world.olots?.find((l) => l.w * l.d >= 1);
+    expect(lot).toBeTruthy();
+    lot!.landmark = "opera";
+    const file = JSON.parse(serialize(a));
+    expect(file.lots.some((l: { landmark?: string }) => l.landmark === "opera")).toBe(true);
+    expect(deserialize(JSON.stringify(file)).world.olots?.some((l) => l.landmark === "opera")).toBe(true);
+    file.lots[0].landmark = "removed_from_catalog";
+    expect(deserialize(JSON.stringify(file)).world.olots?.find((l) => l.id === file.lots[0].id)?.landmark).toBeUndefined();
+  });
+
   it("migrates a v1 tile save into oriented cells without dropping axis-aligned zoning", () => {
     const s = newCity(77);
     s.money = 1e6;

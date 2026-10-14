@@ -57,6 +57,8 @@ export interface OrientedLot {
   /** Build progress; absent only in pre-construction saves and treated as complete. */
   build?: number;
   construction?: ConstructionState;
+  /** Rare city landmark; optional so all existing saves remain valid. */
+  landmark?: import("./landmarks").LandmarkId;
   /** Derived pose: centre and yaw such that a model's +z faces the road. Recomputed from the block, never saved. */
   cx: number; cz: number; yaw: number;
   /** Mirror: tile indices whose centre lies inside the lot's rectangle (at least 1). Derived. */

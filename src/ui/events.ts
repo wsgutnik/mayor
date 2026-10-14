@@ -5,9 +5,11 @@ export type CityEvent =
   | "time:speed"
   | "building:added"
   | "tool:changed"
-  | "infoview:changed";
+  | "infoview:changed"
+  | "landmark:appeared";
 
-export type CityEventHandler = () => void;
+export interface LandmarkAppeared { id: string; name: string; nameEn: string; x: number; z: number }
+export type CityEventHandler = (detail?: LandmarkAppeared) => void;
 
 export class EventBus {
   private listeners = new Map<CityEvent, Set<CityEventHandler>>();
@@ -23,10 +25,10 @@ export class EventBus {
     return () => { this.listeners.get(name)?.delete(fn); };
   }
 
-  emit(name: CityEvent): void {
+  emit(name: CityEvent, detail?: LandmarkAppeared): void {
     const set = this.listeners.get(name);
     if (!set) return;
-    for (const fn of [...set]) fn();
+    for (const fn of [...set]) fn(detail);
   }
 }
 

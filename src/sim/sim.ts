@@ -21,6 +21,8 @@ import { evolveOrientedLot } from "./lot-evolution";
 import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
 import { CELL_DEPTH } from "./zonecells";
 import type { CellRef, ConstructionPhase, ConstructionState, OrientedLot, ZoneBlock } from "./zonecells";
+import { applyLandmarkLandValue, LANDMARKS, landmarkCap, landmarkHappiness, landmarkJobs, landmarkRoll, LANDMARK_COOLDOWN } from "./landmarks";
+import { cityEvents } from "../ui/events";
 export { ZONE_DEPTH } from "./blocks";
 
 export type FacilityTool =
@@ -164,6 +166,8 @@ export interface CityState {
   monthIncome: number;
   monthExpenses: number;
   rngState: number;
+  /** Last appearance day; derived from persisted lots on load when absent. */
+  landmarkCooldownUntil: number;
 }
 
 const emptyUtilities = (): Record<UtilityKey, UtilityStat> => ({
@@ -200,6 +204,7 @@ export function newCity(seed = 1337, size = 96, biome: Biome = "plains"): CitySt
     monthIncome: 0,
     monthExpenses: 0,
     rngState: seed,
+    landmarkCooldownUntil: 0,
   };
 }
 
@@ -1388,7 +1393,7 @@ function recount(s: CityState): void {
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
       - missingPower * 25 - missingWater * 25 - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 8 + s.coverage.park * 10 + s.coverage.transit * 5 + s.coverage.culture * 8
-      + (hasCityHall ? 6 : 0),
+      + (hasCityHall ? 6 : 0) + landmarkHappiness(w.olots ?? []),
     0, 100,
   );
 
@@ -1403,7 +1408,7 @@ function recount(s: CityState): void {
   const seniors = Math.max(0, Math.round(s.population) - children - working);
   s.ages = { children, working, seniors };
   const workers = working;
-  const jobs = com + ind;
+  const jobs = com + ind + landmarkJobs(w.olots ?? []);
   s.employed = Math.min(workers, jobs);
   s.unemployed = Math.max(0, workers - jobs);
   s.labourForce = workers;
@@ -1438,6 +1443,7 @@ export function refreshDerived(s: CityState): void {
   updateCoverage(w);
   syncLots(s);
   updateLandValue(w);
+  applyLandmarkLandValue(w, w.olots ?? []);
   recount(s);
   w.revision++;
 }
@@ -1448,7 +1454,7 @@ export function step(s: CityState): void {
   if (w.connectivityDirty) updateConnectivity(w);
   if (w.coverageDirty) updateCoverage(w);
   s.raining = isRaining(s.day, s.rngState);
-  if (s.day % 5 === 0 || s.lvSeenRevision !== w.revision) { updateLandValue(w); s.lvSeenRevision = w.revision; }
+  if (s.day % 5 === 0 || s.lvSeenRevision !== w.revision) { updateLandValue(w); applyLandmarkLandValue(w, w.olots ?? []); s.lvSeenRevision = w.revision; }
   const rng = makeRng(s.rngState ^ (s.day * 2654435761));
   const demandOf = [0, s.demand.r, s.demand.c, s.demand.i];
   let changed = false;
@@ -1476,6 +1482,8 @@ export function step(s: CityState): void {
     }
     const served = readyIds.has(lot.id) && power && water;
     if (advanceConstruction(s, lot, served)) changed = true;
+    // Landmarks are player-bulldozable, but never decline, burn or evolve.
+    if (oriented && (lot as OrientedLot).landmark) continue;
     if (lvl === 0) {
       if (served && d > 0 && rng() < 0.05 * d) {
         oriented ? setOLotLevel(w, lot as OrientedLot, 1) : setLotLevel(w, lot as WorldLot, 1);
@@ -1497,6 +1505,23 @@ export function step(s: CityState): void {
         } else { setLotLevel(w, lot as WorldLot, lvl + 1); changed = true; }
       }
       else if (d < -0.3 && rng() < 0.01) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl - 1) : setLotLevel(w, lot as WorldLot, lvl - 1); changed = true; }
+    }
+  }
+  // One deterministic rare roll per day. It reads only seed/day/lot, so save/load
+  // and replay select precisely the same landmark and location.
+  if (oriented && s.day >= s.landmarkCooldownUntil) {
+    const existing = (w.olots ?? []).filter((l) => l.landmark).length;
+    const candidates = (w.olots ?? []).filter((l) => !l.landmark && l.level > 0 && l.w * l.d >= 4 && l.build !== undefined && l.build >= 1 && l.construction?.state !== "paused" && l.construction?.state !== "planned");
+    for (const lot of candidates) {
+      if (existing >= landmarkCap(s.population)) break;
+      const eligible = LANDMARKS.filter((m) => m.zones.includes(lot.zone) && lot.w >= m.footprint && lot.d >= m.footprint);
+      const roll = landmarkRoll(s.rngState, s.day, lot);
+      if (!eligible.length || roll % 4096 !== 0) continue;
+      const mark = eligible[Math.floor(roll / 4096) % eligible.length];
+      lot.landmark = mark.id; lot.level = Math.max(lot.level, 3); beginConstruction(lot);
+      setOLotLevel(w, lot, lot.level); s.landmarkCooldownUntil = s.day + LANDMARK_COOLDOWN; changed = true;
+      cityEvents.emit("landmark:appeared", { id: mark.id, name: mark.name, nameEn: mark.nameEn, x: lot.cx, z: lot.cz });
+      break;
     }
   }
   if (changed) {

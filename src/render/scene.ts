@@ -15,6 +15,7 @@ import { CONTACT_DARK, ContactShadows, VehicleLightPools } from "./vehicle-fx";
 import { StreetLightFx } from "./street-light";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
+import { LANDMARKS } from "../sim/landmarks";
 import {
   SITE_PLINTH_SHRINK, cellBaseY, lotFrontSample, lotFrontTile, lotInstances, lotYaw, padBaseY, siteLevel,
 } from "./lots";
@@ -266,6 +267,8 @@ export class CityRenderer {
   /** Dedicated multi-cell pools: one authored GLB is placed at the lot centre. */
   private bX2Meshes = new Map<number, THREE.InstancedMesh>();
   private bX4Meshes = new Map<number, THREE.InstancedMesh>();
+  /** Landmark models are isolated pools, so a missing authored asset retains a kit fallback. */
+  private landmarkMeshes = new Map<string, THREE.InstancedMesh>();
   private procBuildings: ProcBuildingsRenderer | null = null;
   private fMeshes = new Map<number, THREE.InstancedMesh>();
   private sized: THREE.Object3D[] = [];
@@ -276,6 +279,8 @@ export class CityRenderer {
   private glbPending = new Set<number>();
   private glbX2Pending = new Set<number>();
   private glbX4Pending = new Set<number>();
+  private landmarkGlb = new Map<string, LoadedModel | null>();
+  private landmarkPending = new Set<string>();
   private fX2Loaded = new Set<FacilityKind>();
   private glowMats = new Set<THREE.MeshStandardMaterial>();
   private nightGlow = 0;
@@ -489,6 +494,7 @@ export class CityRenderer {
     this.bMeshes.clear();
     this.bX2Meshes.clear();
     this.bX4Meshes.clear();
+    this.landmarkMeshes.clear();
     this.fMeshes.clear();
     for (const [k, g] of this.models.buildings) {
       this.bMeshes.set(k, mkModel(g, Math.ceil(cap * 0.6)));
@@ -498,6 +504,11 @@ export class CityRenderer {
         this.bX2Meshes.set(n, mkModel(g, Math.ceil(cap * 0.15)));
         this.bX4Meshes.set(n, mkModel(g, Math.ceil(cap * 0.08)));
       }
+    }
+    for (const landmark of LANDMARKS) {
+      // First kit geometry is only a safe fallback until its dedicated GLB arrives.
+      const fallback = this.models.buildings.values().next().value as THREE.BufferGeometry;
+      this.landmarkMeshes.set(landmark.id, mkModel(fallback, Math.ceil(cap * .03)));
     }
     for (const [k, g] of this.models.facilities) this.fMeshes.set(k, mkModel(g, Math.ceil(cap * 0.3)));
     // Plants: one instanced mesh per species; cones stand in until its GLB arrives.
@@ -704,6 +715,13 @@ export class CityRenderer {
     };
     wantEvolved(this.bX2Meshes, this.glbX2, this.glbX2Pending, "x2");
     wantEvolved(this.bX4Meshes, this.glbX4, this.glbX4Pending, "x4");
+    for (const [id, mesh] of this.landmarkMeshes) {
+      const apply = (model: LoadedModel) => { if (this.sized.includes(mesh)) { mesh.geometry = model.geometry; mesh.material = model.materials; this.seenRevision = -1; } };
+      if (this.landmarkGlb.has(id)) { const hit = this.landmarkGlb.get(id); if (hit) apply(hit); continue; }
+      if (this.landmarkPending.has(id)) continue;
+      this.landmarkPending.add(id);
+      loadGlb(`/models/landmarks/landmark_${id}.glb`).then((model) => { this.landmarkGlb.set(id, model); this.landmarkPending.delete(id); if (model) apply(model); });
+    }
     const facilityWanted: [FacilityKind, number, THREE.InstancedMesh][] = [];
     for (const [kind, mesh] of this.fMeshes) {
       const n = facilityEntry(kind as FacilityKind)?.n;
@@ -993,9 +1011,9 @@ export class CityRenderer {
         const useProc = !!this.procBuildings && "cx" in lot && lot.w * lot.d >= 4 && !evolved;
         if (useProc) continue; // committed in one static pool pass after all lots are inspected.
         const look = pickLotEntry(z, lot.level, plan.area, tileHash(Math.floor(c.x) + 17, Math.floor(c.z) + 29));
-        const mesh = pose.w === 4 && pose.d === 4 ? this.bX4Meshes.get(look.entry?.n ?? -1)
+        const mesh = ("landmark" in lot && lot.landmark ? this.landmarkMeshes.get(lot.landmark) : undefined) ?? (pose.w === 4 && pose.d === 4 ? this.bX4Meshes.get(look.entry?.n ?? -1)
           : pose.w === 2 && pose.d === 2 ? this.bX2Meshes.get(look.entry?.n ?? -1)
-          : this.bMeshes.get(`${z}-${look.level}-${look.index}`);
+          : this.bMeshes.get(`${z}-${look.level}-${look.index}`));
         if (mesh) {
           tint.setScalar(0.9 + r * 0.2);
           const cells = evolved ? [{ x: c.x, z: c.z, yaw: pose.yaw }] : plan.models;
@@ -1056,7 +1074,7 @@ export class CityRenderer {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
-    for (const m of [...this.bMeshes.values(), ...this.bX2Meshes.values(), ...this.bX4Meshes.values(), ...this.fMeshes.values()]) {
+    for (const m of [...this.bMeshes.values(), ...this.bX2Meshes.values(), ...this.bX4Meshes.values(), ...this.landmarkMeshes.values(), ...this.fMeshes.values()]) {
       m.count = counts.get(m) ?? 0;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
@@ -1751,7 +1769,7 @@ export class CityRenderer {
     fade(this.roadMesh.material, on ? 0.45 : 1);
     fade(this.lodBox.material, on ? 0.3 : 1);
     for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);
-    for (const m of [...this.bX2Meshes.values(), ...this.bX4Meshes.values()]) fade(m.material, on ? 0.3 : 1);
+    for (const m of [...this.bX2Meshes.values(), ...this.bX4Meshes.values(), ...this.landmarkMeshes.values()]) fade(m.material, on ? 0.3 : 1);
     for (const m of this.fMeshes.values()) fade(m.material, on ? 0.45 : 1);
     this.zones.visible = !on;
     this.kerbs.visible = !on;
@@ -2023,7 +2041,7 @@ export class CityRenderer {
     const boxM = box.instanceMatrix.array as Float32Array;
     const boxC = box.instanceColor?.array as Float32Array | undefined;
     let slots = 0;
-    for (const m of [...this.bMeshes.values(), ...this.bX2Meshes.values(), ...this.bX4Meshes.values()]) {
+    for (const m of [...this.bMeshes.values(), ...this.bX2Meshes.values(), ...this.bX4Meshes.values(), ...this.landmarkMeshes.values()]) {
       if (full(m) === 0) continue;
       const r = this.lod.partition(m, cx, cz, dist);
       m.count = this.lodEnabled ? r.near : r.total;

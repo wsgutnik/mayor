@@ -109,6 +109,8 @@ const PT: Record<string, string> = {
   "Autosave found: open the menu to continue": "Autosave encontrado: abra o menu para continuar",
   "Undone": "Desfeito", "Redone": "Refeito",
   "Fire! A building burned down. Build a fire station.": "Incêndio! Um prédio queimou. Construa um posto de bombeiros.",
+  "Landmark appeared": "Marco apareceu",
+  "A new landmark rises at {name}.": "Um novo marco surge: {name}.",
   // sim reasons
   "Not enough money": "Dinheiro insuficiente", "Cannot build on water": "Não é possível construir na água",
   "Facility footprint is outside the map": "A instalação não cabe no mapa", "Facility must be within 5 tiles of a connected road": "A instalação deve ficar a até 5 trechos de uma estrada conectada",

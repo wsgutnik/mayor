@@ -11,6 +11,9 @@ import inspect
 REGISTRY = {}
 #: Non-base variants, keyed (n, variant): never replace the production model; exported to <out>/variants/<variant>/NN.glb.
 VARIANTS = {}
+#: Civic hero assets keyed by stable export slug.  Unlike a kit variant they do
+#: not consume a catalog number and are written to models/landmarks/.
+LANDMARKS = {}
 #: Every registration in import order: {"n", "name", "module", "variant", "version", "footprint"}.
 REGISTRATIONS = []
 #: Replacements: {"n", "replaced_module", "by_module"}.
@@ -69,5 +72,17 @@ def prop(name):
     """Register a prop (tree, vehicle, boat, street furniture) exported to models/props/<name>.glb."""
     def deco(fn):
         PROPS[name] = fn
+        return fn
+    return deco
+
+
+def landmark(slug, name, footprint):
+    """Register a named civic landmark (footprint is 2x2 or 4x4 tiles)."""
+    if footprint not in ((2, 2), (4, 4)):
+        raise ValueError("landmark footprint must be 2x2 or 4x4")
+    def deco(fn):
+        if slug in LANDMARKS:
+            raise ValueError(f"duplicate landmark {slug}")
+        LANDMARKS[slug] = (name, fn, tuple(footprint))
         return fn
     return deco

@@ -1,0 +1,149 @@
+{
+ "schema": 1,
+ "assets": [
+  {
+   "slug": "landmark_artdeco",
+   "name": "Art Deco tower",
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 690,
+   "inside_footprint": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.97
+   ]
+  },
+  {
+   "slug": "landmark_cathedral",
+   "name": "Cathedral",
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 824,
+   "inside_footprint": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.79
+   ]
+  },
+  {
+   "slug": "landmark_clocktower",
+   "name": "Clock tower",
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 618,
+   "inside_footprint": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    2.1
+   ]
+  },
+  {
+   "slug": "landmark_conservatory",
+   "name": "Palm conservatory",
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 379,
+   "inside_footprint": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.96
+   ]
+  },
+  {
+   "slug": "landmark_hotel",
+   "name": "Grand hotel",
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 2338,
+   "inside_footprint": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    1.84
+   ]
+  },
+  {
+   "slug": "landmark_observatory",
+   "name": "Observatory",
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 346,
+   "inside_footprint": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.03
+   ]
+  },
+  {
+   "slug": "landmark_opera",
+   "name": "Opera house",
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 328,
+   "inside_footprint": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.27
+   ]
+  },
+  {
+   "slug": "landmark_palace",
+   "name": "Palace",
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 1255,
+   "inside_footprint": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    1.11
+   ]
+  }
+ ]
+}
