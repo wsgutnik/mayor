@@ -128,6 +128,20 @@ is stored with `mayor:road-snap`, defaults on for old stored values, and does no
 change saves. A placement refusal is still produced by `planRoad`; guide geometry
 never bends a road around a keep-out or overlap.
 
+### Overlay recipe
+
+`src/render/road-guides-overlay.ts` draws the assist as one preallocated
+`LineSegments` call, with `depthTest: false`, `depthWrite: false`, render order
+24, and every vertex lifted `max(terrain, waterline) + 0.18` tiles. Rays are
+6 tiles long, dashed 0.32 on / 0.26 off; their road-kit cyan is dimmed unless
+active, where it is near white. A continued segment additionally draws a
+1.05-tile, 12-chord shortest-turn amber arc; its degree value lives in the
+existing road readout. The end gets two 0.44-tile cross ticks (white node,
+blue segment, pale free), and 0.36-tile chevrons repeat every 1.35 tiles along
+the pending direction. The fixed 1,800-vertex store covers the maximum 24
+15-degree rays plus arc, ticks, and chevrons without allocation; inactive
+guides set draw range to zero. Pure ray and arc recipes are asserted to 1e-8.
+
 ## Known gaps
 
 - Overlap rules: two dead ends facing each other tip to tip closer than their footprints (the tile-paint idiom: a road

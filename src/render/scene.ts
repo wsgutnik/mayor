@@ -49,6 +49,7 @@ import { loadEnvironment } from "./environment";
 import { updateAtmosphereState, type AtmosphereState } from "./atmosphere";
 import type { ZoneBlockSet } from "../sim/zoneblocks";
 import type { CellPose, CellRef } from "../sim/zonecells";
+import { GuideOverlay, type RoadGuideOverlayInput } from "./road-guides-overlay";
 
 const ZONE_TILE = {
   [ZONE.RES]: new THREE.Color("#4fbf6a"),
@@ -237,6 +238,7 @@ export class CityRenderer {
   private previewMesh!: THREE.Mesh;
   /** Ghost of the parallel twin (UI-2); same strip, its own validity colour. */
   private previewMesh2!: THREE.Mesh;
+  private roadGuides!: GuideOverlay;
   /** Crossing markers on the road ghost (junction yellow, grade-separated blue, blocked red). */
   private crossMesh!: THREE.InstancedMesh;
   private zones!: THREE.InstancedMesh;
@@ -375,6 +377,8 @@ export class CityRenderer {
     this.previewMesh2.frustumCulled = false;
     this.previewMesh2.visible = false;
     this.scene.add(this.previewMesh2);
+    this.roadGuides = new GuideOverlay((x, z) => this.groundY(x, z));
+    this.scene.add(this.roadGuides.lines);
     this.crossMesh = new THREE.InstancedMesh(
       new THREE.BoxGeometry(0.42, 0.3, 0.42),
       new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.9, depthWrite: false }), 64);
@@ -1683,6 +1687,11 @@ export class CityRenderer {
     m.count = n;
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }
+
+  /** Construction-only snapping aids; backed by one preallocated line draw call. */
+  setRoadGuides(input: RoadGuideOverlayInput | null): void {
+    this.roadGuides.update(input);
   }
 
   /** Ground position under a client-space pointer. */

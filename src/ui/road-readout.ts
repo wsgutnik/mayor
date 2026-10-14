@@ -30,6 +30,8 @@ export interface RoadReadoutInput {
   ok: boolean;
   /** Raw `planRoad` reason when invalid; translated, never invented. */
   reason?: string;
+  /** Turn from the preceding leg; displayed in the existing floating readout. */
+  angleDeg?: number;
 }
 
 export interface RoadReadoutRow {
@@ -87,6 +89,7 @@ export function formatRoadReadout(d: RoadReadoutInput, i18n: RoadReadoutI18n): R
       value: `${Math.round(d.lengthTiles)} ${tr("tiles")} · ${Math.round(d.lengthTiles * METERS_PER_TILE)} m`,
     },
     { label: tr("Slope"), value: `${Math.round(d.maxSlopePct)}%` },
+    ...(d.angleDeg === undefined ? [] : [{ label: tr("Angle"), value: `${Math.round(d.angleDeg)}°` }]),
     { label: tr("Level"), value: tr(MODE_KEY[d.mode]) },
   ];
   if (!d.ok && d.reason) rows.push({ label: "", value: trReason(d.reason), bad: true });

@@ -297,6 +297,7 @@ function cancelDraft(): void {
   marqueeCurrent = null;
   renderer.setZoneRect(null, null);
   renderer.setRoadPreview(null);
+  renderer.setRoadGuides(null);
   renderer.setStopMarks([]);
   hud.showFinish(false);
   hud.showCreateLine(false);
@@ -389,7 +390,7 @@ function currentSegment(): { pts: Pt[] } | null {
 
 function updatePreview(at?: { x: number; y: number }): void {
   const seg = currentSegment();
-  if (!seg) { renderer.setRoadPreview(null); hud.hideRoadReadout(); return; }
+  if (!seg) { renderer.setRoadPreview(null); renderer.setRoadGuides(null); hud.hideRoadReadout(); return; }
   // Before the bend point is set in curve mode, show the straight guide.
   const plan = planRoad(state, roadType, seg.pts, roadLevel);
   // Parallel twin: same class, offset sideways, with its own plan and validity colour.
@@ -405,6 +406,12 @@ function updatePreview(at?: { x: number; y: number }): void {
   if (cursor && lastSnap && lastSnap.kind !== "free") marks.push({ x: cursor.x, z: cursor.z, kind: lastSnap.refused ? "blocked" : "snap" });
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks,
     twinPts ? { pts: twinPts, valid: twinOk } : null);
+  const anchor = draft[draft.length - 1];
+  const showGuides = tool === "road" && snapOpts.guides && !!cursor && !altDown && !shiftDown;
+  renderer.setRoadGuides(showGuides ? {
+    anchor, guides: guideAngles(anchor, lastSegDir ?? startRef), activeGuide: guideHold,
+    cursor: cursor!, snapKind: lastSnap?.kind ?? "free", prevDir: lastSegDir,
+  } : null);
   const len = segmentLength(seg.pts);
   if (!at || len < 0.5) {
     hud.hideRoadReadout();
@@ -414,6 +421,7 @@ function updatePreview(at?: { x: number; y: number }): void {
     hud.showRoadReadout(
       formatRoadReadout({
         cost: plan.cost, lengthTiles: len, maxSlopePct: slope, mode, ok: plan.ok, reason: plan.reason,
+        ...(lastSegDir !== null ? { angleDeg: Math.abs(Math.atan2(Math.sin(Math.atan2(seg.pts.at(-1)!.z - anchor.z, seg.pts.at(-1)!.x - anchor.x) - lastSegDir), Math.cos(Math.atan2(seg.pts.at(-1)!.z - anchor.z, seg.pts.at(-1)!.x - anchor.x) - lastSegDir))) * 180 / Math.PI } : {}),
         ...(twinPlan ? { parallel: { cost: twinPlan.cost, ok: twinOk, ...(twinReason ? { reason: twinReason } : {}) } } : {}),
       }, { tr, trReason }),
       at.x, at.y,
