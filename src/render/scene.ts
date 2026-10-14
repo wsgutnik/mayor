@@ -14,7 +14,9 @@ import { shadowBias } from "./shadow-tuning";
 import { CONTACT_DARK, ContactShadows } from "./vehicle-fx";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
-import { lotFrontTile, lotInstances } from "./lots";
+import {
+  SITE_PLINTH_SHRINK, cellBaseY, lotFrontSample, lotFrontTile, lotInstances, lotYaw, padBaseY, siteLevel,
+} from "./lots";
 import { loadGlb, LoadedModel } from "./glb-models";
 import { visualV2PreviewEnabled } from "./visual-v2";
 import { loadManifestGatedModel } from "./visual-v2-manifest";
@@ -26,10 +28,12 @@ import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 import { UndergroundView } from "./underground";
 import { createRoadDetailMaterial, loadRoadAtlas, loadRoadDetailMaps, RoadDetail } from "./road-material";
 import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat } from "./terrain-splat";
-import { createPlotMaterial } from "./plot-material";
+import { GROUND_SURFACE_TINT, createPlotMaterial } from "./plot-material";
+import { SURF, planMayorLot, rectWorld } from "../sim/lotground";
 import { LodSorter } from "./lod";
 import { QUALITY_PROFILE, qualityForPixelCap } from "../prefs";
 import { configureKitTextures } from "./kit-materials";
+import { setWindowNight } from "./window-light";
 import { nodeArms, signalNodes, signalPhase } from "../sim/roads";
 import { PROP_KINDS, PropKind, planProps } from "../sim/props";
 import { PROP_TINT, propGeometry } from "./props";
@@ -45,6 +49,8 @@ const ZONE_TILE = {
 /** Street kerb strips and the shared plot under multi-tile buildings. */
 const KERB_TINT = new THREE.Color("#dfe3e8");
 const PLOT_TINT = new THREE.Color("#c9c2b4");
+/** V4 concrete foundation under buildings whose site platform floats above the slope. */
+const CONCRETE_TINT = new THREE.Color("#c9ccd0");
 
 /** 0 = off, a COVER bit, or LAND_VALUE_LAYER. */
 export type OverlayLayer = number;
@@ -410,19 +416,20 @@ export class CityRenderer {
     this.buildTerrain();
     own(this.terrain);
     const box = new THREE.BoxGeometry(1, 1, 1);
-    const mk = (mat: THREE.Material) => {
-      const m = new THREE.InstancedMesh(box, mat, cap);
+    const mk = (mat: THREE.Material, mult = 1) => {
+      const m = new THREE.InstancedMesh(box, mat, cap * mult);
       m.count = 0;
       m.frustumCulled = false;
       own(m);
       return m;
     };
+    // Ground plans emit ~2-8 pads per built lot, so the pad pool is 4x the tile count (one draw call).
     this.zones = mk(createPlotMaterial({
       texture: this.plotTex,
       anisotropy: this.profileAniso,
       maxAnisotropy: this.maxAniso,
       enabled: QUALITY_PROFILE.high.padTex,
-    }));
+    }), 4);
     this.kerbs = mk(new THREE.MeshLambertMaterial({ color: "#ffffff" }));
     // Amber diamonds over buildings missing power or water (red when both are out).
     this.warnMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ toneMapped: false }), cap);
@@ -849,14 +856,59 @@ export class CityRenderer {
           d.rotation.set(0, 0, 0);
         }
       } else {
-        for (const pad of plan.pad) {
+        // V3 ground plan: disjoint per-surface rects instead of one shared plot. NONE rects emit
+        // nothing (terrain grass shows through). Classic lots swap w/h when facing ±x so u runs
+        // along the road like the oriented frame.
+        const pose = "cx" in lot
+          ? { cx: lot.cx, cz: lot.cz, yaw: lot.yaw, w: lot.w, d: lot.d }
+          : (() => {
+            const yaw = lotYaw(lot);
+            const side = lot.facing.dx !== 0;
+            return { cx: c.x, cz: c.z, yaw, w: side ? lot.h : lot.w, d: side ? lot.w : lot.h };
+          })();
+        // V4 site grading: the platform meets the road, the pads hug the ground, the plinth fills the gap.
+        let frontY: number;
+        if ("cx" in lot) {
+          const fs = lotFrontSample(pose);
+          frontY = heightAt(w, fs.x, fs.z);
+        } else {
+          const front = lotFrontTile(lot);
+          frontY = front ? heightAt(w, front.x + 0.5, front.y + 0.5) : heightAt(w, c.x, c.z);
+        }
+        const site = siteLevel(pose, (x, z) => heightAt(w, x, z), frontY);
+        const ground = planMayorLot(pose.w, pose.d, z, lot.level, lot.id).filter((r) => r.surf !== SURF.NONE);
+        const plots = ground.length > 0 ? null : plan.pad;
+        for (const pad of plots ?? []) {
           if (nz >= this.zones.instanceMatrix.count) break;
-          d.position.set(pad.x, this.padY(pad.x, pad.z, pad.sx, pad.sz, pad.yaw, 0.02), pad.z);
+          d.position.set(pad.x, padBaseY(site, this.padMean(pad.x, pad.z, pad.sx, pad.sz, pad.yaw), 0.02), pad.z);
           d.rotation.set(0, pad.yaw, 0);
           d.scale.set(pad.sx, 0.08, pad.sz);
           d.updateMatrix();
           this.zones.setMatrixAt(nz, d.matrix);
           this.zones.setColorAt(nz++, PLOT_TINT);
+          d.rotation.set(0, 0, 0);
+        }
+        for (const rect of ground) {
+          if (nz >= this.zones.instanceMatrix.count) break;
+          const t = rectWorld(rect, pose);
+          d.position.set(t.x, padBaseY(site, this.padMean(t.x, t.z, t.sx, t.sz, t.yaw), 0.025), t.z);
+          d.rotation.set(0, t.yaw, 0);
+          d.scale.set(t.sx, 0.08, t.sz);
+          d.updateMatrix();
+          this.zones.setMatrixAt(nz, d.matrix);
+          this.zones.setColorAt(nz++, tint.set(GROUND_SURFACE_TINT[rect.surf]));
+          d.rotation.set(0, 0, 0);
+        }
+        if (site.plinthDepth > 0 && nk < this.kerbs.instanceMatrix.count) {
+          d.position.set(pose.cx, site.y - site.plinthDepth / 2 + 0.01, pose.cz);
+          d.rotation.set(0, pose.yaw, 0);
+          d.scale.set(
+            Math.max(0.08, pose.w - SITE_PLINTH_SHRINK), site.plinthDepth + 0.02,
+            Math.max(0.08, pose.d - SITE_PLINTH_SHRINK),
+          );
+          d.updateMatrix();
+          this.kerbs.setMatrixAt(nk, d.matrix);
+          this.kerbs.setColorAt(nk++, CONCRETE_TINT);
           d.rotation.set(0, 0, 0);
         }
         const r = hash(Math.floor(c.x), Math.floor(c.z));
@@ -868,7 +920,10 @@ export class CityRenderer {
         if (mesh) {
           tint.setScalar(0.9 + r * 0.2);
           for (const cell of plan.models) {
-            this.placeLotCell(mesh, counts, cell.x, cell.z, cell.yaw, 0.92 + r * 0.2, tint);
+            this.placeLotCell(
+              mesh, counts, cell.x, cell.z, cell.yaw, 0.92 + r * 0.2, tint,
+              cellBaseY(site, heightAt(w, cell.x, cell.z)),
+            );
           }
         }
       }
@@ -1067,12 +1122,12 @@ export class CityRenderer {
     d.rotation.set(0, 0, 0);
   }
 
-  /** One composed cell of a lot's building: explicit ground spot and street-facing yaw. */
-  private placeLotCell(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, fx: number, fz: number, yaw: number, scaleY: number, tint: THREE.Color): void {
+  /** One composed cell of a lot's building: site-graded base height and street-facing yaw. */
+  private placeLotCell(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, fx: number, fz: number, yaw: number, scaleY: number, tint: THREE.Color, baseY: number): void {
     const n = counts.get(mesh) ?? 0;
     if (n >= mesh.instanceMatrix.count) return;
     const d = this.dummy;
-    d.position.set(fx, heightAt(this.world, fx, fz) + 0.04, fz);
+    d.position.set(fx, baseY + 0.04, fz);
     d.rotation.set(0, yaw, 0);
     d.scale.set(1, scaleY, 1);
     d.updateMatrix();
@@ -1087,12 +1142,16 @@ export class CityRenderer {
   }
 
   private padY(x: number, z: number, sx: number, sz: number, yaw: number, lift: number): number {
+    return this.padMean(x, z, sx, sz, yaw) + lift;
+  }
+
+  private padMean(x: number, z: number, sx: number, sz: number, yaw: number): number {
     const s = Math.sin(yaw), c = Math.cos(yaw);
     let h = 0;
     for (const ax of [-sx / 2, sx / 2]) {
       for (const dz of [-sz / 2, sz / 2]) h += heightAt(this.world, x + ax * c + dz * s, z - ax * s + dz * c);
     }
-    return h / 4 + lift;
+    return h / 4;
   }
 
   /**
@@ -1238,7 +1297,10 @@ export class CityRenderer {
     this.hemi.intensity = under ? 1.8 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
     this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
     this.nightGlow = this.winMat.emissiveIntensity;
-    for (const g of this.glowMats) g.emissiveIntensity = this.nightGlow;
+    for (const g of this.glowMats) {
+      g.emissiveIntensity = this.nightGlow;
+      setWindowNight(g, this.nightGlow); // per-window shader (V1); no-op for plain glow mats
+    }
     this.rainOn = raining;
     this.rain.visible = raining;
     this.roadDetail.setDayWet(this.dayLevel, raining ? 1 : 0);

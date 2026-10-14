@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { getFrontage } from "./blocks";
 import { addSegment } from "./roads";
-import { buildZoneBlocks, blocksForSegment, cellIndex, cellPose, migrateCells, nearestCell, type ZoneBlockSet } from "./zoneblocks";
-import { ROAD, ZONE, generateWorld, idx, rasterizeRoad, rebuildRoadRaster, type Pt, type RoadSegment, type RoadType, type World } from "./world";
+import { buildZoneBlocks, blocksForSegment, cellCorners, cellIndex, cellPose, junctionDiscs, migrateCells, nearestCell, quadArea, type ZoneBlockSet } from "./zoneblocks";
+import { ROAD, ROAD_DRAW_WIDTH, ZONE, curvePoints, generateWorld, idx, rasterizeRoad, rebuildRoadRaster, type Pt, type RoadSegment, type RoadType, type World } from "./world";
 import { CELL_DEPTH, type ZoneBlock } from "./zonecells";
 
 function blank(size = 32): World {
@@ -169,5 +169,160 @@ describe("oriented zone blocks", () => {
       }));
     };
     expect(make()).toEqual(make());
+  });
+
+  it("Z1: no valid cell corner lies inside either asphalt at a 45-degree crossing", () => {
+    const w = blank(40);
+    addSegment(w, ROAD.STREET, [{ x: 4.5, z: 20.5 }, { x: 35.5, z: 20.5 }]);
+    addSegment(w, ROAD.STREET, [{ x: 12.5, z: 8.5 }, { x: 28.5, z: 24.5 }]);
+    const set = buildZoneBlocks(w);
+    const lines = w.segments.map((s) => ({ half: ROAD_DRAW_WIDTH[s.type] / 2, pts: curvePoints(s.pts, 0.25) }));
+    const distTo = (x: number, z: number, line: { pts: Pt[] }) => {
+      let best = Infinity;
+      for (let i = 1; i < line.pts.length; i++) {
+        const a = line.pts[i - 1], b = line.pts[i];
+        const vx = b.x - a.x, vz = b.z - a.z, l2 = vx * vx + vz * vz || 1;
+        const u = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / l2));
+        best = Math.min(best, Math.hypot(a.x + vx * u - x, a.z + vz * u - z));
+      }
+      return best;
+    };
+    const corners = new Float32Array(8);
+    let checked = 0;
+    for (const b of set.blocks.values()) for (let r = 0; r < b.rows; r++) for (let c = 0; c < CELL_DEPTH; c++) {
+      if (!b.valid[cellIndex(r, c)]) continue;
+      cellCorners(b, r, c, corners);
+      for (let k = 0; k < 4; k++) {
+        for (const line of lines) expect(distTo(corners[k * 2], corners[k * 2 + 1], line)).toBeGreaterThanOrEqual(line.half - 1e-6);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(50);
+  });
+
+  it("Z1: no valid cell centre lies inside a T-junction keep-out disc", () => {
+    const w = blank(32);
+    addSegment(w, ROAD.STREET, [{ x: 4.5, z: 14.5 }, { x: 27.5, z: 14.5 }]);
+    addSegment(w, ROAD.STREET, [{ x: 16.5, z: 14.5 }, { x: 16.5, z: 26.5 }]);
+    const set = buildZoneBlocks(w);
+    const discs = junctionDiscs(w);
+    expect(discs.length).toBeGreaterThanOrEqual(1);
+    for (const b of set.blocks.values()) for (let r = 0; r < b.rows; r++) for (let c = 0; c < CELL_DEPTH; c++) {
+      if (!b.valid[cellIndex(r, c)]) continue;
+      const p = cellPose(b, r, c);
+      for (const d of discs) expect((p.x - d.x) ** 2 + (p.z - d.z) ** 2).toBeGreaterThanOrEqual(d.r * d.r - 1e-9);
+    }
+  });
+
+  it("Z1: a cell with a corner in water is invalid", () => {
+    const w = blank(32);
+    segment(w, [{ x: 4.5, z: 14.5 }, { x: 27.5, z: 14.5 }]);
+    const s = w.size + 1;
+    for (let y = 16; y <= 18; y++) for (let x = 10; x <= 14; x++) w.heights[y * s + x] = -1;
+    const set = buildZoneBlocks(w);
+    // South side col 0 centre near (12.5, 15.57) has corners reaching into the pond.
+    expect(nearestCell(set, 12.5, 15.5, 0.75)).toBeNull();
+    expect(nearestCell(set, 20.5, 15.5, 0.75)).not.toBeNull();
+  });
+
+  it("Z2: a straight street gives exactly the old unit squares", () => {
+    const w = blank(24);
+    const seg = { id: 1, type: ROAD.STREET, pts: [{ x: 3.5, z: 10.5 }, { x: 18.5, z: 10.5 }], tiles: [], a: 0, b: 0 } as RoadSegment;
+    for (const b of blocksForSegment(w, seg)) {
+      const q = new Float32Array(8);
+      for (let r = 0; r < b.rows; r++) for (let c = 0; c < CELL_DEPTH; c++) {
+        cellCorners(b, r, c, q);
+        const p = cellPose(b, r, c);
+        const nx = p.nx * b.side, nz = p.nz * b.side;
+        const ax = p.tx * 0.5, az = p.tz * 0.5, bx = nx * 0.5, bz = nz * 0.5;
+        const exp = [p.x - ax - bx, p.z - az - bz, p.x + ax - bx, p.z + az - bz, p.x + ax + bx, p.z + az + bz, p.x - ax + bx, p.z - az + bz];
+        for (let k = 0; k < 8; k++) expect(Math.abs(q[k] - exp[k])).toBeLessThan(1e-6);
+        expect(Math.abs(Math.abs(quadArea(q)) - 1)).toBeLessThan(1e-6);
+      }
+    }
+  });
+
+  it("Z2: adjacent cells in a row share their edge on a quarter-circle street", () => {
+    const w = blank(40);
+    const seg = { id: 1, type: ROAD.STREET, pts: [{ x: 8.5, z: 10.5 }, { x: 8.5, z: 18.5 }, { x: 16.5, z: 18.5 }], tiles: [], a: 0, b: 0 } as RoadSegment;
+    const blocks = blocksForSegment(w, seg);
+    expect(blocks.length).toBeGreaterThan(0);
+    const lo = new Float32Array(8), hi = new Float32Array(8);
+    let pairs = 0;
+    for (const b of blocks) {
+      for (let r = 0; r + 1 < b.rows; r++) for (let c = 0; c < CELL_DEPTH; c++) {
+        cellCorners(b, r, c, lo);
+        cellCorners(b, r + 1, c, hi);
+        // High edge of row r (P10,P11) meets low edge of row r+1 (P00,P01).
+        expect(Math.hypot(lo[2] - hi[0], lo[3] - hi[1])).toBeLessThan(1e-3);
+        expect(Math.hypot(lo[4] - hi[6], lo[5] - hi[7])).toBeLessThan(1e-3);
+        pairs++;
+      }
+    }
+    expect(pairs).toBeGreaterThan(10);
+  });
+
+  it("Z2: inner-side cells of an R=2 curve are dropped by the area cut", () => {
+    const w = blank(32);
+    segment(w, [{ x: 14.5, z: 10.5 }, { x: 14.5, z: 12.5 }, { x: 16.5, z: 12.5 }]);
+    const set = buildZoneBlocks(w);
+    const q = new Float32Array(8);
+    let cutFound = false;
+    for (const b of set.blocks.values()) {
+      for (let r = 0; r < b.rows; r++) {
+        for (let c = 0; c < CELL_DEPTH; c++) {
+          cellCorners(b, r, c, q);
+          const small = Math.abs(quadArea(q)) < 0.42;
+          if (small) {
+            expect(b.valid[cellIndex(r, c)]).toBe(0);
+            cutFound = true;
+          }
+        }
+        // Column stops at the cut: no valid cell behind an invalid one.
+        for (let c = 1; c < CELL_DEPTH; c++) {
+          if (!b.valid[cellIndex(r, c - 1)]) expect(b.valid[cellIndex(r, c)]).toBe(0);
+        }
+      }
+    }
+    expect(cutFound).toBe(true);
+  });
+
+  it("Z3: shuffling segment order gives byte-identical validity", () => {
+    const make = (shuffle: boolean) => {
+      const w = blank(40);
+      addSegment(w, ROAD.STREET, [{ x: 4.5, z: 10.5 }, { x: 30.5, z: 10.5 }]);
+      addSegment(w, ROAD.STREET, [{ x: 12.5, z: 4.5 }, { x: 12.5, z: 24.5 }]);
+      addSegment(w, ROAD.STREET, [{ x: 20.5, z: 6.5 }, { x: 28.5, z: 18.5 }]);
+      if (shuffle) w.segments.reverse();
+      const set = buildZoneBlocks(w);
+      return [...set.blocks.values()].sort((a, b) => a.key.localeCompare(b.key)).map((b) => `${b.key}:${[...b.valid].join("")}`).join("|");
+    };
+    expect(make(true)).toBe(make(false));
+  });
+
+  it("Z3: a T-junction block has no interior holes", () => {
+    const w = blank(32);
+    addSegment(w, ROAD.STREET, [{ x: 4.5, z: 14.5 }, { x: 27.5, z: 14.5 }]);
+    addSegment(w, ROAD.STREET, [{ x: 16.5, z: 14.5 }, { x: 16.5, z: 26.5 }]);
+    const set = buildZoneBlocks(w);
+    for (const b of set.blocks.values()) for (let r = 0; r < b.rows; r++) {
+      for (let c = 1; c < CELL_DEPTH; c++) {
+        if (b.valid[cellIndex(r, c)]) expect(b.valid[cellIndex(r, c - 1)]).toBe(1);
+      }
+    }
+  });
+
+  it("Z3: rebuilding axis-aligned roads drops no zoned cells", () => {
+    const w = blank(32);
+    addSegment(w, ROAD.STREET, [{ x: 4.5, z: 14.5 }, { x: 27.5, z: 14.5 }]);
+    const before = buildZoneBlocks(w);
+    let zoned = 0;
+    for (const b of before.blocks.values()) for (let i = 0; i < b.zone.length; i++) {
+      if (b.valid[i]) { b.zone[i] = ZONE.RES; b.level[i] = 1; zoned++; }
+    }
+    expect(zoned).toBeGreaterThan(10);
+    const after = buildZoneBlocks(w, before);
+    const report = migrateCells(before, after);
+    expect(report.dropped).toHaveLength(0);
   });
 });

@@ -38,3 +38,15 @@ describe("kit glow materials (F3)", () => {
     expect(out.glow.length).toBe(3);
   });
 });
+
+describe("kit glow collection (V1 window families)", () => {
+  it("collects every glow_window* suffix into the night-driven set", () => {
+    const std = (name: string) => new THREE.MeshStandardMaterial({ name });
+    const model = upgradeMaterials({
+      geometry: new THREE.BufferGeometry(),
+      materials: [std("wall"), std("glow_window"), std("glow_window_office"), std("glow_sign")],
+      glow: [],
+    });
+    expect(model.glow.map((g) => g.name).sort()).toEqual(["glow_sign", "glow_window", "glow_window_office"]);
+  });
+});

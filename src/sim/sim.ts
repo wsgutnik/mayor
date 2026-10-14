@@ -723,7 +723,7 @@ export function refreshOrientedLots(s: CityState): void {
   const w = s.world;
   const set = getZoneBlocks(w);
   const keep = w.olots ?? [];
-  const lots = planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep });
+  const lots = planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep, seed: s.rngState });
   const keptIds = new Set(keep.map((lot) => lot.id));
   for (const lot of lots) if (!keptIds.has(lot.id) && lot.id < w.nextOLotId) {
     const oldId = lot.id;

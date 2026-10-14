@@ -1,3 +1,4 @@
+// Portions adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10): zoning/ZoneGrid.js#_blocked, #_occupied, #_rasterise, #_buildFrame, #_resolveConflicts, #_better.
 import {
   baseRoadType, blocksBuilding, curvePoints, heightAt, idx, inBounds, isLand, segElevation,
   type Pt, type RoadSegment, type World,
@@ -6,8 +7,15 @@ import {
   BLOCK_MAX_ROWS, CELL_DEPTH, CELL_SLOPE_LIMIT, type CellPose, type CellRef, type Side, type ZoneBlock,
 } from "./zonecells";
 import { profileOf } from "./corridor";
+import { cornerRadiusFor } from "./junction";
 
 const MIGRATE_RADIUS = 0.75;
+/** Clearance around another road's footprint (fable 0.6m / 8). */
+const ROAD_CLEARANCE = 0.075;
+/** Corner/edge samples are pulled this fraction toward the cell centre (fable S=0.93). */
+const SAMPLE_SHRINK = 0.93;
+/** Water level threshold matching isLand's 0.05 corner rule. */
+const WATER_H = 0.05;
 
 export interface ZoneBlockSet {
   graphRevision: number;
@@ -35,7 +43,13 @@ interface CellInfo {
   x: number;
   z: number;
   yaw: number;
+  width: number;
+  grow: number;
+  corners: Float32Array;
 }
+
+/** Rival-cell conflict distance (fable CONFLICT_DIST 6.4m / 8). */
+const CONFLICT_DIST = 0.8;
 
 export const cellIndex = (row: number, col: number): number => row * CELL_DEPTH + col;
 
@@ -64,6 +78,37 @@ function at(s: Sampled, dist: number): CellPose {
   const l = Math.hypot(tx, tz) || 1;
   tx /= l; tz /= l;
   return { x: a.x + (b.x - a.x) * u, z: a.z + (b.z - a.z) * u, yaw: Math.atan2(tx, tz), tx, tz, nx: -tz, nz: tx };
+}
+
+/** Centreline frame extrapolated beyond the ends (so end rows keep full width). */
+function atUnclamped(s: Sampled, dist: number): CellPose {
+  if (dist < 0) {
+    const a = s.pts[0], b = s.pts[Math.min(1, s.pts.length - 1)];
+    let tx = b.x - a.x, tz = b.z - a.z;
+    const l = Math.hypot(tx, tz) || 1;
+    tx /= l; tz /= l;
+    return { x: a.x + tx * dist, z: a.z + tz * dist, yaw: Math.atan2(tx, tz), tx, tz, nx: -tz, nz: tx };
+  }
+  if (dist > s.length) {
+    const n = s.pts.length, a = s.pts[Math.max(0, n - 2)], b = s.pts[n - 1];
+    let tx = b.x - a.x, tz = b.z - a.z;
+    const l = Math.hypot(tx, tz) || 1;
+    tx /= l; tz /= l;
+    const over = dist - s.length;
+    return { x: b.x + tx * over, z: b.z + tz * over, yaw: Math.atan2(tx, tz), tx, tz, nx: -tz, nz: tx };
+  }
+  return at(s, dist);
+}
+
+/** Minimum cell area as a fraction of 1 tile^2 (fable MIN_AREA_FRAC). */
+export const MIN_AREA_FRAC = 0.42;
+
+/** Signed quad area (shoelace / 2). */
+export function quadArea(q: Float32Array): number {
+  return 0.5 * (
+    (q[0] * q[3] - q[2] * q[1]) + (q[2] * q[5] - q[4] * q[3]) +
+    (q[4] * q[7] - q[6] * q[5]) + (q[6] * q[1] - q[0] * q[7])
+  );
 }
 
 function roadHalfWidth(seg: RoadSegment): number {
@@ -101,6 +146,12 @@ export function blocksForSegment(_w: World, seg: RoadSegment): ZoneBlock[] {
   let rowStart = 0;
   for (let block = 0; block < nBlocks; block++) {
     const blockRows = base + (block < extra ? 1 : 0);
+    const s0b = s0 + rowStart;
+    const edge = new Float32Array((blockRows + 1) * 4);
+    for (let k = 0; k <= blockRows; k++) {
+      const p = atUnclamped(sampled, s0b + k - 0.5);
+      edge[k * 4] = p.x; edge[k * 4 + 1] = p.z; edge[k * 4 + 2] = p.tx; edge[k * 4 + 3] = p.tz;
+    }
     for (const side of [-1, 1] as const) {
       const frame = new Float32Array(blockRows * 4);
       for (let r = 0; r < blockRows; r++) {
@@ -114,8 +165,8 @@ export function blocksForSegment(_w: World, seg: RoadSegment): ZoneBlock[] {
       const n = blockRows * CELL_DEPTH;
       out.push({
         key: blockKey(seg.id, side, block),
-        seg: seg.id, side, block, rows: blockRows, s0: s0 + rowStart, lat0,
-        frame,
+        seg: seg.id, side, block, rows: blockRows, s0: s0b, lat0,
+        frame, edge: edge.slice(),
         valid: new Uint8Array(n),
         zone: new Uint8Array(n),
         level: new Uint8Array(n),
@@ -136,6 +187,21 @@ export function cellPose(b: ZoneBlock, row: number, col: number): CellPose {
 }
 
 export function cellCorners(b: ZoneBlock, row: number, col: number, out: Float32Array): void {
+  // Trapezoid from the two boundary frames (fable `_buildFrame`); falls back to
+  // unit squares for fixtures without an edge table. Straight streets are identical.
+  const e = b.edge;
+  if (e && e.length >= (b.rows + 1) * 4) {
+    const o0 = row * 4, o1 = (row + 1) * 4;
+    const x0 = e[o0], z0 = e[o0 + 1], tx0 = e[o0 + 2], tz0 = e[o0 + 3];
+    const x1 = e[o1], z1 = e[o1 + 1], tx1 = e[o1 + 2], tz1 = e[o1 + 3];
+    const nx0 = -tz0 * b.side, nz0 = tx0 * b.side, nx1 = -tz1 * b.side, nz1 = tx1 * b.side;
+    const d0 = b.lat0 - 0.5 + col, d1 = d0 + 1;
+    out[0] = x0 + nx0 * d0; out[1] = z0 + nz0 * d0;
+    out[2] = x1 + nx1 * d0; out[3] = z1 + nz1 * d0;
+    out[4] = x1 + nx1 * d1; out[5] = z1 + nz1 * d1;
+    out[6] = x0 + nx0 * d1; out[7] = z0 + nz0 * d1;
+    return;
+  }
   const p = cellPose(b, row, col);
   const nx = p.nx * b.side, nz = p.nz * b.side;
   const ax = p.tx * 0.5, az = p.tz * 0.5, bx = nx * 0.5, bz = nz * 0.5;
@@ -179,14 +245,52 @@ function distToCenterline(px: number, pz: number, s: Sampled): number {
   return best;
 }
 
+/**
+ * Keep-out discs at junctions (fable `_rasterise` node stamp, analytic form).
+ * Nodes with >= 3 ground arms get radius max(drawHalf + sidewalk + cornerR).
+ */
+export function junctionDiscs(w: World): { x: number; z: number; r: number }[] {
+  const byId = new Map(w.segments.map((s) => [s.id, s]));
+  const out: { x: number; z: number; r: number }[] = [];
+  for (const n of w.nodes) {
+    let r = 0, arms = 0;
+    for (const id of n.segs) {
+      const s = byId.get(id);
+      if (!s || segElevation(s) !== "ground") continue;
+      arms++;
+      const p = profileOf(s.type);
+      r = Math.max(r, p.drawHalf + p.sidewalk + cornerRadiusFor(s.type));
+    }
+    if (arms >= 3 && r > 0) out.push({ x: n.x, z: n.z, r });
+  }
+  return out;
+}
+
+/** 9 sample points: centre, 4 corners and 4 edge midpoints pulled 7% inward (fable `_blocked`). */
+function cellSamples(cx: number, cz: number, corners: Float32Array, out: Float32Array): void {
+  out[0] = cx; out[1] = cz;
+  for (let e = 0; e < 4; e++) {
+    const ax = corners[e * 2], az = corners[e * 2 + 1];
+    const bx = corners[((e + 1) & 3) * 2], bz = corners[((e + 1) & 3) * 2 + 1];
+    out[(1 + e * 2) * 2] = cx + (ax - cx) * SAMPLE_SHRINK;
+    out[(1 + e * 2) * 2 + 1] = cz + (az - cz) * SAMPLE_SHRINK;
+    const mx = (ax + bx) * 0.5, mz = (az + bz) * 0.5;
+    out[(2 + e * 2) * 2] = cx + (mx - cx) * SAMPLE_SHRINK;
+    out[(2 + e * 2) * 2 + 1] = cz + (mz - cz) * SAMPLE_SHRINK;
+  }
+}
+
 function applyValidity(w: World, blocks: ZoneBlock[]): void {
   const roads = w.segments.filter((s) => segElevation(s) === "ground");
   const skipRoadDistance = roads.length > 1000;
   const segById = new Map(w.segments.map((s) => [s.id, s]));
   const roadSamples = new Map<number, Sampled>();
+  const roadClear = new Map<number, number>();
   const roadCandidates = new Map<number, RoadSegment[]>();
   for (const seg of skipRoadDistance ? [] : roads) {
     roadSamples.set(seg.id, sample(seg.pts));
+    const p = profileOf(seg.type);
+    roadClear.set(seg.id, p.drawHalf + p.sidewalk + ROAD_CLEARANCE);
     for (const t of seg.tiles) {
       const x = t % w.size, y = (t / w.size) | 0;
       for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
@@ -199,7 +303,9 @@ function applyValidity(w: World, blocks: ZoneBlock[]): void {
       }
     }
   }
+  const discs = skipRoadDistance ? [] : junctionDiscs(w);
   const corners = new Float32Array(8);
+  const samples = new Float32Array(18);
   for (const b of blocks) {
     const seg = segById.get(b.seg);
     if (!seg) continue;
@@ -211,16 +317,28 @@ function applyValidity(w: World, blocks: ZoneBlock[]): void {
         const tx = Math.floor(p.x), ty = Math.floor(p.z);
         const k = cellIndex(r, c);
         cellCorners(b, r, c, corners);
-        let ok = inBounds(w, tx, ty) && Math.abs(heightAt(w, p.x, p.z) - heightAt(w, road.x, road.z)) <= CELL_SLOPE_LIMIT &&
+        let ok = Math.abs(quadArea(corners)) >= MIN_AREA_FRAC &&
+          inBounds(w, tx, ty) && Math.abs(heightAt(w, p.x, p.z) - heightAt(w, road.x, road.z)) <= CELL_SLOPE_LIMIT &&
           isLand(w, tx, ty) && w.facility[tileOf(w, p.x, p.z)] === 0;
         for (let i = 0; ok && i < 4; i++) ok = corners[i * 2] >= 0 && corners[i * 2] <= w.size && corners[i * 2 + 1] >= 0 && corners[i * 2 + 1] <= w.size;
+        // Corner water: any corner under water blocks the cell (fable `_blocked`).
+        if (ok && (heightAt(w, p.x, p.z) < WATER_H ||
+          heightAt(w, corners[0], corners[1]) < WATER_H || heightAt(w, corners[2], corners[3]) < WATER_H ||
+          heightAt(w, corners[4], corners[5]) < WATER_H || heightAt(w, corners[6], corners[7]) < WATER_H)) ok = false;
         const ti = ok ? tileOf(w, p.x, p.z) : -1;
         if (ok && blocksBuilding(w, ti)) ok = false;
-        if (!skipRoadDistance) {
-          for (const other of roadCandidates.get(ti) ?? []) {
-            if (!ok) break;
-            if (other.id === b.seg) continue;
-            if (distToCenterline(p.x, p.z, roadSamples.get(other.id)!) < roadHalfWidth(other) + 0.45) ok = false;
+        if (ok && !skipRoadDistance) {
+          cellSamples(p.x, p.z, corners, samples);
+          const cands = roadCandidates.get(ti) ?? [];
+          for (let s = 0; ok && s < 9; s++) {
+            const sx = samples[s * 2], sz = samples[s * 2 + 1];
+            for (const other of cands) {
+              if (other.id === b.seg) continue;
+              if (distToCenterline(sx, sz, roadSamples.get(other.id)!) < roadClear.get(other.id)!) { ok = false; break; }
+            }
+            if (ok) for (const d of discs) {
+              if ((sx - d.x) * (sx - d.x) + (sz - d.z) * (sz - d.z) < d.r * d.r) { ok = false; break; }
+            }
           }
         }
         b.valid[k] = ok ? 1 : 0;
@@ -230,13 +348,18 @@ function applyValidity(w: World, blocks: ZoneBlock[]): void {
   }
 }
 
-function yawShared(a: number, b: number): boolean {
-  const q = Math.PI / 2;
-  const d = Math.abs((((a - b) % q) + q) % q);
-  return Math.min(d, q - d) < q * 0.01;
+function pointInQuad(q: Float32Array, x: number, z: number): boolean {
+  let pos = 0, neg = 0;
+  for (let e = 0; e < 4; e++) {
+    const ax = q[e * 2], az = q[e * 2 + 1];
+    const bx = q[((e + 1) & 3) * 2], bz = q[((e + 1) & 3) * 2 + 1];
+    const cr = (bx - ax) * (z - az) - (bz - az) * (x - ax);
+    if (cr > 0) pos++; else if (cr < 0) neg++;
+  }
+  return pos === 0 || neg === 0;
 }
 
-function project(poly: Float32Array, ax: number, az: number): [number, number] {
+function projectQuad(poly: Float32Array, ax: number, az: number): [number, number] {
   let lo = Infinity, hi = -Infinity;
   for (let i = 0; i < 4; i++) {
     const v = poly[i * 2] * ax + poly[i * 2 + 1] * az;
@@ -245,78 +368,95 @@ function project(poly: Float32Array, ax: number, az: number): [number, number] {
   return [lo, hi];
 }
 
-function overlaps(a: Float32Array, b: Float32Array): boolean {
+/** SAT overlap; touching within 1mm is not an overlap (shared cell edges). */
+function quadsOverlap(a: Float32Array, b: Float32Array): boolean {
   for (const poly of [a, b]) {
     for (let i = 0; i < 4; i++) {
       const j = (i + 1) & 3;
       const ex = poly[j * 2] - poly[i * 2], ez = poly[j * 2 + 1] - poly[i * 2 + 1];
       const ax = -ez, az = ex;
-      const pa = project(a, ax, az), pb = project(b, ax, az);
-      if (Math.min(pa[1], pb[1]) - Math.max(pa[0], pb[0]) <= 0.05) return false;
+      const pa = projectQuad(a, ax, az), pb = projectQuad(b, ax, az);
+      if (Math.min(pa[1], pb[1]) - Math.max(pa[0], pb[0]) <= 1e-3) return false;
     }
   }
   return true;
 }
 
-function loser(a: CellInfo, b: CellInfo, shared: boolean): CellInfo {
-  if (shared) {
-    if (a.col !== b.col) return a.col < b.col ? b : a;
-    if (a.b.age !== b.b.age) return a.b.age < b.b.age ? b : a;
-  } else {
-    const ba = a.col <= 1 ? 0 : 1, bb = b.col <= 1 ? 0 : 1;
-    if (ba !== bb) return ba < bb ? b : a;
-    if (a.b.age !== b.b.age) return a.b.age < b.b.age ? b : a;
-  }
-  if (a.b.key !== b.b.key) return a.b.key < b.b.key ? b : a;
-  return a.row <= b.row ? b : a;
+/** Priority order (fable `_better` with our CS1 col band as the col key; older wins ties). */
+function cellBetter(a: CellInfo, b: CellInfo): boolean {
+  const ba = a.col <= 1 ? 0 : 1, bb = b.col <= 1 ? 0 : 1;
+  if (ba !== bb) return ba < bb;
+  if (a.width !== b.width) return a.width > b.width;
+  if (a.b.age !== b.b.age) return a.b.age < b.b.age;
+  if (a.b.side !== b.b.side) return a.b.side < b.b.side;
+  if (a.grow !== b.grow) return a.grow < b.grow;
+  if (a.col !== b.col) return a.col < b.col;
+  return a.b.key < b.b.key;
 }
 
-function validCells(b: ZoneBlock): CellInfo[] {
+function validCells(b: ZoneBlock, width: number): CellInfo[] {
   const out: CellInfo[] = [];
   for (let r = 0; r < b.rows; r++) for (let c = 0; c < CELL_DEPTH; c++) {
     const k = cellIndex(r, c);
     if (!b.valid[k]) continue;
     const p = cellPose(b, r, c);
-    out.push({ b, row: r, col: c, index: k, x: p.x, z: p.z, yaw: p.yaw });
+    const corners = new Float32Array(8);
+    cellCorners(b, r, c, corners);
+    out.push({ b, row: r, col: c, index: k, x: p.x, z: p.z, yaw: p.yaw, width, grow: b.s0 + r, corners });
   }
   return out;
 }
 
-function resolveOverlaps(blocks: ZoneBlock[], rawIndex: Map<number, Set<string>>): void {
-  void rawIndex;
+/**
+ * Greedy priority-ordered independent set with second-chance passes (fable `_resolveConflicts`).
+ * Sorted once by (col band, col, road width, age, side, row); a cell is kept when it fits
+ * against already-kept rivals, then dropped cells get 3 re-admission passes so blocks keep
+ * a clean edge with no holes. Frame neighbours never conflict.
+ */
+function resolveOverlaps(w: World, blocks: ZoneBlock[]): void {
   if (blocks.length > 3000) return;
-  const byTile = new Map<string, CellInfo[]>();
-  for (const b of blocks) for (const cell of validCells(b)) {
-    const corners = new Float32Array(8);
-    cellCorners(b, cell.row, cell.col, corners);
-    for (let i = -1; i < 4; i++) {
-      const x = i < 0 ? cell.x : corners[i * 2], z = i < 0 ? cell.z : corners[i * 2 + 1];
-      const key = `${Math.floor(x)},${Math.floor(z)}`;
-      const arr = byTile.get(key) ?? [];
-      arr.push(cell); byTile.set(key, arr);
-    }
-  }
-  const seen = new Set<string>();
-  const ca = new Float32Array(8), cb = new Float32Array(8);
-  for (const list of byTile.values()) {
-    for (let ai = 0; ai < list.length; ai++) for (let bi = ai + 1; bi < list.length; bi++) {
-      const a = list[ai], b = list[bi];
-      const aid = `${a.b.key}:${a.index}`, bid = `${b.b.key}:${b.index}`;
-      if (aid === bid) continue;
-      const pair = aid <= bid ? `${aid}|${bid}` : `${bid}|${aid}`;
-      if (seen.has(pair)) continue;
-      seen.add(pair);
-      if (!a.b.valid[a.index] || !b.b.valid[b.index]) continue;
-      const d2 = (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
-      if (d2 >= 1) continue;
-      const shared = d2 < 0.01 && yawShared(a.yaw, b.yaw);
-      if (!shared) {
-        cellCorners(a.b, a.row, a.col, ca); cellCorners(b.b, b.row, b.col, cb);
-        if (!overlaps(ca, cb)) continue;
+  const segWidth = new Map<number, number>();
+  for (const s of w.segments) segWidth.set(s.id, profileOf(s.type).drawHalf * 2);
+  const alive: CellInfo[] = [];
+  for (const b of blocks) alive.push(...validCells(b, segWidth.get(b.seg) ?? 0));
+  alive.sort((a, b) => (cellBetter(a, b) ? -1 : 1));
+  const buckets = new Map<number, CellInfo[]>();
+  const keyOf = (cx: number, cz: number) => cz * 65536 + cx;
+  const R2 = CONFLICT_DIST * CONFLICT_DIST;
+  const fits = (c: CellInfo): boolean => {
+    const ccx = Math.floor(c.x), ccz = Math.floor(c.z);
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const list = buckets.get(keyOf(ccx + dx, ccz + dz));
+      if (!list) continue;
+      for (const o of list) {
+        if (o.b.seg === c.b.seg && o.b.side === c.b.side && o.col === c.col && Math.abs(o.grow - c.grow) <= 1.01) continue;
+        const d2 = (o.x - c.x) ** 2 + (o.z - c.z) ** 2;
+        if (d2 < R2 || pointInQuad(o.corners, c.x, c.z) || pointInQuad(c.corners, o.x, o.z) || quadsOverlap(o.corners, c.corners)) return false;
       }
-      const lose = loser(a, b, shared);
-      lose.b.valid[lose.index] = 0;
     }
+    return true;
+  };
+  const keep = (c: CellInfo): void => {
+    const k = keyOf(Math.floor(c.x), Math.floor(c.z));
+    const arr = buckets.get(k);
+    if (arr) arr.push(c); else buckets.set(k, [c]);
+  };
+  const dropped: CellInfo[] = [];
+  for (const c of alive) {
+    if (fits(c)) keep(c);
+    else { c.b.valid[c.index] = 0; dropped.push(c); }
+  }
+  for (let pass = 0; pass < 3 && dropped.length; pass++) {
+    let again = 0;
+    for (const c of dropped) {
+      if (c.b.valid[c.index] || !fits(c)) continue;
+      c.b.valid[c.index] = 1; keep(c); again++;
+    }
+    if (!again) break;
+  }
+  // No interior holes: a valid col-k cell always has a valid col-(k-1) cell.
+  for (const b of blocks) for (let r = 0; r < b.rows; r++) {
+    for (let c = 1; c < CELL_DEPTH; c++) if (!b.valid[cellIndex(r, c - 1)]) b.valid[cellIndex(r, c)] = 0;
   }
 }
 
@@ -363,7 +503,7 @@ export function buildZoneBlocks(w: World, prev?: ZoneBlockSet): ZoneBlockSet {
   }
   const blocks = w.segments.filter(zoneable).sort((a, b) => a.id - b.id).flatMap((seg) => blocksForSegment(w, seg));
   applyValidity(w, blocks);
-  resolveOverlaps(blocks, indexBlocks(w, blocks));
+  resolveOverlaps(w, blocks);
   const next = finalizeSet(w, blocks);
   if (prev) migrateCells(prev, next);
   else setCache.set(w, { graphRevision: w.graphRevision, obstacleRevision: w.obstacleRevision, set: next });

@@ -102,6 +102,96 @@ export function orientedPad(f: LotFrame): { x: number; z: number; sx: number; sz
   return { x: f.cx, z: f.cz, sx: f.w, sz: f.d, yaw: f.yaw };
 }
 
+/** Site-grading constants (fable `buildings/index.js#siteLevel`, metres ÷ 8). */
+export const SITE_SPREAD_FLAT = 0.0175; // 0.14 m: corner spread below this counts as flat
+export const SITE_MID_DROP = 0.025; // 0.2 m: the platform may sit this far below the corner mid
+export const SITE_WATER_CLEAR = 0.0875; // 0.7 m of flood clearance above the water level
+export const SITE_PLINTH_GAP = 0.1125; // 0.9 m: a concrete plinth above this platform-to-ground gap
+export const SITE_PLINTH_EXTRA = 0.075; // 0.6 m: plinth buried below the low corner
+export const SITE_PLINTH_SHRINK = 0.0625; // 0.5 m ÷ 8: plinth footprint inset from the lot (total)
+
+export interface LotSite {
+  /** Level platform height for the building base. */
+  y: number;
+  minY: number;
+  maxY: number;
+  spread: number;
+  /** Concrete plinth depth (tiles), or 0 when the building sits straight on the ground. */
+  plinthDepth: number;
+}
+
+/** World positions of the four lot corners (counter-clockwise from back-left). */
+export function siteCorners(f: LotFrame): { x: number; z: number }[] {
+  return [
+    rotateCell(f, -f.w / 2, -f.d / 2),
+    rotateCell(f, f.w / 2, -f.d / 2),
+    rotateCell(f, f.w / 2, f.d / 2),
+    rotateCell(f, -f.w / 2, f.d / 2),
+  ];
+}
+
+/** Midpoint of the lot's front (kerb) edge, in world units. */
+export function lotFrontPoint(f: LotFrame): { x: number; z: number } {
+  return rotateCell(f, 0, f.d / 2);
+}
+
+/**
+ * Ground sample for the `frontY` argument of `siteLevel`: just outside the
+ * lot toward the road, where the sidewalk sits (fable samples the sidewalk
+ * 1 m in front of the frontage; roads level Mayor's terrain, so heightAt
+ * there is the right reference).
+ */
+export function lotFrontSample(f: LotFrame): { x: number; z: number } {
+  return rotateCell(f, 0, f.d / 2 + 0.15);
+}
+
+// Portions adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10): buildings/index.js#siteLevel.
+/**
+ * Ground level for a lot: road-edge height, footprint spread and (if needed)
+ * a concrete plinth (docs/process/09-fable-buildings-port.md §1.1, task V4).
+ * Pure: the caller supplies the height sampler so sim and render share it.
+ *
+ * `y = max(frontY, (min+max)/2 − 0.025, water + 0.0875)`, sampled over the
+ * four corners plus the centre like fable. Two deliberate deltas from fable:
+ * we never flatten terrain (no lot-grading API; render must not move ground),
+ * so a plinth is emitted whenever the platform-to-ground gap exceeds 0.1125
+ * (fable flattens near-axis lots instead of plinthing them). The spread gate
+ * in the task text is then subsumed: a plinth appears exactly when the gap
+ * exceeds 0.1125, which is the only reading that also satisfies the task's
+ * "never more than 0.1125 above without a plinth".
+ */
+export function siteLevel(
+  frame: LotFrame, heightAt: (x: number, z: number) => number,
+  frontY: number, waterLevel = 0,
+): LotSite {
+  let minY = Infinity, maxY = -Infinity;
+  const consider = (h: number): void => {
+    if (h < minY) minY = h;
+    if (h > maxY) maxY = h;
+  };
+  for (const p of siteCorners(frame)) consider(heightAt(p.x, p.z));
+  consider(heightAt(frame.cx, frame.cz));
+  const y = Math.max(frontY, (minY + maxY) / 2 - SITE_MID_DROP, waterLevel + SITE_WATER_CLEAR);
+  const spread = maxY - minY;
+  const plinthDepth = y - minY > SITE_PLINTH_GAP ? y - minY + SITE_PLINTH_EXTRA : 0;
+  return { y, minY, maxY, spread, plinthDepth };
+}
+
+/**
+ * Ground height for one composed model cell: the site platform, but never
+ * below the terrain at the cell (the task's "base never below terrain").
+ * On flat ground this equals the old heightAt placement exactly.
+ */
+export function cellBaseY(site: LotSite, cellGround: number): number {
+  return Math.max(site.y, cellGround);
+}
+
+/** Pad base: level with the site on flat ground, terrain-hugging on slopes (never floating). */
+export function padBaseY(site: LotSite, terrainMean: number, lift: number): number {
+  if (site.plinthDepth > 0) return terrainMean + lift;
+  return Math.min(site.y, terrainMean) + lift;
+}
+
 export function lotInstances(lot: WorldLot | OrientedLot, onRoad = true): LotInstancePlan {
   if ("cx" in lot) {
     const f: LotFrame = { cx: lot.cx, cz: lot.cz, yaw: lot.yaw, w: lot.w, d: lot.d };

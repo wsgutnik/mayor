@@ -28,6 +28,13 @@ export interface ZoneBlock {
   lat0: number;
   /** Per-row frame: cell centre of (row, 0) and the unit tangent of the segment there. Length rows*4. */
   frame: Float32Array;         // [ox, oz, tx, tz] per row
+  /**
+   * Per-boundary centreline frame for trapezoid cells (Z2, fable `_buildFrame`).
+   * Length (rows+1)*4: [x, z, tx, tz] at arclength s0 + k - 0.5, k = 0..rows,
+   * extrapolated beyond the segment ends so straight streets keep full squares.
+   * Absent in old fixtures; cellCorners falls back to unit squares.
+   */
+  edge?: Float32Array;
   /** Cell state, row-major (index = row * CELL_DEPTH + col). */
   valid: Uint8Array;           // 1 = may hold zone (slope, obstacles, row cut-off, overlap resolution applied)
   zone: Uint8Array;            // ZONE.*; 0 = unzoned. Only meaningful where valid = 1.

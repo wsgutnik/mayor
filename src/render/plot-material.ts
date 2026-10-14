@@ -1,4 +1,17 @@
 import * as THREE from "three";
+import { SURF } from "../sim/lotground";
+
+/**
+ * Instance tints for the V3 ground-plan surfaces over the shared plot
+ * texture (PAVE matches the old PLOT_TINT; LAWN greens the mown strips and
+ * beds). NONE rects emit no instance: the terrain grass shows through.
+ */
+export const GROUND_SURFACE_TINT: Record<number, string> = {
+  [SURF.PAVE]: "#b9b3a6",
+  [SURF.ASPH]: "#55575e",
+  [SURF.CONC]: "#d8dbde",
+  [SURF.LAWN]: "#79a657",
+};
 
 export interface PlotMaterialOpts {
   texture: THREE.Texture | null;

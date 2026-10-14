@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { LoadedModel } from "./glb-models";
 import type { TextureTier } from "../prefs";
+import { familyFor, patchWindowMaterial } from "./window-light";
 
 /**
  * The Blender GLBs carry geometry, UVs, ambient-occlusion vertex colours and material names; the textures
@@ -80,7 +81,8 @@ function texture(name: string): THREE.Texture | null {
 function kitMaterial(src: THREE.Material, table: Patterns): THREE.Material {
   const base = src as THREE.MeshStandardMaterial;
   const name = src.name;
-  const pat = table[name];
+  // Window families (glow_window_res/_office/...) share the base window pattern until V2 adds their own.
+  const pat = table[name] ?? (name.startsWith("glow_window") ? table["glow_window"] : undefined);
   if (!pat || !base.isMeshStandardMaterial) {
     if ((base as THREE.MeshStandardMaterial).isMeshStandardMaterial) base.vertexColors = true;
     return src;
@@ -98,10 +100,13 @@ function kitMaterial(src: THREE.Material, table: Patterns): THREE.Material {
     metalness: 0,
     vertexColors: true,
   });
-  if (name === "glow_window") {
+  // Portions adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10): facadeShader.js night-light block.
+  const family = familyFor(name);
+  if (family) {
     mat.emissive = new THREE.Color("#ffffff");
     mat.emissiveMap = texture("window_glow");
     mat.emissiveIntensity = 0;
+    patchWindowMaterial(mat, family);
   } else if (name === "glow_head" || name === "glow_tail" || name === "glow_sign") {
     // F3: the shared rebuild dropped the GLB's emissiveFactor, leaving black, so the
     // night pass raised emissiveIntensity to no effect. Recover it from the palette hex.
