@@ -57,7 +57,7 @@ body {
 .demand .bar i { position: absolute; left: 0; right: 0; border-radius: 3px; }
 .demand .r i { background: #4fbf6a; } .demand .c i { background: #4a8fe0; } .demand .i i { background: #e0b43a; }
 .demand .bar.neg i { opacity: .55; }
-.demand .legend { position: absolute; left: 10px; right: 10px; bottom: 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; font-size: 11px; color: var(--muted); }
+.demand .demand-legend { position: absolute; left: 10px; right: 10px; bottom: 6px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; font-size: 11px; color: var(--muted); }
 .toolbar {
   position: absolute; left: 50%; bottom: calc(14px + var(--safe-bottom)); transform: translateX(-50%);
   display: flex; gap: 4px; padding: 6px; max-width: calc(100% - 16px); overflow-x: auto;
@@ -362,7 +362,7 @@ body {
 .left-col .indicators.collapsed .ind { display: none; }
 .left-col .demand { display: flex; flex-direction: column; height: auto; padding: 8px; gap: 2px; }
 .demand-body { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; height: 92px; padding-bottom: 20px; }
-.demand-body .legend { left: 0; right: 0; bottom: 0; }
+.demand-body .demand-legend { left: 0; right: 0; bottom: 0; }
 .left-col .demand.collapsed .demand-body { display: none; }
 .demand-toggle { justify-content: center; }
 .lines-body { display: contents; }

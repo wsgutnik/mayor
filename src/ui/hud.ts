@@ -314,7 +314,7 @@ export class Hud {
     const rci = el("div", "panel demand");
     rci.innerHTML = `
       <div class="demand-body"><div class="bar r"><i></i></div><div class="bar c"><i></i></div><div class="bar i"><i></i></div>
-      <div class="legend"><span>R</span><span>C</span><span>I</span></div></div>`;
+      <div class="demand-legend"><span>R</span><span>C</span><span>I</span></div></div>`;
     const [r, c, i] = Array.from(rci.querySelectorAll<HTMLElement>(".bar i"));
     this.bars = { r, c, i };
     const rciBtn = el("button", "svc-head toggle demand-toggle", "<span></span>");
