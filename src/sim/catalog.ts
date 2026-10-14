@@ -115,6 +115,8 @@ export interface LotLook {
  * already looks like level 2), so big footprints never wear the smallest hut.
  */
 export function pickLotEntry(zone: number, level: number, area: number, hash01: number): LotLook {
+  // The kit currently has three visual tiers. Simulation levels 4-5 deliberately
+  // borrow tier 3 until their dedicated growable variants ship.
   const eff = Math.min(3, Math.max(1, level + (area > 1 ? 1 : 0)));
   const list = zoneEntries(zone, eff);
   const index = list.length ? Math.min(list.length - 1, Math.floor(hash01 * list.length)) : 0;

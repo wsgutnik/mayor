@@ -45,6 +45,7 @@ function prefWidth(zone: number, level: number): readonly [number, number] {
   return [1, 4];
 }
 
+
 const cellIndex = (row: number, col: number): number => row * CELL_DEPTH + col;
 
 function cellCentre(b: ZoneBlock, row: number, col: number): { x: number; z: number } {

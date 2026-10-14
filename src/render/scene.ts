@@ -263,14 +263,19 @@ export class CityRenderer {
   private winMat!: THREE.MeshLambertMaterial;
   private plainMat!: THREE.MeshLambertMaterial;
   private bMeshes = new Map<string, THREE.InstancedMesh>();
+  /** Dedicated multi-cell pools: one authored GLB is placed at the lot centre. */
+  private bX2Meshes = new Map<number, THREE.InstancedMesh>();
+  private bX4Meshes = new Map<number, THREE.InstancedMesh>();
   private procBuildings: ProcBuildingsRenderer | null = null;
   private fMeshes = new Map<number, THREE.InstancedMesh>();
   private sized: THREE.Object3D[] = [];
   /** Kit models from Blender (public/models/NN.glb), loaded once and shared across map swaps. */
   private glb = new Map<number, LoadedModel | null>();
   private glbX2 = new Map<number, LoadedModel | null>();
+  private glbX4 = new Map<number, LoadedModel | null>();
   private glbPending = new Set<number>();
   private glbX2Pending = new Set<number>();
+  private glbX4Pending = new Set<number>();
   private fX2Loaded = new Set<FacilityKind>();
   private glowMats = new Set<THREE.MeshStandardMaterial>();
   private nightGlow = 0;
@@ -482,8 +487,18 @@ export class CityRenderer {
       return m;
     };
     this.bMeshes.clear();
+    this.bX2Meshes.clear();
+    this.bX4Meshes.clear();
     this.fMeshes.clear();
-    for (const [k, g] of this.models.buildings) this.bMeshes.set(k, mkModel(g, Math.ceil(cap * 0.6)));
+    for (const [k, g] of this.models.buildings) {
+      this.bMeshes.set(k, mkModel(g, Math.ceil(cap * 0.6)));
+      const [zone, level, entry] = k.split("-").map(Number);
+      const n = zoneEntries(zone, level)[entry]?.n;
+      if (n !== undefined) {
+        this.bX2Meshes.set(n, mkModel(g, Math.ceil(cap * 0.15)));
+        this.bX4Meshes.set(n, mkModel(g, Math.ceil(cap * 0.08)));
+      }
+    }
     for (const [k, g] of this.models.facilities) this.fMeshes.set(k, mkModel(g, Math.ceil(cap * 0.3)));
     // Plants: one instanced mesh per species; cones stand in until its GLB arrives.
     this.treeMeshes.clear();
@@ -671,6 +686,24 @@ export class CityRenderer {
       const [z, l, i] = key.split("-").map(Number);
       want(zoneEntries(z, l)[i]?.n, mesh);
     }
+    const wantEvolved = (pool: Map<number, THREE.InstancedMesh>, cache: Map<number, LoadedModel | null>, pending: Set<number>, dir: "x2" | "x4") => {
+      for (const [n, mesh] of pool) {
+        const apply = (model: LoadedModel) => {
+          if (!this.sized.includes(mesh)) return;
+          mesh.geometry = model.geometry; mesh.material = model.materials;
+          for (const g of model.glow) { this.glowMats.add(g); g.emissiveIntensity = this.nightGlow; }
+          this.seenRevision = -1;
+        };
+        if (cache.has(n)) { const hit = cache.get(n); if (hit) apply(hit); continue; }
+        if (pending.has(n)) continue;
+        pending.add(n);
+        loadGlb(`/models/${dir}/${String(n).padStart(2, "0")}.glb`).then((model) => {
+          cache.set(n, model); pending.delete(n); if (model) apply(model);
+        });
+      }
+    };
+    wantEvolved(this.bX2Meshes, this.glbX2, this.glbX2Pending, "x2");
+    wantEvolved(this.bX4Meshes, this.glbX4, this.glbX4Pending, "x4");
     const facilityWanted: [FacilityKind, number, THREE.InstancedMesh][] = [];
     for (const [kind, mesh] of this.fMeshes) {
       const n = facilityEntry(kind as FacilityKind)?.n;
@@ -956,13 +989,17 @@ export class CityRenderer {
         if (z === 3 && lot.level >= 2) {
           smoke.push({ x: c.x + 0.22, y: hLot + (lot.level === 3 ? 0.95 : 0.7), z: c.z - 0.2, strength: lot.level === 3 ? 0.8 : 0.5 });
         }
-        const useProc = !!this.procBuildings && "cx" in lot && lot.w * lot.d >= 4;
+        const evolved = (pose.w === 2 && pose.d === 2) || (pose.w === 4 && pose.d === 4);
+        const useProc = !!this.procBuildings && "cx" in lot && lot.w * lot.d >= 4 && !evolved;
         if (useProc) continue; // committed in one static pool pass after all lots are inspected.
         const look = pickLotEntry(z, lot.level, plan.area, tileHash(Math.floor(c.x) + 17, Math.floor(c.z) + 29));
-        const mesh = this.bMeshes.get(`${z}-${look.level}-${look.index}`);
+        const mesh = pose.w === 4 && pose.d === 4 ? this.bX4Meshes.get(look.entry?.n ?? -1)
+          : pose.w === 2 && pose.d === 2 ? this.bX2Meshes.get(look.entry?.n ?? -1)
+          : this.bMeshes.get(`${z}-${look.level}-${look.index}`);
         if (mesh) {
           tint.setScalar(0.9 + r * 0.2);
-          for (const cell of plan.models) {
+          const cells = evolved ? [{ x: c.x, z: c.z, yaw: pose.yaw }] : plan.models;
+          for (const cell of cells) {
             this.placeLotCell(
               mesh, counts, cell.x, cell.z, cell.yaw, 0.92 + r * 0.2, tint,
               cellBaseY(site, heightAt(w, cell.x, cell.z)),
@@ -1019,7 +1056,7 @@ export class CityRenderer {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
-    for (const m of [...this.bMeshes.values(), ...this.fMeshes.values()]) {
+    for (const m of [...this.bMeshes.values(), ...this.bX2Meshes.values(), ...this.bX4Meshes.values(), ...this.fMeshes.values()]) {
       m.count = counts.get(m) ?? 0;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
@@ -1714,6 +1751,7 @@ export class CityRenderer {
     fade(this.roadMesh.material, on ? 0.45 : 1);
     fade(this.lodBox.material, on ? 0.3 : 1);
     for (const m of this.bMeshes.values()) fade(m.material, on ? 0.3 : 1);
+    for (const m of [...this.bX2Meshes.values(), ...this.bX4Meshes.values()]) fade(m.material, on ? 0.3 : 1);
     for (const m of this.fMeshes.values()) fade(m.material, on ? 0.45 : 1);
     this.zones.visible = !on;
     this.kerbs.visible = !on;
@@ -1985,7 +2023,7 @@ export class CityRenderer {
     const boxM = box.instanceMatrix.array as Float32Array;
     const boxC = box.instanceColor?.array as Float32Array | undefined;
     let slots = 0;
-    for (const m of this.bMeshes.values()) {
+    for (const m of [...this.bMeshes.values(), ...this.bX2Meshes.values(), ...this.bX4Meshes.values()]) {
       if (full(m) === 0) continue;
       const r = this.lod.partition(m, cx, cz, dist);
       m.count = this.lodEnabled ? r.near : r.total;

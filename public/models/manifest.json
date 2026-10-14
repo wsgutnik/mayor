@@ -905,6 +905,26 @@
    ]
   },
   {
+   "n": 1,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 776,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.725
+   ]
+  },
+  {
    "n": 2,
    "name": "Casa Familiar",
    "variant": "v2",
@@ -962,6 +982,26 @@
     0.48,
     0.0,
     0.55
+   ]
+  },
+  {
+   "n": 2,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 776,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.805
    ]
   },
   {
@@ -1025,6 +1065,26 @@
    ]
   },
   {
+   "n": 3,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 776,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.905
+   ]
+  },
+  {
    "n": 4,
    "name": "Vila Geminada",
    "variant": "v2",
@@ -1082,6 +1142,26 @@
     0.48,
     0.0,
     0.58
+   ]
+  },
+  {
+   "n": 4,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 776,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.945
    ]
   },
   {
@@ -1145,6 +1225,46 @@
    ]
   },
   {
+   "n": 5,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 792,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.165
+   ]
+  },
+  {
+   "n": 5,
+   "name": "Apartment campus",
+   "variant": "x4",
+   "version": 1,
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 2494,
+   "inside_tile": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    1.735
+   ]
+  },
+  {
    "n": 6,
    "name": "Condom\u00ednio Jardim",
    "variant": "v2",
@@ -1202,6 +1322,26 @@
     0.48,
     0.0,
     0.71
+   ]
+  },
+  {
+   "n": 6,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 792,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.045
    ]
   },
   {
@@ -1265,6 +1405,26 @@
    ]
   },
   {
+   "n": 7,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 1164,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.285
+   ]
+  },
+  {
    "n": 8,
    "name": "Residencial Varanda",
    "variant": "v2",
@@ -1322,6 +1482,26 @@
     0.48,
     0.0,
     0.89
+   ]
+  },
+  {
+   "n": 8,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 792,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.105
    ]
   },
   {
@@ -1385,6 +1565,26 @@
    ]
   },
   {
+   "n": 9,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 1164,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.205
+   ]
+  },
+  {
    "n": 10,
    "name": "Premium Tower",
    "variant": "v2",
@@ -1442,6 +1642,46 @@
     0.48,
     0.0,
     2.555
+   ]
+  },
+  {
+   "n": 10,
+   "name": "Evolved residential",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 1164,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.445
+   ]
+  },
+  {
+   "n": 10,
+   "name": "Premium residential tower",
+   "variant": "x4",
+   "version": 1,
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 2494,
+   "inside_tile": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    2.235
    ]
   },
   {
@@ -1505,6 +1745,26 @@
    ]
   },
   {
+   "n": 11,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 483,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.665
+   ]
+  },
+  {
    "n": 12,
    "name": "Caf\u00e9 de Esquina",
    "variant": "v2",
@@ -1562,6 +1822,26 @@
     0.47,
     0.0,
     0.33
+   ]
+  },
+  {
+   "n": 12,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 483,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.685
    ]
   },
   {
@@ -1625,6 +1905,26 @@
    ]
   },
   {
+   "n": 13,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 483,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.765
+   ]
+  },
+  {
    "n": 14,
    "name": "Restaurante Urbano",
    "variant": "v2",
@@ -1682,6 +1982,26 @@
     0.47,
     0.0,
     0.45
+   ]
+  },
+  {
+   "n": 14,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 483,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.785
    ]
   },
   {
@@ -1745,6 +2065,26 @@
    ]
   },
   {
+   "n": 15,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 483,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.705
+   ]
+  },
+  {
    "n": 16,
    "name": "Escrit\u00f3rio Compacto",
    "variant": "v2",
@@ -1802,6 +2142,26 @@
     0.47,
     0.0,
     0.81
+   ]
+  },
+  {
+   "n": 16,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 495,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.905
    ]
   },
   {
@@ -1865,6 +2225,26 @@
    ]
   },
   {
+   "n": 17,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 495,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    0.945
+   ]
+  },
+  {
    "n": 18,
    "name": "Hotel Executivo",
    "variant": "v2",
@@ -1922,6 +2302,46 @@
     0.47,
     0.0,
     1.01
+   ]
+  },
+  {
+   "n": 18,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 495,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    1.205
+   ]
+  },
+  {
+   "n": 18,
+   "name": "Executive hotel",
+   "variant": "x4",
+   "version": 1,
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 1192,
+   "inside_tile": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    1.965
    ]
   },
   {
@@ -1985,6 +2405,26 @@
    ]
   },
   {
+   "n": 19,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 483,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    1.005
+   ]
+  },
+  {
    "n": 20,
    "name": "Corporate Tower",
    "variant": "v2",
@@ -2042,6 +2482,46 @@
     0.48,
     0.0,
     2.36
+   ]
+  },
+  {
+   "n": 20,
+   "name": "Evolved commercial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 495,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -1.0,
+    0.98,
+    0.0,
+    1.405
+   ]
+  },
+  {
+   "n": 20,
+   "name": "Corporate tower",
+   "variant": "x4",
+   "version": 1,
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 1192,
+   "inside_tile": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    2.435
    ]
   },
   {
@@ -2865,6 +3345,26 @@
    ]
   },
   {
+   "n": 36,
+   "name": "Evolved industrial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 228,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.725
+   ]
+  },
+  {
    "n": 37,
    "name": "F\u00e1brica Leve",
    "variant": "v2",
@@ -2922,6 +3422,46 @@
     0.48,
     0.0,
     0.72
+   ]
+  },
+  {
+   "n": 37,
+   "name": "Evolved industrial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 228,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.905
+   ]
+  },
+  {
+   "n": 37,
+   "name": "Light factory campus",
+   "variant": "x4",
+   "version": 1,
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 602,
+   "inside_tile": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    0.694
    ]
   },
   {
@@ -2985,6 +3525,46 @@
    ]
   },
   {
+   "n": 38,
+   "name": "Evolved industrial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 278,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    1.29
+   ]
+  },
+  {
+   "n": 38,
+   "name": "Heavy factory campus",
+   "variant": "x4",
+   "version": 1,
+   "footprint": [
+    4,
+    4
+   ],
+   "tris": 538,
+   "inside_tile": true,
+   "bounds": [
+    -1.98,
+    1.98,
+    -1.98,
+    1.98,
+    0.0,
+    1.38
+   ]
+  },
+  {
    "n": 39,
    "name": "Centro de Reciclagem",
    "variant": "v2",
@@ -3042,6 +3622,26 @@
     0.48,
     0.0,
     0.36
+   ]
+  },
+  {
+   "n": 39,
+   "name": "Evolved industrial",
+   "variant": "x2",
+   "version": 1,
+   "footprint": [
+    2,
+    2
+   ],
+   "tris": 228,
+   "inside_tile": true,
+   "bounds": [
+    -0.98,
+    0.98,
+    -0.98,
+    0.98,
+    0.0,
+    0.845
    ]
   },
   {

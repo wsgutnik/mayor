@@ -17,6 +17,7 @@ import {
 } from "./blocks";
 import { rasterizeMirror } from "./mirror";
 import { lotsReady, planOrientedLots } from "./orientedlots";
+import { evolveOrientedLot } from "./lot-evolution";
 import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
 import { CELL_DEPTH } from "./zonecells";
 import type { CellRef, ConstructionPhase, ConstructionState, OrientedLot, ZoneBlock } from "./zonecells";
@@ -64,16 +65,16 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
 
 /** Residents, commercial jobs, industrial jobs per building level (index = level). */
 export const CAPACITY = {
-  res: [0, 8, 20, 40],
-  com: [0, 4, 10, 20],
-  ind: [0, 6, 14, 28],
+  res: [0, 8, 20, 40, 72, 112],
+  com: [0, 4, 10, 20, 38, 60],
+  ind: [0, 6, 14, 28, 50, 78],
 } as const;
 
 /** Utility units a building consumes per level (power, water, sewage, garbage all use this). */
 export const USAGE = {
-  res: [0, 2, 5, 10],
-  com: [0, 2, 5, 10],
-  ind: [0, 4, 9, 16],
+  res: [0, 2, 5, 10, 17, 26],
+  com: [0, 2, 5, 10, 17, 26],
+  ind: [0, 4, 9, 16, 25, 36],
 } as const;
 
 export const DAYS_PER_MONTH = 30;
@@ -1487,9 +1488,13 @@ export function step(s: CityState): void {
     } else {
       // Level 2 needs sewage; level 3 needs garbage collection and schools.
       const canUp = lvl === 1 ? sewage : garbage && edu;
-      if (d > UPGRADE_DEMAND && lvl < 3 && canUp && rng() < 0.004) {
-        oriented ? setOLotLevel(w, lot as OrientedLot, lvl + 1) : setLotLevel(w, lot as WorldLot, lvl + 1);
-        beginConstruction(lot, true); changed = true;
+      if (d > UPGRADE_DEMAND && lvl < (oriented ? 5 : 3) && canUp && rng() < 0.004) {
+        if (oriented) {
+          // Evolution is atomic: the existing anchor ID survives and all
+          // absorbed neighbours disappear before the mirror is rebuilt.
+          const evolved = evolveOrientedLot(w, getZoneBlocks(w), w.olots ?? [], lot as OrientedLot, lvl + 1);
+          if (evolved) { rasterizeMirror(w, getZoneBlocks(w), w.olots ?? []); beginConstruction(lot, true); changed = true; }
+        } else { setLotLevel(w, lot as WorldLot, lvl + 1); changed = true; }
       }
       else if (d < -0.3 && rng() < 0.01) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl - 1) : setLotLevel(w, lot as WorldLot, lvl - 1); changed = true; }
     }

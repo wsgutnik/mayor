@@ -25,7 +25,16 @@ import preview  # noqa: E402
 from registry import REGISTRY, REGISTRATIONS, OVERRIDES, PROPS, VARIANTS, undeclared_overrides  # noqa: E402
 
 TRI_LIMIT = int(os.environ.get("MAYOR_BUILDING_TRI_LIMIT", "1400"))
+# Multi-cell assets are drawn once per lot, not once per tile.  Keep the 2x2
+# detail level equal to a normal kit building; the larger x4 civic-scale
+# compositions get a separately documented 2800-triangle allowance.
+# Existing service assets have a documented legacy cap. New zoned evolved x2
+# assets use the normal-building cap below; keeping this separate avoids
+# silently invalidating shipped facility GLBs during a manifest rebuild.
 X2_TRI_LIMIT = int(os.environ.get("MAYOR_X2_TRI_LIMIT", "4000"))
+EVOLVED_X2_TRI_LIMIT = int(os.environ.get("MAYOR_EVOLVED_X2_TRI_LIMIT", "1400"))
+EVOLVED_X2_IDS = set(range(1, 21)) | set(range(36, 41))
+X4_TRI_LIMIT = int(os.environ.get("MAYOR_X4_TRI_LIMIT", "2800"))
 
 
 def parse():
@@ -128,6 +137,8 @@ def main():
         span = max(footprint)
         if variant == "x2":
             ok, bounds = lib.check_bounds(ob, limit=1.01, max_h=4.2)
+        elif variant == "x4":
+            ok, bounds = lib.check_bounds(ob, limit=2.01, max_h=6.2)
         else:
             ok, bounds = lib.check_bounds(ob)
         tris = lib.triangle_count(ob)
@@ -135,6 +146,12 @@ def main():
         if variant == "x2":
             # Runtime convention for 2x2 service buildings: models/x2/NN.glb.
             xdir = os.path.join(opts["out"], "x2")
+            os.makedirs(xdir, exist_ok=True)
+            shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(xdir, f"{n:02d}.glb"))
+        elif variant == "x4":
+            # Zoned 4x4 evolved lots use their own runtime directory so they
+            # cannot replace a 1x1 or x2 instance pool.
+            xdir = os.path.join(opts["out"], "x4")
             os.makedirs(xdir, exist_ok=True)
             shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(xdir, f"{n:02d}.glb"))
         if opts["previews"]:
@@ -157,8 +174,12 @@ def main():
         print("VARIANT " + json.dumps(variant_manifest[-1]))
         if not ok:
             problems.append(f"variant {variant} #{n:02d} {name} leaves its tile or height limit")
-        if variant == "x2" and tris > X2_TRI_LIMIT:
-            problems.append(f"variant x2 #{n:02d} {name} has {tris} triangles (limit {X2_TRI_LIMIT})")
+        if variant == "x2":
+            limit = EVOLVED_X2_TRI_LIMIT if n in EVOLVED_X2_IDS else X2_TRI_LIMIT
+            if tris > limit:
+                problems.append(f"variant x2 #{n:02d} {name} has {tris} triangles (limit {limit})")
+        if variant == "x4" and tris > X4_TRI_LIMIT:
+            problems.append(f"variant x4 #{n:02d} {name} has {tris} triangles (limit {X4_TRI_LIMIT})")
     if v2_report:
         with open(os.path.join(opts["out"], "v2", "build-report.json"), "w") as fh:
             json.dump({"schema": 1, "assets": sorted(v2_report, key=lambda a: (a["catalogId"], a["lod"]))}, fh, indent=1)

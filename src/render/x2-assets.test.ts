@@ -4,8 +4,8 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeScene } from "./glb-models";
 
-// 2x2 service-building variants, built by blender/buildings_x2.py into public/models/x2/.
-const X2_IDS = [21, 27, 29, 32, 34, 40];
+// Service and evolved zoned 2x2 variants, built into public/models/x2/.
+const X2_IDS = [...Array.from({ length: 20 }, (_, i) => i + 1), 21, 27, 29, 32, 34, 36, 37, 38, 39, 40];
 const path = (n: number) => `public/models/x2/${String(n).padStart(2, "0")}.glb`;
 const present = X2_IDS.filter((n) => existsSync(path(n)));
 
@@ -31,7 +31,9 @@ describe("2x2 service-building variants (x2)", () => {
       expect(b.max.z, f).toBeLessThanOrEqual(1.01);
       expect(b.min.y, f).toBeGreaterThanOrEqual(-0.01);
       expect(b.max.y, f).toBeLessThan(4.2);
-      expect(tris(g), f).toBeLessThanOrEqual(4000);
+      // Legacy service sites predate the evolved-footprint cap. All newly
+      // authored zoned x2 models must stay within the normal 1400 budget.
+      expect(tris(g), f).toBeLessThanOrEqual(n <= 20 || n >= 36 ? 1400 : 4000);
       expect(m!.materials.length, f).toBeGreaterThan(0);
     }
   });
