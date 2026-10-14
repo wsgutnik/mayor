@@ -65,3 +65,18 @@ gh release create vX.Y.Z src-tauri/target/release/bundle/dmg/Mayor_*.dmg --repo 
 
 The hardened runtime blocks JIT and unsigned memory in the app process. The web view (WKWebView) runs in Apple's process,
 so normally nothing else is needed. If the log shows a block, add the required key to `src-tauri/entitlements.plist` and note the reason next to it.
+
+## One-command release (certificate installed)
+
+With the Developer ID Application certificate in the login keychain (done: `Developer ID Application: Willian Gutnik
+(4AFHZKZYQ6)`), run:
+
+```bash
+npm run release:mac
+```
+
+The first run asks for the Apple ID and an app-specific password (hidden prompt; create it at account.apple.com →
+Sign-In and Security → App-Specific Passwords) and stores them in the keychain profile `mayor-notary`. The script
+builds, signs with the hardened runtime, builds the dmg (falling back to `hdiutil` when the Tauri dmg step fails),
+signs the dmg, notarizes, staples and verifies, and copies the result to `release-out/`. The password is never written
+to disk or to the command line.
