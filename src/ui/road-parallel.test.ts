@@ -108,3 +108,19 @@ describe("parallel options", () => {
     expect(() => saveRoadParallel({ enabled: true, gap: 3, side: "left" })).not.toThrow();
   });
 });
+
+describe("parallelOffset (road profile)", () => {
+  it("keeps both frontages plus `gap` lot cells per side, from the profile", async () => {
+    const { parallelOffset, frontageHalf } = await import("./road-parallel");
+    const { profileOf } = await import("../sim/corridor");
+    const p = profileOf(1);
+    expect(frontageHalf(1)).toBeCloseTo(p.drawHalf + p.sidewalk + p.setback, 12);
+    expect(parallelOffset(1, 2)).toBeCloseTo(2 * frontageHalf(1) + 4, 12);
+    expect(parallelOffset(2, 2) - parallelOffset(1, 2)).toBeCloseTo(2 * (frontageHalf(2) - frontageHalf(1)), 12);
+  });
+
+  it("accepts a 4-cell gap and still repairs garbage", () => {
+    expect(normalizeRoadParallel({ enabled: true, gap: 4, side: "right" })).toEqual({ enabled: true, gap: 4, side: "right" });
+    expect(normalizeRoadParallel({ gap: 5 }).gap).toBe(DEFAULT_ROAD_PARALLEL.gap);
+  });
+});

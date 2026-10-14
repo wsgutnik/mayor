@@ -11,7 +11,9 @@ import {
 import { FACILITY_LINK_RADIUS } from "./networks";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
 import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
-import { addSegment, nodeArms, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt, SNAP_RADIUS } from "./roads";
+import { addSegment, nearestOnSegment, nodeArms, nodeById, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt, SNAP_RADIUS } from "./roads";
+import { profileOf } from "./corridor";
+import { cornerRadiusFor } from "./junction";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
@@ -83,6 +85,50 @@ export const DAYS_PER_MONTH = 30;
 /** Junction builder's smallest stable mouth separation. */
 const MIN_JUNCTION_GAP = (5 * Math.PI) / 180;
 const MIN_JUNCTION_GAP_REASON = "Road leaves this junction too close to another road";
+
+export const TOO_CLOSE_TO_JUNCTION_REASON = "Too close to a junction";
+
+/**
+ * Smallest distance (tiles, along the road) between an existing junction and a
+ * new T-junction on one of its roads, so the two junction keep-outs never
+ * overlap: the incoming road's kerb edge, the widest arm already at the node and
+ * the existing road's kerb return (docs/process/17-road-snapping.md). Dead ends
+ * and bends with one arm only need the node merge radius.
+ */
+export function teeSpacing(w: World, nodeId: number, existing: RoadType, incoming: RoadType): number {
+  const arms = nodeArms(w, nodeId);
+  if (arms.length <= 1) return SNAP_RADIUS;
+  let widest = 0;
+  for (const a of arms) widest = Math.max(widest, profileOf(a.type).drawHalf);
+  return profileOf(incoming).drawHalf + widest + cornerRadiusFor(existing);
+}
+
+/**
+ * Where a road end would split an existing ground segment (a T), the distance
+ * from the split to each end node of that segment must respect teeSpacing.
+ * Ends that merge into a node (within SNAP_RADIUS of it, or with their foot
+ * within SNAP_RADIUS of it) are joins, not new junctions, and pass.
+ */
+function teeTooClose(w: World, type: RoadType, pts: Pt[]): boolean {
+  for (const p of [pts[0], pts[pts.length - 1]]) {
+    if (w.nodes.some((n) => Math.hypot(n.x - p.x, n.z - p.z) <= SNAP_RADIUS)) continue;
+    let best: { seg: RoadSegment; x: number; z: number; d: number } | null = null;
+    for (const seg of w.segments) {
+      if (segElevation(seg) !== "ground" || seg.pts.length < 2) continue;
+      const pr = nearestOnSegment(seg, p);
+      if (pr.d <= SNAP_RADIUS && (!best || pr.d < best.d)) best = { seg, x: pr.x, z: pr.z, d: pr.d };
+    }
+    if (!best) continue;
+    for (const id of [best.seg.a, best.seg.b]) {
+      const n = nodeById(w, id);
+      if (!n) continue;
+      const d = Math.hypot(n.x - best.x, n.z - best.z);
+      if (d <= SNAP_RADIUS) continue; // joins that node
+      if (d < teeSpacing(w, id, best.seg.type, type)) return true;
+    }
+  }
+  return false;
+}
 
 /** Reject a new endpoint that would create a sub-5 degree mouth.  This is
  * deliberately in planning, so preview, paired roads and placement agree. */
@@ -301,6 +347,7 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: Ro
   if (pts.length < 2 || pts.length > 3) return bad("A road needs a start and an end");
   if (segmentLength(pts) > MAX_SEGMENT_TILES) return bad("Road is too long");
   if (leavesNodeTooClose(w, pts)) return bad(MIN_JUNCTION_GAP_REASON);
+  if (teeTooClose(w, type, pts)) return bad(TOO_CLOSE_TO_JUNCTION_REASON);
   const { tiles, outOfBounds } = rasterizeRoad(w, type, pts);
   if (outOfBounds) return bad("Outside the map", tiles);
   const crossings = classifyCrossings(w, type, pts, level);

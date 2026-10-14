@@ -390,9 +390,11 @@ describe("graph endurance", () => {
     const ey = s.world.entry.y;
     s.money = 1e7;
     const t0 = performance.now();
+    // Two-tile grid: one tile apart would put a T inside the neighbouring
+    // junction's keep-out, which planRoad refuses (teeSpacing, doc 17).
     for (let k = 0; k < 12; k++) {
-      road(s, 1, [[4.5 + k, ey - 10], [4.5 + k, ey + 10]]);
-      road(s, 1, [[2.5, ey - 10 + k], [24.5, ey - 10 + k]]);
+      road(s, 1, [[4.5 + 2 * k, ey - 12], [4.5 + 2 * k, ey + 12]]);
+      road(s, 1, [[2.5, ey - 12 + 2 * k], [28.5, ey - 12 + 2 * k]]);
     }
     const ms = performance.now() - t0;
     expect(s.world.segments.length).toBeGreaterThan(24);

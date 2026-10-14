@@ -1644,7 +1644,7 @@ export class CityRenderer {
    * `second` draws the parallel twin (same road class) with its own validity colour.
    */
   setRoadPreview(seg: { type: RoadType; pts: Pt[] } | null, valid = true,
-    crossings: { x: number; z: number; kind: "junction" | "overpass" | "underpass" | "blocked" }[] = [],
+    crossings: { x: number; z: number; kind: "junction" | "overpass" | "underpass" | "blocked" | "snap" }[] = [],
     second?: { pts: Pt[]; valid: boolean } | null): void {
     this.previewMesh.visible = !!seg;
     this.previewMesh2.visible = !!seg && !!second;
@@ -1667,10 +1667,11 @@ export class CityRenderer {
       if (n >= 64) break;
       d.position.set(c.x, Math.max(this.groundY(c.x, c.z), 0.12) + 0.35, c.z);
       d.rotation.set(0, 0, 0);
-      d.scale.set(1, 1, 1);
+      // Snap target ghost: a flat white puck on the attach point (node or centreline).
+      if (c.kind === "snap") d.scale.set(1.3, 0.25, 1.3); else d.scale.set(1, 1, 1);
       d.updateMatrix();
       m.setMatrixAt(n, d.matrix);
-      m.setColorAt(n, col.set(c.kind === "junction" ? "#ffd84a" : c.kind === "blocked" ? "#ff6b60" : "#4aa8ff"));
+      m.setColorAt(n, col.set(c.kind === "junction" ? "#ffd84a" : c.kind === "blocked" ? "#ff6b60" : c.kind === "snap" ? "#ffffff" : "#4aa8ff"));
       n++;
     }
     m.count = n;

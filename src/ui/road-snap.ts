@@ -1,5 +1,8 @@
 /** Road-draft snapping: pure geometry and option plumbing (DOM-free, tested). */
-import type { Pt } from "../sim/world";
+import { baseRoadType, curvePoints, segElevation, type Pt, type RoadSegment, type RoadType, type World } from "../sim/world";
+import { nearestOnSegment, nodeArms, nodeById, segById, SNAP_RADIUS, type RoadNode } from "../sim/roads";
+import { profileOf } from "../sim/corridor";
+import { teeSpacing, TOO_CLOSE_TO_JUNCTION_REASON } from "../sim/sim";
 
 /** Angle snap step in degrees, measured from the reference direction; 0 disables. */
 export type AngleSnap = 0 | 15 | 45;
@@ -102,4 +105,157 @@ export function snapToRoadTile(isRoad: (x: number, y: number) => boolean, p: Pt)
   const x = Math.floor(p.x), y = Math.floor(p.z);
   if (isRoad(x, y)) return { x: x + 0.5, z: y + 0.5 };
   return p;
+}
+
+// ------------------------------------------------------------ road snapping v2 (docs/process/17-road-snapping.md)
+
+/** Snap acquire radius in CSS pixels: a finger needs more than a mouse pointer. */
+export const SNAP_PX_TOUCH = 36;
+export const SNAP_PX_MOUSE = 16;
+/** World radius clamp (tiles): never below a quarter tile, never more than 6 tiles. */
+export const SNAP_MIN_TILES = 0.25;
+export const SNAP_MAX_TILES = 6;
+/** A held target keeps winning until the pointer leaves this multiple of the radius. */
+export const SNAP_HYSTERESIS = 1.35;
+/** Node acquire radius cap (tiles), so a T stays reachable next to a junction at far zoom. */
+export const NODE_SNAP_MAX = 1.5;
+
+/** World units (tiles) per CSS pixel at distance `camToPoint` from a perspective camera. */
+export function worldPerPixel(camToPoint: number, fovDeg: number, viewportH: number): number {
+  return (2 * Math.tan((fovDeg * Math.PI) / 360) * camToPoint) / Math.max(1, viewportH);
+}
+
+/** Acquire radius in tiles for a pointer: a constant pixel radius, clamped. */
+export function snapRadiusTiles(touch: boolean, tilesPerPx: number): number {
+  const px = touch ? SNAP_PX_TOUCH : SNAP_PX_MOUSE;
+  return Math.min(SNAP_MAX_TILES, Math.max(SNAP_MIN_TILES, px * tilesPerPx));
+}
+
+export type SnapKind = "node" | "segment" | "free";
+
+/** What the draft point is attached to; also the hysteresis memory. */
+export interface SnapTarget { kind: "node" | "segment"; id: number }
+
+export interface SnapHit {
+  kind: SnapKind;
+  /** The resolved draft point (exact node position or exact centreline point when attached). */
+  pt: Pt;
+  target: SnapTarget | null;
+  /** Direction (atan2) of the attached road at `pt`; the angle-guide reference. */
+  tangent: number | null;
+  /** Raw planRoad-style reason when this point cannot become a junction. */
+  refused?: string;
+}
+
+export interface SnapQuery {
+  roadType: RoadType;
+  /** Acquire radius in tiles (snapRadiusTiles). */
+  radius: number;
+  opts: RoadSnapOptions;
+  /** Last placed draft point, or null for the first point. */
+  anchor: Pt | null;
+  /** Angle-guide reference (previous leg or the start road's tangent); null = map axes. */
+  refAngle: number | null;
+  /** Target held on the previous pointer event (hysteresis). */
+  prev?: SnapTarget | null;
+}
+
+/** Can a ground road of `type` end on `seg`? Highways only join highways; decks and tunnels never. */
+function connectable(seg: RoadSegment, type: RoadType): boolean {
+  if (segElevation(seg) !== "ground") return false;
+  if (seg.pts.length < 2) return false;
+  const hw = baseRoadType(seg.type) === 3;
+  return !hw || baseRoadType(type) === 3;
+}
+
+function tangentAt(seg: RoadSegment, t: number): number {
+  const s = curvePoints(seg.pts, 0.1);
+  const i = Math.max(0, Math.min(s.length - 2, Math.floor(t * (s.length - 1))));
+  return Math.atan2(s[i + 1].z - s[i].z, s[i + 1].x - s[i].x);
+}
+
+/** First crossing of the ray anchor→dir with a segment's centreline, as a distance along the ray. */
+function rayHit(seg: RoadSegment, anchor: Pt, ang: number): Pt | null {
+  const dx = Math.cos(ang), dz = Math.sin(ang);
+  const s = curvePoints(seg.pts, 0.1);
+  let best: Pt | null = null, bt = Infinity;
+  for (let i = 0; i + 1 < s.length; i++) {
+    const ex = s[i + 1].x - s[i].x, ez = s[i + 1].z - s[i].z;
+    const den = dx * ez - dz * ex;
+    if (Math.abs(den) < 1e-9) continue;
+    const qx = s[i].x - anchor.x, qz = s[i].z - anchor.z;
+    const t = (qx * ez - qz * ex) / den;
+    const u = (qx * dz - qz * dx) / den;
+    if (t > 1e-6 && u >= 0 && u <= 1 && t < bt) { bt = t; best = { x: anchor.x + dx * t, z: anchor.z + dz * t }; }
+  }
+  return best;
+}
+
+/**
+ * Resolve a raw pointer position into a draft point (pure, deterministic).
+ * Priority: an existing node within the radius, else the nearest centreline
+ * whose kerb edge is within the radius (the end lands exactly on the
+ * centreline, so the sim splits the road there), else the free point with the
+ * optional angle/length guides. The angle of a free stroke is never changed
+ * unless the player turned the angle guide on; with it on, an attached end
+ * slides along the target road to where the guided ray meets it. A T that would
+ * sit inside a neighbouring junction's keep-out is reported as refused rather
+ * than moved; an end whose foot lies within the node merge radius joins that node.
+ */
+export function resolveRoadSnap(w: World, raw: Pt, q: SnapQuery): SnapHit {
+  const free = (): SnapHit => ({ kind: "free", pt: snapPoint(q.anchor, raw, q.opts, q.refAngle), target: null, tangent: null });
+  if (!q.opts.roads) return free();
+  const hold = (k: SnapTarget["kind"], id: number) => (q.prev && q.prev.kind === k && q.prev.id === id ? SNAP_HYSTERESIS : 1);
+  // 1. Nodes (junction centres, dead ends) first.
+  // Tight node radius (so T-junctions stay reachable at far zoom); a wider one is used below near keep-outs.
+  const nodeR = Math.min(NODE_SNAP_MAX, Math.max(q.radius, SNAP_RADIUS));
+  let node: RoadNode | null = null, nd = Infinity;
+  for (const n of w.nodes) {
+    const d = Math.hypot(n.x - raw.x, n.z - raw.z);
+    if (d > nodeR * hold("node", n.id) || d >= nd) continue;
+    if (!n.segs.some((id) => { const s = segById(w, id); return !!s && connectable(s, q.roadType); })) continue;
+    node = n; nd = d;
+  }
+  const atNode = (n: RoadNode): SnapHit => {
+    const arm = nodeArms(w, n.id)[0];
+    return { kind: "node", pt: { x: n.x, z: n.z }, target: { kind: "node", id: n.id }, tangent: arm ? arm.angle : null };
+  };
+  // Hysteresis: a held segment keeps winning over a not-held node until the pointer is within the merge radius.
+  if (node && !(q.prev?.kind === "segment" && hold("node", node.id) === 1 && nd > SNAP_RADIUS)) return atNode(node);
+  // 2. Centrelines: acquire when the pointer is within the radius of the kerb edge.
+  let seg: RoadSegment | null = null, sp = { x: 0, z: 0, t: 0, d: Infinity }, se = Infinity;
+  for (const s of w.segments) {
+    if (!connectable(s, q.roadType)) continue;
+    const pr = nearestOnSegment(s, raw);
+    const edge = Math.max(0, pr.d - profileOf(s.type).drawHalf);
+    if (edge > q.radius * hold("segment", s.id)) continue;
+    if (edge < se - 1e-9 || (Math.abs(edge - se) <= 1e-9 && pr.d < sp.d)) { seg = s; sp = pr; se = edge; }
+  }
+  if (!seg) return node ? atNode(node) : free();
+  let pt: Pt = { x: sp.x, z: sp.z };
+  let t = sp.t;
+  if (q.anchor && q.opts.angle) {
+    // Optional guide: the guided ray from the anchor meets the road here.
+    const guided = snapPoint(q.anchor, raw, { ...q.opts, length: 0 }, q.refAngle);
+    const ang = Math.atan2(guided.z - q.anchor.z, guided.x - q.anchor.x);
+    const hit = rayHit(seg, q.anchor, ang);
+    if (hit && Math.hypot(hit.x - raw.x, hit.z - raw.z) <= q.radius + profileOf(seg.type).drawHalf) {
+      const pr = nearestOnSegment(seg, hit);
+      pt = { x: pr.x, z: pr.z };
+      t = pr.t;
+    }
+  }
+  const tangent = tangentAt(seg, t);
+  for (const id of [seg.a, seg.b]) {
+    const n = nodeById(w, id);
+    if (!n) continue;
+    const d = Math.hypot(n.x - pt.x, n.z - pt.z);
+    if (d <= SNAP_RADIUS) return atNode(n);
+    if (d < teeSpacing(w, id, seg.type, q.roadType)) {
+      // Inside the junction keep-out: the junction itself when the pointer is within the radius of it, else refuse.
+      if (Math.hypot(n.x - raw.x, n.z - raw.z) <= q.radius * hold("node", n.id)) return atNode(n);
+      return { kind: "segment", pt, target: { kind: "segment", id: seg.id }, tangent, refused: TOO_CLOSE_TO_JUNCTION_REASON };
+    }
+  }
+  return { kind: "segment", pt, target: { kind: "segment", id: seg.id }, tangent };
 }

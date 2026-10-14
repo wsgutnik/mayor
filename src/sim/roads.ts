@@ -105,7 +105,11 @@ function roughLength(pts: Pt[]): number {
 }
 
 /** Nearest point on a segment's centreline to p, with an arclength-ish parameter. */
-function projectOnSegment(seg: RoadSegment, p: Pt): { x: number; z: number; t: number; d: number } {
+export function nearestOnSegment(seg: { pts: Pt[] }, p: Pt): { x: number; z: number; t: number; d: number } {
+  return projectOnSegment(seg, p);
+}
+
+function projectOnSegment(seg: { pts: Pt[] }, p: Pt): { x: number; z: number; t: number; d: number } {
   const samples = curvePoints(seg.pts, 0.1);
   let best = 0, bd = Infinity;
   for (let i = 0; i < samples.length; i++) {
@@ -171,8 +175,13 @@ function retile(w: World, seg: RoadSegment): void {
 function splitSegment(w: World, seg: RoadSegment, x: number, z: number): RoadNode {
   const aNode = nodeById(w, seg.a), bNode = nodeById(w, seg.b);
   const proj = projectOnSegment(seg, { x, z });
-  if (proj.t < 0.02 && aNode) return aNode;
-  if (proj.t > 0.98 && bNode) return bNode;
+  // Never leave a stub: a split this close to an end reuses that end's node.
+  // Measured in tiles, not curve parameter, so long roads do not jump a whole
+  // tile to their tip and short ones do not grow 0.3-tile slivers.
+  if (aNode && (proj.t < 0.02 || dist(proj.x, proj.z, aNode.x, aNode.z) <= SNAP_RADIUS)
+    && dist(proj.x, proj.z, aNode.x, aNode.z) <= (bNode ? dist(proj.x, proj.z, bNode.x, bNode.z) : Infinity)) return aNode;
+  if (bNode && (proj.t > 0.98 || dist(proj.x, proj.z, bNode.x, bNode.z) <= SNAP_RADIUS)) return bNode;
+  if (aNode && proj.t < 0.02) return aNode;
   const [left, right] = splitPts(seg.pts, proj.t);
   // The node sits exactly on the shared joint so both pieces (and any later
   // rebuild matching their endpoints) agree on its position bit-for-bit.
@@ -208,11 +217,13 @@ function snapEnd(w: World, p: Pt, excludeDegenerate = true): RoadNode | null {
   for (const seg of w.segments) {
     if (excludeDegenerate && roughLength(seg.pts) < 1e-6) continue;
     const pr = projectOnSegment(seg, p);
-    if (pr.d <= best.d && pr.t > 0.03 && pr.t < 0.97) {
+    if (pr.d <= best.d) {
       bestSeg = seg;
       best = pr;
     }
   }
+  // splitSegment reuses an end node when the foot lands within SNAP_RADIUS of
+  // it, so an end next to a junction joins the junction instead of a stub.
   if (bestSeg) return splitSegment(w, bestSeg, best.x, best.z);
   return null;
 }

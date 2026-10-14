@@ -1,8 +1,14 @@
 /** Parallel-road helper (UI-2): pure offset geometry and option plumbing (DOM-free, tested). */
-import type { Pt } from "../sim/world";
+import type { Pt, RoadType } from "../sim/world";
+import { profileOf } from "../sim/corridor";
 
-/** Gap between the player's road and its parallel twin, in tiles. */
-export type ParallelGap = 1 | 2 | 3;
+/**
+ * Lot depth (zone cells, 1 tile each) kept on EACH road between the player's
+ * road and its parallel twin: the twin's centreline sits `parallelOffset` away,
+ * i.e. both frontages (asphalt + kerb + sidewalk + setback, from the road
+ * profile) plus `gap` cells per side, so back-to-back blocks fit exactly.
+ */
+export type ParallelGap = 1 | 2 | 3 | 4;
 /**
  * Which side of the player's path the twin runs on, facing the direction of
  * travel: left is +90° in atan2(z, x) angle space, i.e. the (-dz, dx) normal.
@@ -19,7 +25,18 @@ export interface RoadParallelOptions {
 /** Out of the box the draft behaves as before: no second road. */
 export const DEFAULT_ROAD_PARALLEL: RoadParallelOptions = { enabled: false, gap: 2, side: "left" };
 
-const GAPS: readonly ParallelGap[] = [1, 2, 3];
+const GAPS: readonly ParallelGap[] = [1, 2, 3, 4];
+
+/** Frontage half width of a road class: asphalt + kerb + sidewalk + setback (where zone column 0 starts). */
+export function frontageHalf(type: RoadType): number {
+  const p = profileOf(type);
+  return p.drawHalf + p.sidewalk + p.setback;
+}
+
+/** Centreline distance between a road of `type` and its twin with `gap` lot cells per side. */
+export function parallelOffset(type: RoadType, gap: number): number {
+  return 2 * frontageHalf(type) + 2 * gap;
+}
 const SIDES: readonly ParallelSide[] = ["left", "right"];
 
 /** Validate stored options field by field; anything unknown falls back to the default. */

@@ -642,9 +642,9 @@ export class Hud {
     this.parallelToggleBtn = toggle;
     toggleRow.appendChild(toggle);
     const gapRow = row(tr("Gap"));
-    for (const g of [1, 2, 3] as ParallelGap[]) {
+    for (const g of [1, 2, 3, 4] as ParallelGap[]) {
       const b = el("button", "tool snap-btn", `<span>${g}</span>`);
-      b.title = `${g} ${tr("tiles")}`;
+      b.title = tr("{n} lots per side", { n: g });
       b.setAttribute("aria-pressed", String(g === this.parallel.gap));
       b.setAttribute("aria-label", `${tr("Gap")} ${g}`);
       b.addEventListener("click", () => this.setParallel({ ...this.parallel, gap: g }));

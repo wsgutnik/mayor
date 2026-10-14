@@ -16,8 +16,8 @@ import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
 import { cityEvents } from "./ui/events";
 import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
-import { exitAngle, loadRoadSnap, saveRoadSnap, snapPoint, snapToRoadTile, type RoadSnapOptions } from "./ui/road-snap";
-import { loadRoadParallel, offsetPolyline, saveRoadParallel, type RoadParallelOptions } from "./ui/road-parallel";
+import { exitAngle, loadRoadSnap, resolveRoadSnap, saveRoadSnap, snapRadiusTiles, worldPerPixel, type RoadSnapOptions, type SnapHit, type SnapTarget } from "./ui/road-snap";
+import { loadRoadParallel, offsetPolyline, parallelOffset, saveRoadParallel, type RoadParallelOptions } from "./ui/road-parallel";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { floodFill, rectangleTiles, ZONE_FILL_CAP, type ZoneMode, type ZoneTile } from "./ui/zone-tools";
 import { diamondRamps, summarizeCrossings } from "./sim/crossings";
@@ -66,6 +66,13 @@ let parallelOpts: RoadParallelOptions = loadRoadParallel();
 let lastSegDir: number | null = null;
 /** Alt/Option held: all road snapping is temporarily off. */
 let altDown = false;
+/** Last resolved snap of the draft cursor (target, refusal) and the target held for hysteresis. */
+let lastSnap: SnapHit | null = null;
+let snapHold: SnapTarget | null = null;
+/** Tangent of the road the draft started on: the optional angle guide measures from it. */
+let startRef: number | null = null;
+/** The last pointer was a finger or pen (wider snap radius) rather than a mouse. */
+let touchPointer = false;
 /** Last pointer position over the canvas while drafting, for re-snapping without a new event. */
 let lastHover: { x: number; y: number } | null = null;
 /** Stop ids picked so far for the transit line being built. */
@@ -279,6 +286,9 @@ function cancelDraft(): void {
   cursor = null;
   lastSegDir = null;
   lastHover = null;
+  lastSnap = null;
+  snapHold = null;
+  startRef = null;
   marqueeAnchor = null;
   marqueeCurrent = null;
   renderer.setZoneRect(null, null);
@@ -336,15 +346,19 @@ function refreshHint(): void {
  * road snap so connecting to existing roads still wins. Alt/Option bypasses all.
  */
 function resolveDraftPoint(raw: Pt): Pt {
-  if (altDown) return raw;
+  if (altDown) { lastSnap = null; snapHold = null; return raw; }
   const anchor = draft.length ? draft[draft.length - 1] : null;
-  const p = snapPoint(anchor, raw, snapOpts, lastSegDir);
-  if (!snapOpts.roads) return p;
-  const w = state.world;
-  return snapToRoadTile(
-    (x, y) => x >= 0 && y >= 0 && x < w.size && y < w.size && !!w.road[y * w.size + x],
-    p,
-  );
+  // Constant on-screen radius: tiles per CSS pixel at the picked ground point.
+  const cam = renderer.rig.camera;
+  const h = heightAt(state.world, raw.x, raw.z);
+  const camTo = Math.hypot(cam.position.x - raw.x, cam.position.y - h, cam.position.z - raw.z);
+  const radius = snapRadiusTiles(touchPointer, worldPerPixel(camTo, cam.fov, renderer.viewportHeight));
+  const hit = resolveRoadSnap(state.world, raw, {
+    roadType, radius, opts: snapOpts, anchor, refAngle: lastSegDir ?? startRef, prev: snapHold,
+  });
+  lastSnap = hit;
+  snapHold = hit.target;
+  return hit.pt;
 }
 
 /** Re-resolve the draft end from the last pointer position (snap or Alt changed mid-draft). */
@@ -368,13 +382,16 @@ function updatePreview(at?: { x: number; y: number }): void {
   // Before the bend point is set in curve mode, show the straight guide.
   const plan = planRoad(state, roadType, seg.pts, roadLevel);
   // Parallel twin: same class, offset sideways, with its own plan and validity colour.
-  const twinPts = parallelOpts.enabled ? offsetPolyline(seg.pts, parallelOpts.gap, parallelOpts.side) : null;
+  const twinPts = parallelOpts.enabled ? offsetPolyline(seg.pts, parallelOffset(roadType, parallelOpts.gap), parallelOpts.side) : null;
   const twinPlan = twinPts ? planRoad(state, roadType, twinPts, roadLevel) : null;
   // Each leg only checks its own price; the pair must afford both together.
   const pairBroke = plan.ok && !!twinPlan?.ok && state.money < plan.cost + twinPlan.cost;
   const twinOk = !!twinPlan?.ok && !pairBroke;
   const twinReason = pairBroke ? "Not enough money" : twinPlan?.reason;
-  const marks = (plan.crossings ?? []).filter((c) => !c.atEnd || c.kind === "blocked");
+  const crossMarks = (plan.crossings ?? []).filter((c) => !c.atEnd || c.kind === "blocked");
+  const marks: { x: number; z: number; kind: "junction" | "overpass" | "underpass" | "blocked" | "snap" }[] = [...crossMarks];
+  // Snap target ghost: where the end attaches (node or centreline), red when refused.
+  if (cursor && lastSnap && lastSnap.kind !== "free") marks.push({ x: cursor.x, z: cursor.z, kind: lastSnap.refused ? "blocked" : "snap" });
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks,
     twinPts ? { pts: twinPts, valid: twinOk } : null);
   const len = segmentLength(seg.pts);
@@ -395,7 +412,7 @@ function updatePreview(at?: { x: number; y: number }): void {
   const spanHint = plan.span === "bridge" ? ` · ${tr("Bridge")}` : plan.span === "tunnel" ? ` · ${tr("Tunnel")}` : "";
   if (!plan.ok) { hud.setHint(`${name}: ${trReason(plan.reason!)}`); return; }
   if (twinPlan && !twinOk) { hud.setHint(`${tr("Parallel")}: ${trReason(twinReason!)}`); return; }
-  const n = summarizeCrossings(marks);
+  const n = summarizeCrossings(crossMarks);
   const parts: string[] = [];
   if (n.overpass) parts.push(tr(n.overpass === 1 ? "{n} viaduct" : "{n} viaducts", { n: n.overpass }));
   if (n.underpass) parts.push(tr(n.underpass === 1 ? "{n} underpass" : "{n} underpasses", { n: n.underpass }));
@@ -404,7 +421,8 @@ function updatePreview(at?: { x: number; y: number }): void {
   const gradeHint = roadLevel !== "ground" && n.junction > 0 ? ` · ${tr("Crossing at grade")}` : "";
   const pairTiles = plan.newTiles + (twinPlan?.newTiles ?? 0);
   const pairCost = plan.cost + (twinPlan?.cost ?? 0);
-  hud.setHint(tr("{name}: {n} tiles, ${cost}", { name, n: pairTiles, cost: pairCost }) + spanHint + crossHint + gradeHint);
+  const snapHint = lastSnap?.kind === "node" ? ` · ${tr("Joins junction")}` : lastSnap?.kind === "segment" ? ` · ${tr("Joins road")}` : "";
+  hud.setHint(tr("{name}: {n} tiles, ${cost}", { name, n: pairTiles, cost: pairCost }) + spanHint + crossHint + gradeHint + snapHint);
 }
 
 /** Hovering tarmac with another class chosen previews the in-place upgrade: cost and result. */
@@ -508,8 +526,16 @@ function onTap(cx: number, cy: number): void {
   }
   lastHover = { x: cx, y: cy };
   const p = resolveDraftPoint(raw);
+  if (lastSnap?.refused) {
+    // Never bend the stroke to dodge a junction keep-out: say why and keep the draft as it was.
+    hud.showToast(trReason(lastSnap.refused));
+    if (draft.length) updatePreview({ x: cx, y: cy });
+    return;
+  }
   cursor = p;
   if (draft.length === 0) {
+    startRef = lastSnap?.tangent ?? null;
+    snapHold = null;
     draft = [p];
     hud.showFinish(true);
     refreshHint();
@@ -525,7 +551,7 @@ function onTap(cx: number, cy: number): void {
   const seg = currentSegment()!;
   // Parallel twin, committed atomically with the player's road: both legs are
   // validated first, so one tap (and one undo) always covers exactly the pair.
-  const twinPts = parallelOpts.enabled ? offsetPolyline(seg.pts, parallelOpts.gap, parallelOpts.side) : null;
+  const twinPts = parallelOpts.enabled ? offsetPolyline(seg.pts, parallelOffset(roadType, parallelOpts.gap), parallelOpts.side) : null;
   if (twinPts) {
     const gate = planRoadPair(state, roadType, seg.pts, twinPts, roadLevel);
     if (!gate.ok) {
@@ -553,6 +579,8 @@ function onTap(cx: number, cy: number): void {
     cityEvents.emit("roads:changed");
     // Keep drawing from the end point, like a continuous road.
     lastSegDir = exitAngle(seg.pts);
+    startRef = null;
+    snapHold = null;
     draft = [p];
     cursor = null;
     renderer.setRoadPreview(null);
@@ -727,6 +755,10 @@ function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
   if (!res.ok && res.reason !== lastToast) { hud.showToast(trReason(res.reason)); lastToast = res.reason; }
   if (res.ok) { lastToast = ""; strokeOk = true; }
 }
+
+// Finger/pen vs mouse decides the snap radius (36 vs 16 CSS px).
+renderer.canvas.addEventListener("pointerdown", (e) => { touchPointer = e.pointerType !== "mouse"; }, { capture: true });
+renderer.canvas.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") touchPointer = false; }, { capture: true });
 
 bindInput(renderer, {
   paintsWithPrimary: () => tool !== "pan" && !placing(),

@@ -122,3 +122,15 @@ describe("snap options", () => {
     expect(() => saveRoadSnap({ angle: 45, length: 1, roads: true })).not.toThrow();
   });
 });
+
+describe("snap radius", () => {
+  it("converts a pixel radius to tiles through the camera distance and clamps it", async () => {
+    const { worldPerPixel, snapRadiusTiles, SNAP_MIN_TILES, SNAP_MAX_TILES } = await import("./road-snap");
+    const wpp = worldPerPixel(38, 45, 800);
+    expect(wpp).toBeCloseTo((2 * Math.tan(Math.PI / 8) * 38) / 800, 12);
+    expect(snapRadiusTiles(true, wpp)).toBeCloseTo(36 * wpp, 12);
+    expect(snapRadiusTiles(false, wpp)).toBeCloseTo(16 * wpp, 12);
+    expect(snapRadiusTiles(false, 1e-4)).toBe(SNAP_MIN_TILES);
+    expect(snapRadiusTiles(true, 1)).toBe(SNAP_MAX_TILES);
+  });
+});
