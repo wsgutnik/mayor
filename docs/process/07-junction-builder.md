@@ -168,7 +168,11 @@ connector-pair enumeration is available — until P4 the full R applies).
 4. Diagnostic codes (stable strings, renderer-visible fallbacks mandated):
    `radius-shrunk`, `chamfered-corner`, `trim-clamped`, `crosswalk-dropped`,
    `stopline-dropped`, `min-gap-merged`, `layer-excluded`, `non-ground-node`,
-   `pad-node-deferred`. Dropping order when the budget binds below the floor:
+   `pad-node-deferred`, `short-segment`. A shared segment always reserves a
+   0.12-tile visible asphalt ribbon. If its post-solve ribbon is below 0.72,
+   both endpoint layouts emit `short-segment`; the renderer suppresses their
+   independent crosswalks, stop bars and through guides on that segment.
+   Dropping order when the budget binds below the floor:
    shrink R → drop crosswalk → drop stop line → chamfer, each step diagnosed.
 5. Reflex (concave) gaps > 180°: inner arc tangent at both ray starts (s = 0),
    centre at the intersection of the two edge perpendiculars (per layer, own

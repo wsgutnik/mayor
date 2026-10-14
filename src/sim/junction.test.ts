@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateWorld, type Pt, type World } from "./world";
+import { generateWorld, type Pt, type RoadType, type World } from "./world";
 import { addSegment, nodeById } from "./roads";
 import { buildJunction, checkJunction, junctionsOf, type JunctionLayout } from "./junction";
 
@@ -62,6 +62,48 @@ function crossWorld(): { w: World; node: number } {
 }
 
 describe("junction builder P2", () => {
+  function pairedJunctions(distance: number, trunkType: RoadType = 1, branchType: RoadType = 1, y = false): { w: World; a: number; b: number; seg: number } {
+    const w = blank(64), x = 28.5, z = 28.5, end = x + distance;
+    const branch = (cx: number, sign: number): Pt => y
+      ? { x: cx + Math.cos((25 * Math.PI / 180) * sign) * 5, z: z + Math.sin((25 * Math.PI / 180) * sign) * 5 }
+      : { x: cx, z: z + sign * 5 };
+    addSegment(w, trunkType, [{ x, z }, { x: end, z }]);
+    for (const cx of [x, end]) {
+      addSegment(w, branchType, [{ x: cx, z }, branch(cx, 1)]);
+      addSegment(w, branchType, [{ x: cx, z }, branch(cx, -1)]);
+    }
+    const a = near(w, x, z), b = near(w, end, z);
+    const seg = w.segments.find((s) => (s.a === a && s.b === b) || (s.a === b && s.b === a))!.id;
+    return { w, a, b, seg };
+  }
+
+  function expectJointBudget(w: World, a: number, b: number, seg: number): void {
+    const la = buildJunction(w, a)!, lb = buildJunction(w, b)!;
+    const aa = la.arms.find((arm) => arm.segId === seg)!;
+    const bb = lb.arms.find((arm) => arm.segId === seg)!;
+    const ta = Math.max(aa.trimNeg.asphalt, aa.trimPos.asphalt);
+    const tb = Math.max(bb.trimNeg.asphalt, bb.trimPos.asphalt);
+    expect(ta + tb + 0.12).toBeLessThanOrEqual(Math.hypot(lb.centre.x - la.centre.x, lb.centre.z - la.centre.z) + 1e-3);
+    expect(aa.markingsSuppressed).toBe(true);
+    expect(bb.markingsSuppressed).toBe(true);
+    expect(la.diagnostics.some((d) => d.code === "short-segment")).toBe(true);
+    expect(lb.diagnostics.some((d) => d.code === "short-segment")).toBe(true);
+    // At 1.0 tile the outer sidewalk mitres intentionally meet at the
+    // shared boundary; the pad budget is asserted above on asphalt trims.
+  }
+
+  it("jointly budgets 1.0 and 1.66-tile cross pairs, including avenue + street", () => {
+    for (const [distance, trunk, branch] of [[1.0, 1, 1], [1.66, 2, 1]] as const) {
+      const p = pairedJunctions(distance, trunk, branch);
+      expectJointBudget(p.w, p.a, p.b, p.seg);
+    }
+  });
+
+  it("jointly budgets a 25-degree Y pair without independent pad marks", () => {
+    const p = pairedJunctions(1.66, 1, 1, true);
+    expectJointBudget(p.w, p.a, p.b, p.seg);
+  });
+
   it("builds a 4-way street cross with four equal returns and 0.83 trims", () => {
     const { w, node } = crossWorld();
     const l = buildJunction(w, node)!;

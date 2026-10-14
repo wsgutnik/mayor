@@ -1302,7 +1302,7 @@ function recount(s: CityState): void {
     : 0;
   s.happiness = clamp(
     100 - short("power") * 40 - short("water") * 40 - short("sewage") * 20 - short("garbage") * 15
-      - missingPower * 25 - missingWater * 25 - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 15 + s.coverage.park * 10 + s.coverage.transit * 5 + s.coverage.culture * 8
+      - missingPower * 25 - missingWater * 25 - missingSewage * 20 - missingGarbage * 15 - civicPenalty - s.congestion * 8 + s.coverage.park * 10 + s.coverage.transit * 5 + s.coverage.culture * 8
       + (hasCityHall ? 6 : 0),
     0, 100,
   );

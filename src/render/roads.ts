@@ -672,6 +672,7 @@ function zebra(
 function junctionGuides(g: Geo, l: JunctionLayout, groundY: GroundY): void {
   for (let i = 0; i < l.arms.length; i++) for (let j = i + 1; j < l.arms.length; j++) {
     const a = l.arms[i], b = l.arms[j];
+    if (a.markingsSuppressed || b.markingsSuppressed) continue;
     if (a.dx * b.dx + a.dz * b.dz > -0.94) continue;
     const ta = Math.max(a.trimNeg.asphalt, a.trimPos.asphalt);
     const tb = Math.max(b.trimNeg.asphalt, b.trimPos.asphalt);
@@ -832,6 +833,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     drawJunctionPatch(g, l, groundY, atlas);
     if (l.arms.length >= 3) {
       for (const arm of l.arms) {
+        if (arm.markingsSuppressed) continue;
         zebra(g, l.centre.x, l.centre.z, arm.dx, arm.dz,
           profileOf(arm.type).asphaltHalf,
           Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt), groundY, atlas);

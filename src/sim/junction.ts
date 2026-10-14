@@ -38,9 +38,10 @@ export const R_FLOOR = 0.2;
 export const LAYER_MIN_RADIUS = 0.05;
 /** Arms closer than this merge (no sliver wedge). */
 export const MERGE_GAP = (3 * Math.PI) / 180;
-/** Minimum ribbon between two facing trims (P2: no markings yet; P4 raises
- * this where both ends carry crosswalks). */
-const MIN_RIBBON = 0;
+/** Minimum visible asphalt ribbon between two junction pads. */
+const MIN_RIBBON = 0.12;
+/** Crosswalk + stop-bar clearance required before end markings may coexist. */
+const MARKING_RIBBON = 0.72;
 
 /** Kerb return radius at the asphalt edge, by road class (07 recipe table). */
 export function cornerRadiusFor(type: RoadType): number {
@@ -78,6 +79,8 @@ export interface JunctionArm {
   angle: number;
   trimNeg: JunctionTrimSet;
   trimPos: JunctionTrimSet;
+  /** The facing junction leaves too little ribbon for independent end marks. */
+  markingsSuppressed?: boolean;
 }
 
 export type FilletKind = "convex" | "reflex" | "straight" | "merged";
@@ -418,11 +421,19 @@ function nominalTrimAt(
 }
 
 /** Joint two-end share of L for one side (P0.2 item 2). */
-function allowance(L: number, tNom: number, tNbr: number): number {
+function allowance(L: number, tNom: number, tNbr: number, ribbon = 0): number {
   if (tNom <= 1e-9) return 0;
   const denom = tNom + Math.max(0, tNbr);
-  if (denom <= 1e-9) return Math.max(0, L - MIN_RIBBON);
-  return Math.max(0, L - MIN_RIBBON) * (tNom / denom);
+  if (denom <= 1e-9) return Math.max(0, L - ribbon);
+  return Math.max(0, L - ribbon) * (tNom / denom);
+}
+
+/** A visible ribbon is only meaningful between two actual junction pads;
+ * ordinary junction-to-end runs keep their established cap behaviour. */
+function ribbonReserve(w: World, nodeId: number, otherId: number, cache?: Map<number, NodeNoms>): number {
+  const here = getNoms(w, nodeId, cache)?.ground.length ?? 0;
+  const there = getNoms(w, otherId, cache)?.ground.length ?? 0;
+  return here >= 3 && there >= 3 ? MIN_RIBBON : 0;
 }
 
 interface FinalCorner {
@@ -652,7 +663,7 @@ function hashLayout(l: JunctionLayout): string {
   const parts = [l.kind, l.template, `${l.centre.x.toFixed(3)},${l.centre.z.toFixed(3)}`];
   const t = (s: JunctionTrimSet) =>
     `${s.asphalt.toFixed(3)},${s.kerb.toFixed(3)},${s.sidewalk.toFixed(3)},${s.boundary.toFixed(3)}`;
-  for (const a of l.arms) parts.push(`${a.dx.toFixed(4)},${a.dz.toFixed(4)}|${t(a.trimNeg)}|${t(a.trimPos)}`);
+  for (const a of l.arms) parts.push(`${a.dx.toFixed(4)},${a.dz.toFixed(4)}|${t(a.trimNeg)}|${t(a.trimPos)}|${a.markingsSuppressed ? "short" : "marks"}`);
   for (const r of [l.asphalt, l.kerbOuter, l.sidewalkOuter, l.boundary]) {
     parts.push(r.map((p) => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(";"));
   }
@@ -712,7 +723,7 @@ export function buildJunction(
     const tNbr = nbr === nodeId
       ? 0
       : Math.max(nominalTrimAt(w, nbr, a.segId, 1, nomsCache), nominalTrimAt(w, nbr, a.segId, -1, nomsCache));
-    const Ballow = allowance(L, Bnom, tNbr);
+    const Ballow = allowance(L, Bnom, tNbr, ribbonReserve(w, nodeId, nbr, nomsCache));
     let B = Bnom;
     if (Ballow < Bnom - 1e-9) {
       diags.push({ code: "trim-clamped", detail: `cap ${Bnom.toFixed(2)}->${Ballow.toFixed(3)}` });
@@ -779,8 +790,8 @@ export function buildJunction(
     const nbrB = b.end === "a" ? segB.b : segB.a;
     const flipA = (g.sideA === 1 ? -1 : 1) as -1 | 1;
     const flipB = (g.sideB === 1 ? -1 : 1) as -1 | 1;
-    allowA.set(k, allowance(segLength(w, segA), noms[k].tA, nbrA === nodeId ? 0 : nominalTrimAt(w, nbrA, a.segId, flipA, nomsCache)));
-    allowB.set(k, allowance(segLength(w, segB), noms[k].tB, nbrB === nodeId ? 0 : nominalTrimAt(w, nbrB, b.segId, flipB, nomsCache)));
+    allowA.set(k, allowance(segLength(w, segA), noms[k].tA, nbrA === nodeId ? 0 : nominalTrimAt(w, nbrA, a.segId, flipA, nomsCache), ribbonReserve(w, nodeId, nbrA, nomsCache)));
+    allowB.set(k, allowance(segLength(w, segB), noms[k].tB, nbrB === nodeId ? 0 : nominalTrimAt(w, nbrB, b.segId, flipB, nomsCache), ribbonReserve(w, nodeId, nbrB, nomsCache)));
   });
 
   interface GapFinal {
@@ -1047,6 +1058,25 @@ export function buildJunction(
     trimNeg: trimMap.get(`${idx}:-1`) ?? emptyTrims(),
     trimPos: trimMap.get(`${idx}:1`) ?? emptyTrims(),
   }));
+  // Markings occupy substantially more longitudinal space than the bare
+  // pad.  Keep the pad solve geometric (0.12 visible ribbon), then make a
+  // second, conservative decision for end marks.  Both endpoint layouts make
+  // the same decision from their shared nominal solve, so no zebra/stop bar
+  // can pile up in the remaining short ribbon.
+  for (const arm of arms) {
+    const seg = segById(w, arm.segId)!;
+    const other = arm.end === "a" ? seg.b : seg.a;
+    if (ribbonReserve(w, nodeId, other, nomsCache) === 0) continue;
+    const here = Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt);
+    const there = Math.max(
+      nominalTrimAt(w, other, arm.segId, -1, nomsCache),
+      nominalTrimAt(w, other, arm.segId, 1, nomsCache),
+    );
+    if (segLength(w, seg) - here - there < MARKING_RIBBON - 1e-9) {
+      arm.markingsSuppressed = true;
+      diags.push({ code: "short-segment", detail: `seg ${arm.segId}: shared ribbon ${(segLength(w, seg) - here - there).toFixed(3)}` });
+    }
+  }
 
   const rings = LAYERS.map((L, li) => {
     if (L.name === "kerb" && ground.every((a) => a.kerb === 0)) return [];
@@ -1093,7 +1123,7 @@ export function buildJunction(
 const KNOWN_CODES = new Set([
   "radius-shrunk", "chamfered-corner", "trim-clamped", "crosswalk-dropped",
   "stopline-dropped", "min-gap-merged", "layer-excluded",
-  "non-ground-node", "pad-node-deferred",
+  "non-ground-node", "pad-node-deferred", "short-segment",
 ]);
 
 function nearestVert(ring: Pt[], p: Pt): Pt {

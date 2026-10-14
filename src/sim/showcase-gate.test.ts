@@ -259,11 +259,7 @@ function checkCase(name: ShowcaseCaseName): CaseMetrics {
         m.maxRingOverlap = Math.max(m.maxRingOverlap,
           intersectionArea(rings[i].ring, rings[j].ring));
       }
-      // The deliberate 1.5-tile short-pair is a merged-corridor diagnostic:
-      // its independent node pads overlap until the P0 joint trim budget is
-      // extended to both sides. Keep it measured, but do not mislabel that
-      // intentional stress case as an unrelated template failure.
-      if (name !== "short-pair") expect(hit, `${name}: rings of nodes ${rings[i].node} and ${rings[j].node} overlap`).toBe(false);
+      expect(hit, `${name}: rings of nodes ${rings[i].node} and ${rings[j].node} overlap`).toBe(false);
     }
   }
 

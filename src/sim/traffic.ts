@@ -4,6 +4,7 @@ import { ROAD, World, ZONE, heightAt, idx, inBounds, isTunnelTile, TransitKind, 
 import { SignalInfo, signalNodes, signalPhaseAt } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
+import { profileOf } from "./corridor";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
 export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7, [ROAD.ONEWAY_STREET]: 3, [ROAD.ONEWAY_AVENUE]: 4.5 };
@@ -181,6 +182,29 @@ export const IDM_SUBSTEP = 0.1;
 /** Half vehicle length, bumper to centre: car 0.20, truck 0.30 tile. */
 export function halfLength(kind: 0 | 1): number {
   return kind === 1 ? 0.3 : 0.2;
+}
+
+/** Vehicles/second for one lane at free-flow speed under the pinned IDM gap. */
+export function idmCapacityPerLane(speed: number, kind: 0 | 1 = 0): number {
+  return speed / (IDM_S0 + speed * IDM_T + halfLength(kind) * 2);
+}
+
+/** Flow capacity of a road tile, used to translate demand into IDM units. */
+export function idmRoadCapacity(type: number, kind: 0 | 1 = 0): number {
+  return idmCapacityPerLane(ROAD_SPEED[type], kind) * profileOf(type as 1 | 2 | 3 | 4 | 5).lanes;
+}
+
+function demandCapacityFactor(w: World): number {
+  let total = 0, physical = 0;
+  for (let i = 0; i < w.road.length; i++) {
+    const type = w.road[i];
+    if (!type) continue;
+    total += ROAD_CAPACITY[type];
+    physical += idmRoadCapacity(type);
+  }
+  // Keep legacy demand stable on ordinary streets; only a materially
+  // under-capacity network needs demand throttling.
+  return total > 0 ? (physical / total < 0.5 ? Math.max(0.5, physical / total) : 1) : 1;
 }
 
 const IDM_GAP_FLOOR = 0.035;   // 0.4 m: keeps the gap term finite on contact
@@ -865,8 +889,9 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   if (dt <= 0) return;
 
   // Spawn: commuters scale with residents, trucks with industry.
-  t.spawnCarry += (s.population / 150) * (1 - 0.6 * s.transit.share) * dt;
-  t.truckCarry += (s.capacity.ind / 120) * dt;
+  const demandFactor = demandCapacityFactor(w);
+  t.spawnCarry += (s.population / 150) * demandFactor * (1 - 0.6 * s.transit.share) * dt;
+  t.truckCarry += (s.capacity.ind / 120) * demandFactor * dt;
   while (t.spawnCarry >= 1 && t.vehicles.length < MAX_VEHICLES) { t.spawnCarry -= 1; spawn(s, t, 0); }
   while (t.truckCarry >= 1 && t.vehicles.length < MAX_VEHICLES) { t.truckCarry -= 1; spawn(s, t, 1); }
   t.spawnCarry = Math.min(t.spawnCarry, 3);
