@@ -32,7 +32,8 @@ npm run desktop:build
 ```
 
 Generates `src-tauri/target/release/bundle/macos/Mayor.app` and the `.dmg`.
-The app is not signed or notarized: the first time, open it with right-click → Open.
+A plain `npm run desktop:build` does not sign or notarize: the first time, open it with right-click → Open.
+For a signed build, see the notes below and [SIGNING.md](SIGNING.md).
 
 ## Windows
 
@@ -48,14 +49,19 @@ Prerequisites: Node 22, Rust (stable), and WebView2 (already included with Windo
 
 ## Mac (ready-made dmg)
 
-The latest installer is in the private repository Releases: https://github.com/wsgutnik/mayor/releases
-(`Mayor-*-aarch64.dmg`, Apple Silicon). Local builds land in `release-out/` (`npm run package:adhoc`, then copy the dmg and zip `dist/` for the iPad PWA); they are ad hoc signed and not notarized. Open the dmg, drag Mayor to Applications, and on first launch use
-right-click > Open (the app is unsigned). Generated locally with `npm run package`. For the unsigned-app warning and
-how to notarize, see [SIGNING.md](SIGNING.md).
+The M34 release (pre-release tag `v0.1.0-m34`) is on the GitHub Releases page: https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m34
+
+- `Mayor-m34-mac-arm64-signed-notarized.dmg`: macOS Apple Silicon, Developer ID signed and notarized. Open the dmg and drag Mayor to Applications.
+- `Mayor-m34-ipad-pwa.zip`: the PWA bundle for iPad.
+- `SHA256SUMS-m34`: checksums for the files above.
+
+Fallback when no notarized build is available: `npm run package:adhoc` writes an ad hoc signed dmg to `release-out/`. It is not notarized, so on first launch use right-click > Open. Signing and notarization steps are in [SIGNING.md](SIGNING.md).
 
 ## Private remote preview (any network)
 
-For viewing the PWA away from the Mac, `scripts/serve-gated.mjs` serves `dist/` behind one shared password (HTTP Basic
+The current remote preview address is https://mayor.gutnikcrm.com. It is protected by a shared password, which is not stored in this repository; ask the owner for it.
+
+To serve the PWA from the Mac for viewing away from home, `scripts/serve-gated.mjs` serves `dist/` behind one shared password (HTTP Basic
 auth) and a Cloudflare named tunnel publishes it:
 
 ```bash

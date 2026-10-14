@@ -1,6 +1,6 @@
 # PROGRESS — Mayor
 
-Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with screenshots: status artifact (source in [docs/mayor-status.html](docs/mayor-status.html)).
+Updated on 2026-10-14 (after the M34 release and the junction, traffic, zoning and render ports; see the 2026-10-14 section at the end). Live status with screenshots: status artifact (source in [docs/mayor-status.html](docs/mayor-status.html)).
 
 ## State
 
@@ -30,10 +30,12 @@ Updated on 2026-10-13 (after M28 and UI-1/UI-2/UI-3 step 1). Live status with sc
 | 2x2 services | done | `facilityAnchors` in the world and save (optional field), placement/bulldoze/coverage/utility links from the footprint centre, one model per anchor with `/models/x2/NN.glb` or a 1.8x scaled 1x1 fallback; hospital, city hall, secondary school, thermal plant, water, metro. 2x2 models built and loaded from `models/x2/` for #21, #27, #29, #32, #34, #40 (640-940 triangles each) |
 | v2 buildings batch | done | 35 buildings have `v2` variants with `v2_lod1`/`v2_lod2` (`?visualV2=1`, manifest-gated); runtime LOD switching still open |
 | Corridor model | steps 1-2 of ADR 06, junction rendering (part of step 3) | `src/sim/corridor.ts` (RoadProfile, SegmentCorridor); junction asphalt polygon from arm edges, miter-limited acute corners, trimmed arms, kerbs wrapping corners without inner arcs; lots are not yet clipped against junction polygons |
+| Junction builder | in progress | sidewalks wrapping corners, crosswalks and stop bars, guide dashes, arrows, lane graph; unsignalised priority pending (design in `docs/process/07-junction-builder.md`) |
+| Procedural buildings | experimental, off by default | `?procBuildings=1`; rejected visually, rework pending gb3 |
 | Native iPad app | prepared | `tauri.conf.json` iOS section, `Info.ios.plist`, `scripts/ios-prereq-check.sh`, `docs/IOS.md`; needs full Xcode 26.1.1 and an iOS provisioning profile (not available here); rust iOS targets installed |
 | M22 Polish | pending | pedestrians, polish, real Windows and iPad hardware |
 
-Tests: 484 passing (`npx vitest run`). Mac build verified; real Windows and iPad hardware not tested yet.
+Tests: 692 passing, 2 todo, 84 files (`npx vitest run`, 2026-10-14). Mac build verified; real Windows and iPad hardware not tested yet.
 
 ## Oriented zoning (M27) phases
 
@@ -92,7 +94,8 @@ CI and packaging are local: `npm run ci` (types, tests, build) before each merge
 
 ## Mac Distribution
 
-- Consistent ad hoc signing is ready (`npm run package:adhoc`); Developer ID signing and notarization are scripted (`npm run package:signed`, `scripts/mac-cert-setup.sh`) but **depend on an Apple certificate and notary credentials**, which do not exist on this Mac yet. Step-by-step in [docs/SIGNING.md](docs/SIGNING.md).
+- The M34 release (`v0.1.0-m34`) ships `Mayor-m34-mac-arm64-signed-notarized.dmg`, Developer ID signed and notarized, built with `scripts/release-mac.sh` (commit 22f7b35). Step-by-step in [docs/SIGNING.md](docs/SIGNING.md).
+- Consistent ad hoc signing remains the fallback (`npm run package:adhoc`); the dmg is then not notarized.
 
 ## Asset Backlog
 
@@ -111,6 +114,30 @@ CI and packaging are local: `npm run ci` (types, tests, build) before each merge
 1. Oriented zoning polish: ragged block edges where rows are cut off, growth in deeper rows, pad thickness (it is the default now).
 2. UI-2/UI-3 remainder: whole-road upgrade stroke, density and lot visualisation, inspector diagnostics, economy dashboard (numbers from the real sim).
 3. Assets: runtime LOD1/LOD2 for the v2 references, rear facades for the few remaining plain models, multi-tile footprints for #27/#21/#31-#33/#34/#40 (needs a save-version bump), then real Mac/iPad profiling.
-4. Per-lane traffic (reference: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, phases C and E).
+4. Vehicles follow lane connectors (in flight, gt3); per-lane traffic (reference: `third_party/mayor-road-kit/docs/ROAD_NETWORK_ARCHITECTURE.md`, phases C and E).
 5. M22: moving pedestrians, polish, validation on Windows and iPad.
-6. Distribution: Developer ID certificate + notarization (`docs/SIGNING.md`); public web demo (Vercel + Stripe, package in `~/mayor-site`) waits on Vercel login and Stripe account choice.
+6. Distribution: public web demo (Vercel + Stripe, package in `~/mayor-site`) waits on Vercel login and Stripe account choice; App Store release is blocked until full Xcode 26.1.1 is installed (`docs/IOS.md`).
+
+## 2026-10-14
+
+Landed on 2026-10-13 and 2026-10-14, grouped by area (commit short hashes from `git log`):
+
+- **Release:** `v0.1.0-m34` (macOS Apple Silicon, signed and notarized dmg, iPad PWA zip, SHA256SUMS). Signing script `22f7b35`.
+- **Junction builder and renderer:** `bcfc67a`, `1d6345a`, `f635f78`, `2a9ec06` (lane arrows on asphalt, adaptive signal controller as a pure module), `7b601b6` (no guide dashes on roundabout ring nodes), `3160b2d` (short-segment trim budget), `a0d7717` (layout-driven bands, crosswalks, stop bars, guide dashes), `4aa6ca1` and `8bd6df2` (miter-limited acute corners, kerbs wrapping corners), `955362c` (junction showcase and gate, signals by angle), `4d843ae` (sidewalk profile, junction.ts P0-P2), `eb7dfa6` (design and visual-quality skill), `c3d4b21` (AGENTS.md rule 11).
+- **Lane graph and procedural buildings:** `13d1b5e` (procedural building core and lane graph with connectors), `80fbc47` (procedural building renderer and construction state, behind `?procBuildings=1`).
+- **Traffic:** `59e169d` (IDM car-following; red lights as virtual leaders).
+- **Zoning:** `ef1c8f2` (9-point cell validity, trapezoid cells, priority overlap resolution, DP lot packer, per-window night lights, lot ground plans).
+- **Vehicles, render and environment:** `26f962b` (single baked vehicle geometry, per-car paint and lamps, shadow proxies, PCF bias), `5b97698` (night vehicle and street-light pools, HDRI environment with day-faded IBL, CC0 texture set), `e6bb792` (Blender facade and roof pass).
+- **Info views v2 and UI patterns:** `bcfc67a` (coverage field texture, traffic road tint, bell toasts, onboarding card, tooltip, legend).
+- **Research:** `5e920e1` (GitHub road and traffic tools, licence-checked), plus the Fable Cities port studies in `docs/process/08` to `10`.
+
+Gaps, stated plainly:
+
+- Vehicles do not follow lane connectors yet. The lane graph is used by junction geometry only (gt3 in flight).
+- Unsignalised priority (yield and stop rules) is pending.
+- The adaptive signal controller exists as a pure module in `src/sim/signals.ts`; nothing in the sim calls it yet.
+- Procedural buildings are rejected visually and stay behind `?procBuildings=1`, off by default, until gb3 is done.
+- The junction showcase `?showcase=1` is dev-only (`import.meta.env.DEV`); the headless gate is `src/sim/showcase-gate.test.ts`.
+- App Store release is blocked on full Xcode 26.1.1 (see `docs/IOS.md`).
+- `NOTICE.md` attributes only the signal and IDM code to Fable Cities. The zoning, vehicle, render and buildings ports carry MIT headers in code but are not yet listed there.
+- Hardware performance on Mac, Windows and iPad is still not measured.

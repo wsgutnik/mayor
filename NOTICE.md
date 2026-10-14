@@ -37,6 +37,19 @@ https://github.com/rawprogress/fable-cities (commit aea8b10), translated to
 TypeScript. Ported functions carry a header comment naming the fable source
 file and function.
 
+The same MIT notice covers further functions adapted from Fable Cities (each
+carries a header comment naming the fable source): junction solving ideas and
+lane connectors (`src/sim/lanes.ts`, `src/sim/junction.ts`), zoning (cell
+validity, trapezoid cells, priority overlap resolution, DP lot packer in
+`src/sim/zoneblocks.ts`, `src/sim/orientedlots.ts`), lot ground plans
+(`src/sim/lotground.ts`), vehicle surface/material/palette/lights and shadow
+tuning (`src/render/vehicle-*.ts`, `src/render/shadow-tuning.ts`), street-light
+pools (`src/render/street-light.ts`), per-window night lights
+(`src/render/window-light.ts`, `src/render/kit-materials.ts`), procedural
+buildings (`src/render/facade.ts`, `procgeo.ts`, `procbuildings*.ts`), and info
+view field/tint textures (`src/sim/coverage-field.ts`,
+`src/render/coverage-overlay.ts`, `src/render/traffic-tint.ts`).
+
 MIT License — Copyright (c) 2026 raw (github.com/rawprogress)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

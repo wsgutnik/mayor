@@ -49,12 +49,26 @@ CS2 is a game made by roughly 100 people over years. Goal: a **playable core** t
 | M25 | ✅ Detection and texture | Automatic crossing rules, preview, interchange; texture-based Blender roads |
 | M24 | ✅ Level separation | Overpass and underpass without a node, layer-specific traffic |
 | M23 | ✅ Bridges and tunnels | Segment elevation, water and hill spans, deck, pillars, portals |
-| M27 | ✅ merged, off by default | Oriented zoning: segment-frame blocks, oriented lots, tile mirror, save v2, oriented rendering and painting behind the `zoning` preference; cutover (P9) pending |
+| M27 | ✅ default | Oriented zoning: segment-frame blocks, oriented lots, tile mirror, save v2, oriented rendering and painting; default since the P9 cutover |
 | M28 | ✅ Visual assets | Audit and strict export, manifests, base/variant registry, rear facades, detailed fleet, v2 reference buildings with LODs (opt-in), 700-triangle budget |
 | UI-1 | ✅ Interface | UI scale/opacity, collapsible persistent panels, road-build readout |
 | UI-2 | ◐ Road builder | Undo/Redo, snapping, upgrade in place, parallel roads done; whole-road upgrade stroke pending |
 | UI-3 | ◐ Zoning tools | Marquee and Fill done; densities and lot visualisation pending |
+| Junction builder | ◐ in progress | Design in `docs/process/07-junction-builder.md`: sidewalks wrapping corners, crosswalks, stop bars, guide dashes, arrows, lane graph. Unsignalised priority pending |
+| Fable Cities ports | ✅ | MIT ports (signals by angle, IDM, zoning cells and packer, vehicle baking, HDRI, info views v2, UI patterns). `NOTICE.md` currently attributes only the signal and IDM code |
+| Procedural buildings | ◐ experimental | Core and renderer behind `?procBuildings=1`, off by default; rejected visually, rework pending |
+| 0.1.0 (M34) | ✅ released | macOS Apple Silicon, signed and notarized; iPad PWA bundle (GitHub release `v0.1.0-m34`) |
 | UI-4 to UI-6 | pending | Inspector diagnostics and economy dashboard, iPad layout and onboarding, themes and districts (see `docs/UI-V2-PLAN.md`) |
+
+## Next Items
+
+1. Vehicles follow lane connectors (in flight, gt3).
+2. Unsignalised priority at junctions (yield and stop rules).
+3. Wire the adaptive signal controller (`src/sim/signals.ts`) into the sim.
+4. Procedural buildings: pass the visual review (gb3) before any change to the default.
+5. Junction visual gate: critic pass on the hard cases (acute junction, dead end, curve, avenue plus street, bridge ramp), day and night.
+6. App Store and iOS release: blocked until full Xcode 26.1.1 is installed (see `docs/IOS.md`).
+7. M22: pedestrians, polish, validation on Windows and iPad.
 
 ## Architecture
 
