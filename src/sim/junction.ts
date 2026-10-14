@@ -372,23 +372,45 @@ function segLength(w: World, seg: RoadSegment): number {
   return L;
 }
 
+/** Per-node corner nominals, shared across a junctionsOf pass (each segment end
+ * is budgeted once here and once from its neighbour; without the cache every
+ * lookup recomputes arms, gaps and nominals). */
+interface NodeNoms {
+  ground: JArm[]; excluded: ExcludedArm[]; gaps: Gap[]; noms: Nominal[];
+}
+function getNoms(w: World, nodeId: number, cache?: Map<number, NodeNoms>): NodeNoms | null {
+  const hit = cache?.get(nodeId);
+  if (hit) return hit;
+  const node = nodeById(w, nodeId);
+  if (!node) return null;
+  const { ground, excluded } = armsAt(w, nodeId);
+  const gaps = gapsOf(ground);
+  const noms = gaps.map((g) => nominalCorner(node.x, node.z, ground[g.i], ground[g.j], g));
+  const out: NodeNoms = { ground, excluded, gaps, noms };
+  cache?.set(nodeId, out);
+  return out;
+}
+
 /** Nominal (unbudgeted) trim of one segment end on one side; 0 when the end
  * has no corner there. Side flips at the far end (same physical edge). */
-function nominalTrimAt(w: World, nodeId: number, segId: number, side: -1 | 1): number {
-  const node = nodeById(w, nodeId);
-  if (!node) return 0;
-  const { ground } = armsAt(w, nodeId);
+function nominalTrimAt(
+  w: World, nodeId: number, segId: number, side: -1 | 1, cache?: Map<number, NodeNoms>,
+): number {
+  const nn = getNoms(w, nodeId, cache);
+  if (!nn) return 0;
+  const ground = nn.ground;
   const idx = ground.findIndex((a) => a.segId === segId);
   if (idx < 0) return 0;
   if (ground.length < 2) {
     const p = profileOf(ground[idx].type);
     return Math.max(p.kerb + p.sidewalk, 0.1);
   }
-  for (const g of gapsOf(ground)) {
+  for (let k = 0; k < nn.gaps.length; k++) {
+    const g = nn.gaps[k];
     const hitA = g.i === idx && g.sideA === side;
     const hitB = g.j === idx && g.sideB === side;
     if (!hitA && !hitB) continue;
-    const n = nominalCorner(node.x, node.z, ground[g.i], ground[g.j], g);
+    const n = nn.noms[k];
     if (!n.ok) return 0;
     return Math.max(0, hitA ? n.tA : n.tB);
   }
@@ -563,7 +585,14 @@ function classify(ground: JArm[], gaps: Gap[]): { kind: JunctionKind; template: 
   return { kind: "junction", template: "general" };
 }
 
-/** Square dead-end cap (P0.7): cap plane at the node, U-wrap outside. */
+/**
+ * Square dead-end cap (P0.7): stations measured from the node INTO the segment
+ * (arm direction). Cap plane at the node (s = 0); ribbons end B before it, so
+ * the asphalt rectangle spans s ∈ [0, B] and abuts the ribbon ends edge to
+ * edge. Kerb/sidewalk/boundary wrap the tip as a U OUTSIDE (legs from the
+ * mouth at s = B back to s = 0, quarter arcs around the tip corners, joined
+ * across at s = -r).
+ */
 function buildEndCap(
   cx: number, cz: number, a: JArm, B: number,
 ): { rings: Pt[][]; } {
@@ -572,20 +601,21 @@ function buildEndCap(
     z: cz + a.dz * s + a.dx * l,
   });
   const h = a.h;
-  const rings: Pt[][] = [[P(-B, -h), P(0, -h), P(0, h), P(-B, h)]];
+  const rings: Pt[][] = [[P(0, -h), P(B, -h), P(B, h), P(0, h)]];
   const uRing = (o: number, r: number): Pt[] => {
-    const pts: Pt[] = [P(-B, -o), P(0, -o)];
+    const pts: Pt[] = [P(B, -o), P(0, -o)];
     if (r > 1e-9) {
-      const k1 = P(0, -h), e1 = P(r, -h);
+      const k1 = P(0, -h), e1 = P(-r, -h);
       const s1 = pickSweepDir(k1.x, k1.z, r, P(0, -o), e1, cx, cz, true);
       pts.push(...arcPoints(k1.x, k1.z, r, P(0, -o), e1, s1).pts.slice(1));
-      const k2 = P(0, h), s2pt = P(r, h), e2 = P(0, o);
+      pts.push(P(-r, h));
+      const k2 = P(0, h), s2pt = P(-r, h), e2 = P(0, o);
       const s2 = pickSweepDir(k2.x, k2.z, r, s2pt, e2, cx, cz, true);
       pts.push(...arcPoints(k2.x, k2.z, r, s2pt, e2, s2).pts.slice(1));
     } else {
       pts.push(P(0, -h), P(0, h));
     }
-    pts.push(P(-B, o));
+    pts.push(P(B, o));
     return pts;
   };
   const k = a.kerb, sw = a.sidewalk, clr = a.clearance;
@@ -596,13 +626,13 @@ function buildEndCap(
 }
 
 function buildAnchors(
-  cx: number, cz: number, kind: JunctionKind, arms: JArm[], boundary: Pt[],
+  cx: number, cz: number, arms: JArm[], boundary: Pt[],
 ): LotAnchor[] {
   if (boundary.length === 0) return [];
   const out: LotAnchor[] = [];
   for (const a of arms) {
-    const inX = kind === "end" ? -a.dx : a.dx;
-    const inZ = kind === "end" ? -a.dz : a.dz;
+    const inX = a.dx;
+    const inZ = a.dz;
     for (const side of [-1, 1] as const) {
       const nx = -a.dz * side, nz = a.dx * side;
       let best = 0;
@@ -631,16 +661,22 @@ function hashLayout(l: JunctionLayout): string {
 
 // ---------------------------------------------------------------- builder
 
-export function buildJunction(w: World, nodeId: number): JunctionLayout | null {
+export function buildJunction(
+  w: World, nodeId: number, nomsCache?: Map<number, NodeNoms>,
+): JunctionLayout | null {
   const node = nodeById(w, nodeId);
   if (!node) return null;
   const cx = node.x, cz = node.z;
-  const { ground, excluded } = armsAt(w, nodeId);
+  const nn = getNoms(w, nodeId, nomsCache);
+  if (!nn) return null;
+  const ground = nn.ground, excluded = nn.excluded;
   const diags: JunctionDiagnostic[] = [];
   if (excluded.length > 0) {
     diags.push({ code: "layer-excluded", detail: `segs ${excluded.map((e) => e.segId).join(",")}` });
   }
-  const gaps = gapsOf(ground);
+  // Copies: the builder reclassifies degenerate gaps ("merged") below, which
+  // must not leak into the cached nominals.
+  const gaps = nn.gaps.map((g) => ({ ...g }));
   for (const g of gaps) {
     if (g.kind === "merged") {
       diags.push({ code: "min-gap-merged", detail: `gap ${g.i}-${g.j} ${((g.gap * 180) / Math.PI).toFixed(2)}deg` });
@@ -675,7 +711,7 @@ export function buildJunction(w: World, nodeId: number): JunctionLayout | null {
     const Bnom = Math.max(a.kerb + a.sidewalk, 0.1);
     const tNbr = nbr === nodeId
       ? 0
-      : Math.max(nominalTrimAt(w, nbr, a.segId, 1), nominalTrimAt(w, nbr, a.segId, -1));
+      : Math.max(nominalTrimAt(w, nbr, a.segId, 1, nomsCache), nominalTrimAt(w, nbr, a.segId, -1, nomsCache));
     const Ballow = allowance(L, Bnom, tNbr);
     let B = Bnom;
     if (Ballow < Bnom - 1e-9) {
@@ -692,7 +728,7 @@ export function buildJunction(w: World, nodeId: number): JunctionLayout | null {
         trimNeg: { ...set }, trimPos: { ...set },
       }],
       asphalt: rings[0], kerbOuter: rings[1], sidewalkOuter: rings[2], boundary: rings[3],
-      fillets: [], lotAnchors: buildAnchors(cx, cz, "end", ground, rings[3]), hash: "",
+      fillets: [], lotAnchors: buildAnchors(cx, cz, ground, rings[3]), hash: "",
     };
     layout.hash = hashLayout(layout);
     return layout;
@@ -725,7 +761,7 @@ export function buildJunction(w: World, nodeId: number): JunctionLayout | null {
   }
 
   // --- bend / transition / junction: nominals, budget, per-layer corners.
-  const noms = gaps.map((g) => nominalCorner(cx, cz, ground[g.i], ground[g.j], g));
+  const noms = nn.noms.map((n) => ({ ...n }));
   gaps.forEach((g, k) => {
     if (!noms[k].ok) {
       g.kind = "merged";
@@ -743,8 +779,8 @@ export function buildJunction(w: World, nodeId: number): JunctionLayout | null {
     const nbrB = b.end === "a" ? segB.b : segB.a;
     const flipA = (g.sideA === 1 ? -1 : 1) as -1 | 1;
     const flipB = (g.sideB === 1 ? -1 : 1) as -1 | 1;
-    allowA.set(k, allowance(segLength(w, segA), noms[k].tA, nbrA === nodeId ? 0 : nominalTrimAt(w, nbrA, a.segId, flipA)));
-    allowB.set(k, allowance(segLength(w, segB), noms[k].tB, nbrB === nodeId ? 0 : nominalTrimAt(w, nbrB, b.segId, flipB)));
+    allowA.set(k, allowance(segLength(w, segA), noms[k].tA, nbrA === nodeId ? 0 : nominalTrimAt(w, nbrA, a.segId, flipA, nomsCache)));
+    allowB.set(k, allowance(segLength(w, segB), noms[k].tB, nbrB === nodeId ? 0 : nominalTrimAt(w, nbrB, b.segId, flipB, nomsCache)));
   });
 
   interface GapFinal {
@@ -1046,7 +1082,7 @@ export function buildJunction(w: World, nodeId: number): JunctionLayout | null {
   const layout: JunctionLayout = {
     ...base, kind, template, arms,
     asphalt: rings[0], kerbOuter: rings[1], sidewalkOuter: rings[2], boundary: rings[3],
-    fillets, lotAnchors: buildAnchors(cx, cz, kind, ground, rings[3]), hash: "",
+    fillets, lotAnchors: buildAnchors(cx, cz, ground, rings[3]), hash: "",
   };
   layout.hash = hashLayout(layout);
   return layout;
@@ -1158,7 +1194,8 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
   }
 
   // Mouths: each arm-side edge point at its trim lies on the asphalt ring.
-  const dirS = l.kind === "end" ? -1 : 1;
+  // All trims measure from the node into the segment (dead-end caps span
+  // s ∈ [0, B] along the arm), so no end-kind sign flip applies.
   if (l.asphalt.length > 0) {
     for (const a of l.arms) {
       const h = profileOf(a.type).asphaltHalf;
@@ -1166,8 +1203,8 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
         const t = side < 0 ? a.trimNeg.asphalt : a.trimPos.asphalt;
         if (!Number.isFinite(t)) { err(`seg ${a.segId} side ${side}: trim not finite`); continue; }
         const e = {
-          x: cx + a.dx * dirS * t + -a.dz * side * h,
-          z: cz + a.dz * dirS * t + a.dx * side * h,
+          x: cx + a.dx * t + -a.dz * side * h,
+          z: cz + a.dz * t + a.dx * side * h,
         };
         const d = distToRing(e, l.asphalt);
         if (d > 1e-3) err(`mouth seg ${a.segId} side ${side}: edge point ${d.toFixed(4)} off the asphalt ring`);
@@ -1265,8 +1302,8 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
     if (!Number.isFinite(an.s) || an.s < -1e-9) { err("anchor s invalid"); continue; }
     if (Math.abs(an.s * 1000 - Math.round(an.s * 1000)) > 1e-6) err("anchor s off the 1e-3 grid");
     if (l.boundary.length > 0) {
-      const inX = l.kind === "end" ? -arm.dx : arm.dx;
-      const inZ = l.kind === "end" ? -arm.dz : arm.dz;
+      const inX = arm.dx;
+      const inZ = arm.dz;
       const nx = -arm.dz * an.side, nz = arm.dx * an.side;
       let best = 0;
       for (const v of l.boundary) {
@@ -1294,8 +1331,9 @@ export function junctionsOf(w: World): { graphRevision: number; byNode: Map<numb
   const hit = junctionCache.get(w);
   if (hit && hit.rev === rev) return { graphRevision: hit.rev, byNode: hit.map };
   const map = new Map<number, JunctionLayout>();
+  const nomsCache = new Map<number, NodeNoms>();
   for (const n of [...w.nodes].sort((a, b) => a.id - b.id)) {
-    const l = buildJunction(w, n.id);
+    const l = buildJunction(w, n.id, nomsCache);
     if (l) map.set(n.id, l);
   }
   junctionCache.set(w, { rev, map });

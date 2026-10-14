@@ -3,7 +3,8 @@ import * as THREE from "three";
 import * as fs from "node:fs";
 import { newCity, placeRoad, CityState } from "../sim/sim";
 import { cidx, heightAt, RoadType } from "../sim/world";
-import { nodeArms, nodeLayout } from "../sim/roads";
+import { nodeArms } from "../sim/roads";
+import { junctionsOf } from "../sim/junction";
 import {
   buildRoadNetworkGeometry, buildStripGeometry, junctionDebugGeometry,
   JUNCTION_TILE, ROAD_CLASS, ROAD_TILE_LENGTH, roadClassFor,
@@ -70,11 +71,12 @@ const dumpSvg = (name: string, s: CityState): void => {
   const chunks: string[] = [];
   const polys: { x: number; z: number }[][] = [];
   const lines: { x: number; z: number }[][] = [];
+  const layouts = junctionsOf(s.world);
   for (const node of s.world.nodes) {
-    const l = nodeLayout(s.world, node.id);
-    if (!l || l.arms.length < 2) continue;
+    const l = layouts.byNode.get(node.id);
+    if (!l || l.asphalt.length < 3) continue;
     const d = junctionDebugGeometry(l);
-    if (d.asphalt.length >= 3) polys.push(d.asphalt);
+    polys.push(d.asphalt);
     lines.push(...d.kerbs);
   }
   const all = [...polys.flat(), ...lines.flat()];
@@ -118,15 +120,30 @@ describe("road network geometry", () => {
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
     const g = buildRoadNetworkGeometry(s.world, gy);
     const pos = g.attributes.position.array as Float32Array;
+    const idxAttr = g.index!;
+    const sign = (px: number, pz: number, ax: number, az: number, bx: number, bz: number): number =>
+      (px - bx) * (az - bz) - (ax - bx) * (pz - bz);
+    const covered = (px: number, pz: number): boolean => {
+      for (let t = 0; t < idxAttr.count; t += 3) {
+        const vi = [idxAttr.getX(t), idxAttr.getX(t + 1), idxAttr.getX(t + 2)];
+        const ax = pos[vi[0] * 3], az = pos[vi[0] * 3 + 2];
+        const bx = pos[vi[1] * 3], bz = pos[vi[1] * 3 + 2];
+        const cx = pos[vi[2] * 3], cz = pos[vi[2] * 3 + 2];
+        const y = (pos[vi[0] * 3 + 1] + pos[vi[1] * 3 + 1] + pos[vi[2] * 3 + 1]) / 3;
+        const lift = y - gy((ax + bx + cx) / 3, (az + bz + cz) / 3);
+        if (Math.abs(lift - 0.06) > 5e-4 && Math.abs(lift - 0.08) > 5e-4) continue;
+        const d1 = sign(px, pz, ax, az, bx, bz);
+        const d2 = sign(px, pz, bx, bz, cx, cz);
+        const d3 = sign(px, pz, cx, cz, ax, az);
+        if (!((d1 < -1e-7 || d2 < -1e-7 || d3 < -1e-7) && (d1 > 1e-7 || d2 > 1e-7 || d3 > 1e-7))) return true;
+      }
+      return false;
+    };
+    // Ear clipping owns no centre vertex; the centre must lie inside an
+    // asphalt triangle instead (ribbon or patch).
     for (const node of s.world.nodes) {
       if (node.segs.length < 2) continue;
-      let best = Infinity;
-      for (let i = 0; i < pos.length; i += 3) {
-        const d = Math.hypot(pos[i] - node.x, pos[i + 2] - node.z);
-        if (d < best) best = d;
-      }
-      // The node fan owns a vertex at (or nearly at) the centre.
-      expect(best).toBeLessThan(0.05);
+      expect(covered(node.x, node.z)).toBe(true);
     }
   });
 
@@ -159,8 +176,8 @@ describe("road network geometry", () => {
     const pos = g.attributes.position.array as Float32Array;
     const lifts = new Set<string>();
     for (let i = 0; i < pos.length / 3; i++) lifts.add((pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2])).toFixed(3));
-    // ribbons 0.060 / kerb 0.066 / marks 0.064, then the node patch on top: kerb 0.078, asphalt 0.080
-    const allowed = new Set(["0.060", "0.064", "0.066", "0.078", "0.080", "0.074"]);
+    // ribbons 0.060 / kerb 0.066 / marks 0.064, node patch asphalt 0.080, bands and node markings above it 0.084 / 0.086
+    const allowed = new Set(["0.060", "0.064", "0.066", "0.078", "0.080", "0.074", "0.084", "0.086"]);
     for (const y of lifts) expect(allowed.has(y)).toBe(true);
     expect(lifts.has("0.060")).toBe(true);
     expect(lifts.has("0.066")).toBe(true);
@@ -244,11 +261,11 @@ describe("road network geometry", () => {
       dumpSvg("cross-and-oneway-t", s);
     }
     for (const s of scenarios) {
+      const layouts = junctionsOf(s.world);
       for (const node of s.world.nodes) {
-        const l = nodeLayout(s.world, node.id);
-        if (!l || l.arms.length < 2) continue;
+        const l = layouts.byNode.get(node.id);
+        if (!l || l.asphalt.length < 3) continue;
         const d = junctionDebugGeometry(l);
-        if (d.asphalt.length < 3) continue;
         for (const line of d.kerbs) {
           for (const p of line) {
             expect(pointInPoly(d.asphalt, p) && !onBoundary(d.asphalt, p)).toBe(false);
@@ -299,8 +316,25 @@ describe("road network geometry", () => {
     const flat = buildRoadNetworkGeometry(s.world, gy);
     const atlas = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
     finite(atlas);
-    const fv = flat.attributes.position.count;
-    const av = atlas.attributes.position.count;
+    // Ribbon verts only (junction patches triangulate identically in both
+    // paths, so they are excluded from the efficiency comparison): flat
+    // ribbon lifts vs the atlas textured-strip classes.
+    const liftOf = (g: THREE.BufferGeometry, i: number): number => {
+      const p = g.attributes.position.array as Float32Array;
+      return p[i * 3 + 1] - gy(p[i * 3], p[i * 3 + 2]);
+    };
+    let fv = 0;
+    for (let i = 0; i < flat.attributes.position.count; i++) {
+      const l = liftOf(flat, i);
+      if (Math.abs(l - 0.06) < 5e-4 || Math.abs(l - 0.066) < 5e-4) fv++;
+    }
+    const acls = atlas.attributes.aClass.array as Float32Array;
+    let av = 0;
+    for (let i = 0; i < acls.length; i++) {
+      if (acls[i] >= ROAD_CLASS.STREET && acls[i] <= ROAD_CLASS.ONEWAY_AVENUE) av++;
+    }
+    expect(fv).toBeGreaterThan(0);
+    expect(av).toBeGreaterThan(0);
     expect(av * 3).toBeLessThanOrEqual(fv);
     // Cross-section UVs: u spans exactly 0..1, v spans the length in tiles.
     const uv = atlas.attributes.uv.array as Float32Array;
@@ -319,7 +353,7 @@ describe("road network geometry", () => {
     expect(vMax).toBeCloseTo(20 / ROAD_TILE_LENGTH, 5);
   });
 
-  it("atlas junction: disc uses world-space UV, zebras are single textured quads", () => {
+  it("atlas junction: patch uses world-space UV, zebras are single textured quads", () => {
     const s = junction();
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
     const g = buildRoadNetworkGeometry(s.world, gy, { atlas: true });

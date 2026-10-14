@@ -1,6 +1,6 @@
 import type { CityRenderer } from "../render/scene";
 import type { CityState } from "../sim/sim";
-import { nodeLayout } from "../sim/roads";
+import { buildJunction } from "../sim/junction";
 import { junctionDebugGeometry } from "../render/roads";
 import {
   SHOWCASE_CASES, SHOWCASE_TITLES, ShowcaseCaseName, buildShowcaseWorld,
@@ -85,13 +85,13 @@ export function initShowcase(deps: Deps): ShowcaseApi {
     const w = state.world;
     let rings = 0, nonSimple = 0, minArea = Infinity, minAngle = Infinity;
     for (const node of w.nodes) {
-      const l = nodeLayout(w, node.id);
+      const l = buildJunction(w, node.id);
       if (!l || l.arms.length < 2) continue;
       const d = junctionDebugGeometry(l);
       if (d.asphalt.length < 3) continue;
       rings++;
       if (ringSelfIntersects(d.asphalt)) nonSimple++;
-      for (const t of fanTris(l.cx, l.cz, d.asphalt)) {
+      for (const t of fanTris(l.centre.x, l.centre.z, d.asphalt)) {
         minArea = Math.min(minArea, triArea2(t) / 2);
         minAngle = Math.min(minAngle, minTriAngleDeg(t));
       }

@@ -3,8 +3,11 @@ import {
   Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints,
   makeDeckSampler, segElevation, DeckSampler,
 } from "../sim/world";
-import { NodeLayout, NodeLayoutArm, halfAsphalt, kerbWidth, nodeArms, nodeById, nodeLayout } from "../sim/roads";
-import { fullHalf, profileOf } from "../sim/corridor";
+import { nodeArms, nodeById } from "../sim/roads";
+import { junctionsOf, type JunctionLayout } from "../sim/junction";
+import { profileOf, sidewalkEdge } from "../sim/corridor";
+import { asIndexed, sampleRing, sameSample, triangulateBand, triangulateRing } from "./earclip";
+import type { RingSample } from "./earclip";
 
 /**
  * Junction road geometry: ribbons stop at the corner offsets and every node
@@ -15,6 +18,8 @@ export const ROAD_LIFT = 0.06;
 const KERB_LIFT = ROAD_LIFT + 0.006;
 const MARK_LIFT = ROAD_LIFT + 0.004;
 const NODE_ASPHALT_LIFT = ROAD_LIFT + 0.02;
+/** Markings drawn on a junction patch must ride above its asphalt. */
+const NODE_MARK_LIFT = NODE_ASPHALT_LIFT + 0.004;
 
 const ASPHALT = "#3b3f46";
 const KERB = "#c4c7cc";
@@ -67,18 +72,35 @@ class Geo {
   /** When set, every vertex takes this colour (build preview tint). */
   force: string | null = null;
   private palette = new Map<string, THREE.Color>();
+  private n = 0;
 
   vert(x: number, y: number, z: number, color: string, uv?: [number, number], cls = 0): number {
+    return this.vertFast(x, y, z, this.colorFor(color), uv, cls);
+  }
+
+  /** Resolve a colour once for a multi-vertex emission (hot paths hoist this). */
+  colorFor(color: string): THREE.Color {
     const key = this.force ?? color;
     let c = this.palette.get(key);
     if (!c) {
       c = new THREE.Color(key);
       this.palette.set(key, c);
     }
-    const vi = this.pos.length / 3;
+    return c;
+  }
+
+  /** Vertices emitted so far (base index for indexed triangle batches). */
+  get count(): number {
+    return this.n;
+  }
+
+  /** Vertex with a pre-resolved colour (see colorFor). */
+  vertFast(x: number, y: number, z: number, c: THREE.Color, uv?: [number, number], cls = 0): number {
+    const vi = this.n++;
     this.pos.push(x, y, z);
     this.col.push(c.r, c.g, c.b);
-    this.uv.push(uv ? uv[0] : x / 0.6, uv ? uv[1] : z / 0.6);
+    if (uv === undefined) this.uv.push(x / 0.6, z / 0.6);
+    else this.uv.push(uv[0], uv[1]);
     this.cls.push(cls);
     return vi;
   }
@@ -100,10 +122,11 @@ class Geo {
     ax: number, az: number, bx: number, bz: number, cx: number, cz: number,
     dx: number, dz: number, y: number, color: string, groundY: (x: number, z: number) => number,
   ): void {
-    const a = this.vert(ax, groundY(ax, az) + y, az, color);
-    const b = this.vert(bx, groundY(bx, bz) + y, bz, color);
-    const c = this.vert(cx, groundY(cx, cz) + y, cz, color);
-    const d = this.vert(dx, groundY(dx, dz) + y, dz, color);
+    const col = this.colorFor(color);
+    const a = this.vertFast(ax, groundY(ax, az) + y, az, col);
+    const b = this.vertFast(bx, groundY(bx, bz) + y, bz, col);
+    const c = this.vertFast(cx, groundY(cx, cz) + y, cz, col);
+    const d = this.vertFast(dx, groundY(dx, dz) + y, dz, col);
     this.tri(a, b, c);
     this.tri(a, c, d);
   }
@@ -115,15 +138,49 @@ class Geo {
     g.setAttribute("uv", new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute("aClass", new THREE.Float32BufferAttribute(this.cls, 1));
     g.setIndex(this.ind);
-    g.computeVertexNormals();
+    computeNormals(g);
     return g;
   }
+}
+
+/**
+ * Area-weighted vertex normals, same math as THREE's computeVertexNormals
+ * (face cross (C-B)x(A-B) accumulated per corner, then normalized) over the
+ * raw arrays instead of Vector3 round-trips. Falls back to THREE for the
+ * non-indexed case, which Geo never emits.
+ */
+function computeNormals(g: THREE.BufferGeometry): void {
+  const pos = g.getAttribute("position") as THREE.BufferAttribute;
+  const idx = g.getIndex();
+  if (!idx) {
+    g.computeVertexNormals();
+    return;
+  }
+  const p = pos.array as Float32Array;
+  const ix = idx.array as Uint16Array | Uint32Array;
+  const n = new Float32Array(p.length);
+  for (let k = 0; k < ix.length; k += 3) {
+    const a = ix[k] * 3, b = ix[k + 1] * 3, c = ix[k + 2] * 3;
+    const abx = p[a] - p[b], aby = p[a + 1] - p[b + 1], abz = p[a + 2] - p[b + 2];
+    const cbx = p[c] - p[b], cby = p[c + 1] - p[b + 1], cbz = p[c + 2] - p[b + 2];
+    const nx = cby * abz - cbz * aby;
+    const ny = cbz * abx - cbx * abz;
+    const nz = cbx * aby - cby * abx;
+    n[a] += nx; n[a + 1] += ny; n[a + 2] += nz;
+    n[b] += nx; n[b + 1] += ny; n[b + 2] += nz;
+    n[c] += nx; n[c + 1] += ny; n[c + 2] += nz;
+  }
+  for (let i = 0; i < n.length; i += 3) {
+    const len = Math.sqrt(n[i] * n[i] + n[i + 1] * n[i + 1] + n[i + 2] * n[i + 2]) || 1;
+    n[i] /= len; n[i + 1] /= len; n[i + 2] /= len;
+  }
+  g.setAttribute("normal", new THREE.BufferAttribute(n, 3));
 }
 
 interface Sample { x: number; z: number; s: number }
 
 /** Dense centreline samples with arclength, endpoints included. */
-function sampleCurve(pts: Pt[], step = 0.25): Sample[] {
+function sampleCurveCompute(pts: Pt[], step: number): Sample[] {
   const raw = curvePoints(pts, step);
   const out: Sample[] = [];
   let s = 0;
@@ -131,6 +188,18 @@ function sampleCurve(pts: Pt[], step = 0.25): Sample[] {
     if (i > 0) s += Math.hypot(raw[i].x - raw[i - 1].x, raw[i].z - raw[i - 1].z);
     out.push({ x: raw[i].x, z: raw[i].z, s });
   }
+  return out;
+}
+
+type SampleEntry = { step: number; s: RingSample; out: Sample[] };
+const sampleCache = new WeakMap<Pt[], SampleEntry>();
+
+/** sampleCurveCompute cached by segment-point identity + content hash. */
+function sampleCurve(pts: Pt[], step = 0.25): Sample[] {
+  const e = sampleCache.get(pts);
+  if (e !== undefined && e.step === step && sameSample(sampleRing(pts), e.s)) return e.out;
+  const out = sampleCurveCompute(pts, step);
+  sampleCache.set(pts, { step, s: sampleRing(pts), out });
   return out;
 }
 
@@ -159,45 +228,24 @@ function makeWalker(samples: Sample[]): (s: number) => { x: number; z: number; d
 }
 
 interface RibbonOpts {
-  /** Per-side trims (lateral -1 / +1), near end then far end, asphalt then kerb. */
+  /** Per-side trims (lateral -1 / +1), near end then far end, per layer. */
   aNeg: number; aPos: number;
   kNeg: number; kPos: number;
+  sNeg: number; sPos: number;
   eANeg: number; eAPos: number;
   eKNeg: number; eKPos: number;
+  eSNeg: number; eSPos: number;
 }
 
+/** Junction rings for tests and SVG dumps: thin adapter over JunctionLayout. */
 export interface JunctionDebugGeometry {
   asphalt: Pt[];
   kerbs: Pt[][];
-  kerbQuads: [Pt, Pt, Pt, Pt][];
-}
-
-function pointInPoly(poly: Pt[], p: Pt): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i], b = poly[j];
-    if (((a.z > p.z) !== (b.z > p.z))
-      && p.x < ((b.x - a.x) * (p.z - a.z)) / ((b.z - a.z) || 1e-12) + a.x) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
-const triArea2 = (a: Pt, b: Pt, c: Pt): number =>
-  Math.abs((b.x - a.x) * (c.z - a.z) - (c.x - a.x) * (b.z - a.z));
-
-function minTriAngleDeg(a: Pt, b: Pt, c: Pt): number {
-  const side = (p: Pt, q: Pt): number => Math.hypot(p.x - q.x, p.z - q.z);
-  const ab = side(a, b), bc = side(b, c), ca = side(c, a);
-  if (ab < 1e-9 || bc < 1e-9 || ca < 1e-9) return 0;
-  const angle = (x: number, y: number, z: number): number =>
-    Math.acos(Math.max(-1, Math.min(1, (x * x + y * y - z * z) / (2 * x * y)))) * 180 / Math.PI;
-  return Math.min(angle(ab, ca, bc), angle(ab, bc, ca), angle(bc, ca, ab));
 }
 
 export const NO_TRIM: RibbonOpts = {
-  aNeg: 0, aPos: 0, kNeg: 0, kPos: 0, eANeg: 0, eAPos: 0, eKNeg: 0, eKPos: 0,
+  aNeg: 0, aPos: 0, kNeg: 0, kPos: 0, sNeg: 0, sPos: 0,
+  eANeg: 0, eAPos: 0, eKNeg: 0, eKPos: 0, eSNeg: 0, eSPos: 0,
 };
 
 /**
@@ -216,8 +264,9 @@ function ribbon(
   if (atlas && !tint) {
     // One textured strip for the whole cross-section: two triangles per
     // sample, u across the full width, v along the length in texture tiles.
+    // The strip spans the sidewalk edge so mid-block meets junction flush.
     const walkA = makeWalker(samples);
-    const fw = fullHalf(type);
+    const fw = sidewalkEdge(type);
     const cls = roadClassFor(type, dirSign);
     const stations = [0];
     let dense = pts.length > 2;
@@ -251,8 +300,10 @@ function ribbon(
     g.force = null;
     return;
   }
-  const hw = halfAsphalt(type);
-  const kw = kerbWidth(type);
+  const prof = profileOf(type);
+  const hw = prof.asphaltHalf;
+  const kw = prof.kerb;
+  const sw = prof.sidewalk;
   const walk = makeWalker(samples);
   // Half-strip from the centreline to one edge, starting at arclength s0.
   const half = (
@@ -276,11 +327,12 @@ function ribbon(
     }
     stations.push(b);
     let prev: number[] | null = null;
+    const c = g.colorFor(color);
     for (const s of stations) {
       const p = walk(s);
       const nx = -p.dz * side, nz = p.dx * side;
-      const i0 = g.vert(p.x + nx * inner, groundY(p.x + nx * inner, p.z + nz * inner) + y, p.z + nz * inner, color);
-      const i1 = g.vert(p.x + nx * outer, groundY(p.x + nx * outer, p.z + nz * outer) + y, p.z + nz * outer, color);
+      const i0 = g.vertFast(p.x + nx * inner, groundY(p.x + nx * inner, p.z + nz * inner) + y, p.z + nz * inner, c);
+      const i1 = g.vertFast(p.x + nx * outer, groundY(p.x + nx * outer, p.z + nz * outer) + y, p.z + nz * outer, c);
       if (prev) {
         g.tri(prev[0], prev[1], i0);
         g.tri(prev[1], i1, i0);
@@ -290,33 +342,59 @@ function ribbon(
   };
   const endA = (side: -1 | 1): number => total - (side < 0 ? o.eANeg : o.eAPos);
   const endK = (side: -1 | 1): number => total - (side < 0 ? o.eKNeg : o.eKPos);
+  const endS = (side: -1 | 1): number => total - (side < 0 ? o.eSNeg : o.eSPos);
   for (const side of [-1, 1] as const) {
     const sA = side < 0 ? o.aNeg : o.aPos;
     const sK = side < 0 ? o.kNeg : o.kPos;
+    const sS = side < 0 ? o.sNeg : o.sPos;
     half(side, sA, endA(side), 0, hw, ROAD_LIFT, type === 3 ? HW_ASPHALT : ASPHALT);
     if (kw > 0) half(side, sK, endK(side), hw, hw + kw, KERB_LIFT, KERB);
+    // Sidewalk band outside the kerb (same lift and material): mid-block
+    // sidewalks run into the junction sidewalk ring with no step.
+    if (sw > 0) half(side, sS, endS(side), hw + kw, hw + kw + sw, KERB_LIFT, KERB);
   }
   // Markings above the asphalt: dashes, avenue median, highway lines.
   const aMin = Math.min(o.aNeg, o.aPos);
   const eMin = Math.min(o.eANeg, o.eAPos);
   const mEnd = total - eMin;
-  const mark = (offset: number, halfW: number, color: string, dashed: boolean, every = 4, on = 2): void => {
+  const mark = (offset: number, halfW: number, color: string): void => {
+    const every = 4, on = 2;
     const a = aMin;
     if (mEnd - a < 0.3) return;
-    const stations: number[] = [];
     const n = Math.max(2, Math.ceil((mEnd - a) / 0.25) + 1);
-    for (let i = 0; i < n; i++) stations.push(a + ((mEnd - a) * i) / (n - 1));
+    const step = (mEnd - a) / (n - 1);
+    const c = g.colorFor(color);
+    const dashQuad = (i0: number, i1: number): void => {
+      const p0 = walk(a + i0 * step), p1 = walk(a + i1 * step);
+      const nx0 = -p0.dz, nz0 = p0.dx, nx1 = -p1.dz, nz1 = p1.dx;
+      const ax0 = p0.x + nx0 * offset, az0 = p0.z + nz0 * offset;
+      const ax1 = p1.x + nx1 * offset, az1 = p1.z + nz1 * offset;
+      const v0 = g.vertFast(ax0 + nx0 * halfW, groundY(ax0 + nx0 * halfW, az0 + nz0 * halfW) + MARK_LIFT, az0 + nz0 * halfW, c);
+      const v1 = g.vertFast(ax0 - nx0 * halfW, groundY(ax0 - nx0 * halfW, az0 - nz0 * halfW) + MARK_LIFT, az0 - nz0 * halfW, c);
+      const v2 = g.vertFast(ax1 + nx1 * halfW, groundY(ax1 + nx1 * halfW, az1 + nz1 * halfW) + MARK_LIFT, az1 + nz1 * halfW, c);
+      const v3 = g.vertFast(ax1 - nx1 * halfW, groundY(ax1 - nx1 * halfW, az1 - nz1 * halfW) + MARK_LIFT, az1 - nz1 * halfW, c);
+      g.tri(v0, v1, v2);
+      g.tri(v1, v3, v2);
+    };
+    // Straight+flat: dashes span known station pairs; walk only those.
+    if (rangeIsStraightFlat(walk, groundY, a, mEnd)) {
+      for (let k = 0; k * every < n; k++) {
+        const i0 = k * every, i1 = Math.min(i0 + on - 1, n - 1);
+        if (i1 > i0) dashQuad(i0, i1);
+      }
+      return;
+    }
     let prev: number[] | null = null;
     let prevOn = false;
-    for (let i = 0; i < stations.length; i++) {
-      const onSeg = !dashed || i % every < on;
+    for (let i = 0; i < n; i++) {
+      const onSeg = i % every < on;
       if (!onSeg) { prev = null; prevOn = false; continue; }
       const first = !prevOn;
-      const p = walk(stations[i]);
+      const p = walk(a + i * step);
       const nx = -p.dz, nz = p.dx;
       const ax = p.x + nx * offset, az = p.z + nz * offset;
-      const v0 = g.vert(ax + nx * halfW, groundY(ax + nx * halfW, az + nz * halfW) + MARK_LIFT, az + nz * halfW, color);
-      const v1 = g.vert(ax - nx * halfW, groundY(ax - nx * halfW, az - nz * halfW) + MARK_LIFT, az - nz * halfW, color);
+      const v0 = g.vertFast(ax + nx * halfW, groundY(ax + nx * halfW, az + nz * halfW) + MARK_LIFT, az + nz * halfW, c);
+      const v1 = g.vertFast(ax - nx * halfW, groundY(ax - nx * halfW, az - nz * halfW) + MARK_LIFT, az - nz * halfW, c);
       if (!first && prev) {
         g.tri(prev[0], prev[1], v0);
         g.tri(prev[1], v1, v0);
@@ -328,7 +406,7 @@ function ribbon(
   const base = baseRoadType(type);
   if (dirSign !== 0) {
     // One-way: amber chevrons along the centreline point the way traffic flows.
-    if (base === 2) { mark(hw * 0.5, 0.012, AVE_LINE, true); mark(-hw * 0.5, 0.012, AVE_LINE, true); }
+    if (base === 2) { mark(hw * 0.5, 0.012, AVE_LINE); mark(-hw * 0.5, 0.012, AVE_LINE); }
     for (let s = aMin + 0.7; s < mEnd - 0.2; s += 1.8) {
       const p = walk(s);
       const tx = p.dx * dirSign, tz = p.dz * dirSign;
@@ -338,16 +416,16 @@ function ribbon(
       const b2 = g.vert(p.x - tx * 0.1 - nx * 0.11, groundY(p.x - tx * 0.1 - nx * 0.11, p.z - tz * 0.1 - nz * 0.11) + MARK_LIFT + 0.002, p.z - tz * 0.1 - nz * 0.11, "#f5c542");
       g.tri(b1, tip, b2);
     }
-  } else if (base === 1) mark(0, 0.012, LINE, true);
+  } else if (base === 1) mark(0, 0.012, LINE);
   else if (base === 2) {
     // Median then the two carriageway dashes.
-    strip(g, samples, aMin, mEnd, 0.16, MARK_LIFT, MEDIAN, groundY, false);
-    mark(hw * 0.5, 0.012, AVE_LINE, true);
-    mark(-hw * 0.5, 0.012, AVE_LINE, true);
+    strip(g, samples, aMin, mEnd, 0.16, MARK_LIFT, MEDIAN, groundY);
+    mark(hw * 0.5, 0.012, AVE_LINE);
+    mark(-hw * 0.5, 0.012, AVE_LINE);
   } else {
-    strip(g, samples, aMin, mEnd, 0.14, MARK_LIFT, HW_EDGE, groundY, false);
-    mark(profileOf(3).drawHalf * 0.5, 0.012, LINE, true);
-    mark(-profileOf(3).drawHalf * 0.5, 0.012, LINE, true);
+    strip(g, samples, aMin, mEnd, 0.14, MARK_LIFT, HW_EDGE, groundY);
+    mark(profileOf(3).drawHalf * 0.5, 0.012, LINE);
+    mark(-profileOf(3).drawHalf * 0.5, 0.012, LINE);
   }
   g.force = null;
 }
@@ -356,29 +434,53 @@ function ribbon(
 export type GroundY = (x: number, z: number) => number;
 
 /** Plain centred band (used for the median and highway edge lines). */
+/**
+ * True when the walked range is geometrically straight (quadratic/lerp
+ * tangents rotate monotonically, so equal tangents at three stations imply
+ * zero curvature) and flat: callers may join endpoints directly instead of
+ * walking dense samples. Conservative by construction: dust falls back to
+ * the dense path with identical output.
+ */
+function rangeIsStraightFlat(
+  walk: (s: number) => { x: number; z: number; dx: number; dz: number },
+  groundY: (x: number, z: number) => number, a: number, b: number,
+): boolean {
+  const pa = walk(a), pm = walk((a + b) / 2), pb = walk(b);
+  if (Math.abs(pa.dx * pm.dx + pa.dz * pm.dz) < 1 - 1e-9) return false;
+  if (Math.abs(pa.dx * pb.dx + pa.dz * pb.dz) < 1 - 1e-9) return false;
+  const ya = groundY(pa.x, pa.z), ym = groundY(pm.x, pm.z), yb = groundY(pb.x, pb.z);
+  return Math.max(ya, ym, yb) - Math.min(ya, ym, yb) <= 0.06;
+}
+
 function strip(
   g: Geo, samples: Sample[], a: number, b: number, halfW: number, y: number,
-  color: string, groundY: (x: number, z: number) => number, dashed: boolean,
+  color: string, groundY: (x: number, z: number) => number,
 ): void {
   if (b - a < 0.3) return;
-  const n = Math.max(2, Math.ceil((b - a) / 0.25) + 1);
   const walk = makeWalker(samples);
+  const c = g.colorFor(color);
+  if (rangeIsStraightFlat(walk, groundY, a, b)) {
+    const p0 = walk(a), p1 = walk(b);
+    const nx0 = -p0.dz, nz0 = p0.dx, nx1 = -p1.dz, nz1 = p1.dx;
+    g.quad(
+      p0.x + nx0 * halfW, p0.z + nz0 * halfW, p1.x + nx1 * halfW, p1.z + nz1 * halfW,
+      p1.x - nx1 * halfW, p1.z - nz1 * halfW, p0.x - nx0 * halfW, p0.z - nz0 * halfW,
+      y, color, groundY,
+    );
+    return;
+  }
+  const n = Math.max(2, Math.ceil((b - a) / 0.25) + 1);
   let prev: number[] | null = null;
-  let prevOn = false;
   for (let i = 0; i < n; i++) {
-    const onSeg = !dashed || i % 4 < 2;
-    if (!onSeg) { prev = null; prevOn = false; continue; }
-    const first = !prevOn;
     const p = walk(a + ((b - a) * i) / (n - 1));
     const nx = -p.dz, nz = p.dx;
-    const v0 = g.vert(p.x + nx * halfW, groundY(p.x + nx * halfW, p.z + nz * halfW) + y, p.z + nz * halfW, color);
-    const v1 = g.vert(p.x - nx * halfW, groundY(p.x - nx * halfW, p.z - nz * halfW) + y, p.z - nz * halfW, color);
-    if (!first && prev) {
+    const v0 = g.vertFast(p.x + nx * halfW, groundY(p.x + nx * halfW, p.z + nz * halfW) + y, p.z + nz * halfW, c);
+    const v1 = g.vertFast(p.x - nx * halfW, groundY(p.x - nx * halfW, p.z - nz * halfW) + y, p.z - nz * halfW, c);
+    if (prev) {
       g.tri(prev[0], prev[1], v0);
       g.tri(prev[1], v1, v0);
     }
     prev = [v0, v1];
-    prevOn = true;
   }
 }
 
@@ -410,7 +512,7 @@ function box(
 
 /** Parapet walls along both deck edges, following the deck profile. */
 function parapets(g: Geo, type: RoadType, deck: DeckSampler): void {
-  const off = fullHalf(type) + 0.03;
+  const off = sidewalkEdge(type) + 0.03;
   const n = Math.max(1, Math.ceil(deck.length / 0.4));
   for (const side of [-1, 1] as const) {
     let prev: [number, number] | null = null;
@@ -447,7 +549,7 @@ function pillars(g: Geo, deck: DeckSampler, groundY: GroundY, w?: World, type?: 
         const q = deck.pos(Math.min(deck.length, s + 0.05));
         let dx = q.x - p.x, dz = q.z - p.z;
         const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
-        const off = (type ? fullHalf(type) : 0.5) + 0.55;
+        const off = (type ? sidewalkEdge(type) : 0.5) + 0.55;
         cx = p.x - dz * off; cz = p.z + dx * off;
         // If that side is also road (wide avenue), use the other side.
         const tx2 = Math.floor(cx), ty2 = Math.floor(cz);
@@ -462,7 +564,7 @@ function pillars(g: Geo, deck: DeckSampler, groundY: GroundY, w?: World, type?: 
 
 /** Dark ribbon under the deck (water or the road below), so the crossing reads from far away. */
 function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY, w?: World): void {
-  const hw = fullHalf(type) + 0.2;
+  const hw = sidewalkEdge(type) + 0.2;
   const n = Math.max(1, Math.ceil(deck.length / 0.5));
   let prev: [number, number] | null = null;
   for (let i = 0; i <= n; i++) {
@@ -501,7 +603,7 @@ function endOut(seg: RoadSegment, end: "a" | "b"): { dx: number; dz: number } {
 
 /** Procedural tunnel mouth: two posts, a lintel and a dark opening. */
 function portal(g: Geo, m: Pt, dx: number, dz: number, type: RoadType, groundY: GroundY): void {
-  const hw = fullHalf(type);
+  const hw = sidewalkEdge(type);
   const gy = groundY(m.x, m.z);
   const yaw = Math.atan2(dx, dz);
   const px = -dz, pz = dx;
@@ -522,199 +624,159 @@ function portal(g: Geo, m: Pt, dx: number, dz: number, type: RoadType, groundY: 
 
 // ---------------------------------------------------------------- network
 
-/** Round dead-end cap: asphalt semicircle plus the kerb annulus around it. */
-function deadEnd(
-  g: Geo, tip: Pt, backAngle: number, hw: number, kw: number, groundY: GroundY,
-): void {
-  const N = 10;
-  const ring = (r: number, y: number, color: string, a0: number, a1: number): number[] => {
-    const ids: number[] = [];
-    for (let k = 0; k <= N; k++) {
-      const a = a0 + ((a1 - a0) * k) / N;
-      const x = tip.x + Math.cos(a) * r, z = tip.z + Math.sin(a) * r;
-      ids.push(g.vert(x, groundY(x, z) + y, z, color));
-    }
-    return ids;
-  };
-  const c = g.vert(tip.x, groundY(tip.x, tip.z) + ROAD_LIFT, tip.z, ASPHALT);
-  const edge = ring(hw, ROAD_LIFT, ASPHALT, backAngle - Math.PI / 2, backAngle + Math.PI / 2);
-  for (let k = 0; k < N; k++) g.tri(c, edge[k], edge[k + 1]);
-  if (kw > 0) {
-    const inner = ring(hw, KERB_LIFT, KERB, backAngle - Math.PI / 2, backAngle + Math.PI / 2);
-    const outer = ring(hw + kw, KERB_LIFT, KERB, backAngle - Math.PI / 2, backAngle + Math.PI / 2);
-    for (let k = 0; k < N; k++) {
-      g.tri(inner[k], outer[k], inner[k + 1]);
-      g.tri(outer[k], outer[k + 1], inner[k + 1]);
-    }
-  }
-}
-
-/** Zebra crossing plus stop line on one arm, just outside the junction. */
+/** Zebra crossing and inbound-only stop line at an asphalt mouth. */
 function zebra(
-  g: Geo, l: NodeLayout, arm: NodeLayoutArm, groundY: GroundY, atlas = false,
+  g: Geo, cx: number, cz: number, dx: number, dz: number,
+  halfWidth: number, trim: number, groundY: GroundY, atlas = false,
 ): void {
-  const hw = arm.halfWidth;
-  const d = Math.max(arm.trimK.neg, arm.trimK.pos) + 0.1;
-  const cx = l.cx + arm.dx * d, cz = l.cz + arm.dz * d;
-  const px = -arm.dz, pz = arm.dx;
+  const hw = halfWidth;
+  // The whole zebra lies inside the patch; its outer edge meets max trim.
+  const d = Math.max(0, trim - 0.15);
+  const zx = cx + dx * d, zz = cz + dz * d;
+  const px = -dz, pz = dx;
   if (atlas) {
     // One textured quad per marking instead of one quad per stripe.
-    const c = (along: number, side: number) => ({ x: cx + arm.dx * along + px * side, z: cz + arm.dz * along + pz * side });
+    const c = (along: number, side: number) => ({ x: zx + dx * along + px * side, z: zz + dz * along + pz * side });
     g.texQuad([c(-0.16, -hw * 0.92), c(-0.16, hw * 0.92), c(0.16, hw * 0.92), c(0.16, -hw * 0.92)],
-      MARK_LIFT, groundY, ROAD_CLASS.CROSSWALK);
-    const bx = l.cx + arm.dx * (d + 0.32), bz = l.cz + arm.dz * (d + 0.32);
-    const b = (along: number, side: number) => ({ x: bx + arm.dx * along + px * side, z: bz + arm.dz * along + pz * side });
-    g.texQuad([b(-0.09, -hw * 0.92), b(-0.09, hw * 0.92), b(0.09, hw * 0.92), b(0.09, -hw * 0.92)],
-      MARK_LIFT, groundY, ROAD_CLASS.STOP_BAR);
+      NODE_MARK_LIFT, groundY, ROAD_CLASS.CROSSWALK);
+    const bx = cx + dx * (trim + 0.38), bz = cz + dz * (trim + 0.38);
+    const b = (along: number, side: number) => ({ x: bx + dx * along + px * side, z: bz + dz * along + pz * side });
+    g.texQuad([b(-0.02, -hw * 0.92), b(-0.02, 0), b(0.02, 0), b(0.02, -hw * 0.92)],
+      NODE_MARK_LIFT, groundY, ROAD_CLASS.STOP_BAR);
     return;
   }
   const stripes = Math.max(4, Math.round(hw * 9));
   for (let k = 0; k < stripes; k++) {
     const t = ((k + 0.5) / stripes) * 2 - 1;
-    const sx = cx + px * hw * t * 0.9, sz = cz + pz * hw * t * 0.9;
+    const sx = zx + px * hw * t * 0.9, sz = zz + pz * hw * t * 0.9;
     const sw = (hw * 0.9) / stripes * 0.5;
     g.quad(
-      sx + arm.dx * 0.13 + px * sw, sz + arm.dz * 0.13 + pz * sw,
-      sx - arm.dx * 0.13 + px * sw, sz - arm.dz * 0.13 + pz * sw,
-      sx - arm.dx * 0.13 - px * sw, sz - arm.dz * 0.13 - pz * sw,
-      sx + arm.dx * 0.13 - px * sw, sz + arm.dz * 0.13 - pz * sw,
-      MARK_LIFT, ZEBRA, groundY,
+      sx + dx * 0.13 + px * sw, sz + dz * 0.13 + pz * sw,
+      sx - dx * 0.13 + px * sw, sz - dz * 0.13 + pz * sw,
+      sx - dx * 0.13 - px * sw, sz - dz * 0.13 - pz * sw,
+      sx + dx * 0.13 - px * sw, sz + dz * 0.13 - pz * sw,
+      NODE_MARK_LIFT, ZEBRA, groundY,
     );
   }
-  const lx = l.cx + arm.dx * (d + 0.25), lz = l.cz + arm.dz * (d + 0.25);
+  const lx = cx + dx * (trim + 0.38), lz = cz + dz * (trim + 0.38);
   g.quad(
-    lx + px * hw * 0.92 + arm.dx * 0.012, lz + pz * hw * 0.92 + arm.dz * 0.012,
-    lx + px * hw * 0.92 - arm.dx * 0.012, lz + pz * hw * 0.92 - arm.dz * 0.012,
-    lx - px * hw * 0.92 - arm.dx * 0.012, lz - pz * hw * 0.92 - arm.dz * 0.012,
-    lx - px * hw * 0.92 + arm.dx * 0.012, lz - pz * hw * 0.92 + arm.dz * 0.012,
-    MARK_LIFT, ZEBRA, groundY,
+    lx - px * hw * 0.92 + dx * 0.02, lz - pz * hw * 0.92 + dz * 0.02,
+    lx + dx * 0.02, lz + dz * 0.02,
+    lx - dx * 0.02, lz - dz * 0.02,
+    lx - px * hw * 0.92 - dx * 0.02, lz - pz * hw * 0.92 - dz * 0.02,
+    NODE_MARK_LIFT, ZEBRA, groundY,
   );
 }
 
-/**
- * Corner and junction patch at a node: an asphalt disc over the ribbon ends (hiding dashes and medians there) and
- * kerb sectors only in the gaps between the arms, so bends and junctions get rounded kerb corners without arcs
- * cutting across an arm's roadway.
- */
-export function junctionDebugGeometry(l: NodeLayout): JunctionDebugGeometry {
-  const arms = l.arms
-    .map((a, idx) => ({ a, idx, ang: Math.atan2(a.dz, a.dx) }))
-    .sort((p, q) => p.ang - q.ang);
-  const cornerByA = new Map<number, (typeof l.corners)[number]>();
-  for (const c of l.corners) cornerByA.set(c.aIdx, c);
-  const sidePoint = (a: NodeLayoutArm, side: -1 | 1, trim: number, width = a.halfWidth): Pt => {
-    const nx = -a.dz * side, nz = a.dx * side;
-    return { x: l.cx + a.dx * trim + nx * width, z: l.cz + a.dz * trim + nz * width };
-  };
-  const arc = (c: (typeof l.corners)[number], outer = 0): Pt[] => {
-    const pts: Pt[] = [];
-    const r = c.r + outer;
-    if (c.beveled || r <= 1e-6) return pts;
-    let a0 = Math.atan2(c.pa.z - c.oz, c.pa.x - c.ox);
-    let a1 = Math.atan2(c.pb.z - c.oz, c.pb.x - c.ox);
-    while (a1 <= a0) a1 += Math.PI * 2;
-    if (a1 - a0 > Math.PI) [a0, a1] = [a1, a0 + Math.PI * 2];
-    const steps = Math.max(1, Math.ceil(Math.abs(a1 - a0) / 0.18));
-    for (let k = 1; k < steps; k++) {
-      const a = a0 + ((a1 - a0) * k) / steps;
-      pts.push({ x: c.ox + Math.cos(a) * r, z: c.oz + Math.sin(a) * r });
+/** Centre dashes through pairs that are visually straight, clipped to trims. */
+function junctionGuides(g: Geo, l: JunctionLayout, groundY: GroundY): void {
+  for (let i = 0; i < l.arms.length; i++) for (let j = i + 1; j < l.arms.length; j++) {
+    const a = l.arms[i], b = l.arms[j];
+    if (a.dx * b.dx + a.dz * b.dz > -0.94) continue;
+    const ta = Math.max(a.trimNeg.asphalt, a.trimPos.asphalt);
+    const tb = Math.max(b.trimNeg.asphalt, b.trimPos.asphalt);
+    const ax = l.centre.x + a.dx * Math.max(0, ta - 0.06), az = l.centre.z + a.dz * Math.max(0, ta - 0.06);
+    const bx = l.centre.x + b.dx * Math.max(0, tb - 0.06), bz = l.centre.z + b.dz * Math.max(0, tb - 0.06);
+    const len = Math.hypot(bx - ax, bz - az); if (len < 0.25) continue;
+    const dx = (bx - ax) / len, dz = (bz - az) / len, px = -dz, pz = dx;
+    for (let s = 0.12; s < len - 0.06; s += 0.32) {
+      const e = Math.min(len - 0.04, s + 0.16), ww = 0.012;
+      g.quad(ax + dx * s + px * ww, az + dz * s + pz * ww, ax + dx * e + px * ww, az + dz * e + pz * ww,
+        ax + dx * e - px * ww, az + dz * e - pz * ww, ax + dx * s - px * ww, az + dz * s - pz * ww,
+        NODE_MARK_LIFT + 0.002, LINE, groundY);
     }
-    return pts;
-  };
-  const ring: Pt[] = [];
-  for (let i = 0; i < arms.length; i++) {
-    const p = arms[i].a;
-    const q = arms[(i + 1) % arms.length].a;
-    const corner = cornerByA.get(arms[i].idx);
-    const pTrim = p.trimA.pos || l.radius * 0.55;
-    const qTrim = q.trimA.neg || l.radius * 0.55;
-    ring.push(corner?.pa ?? sidePoint(p, 1, pTrim));
-    for (const pt of corner ? arc(corner) : []) ring.push(pt);
-    ring.push(corner?.pb ?? sidePoint(q, -1, qTrim));
   }
-  const clean: Pt[] = [];
-  for (const p of ring) {
-    const last = clean[clean.length - 1];
-    if (!last || Math.hypot(last.x - p.x, last.z - p.z) > 1e-4) clean.push(p);
-  }
-  const kerbs: Pt[][] = [];
-  const kerbQuads: [Pt, Pt, Pt, Pt][] = [];
-  for (const c of l.corners) {
-    if (c.kerb <= 0) continue;
-    const inner = [c.pa, ...arc(c), c.pb];
-    const outer = [sidePoint(l.arms[c.aIdx], 1, l.arms[c.aIdx].trimA.pos, l.arms[c.aIdx].halfWidth + c.kerb),
-      ...arc(c, c.kerb),
-      sidePoint(l.arms[c.bIdx], -1, l.arms[c.bIdx].trimA.neg, l.arms[c.bIdx].halfWidth + c.kerb)];
-    const n = Math.min(inner.length, outer.length);
-    const strip: Pt[] = [];
-    for (let k = 0; k + 1 < n; k++) {
-      const a = inner[k], b = inner[k + 1], c0 = outer[k + 1], d = outer[k];
-      const mid = { x: (a.x + b.x + c0.x + d.x) * 0.25, z: (a.z + b.z + c0.z + d.z) * 0.25 };
-      const tooThin = triArea2(a, b, c0) < 1e-5 || triArea2(a, c0, d) < 1e-5
-        || minTriAngleDeg(a, b, c0) < 5 || minTriAngleDeg(a, c0, d) < 5;
-      if (clean.length >= 3 && (pointInPoly(clean, mid) || tooThin)) continue;
-      if (strip.length === 0) strip.push(a);
-      strip.push(b);
-      kerbQuads.push([a, b, c0, d]);
-    }
-    if (strip.length > 1) kerbs.push(strip);
-  }
-  return { asphalt: clean, kerbs, kerbQuads };
 }
 
-function nodePatch(g: Geo, l: NodeLayout, groundY: GroundY, atlas = false): void {
-  const arms = l.arms
-    .map((a, idx) => ({ a, idx, ang: Math.atan2(a.dz, a.dx) }))
-    .sort((p, q) => p.ang - q.ang);
-  // A straight continuation (two arms, opposite) needs no patch.
-  if (arms.length === 2) {
-    const dot = arms[0].a.dx * arms[1].a.dx + arms[0].a.dz * arms[1].a.dz;
-    if (dot < -0.985) return;
+/**
+ * Thin adapter over the junction layout: the asphalt polygon and the kerb /
+ * sidewalk outer rings as polylines, for tests and SVG dumps.
+ */
+export function junctionDebugGeometry(l: JunctionLayout): JunctionDebugGeometry {
+  const kerbs: Pt[][] = [];
+  if (l.kerbOuter.length >= 3) kerbs.push(l.kerbOuter);
+  if (l.sidewalkOuter.length >= 3) kerbs.push(l.sidewalkOuter);
+  return { asphalt: l.asphalt, kerbs };
+}
+
+/** Emit pre-triangulated 2-D triangles into the road mesh at one lift. */
+function emitTris(
+  g: Geo, tris: [Pt, Pt, Pt][], y: number, color: string, groundY: GroundY,
+  uvOf?: (p: Pt) => [number, number], cls: number = ROAD_CLASS.FLAT,
+): void {
+  const c = g.colorFor(color);
+  // Indexed: one vertex per unique corner (~3x fewer than soup). Safe: every
+  // vertex in this call shares lift, colour, class, and position-derived UVs.
+  // Winding is normalised here: band strips from triangulateBand mix both
+  // orientations and back-face culling would drop half of them (sawtooth).
+  const oriented = tris.map((t) => {
+    const area2 = (t[1].x - t[0].x) * (t[2].z - t[0].z) - (t[2].x - t[0].x) * (t[1].z - t[0].z);
+    return area2 < 0 ? ([t[0], t[2], t[1]] as [Pt, Pt, Pt]) : t;
+  });
+  const { pts, idx } = asIndexed(oriented);
+  const base = g.count;
+  for (const p of pts) g.vertFast(p.x, groundY(p.x, p.z) + y, p.z, c, uvOf?.(p), cls);
+  for (let k = 0; k < idx.length; k += 3) g.tri(base + idx[k], base + idx[k + 1], base + idx[k + 2]);
+}
+
+/**
+ * Junction patch from the layout rings: one asphalt polygon (ear clipping,
+ * never a centre fan), the kerb band asphalt→kerbOuter and the sidewalk band
+ * kerbOuter→sidewalkOuter in the ribbon kerb material. Bands ride above the
+ * ribbon ends by lift, like the asphalt rides above the bands. When a band
+ * has no valid triangulation (degenerate input), the full outer ring is
+ * stacked underneath instead — same lifts, hidden by the inner surface.
+ */
+function drawJunctionPatch(g: Geo, l: JunctionLayout, groundY: GroundY, atlas = false): void {
+  if (l.asphalt.length < 3) return;
+  const bandLift = NODE_ASPHALT_LIFT + 0.004;
+  const kerb = l.kerbOuter.length >= 3 ? l.kerbOuter : null;
+  const walk = l.sidewalkOuter.length >= 3 ? l.sidewalkOuter : null;
+  if (kerb) {
+    const band = triangulateBand(l.asphalt, kerb);
+    if (band) emitTris(g, band, bandLift, KERB, groundY);
+    else emitTris(g, triangulateRing(kerb), bandLift, KERB, groundY);
   }
-  const dbg = junctionDebugGeometry(l);
-  const clean = dbg.asphalt;
-  if (clean.length < 3) return;
-  // Kerb strips follow the same corner fillets as the asphalt boundary. Strips
-  // whose band falls inside the asphalt polygon are discarded; those are
-  // concave/interior mouths and otherwise show up as pale arcs on the road.
-  for (const [a, b, c0, d] of dbg.kerbQuads) {
-    g.quad(a.x, a.z, b.x, b.z, c0.x, c0.z, d.x, d.z, KERB_LIFT + 0.012, KERB, groundY);
+  if (kerb && walk) {
+    const band = triangulateBand(kerb, walk);
+    if (band) emitTris(g, band, bandLift, KERB, groundY);
+    else emitTris(g, triangulateRing(walk), bandLift, KERB, groundY);
   }
-  const discCol = atlas ? "#ffffff" : ASPHALT;
-  const discCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;
-  const lift = NODE_ASPHALT_LIFT;
-  const c0 = g.vert(l.cx, groundY(l.cx, l.cz) + lift, l.cz, discCol,
-    atlas ? [l.cx / JUNCTION_TILE, l.cz / JUNCTION_TILE] : undefined, discCls);
-  const ids = clean.map((p) =>
-    g.vert(p.x, groundY(p.x, p.z) + lift, p.z, discCol,
-      atlas ? [p.x / JUNCTION_TILE, p.z / JUNCTION_TILE] : undefined, discCls));
-  for (let k = 0; k < ids.length; k++) g.tri(c0, ids[k], ids[(k + 1) % ids.length]);
+  const patchCol = atlas ? "#ffffff" : ASPHALT;
+  const patchCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;
+  const uvOf = atlas ? (p: Pt): [number, number] => [p.x / JUNCTION_TILE, p.z / JUNCTION_TILE] : undefined;
+  emitTris(g, triangulateRing(l.asphalt), NODE_ASPHALT_LIFT, patchCol, groundY, uvOf, patchCls);
 }
 
 /**
  * Full road network in one geometry: trimmed ribbons, one asphalt polygon per
- * junction with kerb fillets, round dead-end caps, zebras on 3+ arm nodes.
- * Bridges ride their deck profile with parapets, piers and a water shadow;
- * tunnels show only their two portals (the ribbon stays buried). With
+ * junction with kerb and sidewalk bands, square dead-end caps, zebras on 3+
+ * arm nodes. Bridges ride their deck profile with parapets, piers and a water
+ * shadow; tunnels show only their two portals (the ribbon stays buried). With
  * `hideBridges` the decks are dropped for the underground view.
  */
 export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hideBridges?: boolean; atlas?: boolean }): THREE.BufferGeometry {
   const atlas = !!opts?.atlas;
   const g = new Geo();
-  const cache = new Map<number, NodeLayout | null>();
-  const layoutOf = (id: number): NodeLayout | null => {
-    if (!cache.has(id)) cache.set(id, nodeLayout(w, id));
-    return cache.get(id)!;
-  };
-  const trimsFor = (layout: NodeLayout | null, seg: RoadSegment, end: "a" | "b"): Pick<RibbonOpts, "aNeg" | "aPos" | "kNeg" | "kPos"> => {
-    const zero = { aNeg: 0, aPos: 0, kNeg: 0, kPos: 0 };
-    if (!layout || layout.arms.length < 2) return zero;
+  const layouts = junctionsOf(w);
+  const layoutOf = (id: number): JunctionLayout | null => layouts.byNode.get(id) ?? null;
+  // Ribbon trims for one segment end from its node layout. Layout sides are in
+  // the arm's outward frame; the ribbon walks a→b, so end "b" swaps sides.
+  // Excluded (bridge/tunnel) arms have no layout arm: their ribbons run to
+  // the node centre.
+  const trimsFor = (layout: JunctionLayout | null, seg: RoadSegment, end: "a" | "b"):
+    Pick<RibbonOpts, "aNeg" | "aPos" | "kNeg" | "kPos" | "sNeg" | "sPos"> => {
+    const zero = { aNeg: 0, aPos: 0, kNeg: 0, kPos: 0, sNeg: 0, sPos: 0 };
+    if (!layout) return zero;
     const arm = layout.arms.find((a) => a.segId === seg.id && a.end === end);
     if (!arm) return zero;
-    if (end === "a") {
-      return { aNeg: arm.trimA.neg, aPos: arm.trimA.pos, kNeg: arm.trimK.neg, kPos: arm.trimK.pos };
-    }
-    return { aNeg: arm.trimA.pos, aPos: arm.trimA.neg, kNeg: arm.trimK.pos, kPos: arm.trimK.neg };
+    const neg = end === "a" ? arm.trimNeg : arm.trimPos;
+    const pos = end === "a" ? arm.trimPos : arm.trimNeg;
+    return {
+      aNeg: neg.asphalt, aPos: pos.asphalt,
+      kNeg: neg.kerb, kPos: pos.kerb,
+      sNeg: neg.sidewalk, sPos: pos.sidewalk,
+    };
   };
   for (const seg of w.segments) {
     const elev = segElevation(seg);
@@ -751,6 +813,8 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
       eAPos: tb.aPos,
       eKNeg: tb.kNeg,
       eKPos: tb.kPos,
+      eSNeg: tb.sNeg,
+      eSPos: tb.sPos,
     };
     ribbon(g, seg.pts, seg.type, trim, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0, atlas);
     if (deck) {
@@ -758,29 +822,24 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
       pillars(g, deck, groundY, w, seg.type);
       deckShadow(g, seg.type, deck, groundY, w);
     }
-    // Dead ends close with a round cap (a lone arm, or a missing layout).
-    for (const [end, l] of [["a", la], ["b", lb]] as const) {
-      if ((l && l.arms.length > 1) || seg.type === 3) continue;
-      const tip = end === "a" ? seg.pts[0] : seg.pts[seg.pts.length - 1];
-      const dir = end === "a"
-        ? { x: samples[0].x - samples[1].x, z: samples[0].z - samples[1].z }
-        : { x: samples[samples.length - 1].x - samples[samples.length - 2].x, z: samples[samples.length - 1].z - samples[samples.length - 2].z };
-      const hw = halfAsphalt(seg.type);
-      const kw = kerbWidth(seg.type);
-      deadEnd(g, tip, Math.atan2(dir.z, dir.x), hw, kw, gy);
-    }
   }
 
   for (const node of w.nodes) {
     const l = layoutOf(node.id);
-    if (!l || l.arms.length < 2) continue;
-    nodePatch(g, l, groundY, atlas);
+    if (!l) continue;
+    // Dead ends (kind "end") draw their square cap here; middle/transition
+    // and non-ground nodes carry no rings and are skipped inside.
+    drawJunctionPatch(g, l, groundY, atlas);
     if (l.arms.length >= 3) {
       for (const arm of l.arms) {
-        zebra(g, l, arm, groundY, atlas);
+        zebra(g, l.centre.x, l.centre.z, arm.dx, arm.dz,
+          profileOf(arm.type).asphaltHalf,
+          Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt), groundY, atlas);
       }
+      junctionGuides(g, l, groundY);
     }
   }
+
   // Roundabout islands: kerb rim, grass disc, and a yield dash across each entry arm.
   for (const rb of w.roundabouts) {
     const SEG = 20;
@@ -811,7 +870,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
             sx - arm.dx * 0.05 + px * hw2 * 0.28, sz - arm.dz * 0.05 + pz * hw2 * 0.28,
             sx - arm.dx * 0.05 - px * hw2 * 0.28, sz - arm.dz * 0.05 - pz * hw2 * 0.28,
             sx + arm.dx * 0.05 - px * hw2 * 0.28, sz + arm.dz * 0.05 - pz * hw2 * 0.28,
-            MARK_LIFT, ZEBRA, groundY,
+            NODE_MARK_LIFT, ZEBRA, groundY,
           );
         }
       }

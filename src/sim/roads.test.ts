@@ -3,9 +3,10 @@ import { applyTool, newCity, placeRoad, step, CityState } from "./sim";
 import { deserialize, serialize } from "./save";
 import { findPath, newTraffic, tickTraffic } from "./traffic";
 import {
-  armHasGreen, hasSignal, nodeArms, nodeById, nodeLayout,
+  armHasGreen, hasSignal, nodeArms, nodeById,
   rebuildNodes, redHold, removeSegment, signalNodes, signalPhase, signalPhaseAt,
 } from "./roads";
+import { junctionsOf } from "./junction";
 import { cidx, idx, rasterizeRoad, updateConnectivity } from "./world";
 
 /** Dry, flat ground for a wide band around the entry row. */
@@ -255,49 +256,25 @@ describe("road graph", () => {
     expect(w.nodes.some((n) => nodeArms(w, n.id).length === 3)).toBe(true);
   });
 
-  it("lays out junction trims for the renderer", () => {
+  it("exposes every node to the junction builder (the renderer's trim contract)", () => {
+    // nodeLayout was deleted when the renderer migrated to junctionsOf (07
+    // P0.2 item 7); trim values, butt joints and acute budgets are pinned in
+    // junction.test.ts. This keeps the road-graph side: nodes the renderer
+    // will ask about exist with the arms the builder classifies.
     const s = newCity(3);
     const ey = flat(s);
     road(s, 1, [[4.5, ey + 0.5], [20.5, ey + 0.5]]);
     road(s, 1, [[12.5, ey - 5], [12.5, ey + 5]]);
     const w = s.world;
     const cross = w.nodes.find((n) => n.segs.length === 4)!;
-    const l = nodeLayout(w, cross.id)!;
-    expect(l.arms.length).toBe(4);
-    expect(l.corners.length).toBe(4);
-    for (const a of l.arms) {
-      expect(a.trimA.neg).toBeGreaterThan(0.3);
-      expect(a.trimA.pos).toBeGreaterThan(0.3);
-    }
-    // Straight-through pairs keep a butt joint at the centre.
+    expect(nodeArms(w, cross.id)).toHaveLength(4);
+    const layouts = junctionsOf(w);
+    expect(layouts.byNode.get(cross.id)?.template).toBe("cross");
     const h = newCity(3);
     flat(h);
     road(h, 1, [[2.5, h.world.entry.y + 0.5], [12.5, h.world.entry.y + 0.5]]);
     const joint = h.world.nodes.find((n) => n.segs.length === 2)!;
-    const jl = nodeLayout(h.world, joint.id)!;
-    expect(jl.arms.length).toBe(2);
-    expect(jl.corners.length).toBe(0);
-    for (const a of jl.arms) {
-      expect(a.trimA.neg).toBe(0);
-      expect(a.trimA.pos).toBe(0);
-    }
-  });
-
-  it("clamps acute junction corner miters deterministically", () => {
-    const s = newCity(3);
-    const ey = flat(s);
-    road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
-    road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
-    road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
-    const node = s.world.nodes.find((n) => n.segs.length === 4)!;
-    const a = nodeLayout(s.world, node.id)!;
-    const b = nodeLayout(s.world, node.id)!;
-    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-    expect(a.corners.some((c) => c.beveled)).toBe(true);
-    for (const arm of a.arms) {
-      expect(arm.trimA.neg).toBeLessThanOrEqual(a.miterLimit + 1e-6);
-      expect(arm.trimA.pos).toBeLessThanOrEqual(a.miterLimit + 1e-6);
-    }
+    expect(junctionsOf(h.world).byNode.get(joint.id)?.kind).toBe("middle");
   });
 });
 

@@ -133,10 +133,13 @@ describe("junction builder P2", () => {
     // B = kerb + sidewalk = 0.19 for streets.
     expect(l.arms[0].trimNeg.asphalt).toBeCloseTo(0.19, 3);
     expect(l.arms[0].trimPos.asphalt).toBeCloseTo(0.19, 3);
-    // Asphalt is exactly the sharp rectangle: no arc inside the road.
+    // Asphalt is exactly the sharp rectangle: no arc inside the road. The cap
+    // spans s ∈ [0, B] INTO the segment (east of the node here), so the
+    // ribbon starting at trim B butts against it with no gap.
     expect(l.asphalt).toHaveLength(4);
     const got = new Set(l.asphalt.map((p) => `${p.x.toFixed(3)},${p.z.toFixed(3)}`));
-    expect(got).toEqual(new Set(["4.310,20.120", "4.500,20.120", "4.500,20.880", "4.310,20.880"]));
+    expect(got).toEqual(new Set(["4.500,20.120", "4.690,20.120", "4.690,20.880", "4.500,20.880"]));
+    for (const p of l.asphalt) expect(p.x).toBeGreaterThanOrEqual(4.5);
     // Kerb and sidewalk wrap the tip as a U with outer arcs.
     expect(l.kerbOuter.length).toBeGreaterThan(8);
     expect(l.sidewalkOuter.length).toBeGreaterThan(8);

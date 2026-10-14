@@ -79,10 +79,9 @@ describe("dev showcase", () => {
     const st = api.stats();
     expect(st.cases).toBe(12);
     expect(st.segments).toBeGreaterThan(12);
-    // One ring per junction: 1+1+1+1+1+0+1+1+1+2+2+4 = 16.
-    expect(st.rings).toBe(16);
-    // F1 ratchet: non-simple rings, same pins as showcase-gate.test.ts.
-    expect(st.nonSimpleRings).toBe(13);
+    // Middle nodes have no patch; the layout builder emits 13 visible rings.
+    expect(st.rings).toBe(13);
+    expect(st.nonSimpleRings).toBe(0);
     expect(st.minFanArea).toBeGreaterThan(1e-9);
     // No WebGL in the harness: counters report unknown, not zero.
     expect(st.drawCalls).toBe(-1);
