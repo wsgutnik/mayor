@@ -631,3 +631,18 @@ body {
 .road-fly { width: min(calc(860px / var(--ui-scale, 1)), calc((100% - 16px) / var(--ui-scale, 1))); }
 .toolbar { gap: 6px; padding: 9px; }
 .fly-head { padding: 12px 16px 10px; }
+
+/* Flyout finish matched to the approved concept: solid-gold selection,
+   near-black glass, snap/parallel as their own cards */
+.fly { background: rgb(9 15 23 / .94); }
+.fly-body .tool.active, .toolbar .tool.active {
+  background: linear-gradient(180deg, #f2c65c, #dfa92e);
+  border-color: #f6d47e; color: var(--gold-ink);
+  box-shadow: 0 6px 18px rgba(223, 169, 46, .35);
+}
+.fly-body .tool.active small, .toolbar .tool.active small { color: rgba(26, 20, 5, .72); }
+.fly-body .tool.active .fp { background: rgba(26, 20, 5, .16); color: var(--gold-ink); }
+.fly-body .snap-group {
+  padding: 9px; border-radius: 12px;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .055);
+}
