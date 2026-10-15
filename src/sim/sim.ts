@@ -6,7 +6,7 @@ import {
   isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
   ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, RoadSegment, Pt, baseRoadType, curvePoints, isOneWayType, rasterizeRoad,
   rebuildRoadRaster, segElevation, segmentLength, levelTiles, facilityFootprint, facilityAnchorAt,
-  Elevation,
+  Elevation, facilityUtility,
 } from "./world";
 import { FACILITY_LINK_RADIUS } from "./networks";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
@@ -1594,12 +1594,14 @@ function recount(s: CityState): void {
   let lvSum = 0;
 
   for (let i = 0; i < w.facility.length; i++) {
-    const f = w.facility[i];
-    if (!f || f > FAC.LANDFILL) continue;
+    const f = w.facility[i] as FacilityKind;
+    if (!f) continue;
+    const info = FACILITY_INFO[f];
+    // Every tier supplies its utility (solar, large plant, tower, large water plant), not only kinds 1-4.
+    const key: UtilityKey | null = info?.capacity ? facilityUtility(f) : null;
+    if (!key) continue;
     const a = facilityAnchorAt(w, i);
     if (a && idx(w, a.x, a.y) !== i) continue;
-    const info = FACILITY_INFO[f as FacilityKind];
-    const key: UtilityKey = f === FAC.POWER ? "power" : f === FAC.WATER ? "water" : f === FAC.SEWAGE ? "sewage" : "garbage";
     util[key].supply += info.capacity;
   }
 

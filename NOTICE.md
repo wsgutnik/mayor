@@ -85,6 +85,8 @@ for this port; no non-CC0 Fable asset was copied.
 
 ## Owner-supplied flora imagery (2026-10-14)
 
-`public/textures/flora/` contains derivative, budgeted PNGs made from tree, cloud, grass, hedge, limestone and soil images supplied by the project owner. The tree and cloud images were generated with ChatGPT Image; the ground images were generated with Midjourney. They are project assets, not third-party artwork, and are not offered under an open license.
+`public/textures/flora/` contains derivative, budgeted PNGs made from tree, cloud, grass, hedge, limestone and soil images supplied by the project owner. The tree and cloud images were generated with ChatGPT Image; the ground images were generated with Midjourney. They are project assets, not third-party artwork, and are not offered under an open license. The five ground maps (grass fur, hedge, limestone, grey soil, red earth) are drawn as terrain detail layers by `src/render/terrain-splat.ts` (per-biome layer sets, docs/process/23-flora-assets.md).
+
+The service-tier models `public/models/x2/61.glb`, `73.glb`, `81.glb`, `82.glb`, `83.glb` and `public/models/x1/76.glb`, `84.glb` are original Blender recipes (`blender/buildings_services_tiers.py`) using the project palette and pattern textures; no third-party geometry.
 
 `public/models/props/tree_maple.glb`, `tree_maple_dense.glb`, `tree_birch.glb` and `tree_autumn_maple.glb` are low-poly reductions (`blender/make_pack_trees.py`: foliage cards clustered into icosahedron clumps, tapered trunk and limbs, vertex colours sampled from the source) of the four procedural trees in `trees_blender_pack` supplied by the project owner.

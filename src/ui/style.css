@@ -331,6 +331,8 @@ body {
 .insp-chip.off { color: var(--muted); opacity: .5; text-decoration: line-through; border-color: rgba(255,255,255,.06); }
 .insp-fac { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--panel-border); padding-top: 8px; }
 .insp-fac[hidden] { display: none; }
+.insp-usage { display: flex; flex-direction: column; gap: 4px; }
+.insp-usage .insp-val { text-align: right; }
 @media (max-width: 640px) {
   .inspector { left: 10px; right: 10px; width: calc(100vw - 20px); }
 }

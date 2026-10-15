@@ -34,14 +34,16 @@ def _caller_module():
 
 
 def building(n, name, variant="base", version=1, footprint=(1, 1)):
-    """Register a modelling function for kit number n (1-40). The function receives a fresh lib.Model.
+    """Register a modelling function for kit number n (1-40; variants up to 84). The function receives a fresh lib.Model.
 
     variant is "base" for the production model. Any other variant (e.g. "v2") never replaces it: it is exported
     to variants/<variant>/NN.glb for A/B comparison. footprint is the number of tiles
     (width, depth) the model is designed for, 1x1 for every shipped model today.
     """
-    if not 1 <= n <= 40:
-        raise ValueError(f"kit number out of range: {n}")
+    # Base models are the 40-building kit. Variants may also carry the 41-84 expansion numbers: the service
+    # tiers ship as x2 (2x2) or x1 (1x1, models/x1/NN.glb) variants beside the kit, never as base models.
+    if not 1 <= n <= (40 if variant == "base" else 84):
+        raise ValueError(f"kit number out of range for variant {variant}: {n}")
 
     def deco(fn):
         module = fn.__module__

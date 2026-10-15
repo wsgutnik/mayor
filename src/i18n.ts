@@ -204,6 +204,18 @@ const PT: Record<string, string> = {
   "City average": "Média da cidade", "Facilities": "Instalações", "Capacity": "Capacidade", "Supply": "Oferta",
   "Vehicles": "Veículos", "Congestion": "Congestionamento", "Happiness": "Felicidade", "Riders": "Passageiros",
   "Close info view": "Fechar mapa",
+  // service tiers (hints) and usage numbers (src/ui/facility-usage-view.ts)
+  "Solar plant: clean power, no smoke (2x2, feeds the road grid)": "Usina solar: energia limpa, sem fumaça (2x2, alimenta a rede das estradas)",
+  "Large power plant: high output (2x2, feeds the road grid)": "Usina de grande porte: alta produção (2x2, alimenta a rede das estradas)",
+  "Water tower: small supply, no water tile needed (feeds the road grid)": "Reservatório elevado: pouca oferta, não precisa de água por perto (alimenta a rede das estradas)",
+  "Large water plant near water (2x2, feeds the road grid)": "Estação de água grande perto da água (2x2, alimenta a rede das estradas)",
+  "Fire post: fast local cover (radius 8)": "Posto dos bombeiros: cobertura local rápida (raio 8)",
+  "Fire headquarters: 2x2, wide cover (radius 20)": "Quartel central: 2x2, cobertura ampla (raio 20)",
+  "In use": "Em uso", "units": "unidades", "Serves": "Atende", "buildings": "prédios", "residents": "moradores", "jobs": "empregos",
+  "homes": "casas", "At full capacity": "Na capacidade total", "At full coverage": "Com cobertura total", "Network": "Rede",
+  "supply": "oferta", "demand": "demanda", "Not connected to a road": "Sem ligação com estrada",
+  "Relays the network, adds no supply": "Repassa a rede, não acrescenta oferta", "Reach": "Alcance", "Whole city": "Cidade inteira",
+  "Road network": "Rede das estradas", "Lines": "Linhas", "seats": "lugares", "day": "dia",
 };
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];

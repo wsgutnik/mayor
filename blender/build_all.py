@@ -141,6 +141,8 @@ def main():
             ok, bounds = lib.check_bounds(ob, limit=1.01, max_h=4.2)
         elif variant == "x4":
             ok, bounds = lib.check_bounds(ob, limit=2.01, max_h=6.2)
+        elif variant == "x1":
+            ok, bounds = lib.check_bounds(ob, limit=0.5001, max_h=2.6)
         else:
             ok, bounds = lib.check_bounds(ob)
         tris = lib.triangle_count(ob)
@@ -148,6 +150,11 @@ def main():
         if variant == "x2":
             # Runtime convention for 2x2 service buildings: models/x2/NN.glb.
             xdir = os.path.join(opts["out"], "x2")
+            os.makedirs(xdir, exist_ok=True)
+            shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(xdir, f"{n:02d}.glb"))
+        elif variant == "x1":
+            # 1x1 expansion service buildings (catalog 41-84): models/x1/NN.glb keeps the 40-file kit intact.
+            xdir = os.path.join(opts["out"], "x1")
             os.makedirs(xdir, exist_ok=True)
             shutil.copyfile(os.path.join(vdir, f"{n:02d}.glb"), os.path.join(xdir, f"{n:02d}.glb"))
         elif variant == "x4":
@@ -180,6 +187,8 @@ def main():
             limit = EVOLVED_X2_TRI_LIMIT if n in EVOLVED_X2_IDS else X2_TRI_LIMIT
             if tris > limit:
                 problems.append(f"variant x2 #{n:02d} {name} has {tris} triangles (limit {limit})")
+        if variant == "x1" and tris > TRI_LIMIT:
+            problems.append(f"variant x1 #{n:02d} {name} has {tris} triangles (limit {TRI_LIMIT})")
         if variant == "x4" and tris > X4_TRI_LIMIT:
             problems.append(f"variant x4 #{n:02d} {name} has {tris} triangles (limit {X4_TRI_LIMIT})")
     if v2_report:

@@ -5,7 +5,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { mergeScene } from "./glb-models";
 
 // Service and evolved zoned 2x2 variants, built into public/models/x2/.
-const X2_IDS = [...Array.from({ length: 20 }, (_, i) => i + 1), 21, 27, 29, 32, 34, 36, 37, 38, 39, 40];
+const X2_IDS = [...Array.from({ length: 20 }, (_, i) => i + 1), 21, 27, 29, 32, 34, 36, 37, 38, 39, 40, 61, 73, 81, 82, 83];
+/** Service sites (kit civic set and the 41-84 service tiers) keep the legacy 4000 cap; zoned evolved x2 use 1400. */
+const SERVICE_X2 = new Set([21, 27, 29, 32, 34, 61, 73, 81, 82, 83]);
 const path = (n: number) => `public/models/x2/${String(n).padStart(2, "0")}.glb`;
 const present = X2_IDS.filter((n) => existsSync(path(n)));
 
@@ -33,7 +35,7 @@ describe("2x2 service-building variants (x2)", () => {
       expect(b.max.y, f).toBeLessThan(4.2);
       // Legacy service sites predate the evolved-footprint cap. All newly
       // authored zoned x2 models must stay within the normal 1400 budget.
-      expect(tris(g), f).toBeLessThanOrEqual(n <= 20 || n >= 36 ? 1400 : 4000);
+      expect(tris(g), f).toBeLessThanOrEqual(SERVICE_X2.has(n) ? 4000 : 1400);
       expect(m!.materials.length, f).toBeGreaterThan(0);
     }
   });

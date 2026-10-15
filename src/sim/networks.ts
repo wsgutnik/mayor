@@ -1,4 +1,4 @@
-import { COVER, FAC, FACILITY_INFO, FacilityKind, RoadLayer, World, facilityAnchorAt, idx, inBounds, layerClass } from "./world";
+import { COVER, FACILITY_INFO, FacilityKind, RoadLayer, World, facilityAnchorAt, facilityUtility, idx, inBounds, isNetworkedFacility, layerClass } from "./world";
 import { findFrontage } from "./blocks";
 
 /** Bits in World.nets: which utility floods reached each road tile. */
@@ -26,14 +26,22 @@ interface NetDef {
 
 /**
  * Built per call, not at module load: this module cycles back into world.ts,
- * whose COVER/FAC bindings are still initialising when we first evaluate.
+ * whose COVER/FACILITY_INFO bindings are still initialising when we first evaluate.
  */
 function netDefs(): NetDef[] {
+  // Sources come from FACILITY_INFO (coverage bit), so a new tier joins its network without a second list to edit.
+  const kinds = Object.keys(FACILITY_INFO).map(Number) as FacilityKind[];
+  const of = (u: NetKind) => kinds.filter((k) => facilityUtility(k) === u);
   return [
-    { kind: "power", coverBit: COVER.POWER, netBit: NET.POWER, sources: [FAC.POWER, FAC.POWER_SOLAR, FAC.POWER_LARGE, FAC.SUBSTATION] },
-    { kind: "water", coverBit: COVER.WATER, netBit: NET.WATER, sources: [FAC.WATER, FAC.WATER_TOWER, FAC.WATER_LARGE] },
-    { kind: "sewage", coverBit: COVER.SEWAGE, netBit: NET.SEWAGE, sources: [FAC.SEWAGE] },
+    { kind: "power", coverBit: COVER.POWER, netBit: NET.POWER, sources: of("power") },
+    { kind: "water", coverBit: COVER.WATER, netBit: NET.WATER, sources: of("water") },
+    { kind: "sewage", coverBit: COVER.SEWAGE, netBit: NET.SEWAGE, sources: of("sewage") },
   ];
+}
+
+/** Facility kinds feeding (or relaying) each road network; exported for the usage panel and tests. */
+export function networkSources(net: NetKind): FacilityKind[] {
+  return netDefs().find((d) => d.kind === net)?.sources ?? [];
 }
 
 /**
@@ -173,11 +181,11 @@ export function withinReach(w: World, dist: Int32Array, front: number): boolean 
  * level-1 demand so growth and capacity see the same picture.
  */
 export function updateNetworkCoverage(w: World): void {
-  // Fast path: no networked facilities, nothing to flood.
+  // Fast path: no networked facilities, nothing to flood. Every tier counts: a city powered only by a
+  // solar plant or watered only by a tower must still flood its network.
   let any = false;
   for (let i = 0; i < w.facility.length; i++) {
-    const f = w.facility[i];
-    if (f === FAC.POWER || f === FAC.WATER || f === FAC.SEWAGE || f === FAC.SUBSTATION) {
+    if (isNetworkedFacility(w.facility[i])) {
       any = true;
       break;
     }

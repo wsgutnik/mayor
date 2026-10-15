@@ -1,4 +1,6 @@
-import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
+import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH, FACILITY_OF_TOOL, isFacilityTool } from "../sim/sim";
+import { facilityUsage } from "../sim/facility-usage";
+import { usageRows } from "./facility-usage-view";
 import { MAX_LINE_VEHICLES, transitTotals } from "../sim/transit";
 import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
@@ -50,15 +52,18 @@ const T: Record<string, ToolDef> = {
   museum: { id: "museum", label: "Museum", hint: "City museum: culture and land value (radius 16)", color: "#efe6d2", icon: { img: "kit/ico-trofeu" } },
   cityhall: { id: "cityhall", label: "City hall", hint: "City hall (2x2, one per city): happiness and tax income", color: "#4f5f86", icon: { img: "kit/ico-martelo" } },
   substation: { id: "substation", label: "Substation", hint: "Substation: relays power to nearby roads", color: "#cfd3d6", icon: { img: "kit/ico-energia" } },
-  solar: { id: "solar", label: "Solar plant", hint: "Solar plant: clean power (2x2, capacity 180)", color: "#f2c230", icon: { img: "kit/ico-energia" } },
-  powerlarge: { id: "powerlarge", label: "Large power plant", hint: "Large power plant: 2x2, capacity 380", color: "#e08a3c", icon: { img: "kit/ico-energia" } },
-  watertower: { id: "watertower", label: "Water tower", hint: "Water tower: capacity 160, no water tile needed", color: "#39b6e8", icon: { img: "kit/ico-agua" } },
-  waterlarge: { id: "waterlarge", label: "Large water plant", hint: "Large water plant near water (2x2, capacity 260)", color: "#2a86cc", icon: { img: "kit/ico-agua" } },
+  solar: { id: "solar", label: "Solar plant", hint: "Solar plant: clean power, no smoke (2x2, feeds the road grid)", color: "#f2c230", icon: { img: "kit/ico-energia" } },
+  powerlarge: { id: "powerlarge", label: "Large power plant", hint: "Large power plant: high output (2x2, feeds the road grid)", color: "#e08a3c", icon: { img: "kit/ico-energia" } },
+  watertower: { id: "watertower", label: "Water tower", hint: "Water tower: small supply, no water tile needed (feeds the road grid)", color: "#39b6e8", icon: { img: "kit/ico-agua" } },
+  waterlarge: { id: "waterlarge", label: "Large water plant", hint: "Large water plant near water (2x2, feeds the road grid)", color: "#2a86cc", icon: { img: "kit/ico-agua" } },
   firepost: { id: "firepost", label: "Fire post", hint: "Fire post: fast local cover (radius 8)", color: "#ee5a4c", icon: { img: "kit/ico-extintor" } },
   firehq: { id: "firehq", label: "Fire headquarters", hint: "Fire headquarters: 2x2, wide cover (radius 20)", color: "#c22f28", icon: { img: "kit/ico-extintor" } },
   bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "kit/ico-lixeira" } },
   roundabout: { id: "roundabout", label: "Roundabout", hint: "Stamp a roundabout on a junction", color: "#9aa3b2", icon: { glyph: "⟳", color: "#9aa3b2" } },
 };
+
+/** Every tool label and hint (translated in src/i18n.ts; facility-usage-view.test.ts checks pt-BR coverage). */
+export const TOOL_I18N_KEYS: string[] = Object.values(T).flatMap((t) => [t.label, t.hint]);
 
 const ZONE_TOOLS = ["res", "com", "ind"];
 
@@ -443,10 +448,15 @@ export class Hud {
       this.setTool(t.id);
       this.closeFlyouts();
     });
-    this.tooltip.attach(b, () => ({
-      icon: t.icon.glyph, title: tr(t.label), desc: tr(t.hint),
-      cost: free ? undefined : price, color: t.color,
-    }));
+    this.tooltip.attach(b, () => {
+      // Service buildings show their numbers of use before placing: upkeep, capacity or radius, homes served.
+      const usage = isFacilityTool(t.id) ? facilityUsage(FACILITY_OF_TOOL[t.id]) : null;
+      return {
+        icon: t.icon.glyph, title: tr(t.label), desc: tr(t.hint),
+        cost: free ? undefined : price, color: t.color,
+        upkeep: usage?.upkeep, rows: usage ? usageRows(usage) : undefined,
+      };
+    });
     this.toolBtns.set(t.id, b);
     return b;
   }

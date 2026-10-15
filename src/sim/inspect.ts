@@ -1,10 +1,8 @@
 import { CityState, CAPACITY, lotDemographics, syncLots } from "./sim";
 import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
-import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, facilityFootprint, idx, inBounds } from "./world";
+import { COVER, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, facilityFootprint, idx, inBounds } from "./world";
 import { landmarkById } from "./landmarks";
-
-/** Utilities served through the road network have no radius to report. */
-const NETWORKED = new Set<FacilityKind>([FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.SUBSTATION, FAC.POWER_SOLAR, FAC.POWER_LARGE, FAC.WATER_TOWER, FAC.WATER_LARGE]);
+import { FacilityUsage, facilityUsage } from "./facility-usage";
 
 /** What the inspector card shows about one tile. Plain data, so the UI needs no simulation knowledge. */
 export interface TileInfo {
@@ -34,6 +32,8 @@ export interface TileInfo {
   /** Facility footprint in tiles, formatted by the UI as NxN. */
   footprint: 1 | 2;
   construction?: { state: string; percent: number };
+  /** Facilities: capacity, load, radius and what they serve (src/sim/facility-usage.ts). */
+  usage?: FacilityUsage;
   demographics?: { children: number; working: number; seniors: number; workers: number };
 }
 
@@ -64,9 +64,11 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
   if (fac) {
     const info = FACILITY_INFO[fac];
     const e = facilityEntry(fac);
+    // Networked utilities follow the roads and report no radius (the usage carries the same rule).
+    const usage = facilityUsage(fac, { state: s, tile: i });
     return {
       ...base, kind: "facility", ...(e ? fromEntry(e) : { name: info.name, nameEn: info.name }),
-      upkeep: info.upkeep, radius: NETWORKED.has(fac) ? 0 : info.radius, footprint: facilityFootprint(fac),
+      upkeep: info.upkeep, radius: usage.radius, footprint: facilityFootprint(fac), usage,
     };
   }
   if (w.road[i]) {

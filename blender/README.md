@@ -29,6 +29,12 @@ A building's `footprint` (tiles wide x deep) is declared in `registry.building(.
 shipped model is 1x1. Several models may share a kit number as *variants* (`variant`, `version`); the last
 registration for a number wins and any replacement must be listed in `registry.DECLARED_OVERRIDES`.
 
+Service buildings of the 41-84 expansion are variants, never base models: 2x2 kinds register `variant="x2"`
+(exported to `models/x2/NN.glb`, |x|,|y| <= 1, legacy service cap 4000 triangles) and 1x1 kinds `variant="x1"`
+(exported to `models/x1/NN.glb`, inside the tile, 1400 triangles), so the 40-file kit stays exact. Recipes:
+`buildings_services_tiers.py`; build only them with `--only 61,73,76,81,82,83,84 --out DIR --previews DIR` and copy
+the `x2/` and `x1/` GLBs (a run without `--only` rewrites every model and the manifest).
+
 ## Strict validation
 
 `--strict` fails the build (exit 1) when a model leaves its tile, exceeds `MAYOR_BUILDING_TRI_LIMIT`

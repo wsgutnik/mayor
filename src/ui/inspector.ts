@@ -9,6 +9,7 @@ import {
   peopleLabelKey,
   serviceChips,
 } from "./inspector-model";
+import { usageRows } from "./facility-usage-view";
 
 export interface InspectorHooks {
   onClose(): void;
@@ -33,6 +34,7 @@ export class Inspector {
   private footprintVal: HTMLElement;
   private radiusRow: HTMLElement;
   private radiusVal: HTMLElement;
+  private usageEl: HTMLElement;
   private closeBtn: HTMLButtonElement;
   private open = false;
 
@@ -143,6 +145,10 @@ export class Inspector {
     this.facRows.appendChild(upkeepRow);
     this.facRows.appendChild(footprintRow);
     this.facRows.appendChild(radiusRow);
+    // Numbers of use: load, network totals, lots and residents served (one row each).
+    this.usageEl = document.createElement("div");
+    this.usageEl.className = "insp-usage";
+    this.facRows.appendChild(this.usageEl);
     root.appendChild(this.facRows);
 
     this.root = root;
@@ -218,6 +224,19 @@ export class Inspector {
       // Networked utilities (usina, bomba, esgoto, subestação) show no radius.
       this.radiusRow.hidden = info.radius === 0;
       this.radiusVal.textContent = `${info.radius} ${tr("tiles")}`;
+      this.usageEl.innerHTML = "";
+      for (const r of info.usage ? usageRows(info.usage) : []) {
+        const row = document.createElement("div");
+        row.className = "insp-row";
+        const k = document.createElement("span");
+        k.className = "insp-lbl";
+        k.textContent = r.k;
+        const v = document.createElement("span");
+        v.className = "insp-val";
+        v.textContent = r.v;
+        row.append(k, v);
+        this.usageEl.appendChild(row);
+      }
     }
 
     this.closeBtn.title = tr("Close");

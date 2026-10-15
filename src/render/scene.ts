@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import type { CityState } from "../sim/sim";
 import {
-  ZONE, COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
+  ZONE, COVER, FAC, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
   RoadType, Pt, inBounds, heightAt, Biome, blocksBuilding, isTunnelTile,
-  facilityAnchorAt, facilityFootprint,
+  facilityAnchorAt,
 } from "../sim/world";
 import { CameraRig } from "./camera";
 import { ROAD_LIFT } from "./roads";
@@ -14,7 +14,7 @@ import { shadowBias } from "./shadow-tuning";
 import { CONTACT_DARK, ContactShadows, VehicleLightPools } from "./vehicle-fx";
 import { StreetLightFx } from "./street-light";
 import { buildModels, makeWindowTextures } from "./models";
-import { zoneEntries, tileHash, facilityEntry, pickLotEntry } from "../sim/catalog";
+import { zoneEntries, tileHash, pickLotEntry } from "../sim/catalog";
 import { LANDMARKS } from "../sim/landmarks";
 import {
   SITE_PLINTH_SHRINK, cellBaseY, lotFrontSample, lotFrontTile, lotInstances, lotKerb, lotYaw, padBaseY, siteLevel,
@@ -47,7 +47,8 @@ import { TrafficTint } from "./traffic-tint";
 import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
 import { UndergroundView } from "./underground";
 import { createRoadDetailMaterial, loadRoadAtlas, loadRoadDetailMaps, RoadDetail } from "./road-material";
-import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat } from "./terrain-splat";
+import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat, terrainLayerSet } from "./terrain-splat";
+import { facilityFallbackScale, facilityModelPlan } from "./facility-models";
 import { GROUND_SURFACE_TINT, createPlotMaterial } from "./plot-material";
 import { SURF, planMayorLot, rectWorld } from "../sim/lotground";
 import { LodSorter } from "./lod";
@@ -230,6 +231,8 @@ export class CityRenderer {
   private grassTex!: THREE.Texture;
   private splat!: TerrainSplat;
   private splatTier: "off" | SplatTier = "off";
+  /** Tier and layer set currently bound (or loading) on the terrain material. */
+  private splatKey = "off";
   private roadDetail!: RoadDetail;
   private roadAtlasReady = false;
   private roadAtlasAllowed = true;
@@ -297,6 +300,9 @@ export class CityRenderer {
   private glbPending = new Set<number>();
   private glbX2Pending = new Set<number>();
   private glbX4Pending = new Set<number>();
+  /** 1x1 expansion service buildings (public/models/x1/NN.glb). */
+  private glbX1 = new Map<number, LoadedModel | null>();
+  private glbX1Pending = new Set<number>();
   private landmarkGlb = new Map<string, LoadedModel | null>();
   private landmarkPending = new Set<string>();
   private fX2Loaded = new Set<FacilityKind>();
@@ -744,12 +750,31 @@ export class CityRenderer {
     }
     const facilityWanted: [FacilityKind, number, THREE.InstancedMesh][] = [];
     for (const [kind, mesh] of this.fMeshes) {
-      const n = facilityEntry(kind as FacilityKind)?.n;
-      if (n !== undefined) facilityWanted.push([kind as FacilityKind, n, mesh]);
-      if (facilityFootprint(kind as FacilityKind) === 1) want(n, mesh);
+      const plan = facilityModelPlan(kind as FacilityKind);
+      if (plan.n === undefined) continue;
+      if (plan.dir === "x2") facilityWanted.push([kind as FacilityKind, plan.n, mesh]);
+      else if (plan.dir === "kit") want(plan.n, mesh);
+      else if (plan.dir === "x1" && plan.url) {
+        // 1x1 expansion service buildings (catalog 41-84) load from models/x1/, outside the kit inventory.
+        const n = plan.n, url = plan.url;
+        const apply = (model: LoadedModel) => {
+          if (!this.sized.includes(mesh)) return;
+          mesh.geometry = model.geometry;
+          mesh.material = model.materials;
+          for (const g of model.glow) { this.glowMats.add(g); g.emissiveIntensity = this.nightGlow; }
+          this.seenRevision = -1;
+        };
+        if (this.glbX1.has(n)) { const hit = this.glbX1.get(n); if (hit) apply(hit); continue; }
+        if (this.glbX1Pending.has(n)) continue;
+        this.glbX1Pending.add(n);
+        loadGlb(url).then((model) => {
+          this.glbX1.set(n, model);
+          this.glbX1Pending.delete(n);
+          if (model) this.applyGlbModels();
+        });
+      }
     }
     for (const [kind, n, mesh] of facilityWanted) {
-      if (facilityFootprint(kind) !== 2) continue;
       const apply = (model: LoadedModel, x2: boolean) => {
         if (!this.sized.includes(mesh)) return;
         mesh.geometry = model.geometry;
@@ -833,6 +858,31 @@ export class CityRenderer {
     // Blend bands follow the same biome heights the vertex colours use.
     const look = BIOME_LOOK[this.world.biome];
     this.splat.setParams({ sandAt: 0.3, rockAt: look.rockAt, slopeRock: 0.32 });
+    // A new world may bring another biome or seed, hence another detail layer set.
+    this.refreshSplat();
+  }
+
+  /**
+   * Bind the detail layer set of the current world (biome + seed) for the current tier. Only reloads when the
+   * tier or set changes; the low tier renders flat vertex colours. Five samplers whatever the set.
+   */
+  private refreshSplat(): void {
+    if (!this.splat) return;
+    if (this.splatTier === "off") {
+      this.splatKey = "off";
+      this.splat.setEnabled(false);
+      return;
+    }
+    const tier = this.splatTier;
+    const set = terrainLayerSet(this.world.biome, this.world.seed ?? 0);
+    const key = `${tier}:${set.id}:${set.accentOffset.join(",")}`;
+    if (key === this.splatKey) return;
+    this.splatKey = key;
+    loadSplatMaps(tier, set, this.grassTex, this.maxAniso, this.profileAniso, (m) => {
+      if (this.splatKey !== key) return; // the tier or world moved on mid-load
+      this.splat.setMaps(m);
+      this.splat.setEnabled(true);
+    });
   }
 
   private updateTerrain(): void {
@@ -889,10 +939,17 @@ export class CityRenderer {
           if (kind === 1) smoke.push({ x: anchor ? anchor.x + 1.2 : x + 0.7, y: h + 0.85, z: anchor ? anchor.y + 1.2 : y + 0.72, strength: 1 });
           const mesh = this.fMeshes.get(kind);
           if (mesh) {
-            const transform = facilityModelTransform(anchor, x, y, anchor && !this.fX2Loaded.has(kind) ? 1.8 : 1);
+            // Only a 2x2 stand-in is enlarged: since street-frame snapping every facility carries an anchor,
+            // and scaling 1x1 kinds by the 2x2 fallback made them overflow their tile.
+            const transform = facilityModelTransform(anchor, x, y, facilityFallbackScale(kind, this.fX2Loaded.has(kind)));
             const { x: px, z: pz, yaw, scale } = transform;
             const ph = anchor ? heightAt(w, px, pz) : h;
             this.placeModel(mesh, counts, px, pz, ph, scale, 1, tint.setScalar(1), x, y, yaw);
+            if (kind === FAC.POWER_LARGE && this.fX2Loaded.has(kind)) {
+              // Smoke leaves the tall stack of the x2 model (Blender (0.82, 0.02), 1.93 high), turned with the site.
+              const lx = 0.82, lz = -0.02, c = Math.cos(yaw), sn = Math.sin(yaw);
+              smoke.push({ x: px + lx * c + lz * sn, y: ph + 1.95, z: pz - lx * sn + lz * c, strength: 1.2 });
+            }
           }
         } else if (blocksBuilding(w, i)) {
           // Drawn as ribbons (see buildRoadGeometry). Tunnels fall through: ground above keeps its trees.
@@ -2019,15 +2076,7 @@ export class CityRenderer {
     // Terrain splat follows the tier; low renders flat vertex colours.
     if (profile.splat !== this.splatTier) {
       this.splatTier = profile.splat;
-      if (profile.splat === "off") this.splat.setEnabled(false);
-      else {
-        const tier = profile.splat;
-        loadSplatMaps(tier, this.grassTex, this.maxAniso, this.profileAniso, (m) => {
-          if (this.splatTier !== tier) return; // the tier moved on mid-load
-          this.splat.setMaps(m);
-          this.splat.setEnabled(true);
-        });
-      }
+      this.refreshSplat();
     }
     // Vegetation density needs a rebuild; the LOD range needs a fresh pass.
     if (profile.veg !== this.vegMul) {

@@ -59,10 +59,12 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.SUBSTATION]: { name: "Substation", cost: 300, upkeep: 20, radius: 14, capacity: 0, bit: COVER.POWER, nearWater: false },
   /** Regional rail: bigger catchment and cost than metro, surface trains. */
   [FAC.TRAIN_STATION]: { name: "Train station", cost: 2000, upkeep: 90, radius: 12, footprint: 2, capacity: 0, bit: COVER.TRANSIT, nearWater: false },
-  /** Tiered services: same network/coverage bits as their base kind, more output per tile. */
-  [FAC.POWER_SOLAR]: { name: "Solar plant", cost: 1600, upkeep: 50, radius: 16, footprint: 2, capacity: 180, bit: COVER.POWER, nearWater: false },
+  /** Tiered services: same network/coverage bits as their base kind; small < base < large (docs/process/24-service-usage.md). */
+  /** Clean but small: below the coal plant, cheaper to run per unit (docs/process/24-service-usage.md). */
+  [FAC.POWER_SOLAR]: { name: "Solar plant", cost: 1000, upkeep: 30, radius: 16, footprint: 2, capacity: 80, bit: COVER.POWER, nearWater: false },
   [FAC.POWER_LARGE]: { name: "Large power plant", cost: 3200, upkeep: 140, radius: 18, footprint: 2, capacity: 380, bit: COVER.POWER, nearWater: false },
-  [FAC.WATER_TOWER]: { name: "Water tower", cost: 900, upkeep: 45, radius: 12, footprint: 1, capacity: 160, bit: COVER.WATER, nearWater: false },
+  /** Needs no shoreline, so it supplies less than the pump; tier order is tower < pump < large plant. */
+  [FAC.WATER_TOWER]: { name: "Water tower", cost: 450, upkeep: 28, radius: 12, footprint: 1, capacity: 60, bit: COVER.WATER, nearWater: false },
   [FAC.WATER_LARGE]: { name: "Large water plant", cost: 1500, upkeep: 80, radius: 14, footprint: 2, capacity: 260, bit: COVER.WATER, nearWater: true },
   [FAC.FIRE_POST]: { name: "Fire post", cost: 300, upkeep: 25, radius: 8, footprint: 1, capacity: 0, bit: COVER.FIRE, nearWater: false },
   [FAC.FIRE_HQ]: { name: "Fire headquarters", cost: 1500, upkeep: 110, radius: 20, footprint: 2, capacity: 0, bit: COVER.FIRE, nearWater: false },
@@ -72,6 +74,20 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
 export interface FacilityAnchor { x: number; y: number; kind: FacilityKind; w: number; h: number; cx?: number; cz?: number; yaw?: number }
 
 export const facilityFootprint = (kind: FacilityKind): 1 | 2 => FACILITY_INFO[kind].footprint ?? 1;
+
+/** Utility a facility belongs to, from its coverage bit (power/water/sewage feed road networks, garbage is radius-based). */
+export type FacilityUtility = "power" | "water" | "sewage" | "garbage";
+export function facilityUtility(kind: FacilityKind): FacilityUtility | null {
+  const bit = FACILITY_INFO[kind]?.bit ?? 0;
+  return bit === COVER.POWER ? "power" : bit === COVER.WATER ? "water" : bit === COVER.SEWAGE ? "sewage" : bit === COVER.GARBAGE ? "garbage" : null;
+}
+
+/** Power, water and sewage facilities (every tier, plus the relaying substation) serve through the road network, never by radius. */
+export function isNetworkedFacility(kind: number): boolean {
+  if (!kind) return false;
+  const u = facilityUtility(kind as FacilityKind);
+  return u === "power" || u === "water" || u === "sewage";
+}
 
 export function facilityAnchorAt(w: World, tile: number): FacilityAnchor | undefined {
   const anchors = w.facilityAnchors;
@@ -174,6 +190,11 @@ export interface WorldLot {
 
 export interface World {
   biome: Biome;
+  /**
+   * Generation seed. Derived, not saved: loading regenerates the world from the save's seed. Drives
+   * deterministic cosmetic choices such as the terrain detail layer set. Absent in hand-built test worlds.
+   */
+  seed?: number;
   size: number;
   /** (size+1)^2 corner heights; water level is 0. */
   heights: Float32Array;
@@ -326,6 +347,7 @@ export function generateWorld(size: number, seed: number, biome: Biome = "plains
   }
   const world: World = {
     biome,
+    seed,
     size,
     heights,
     road: new Uint8Array(size * size),
@@ -498,7 +520,7 @@ export function updateCoverage(w: World): void {
       const f = w.facility[i] as FacilityType;
       if (!f) continue;
       // Power, water and sewage cover through the road network, not by radius.
-      if (f === FAC.POWER || f === FAC.WATER || f === FAC.SEWAGE || f === FAC.SUBSTATION || f === FAC.POWER_SOLAR || f === FAC.POWER_LARGE || f === FAC.WATER_TOWER || f === FAC.WATER_LARGE) continue;
+      if (isNetworkedFacility(f)) continue;
       const anchor = facilityAnchorAt(w, i);
       if (anchor && (anchor.x !== x || anchor.y !== y)) continue;
       const info = FACILITY_INFO[f as FacilityKind];
