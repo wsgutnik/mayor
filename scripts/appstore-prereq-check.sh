@@ -7,6 +7,7 @@ cd "$(dirname "$0")/.." || exit 1
 
 ROOT="$(pwd)"
 CONF="src-tauri/tauri.conf.json"
+IOSCONF="src-tauri/tauri.ios.conf.json"
 APPLE="src-tauri/gen/apple"
 PLIST="$APPLE/app_iOS/Info.plist"
 OVERLAY="src-tauri/Info.ios.plist"
@@ -38,7 +39,7 @@ for t in aarch64-apple-ios; do
 done
 
 # --- identity and versions
-bid="$(json_get "$CONF" identifier)"
+bid="$(json_get "$IOSCONF" identifier)"
 [ "$bid" = "com.gutnik.mayor" ] && row PASS "Bundle id (tauri.conf)" "$bid" || row FAIL "Bundle id (tauri.conf)" "'$bid' != com.gutnik.mayor"
 if grep -q "PRODUCT_BUNDLE_IDENTIFIER = com.gutnik.mayor;" "$PBX" && grep -q "PRODUCT_BUNDLE_IDENTIFIER: com.gutnik.mayor" "$APPLE/project.yml"; then
   row PASS "Bundle id (Xcode)" "pbxproj + project.yml"
@@ -48,7 +49,7 @@ team="$(json_get "$CONF" bundle.iOS.developmentTeam)"
 ver="$(json_get "$CONF" version)"; pver="$(json_get package.json version)"
 if echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then row PASS "Marketing version" "$ver (CFBundleShortVersionString)"; else row FAIL "Marketing version" "'$ver' must be 1-3 integers"; fi
 [ "$ver" = "$pver" ] && row PASS "Version sync" "tauri.conf = package.json = $ver (About screen shows package.json)" || row WARN "Version sync" "tauri.conf $ver vs package.json $pver"
-bv="$(json_get "$CONF" bundle.iOS.bundleVersion)"
+bv="$(json_get "$IOSCONF" bundle.iOS.bundleVersion)"
 if echo "$bv" | grep -Eq '^[0-9]+$'; then row PASS "Build number" "bundle.iOS.bundleVersion=$bv (raise for every upload)"; else row FAIL "Build number" "bundle.iOS.bundleVersion '$bv' should be an integer"; fi
 fam="$(grep -o 'TARGETED_DEVICE_FAMILY = [^;]*' "$PBX" | sort -u | tr '\n' ' ')"
 [ "$fam" = "TARGETED_DEVICE_FAMILY = 2 " ] && row PASS "Device family" "iPad only" || row WARN "Device family" "$fam (iPhone needs its own screenshots)"

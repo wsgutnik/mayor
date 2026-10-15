@@ -119,13 +119,14 @@
 <div class="wrap">
   <nav class="index" aria-label="Sections">
     <a href="#play">How to play</a><a href="#roads">Roads</a><a href="#zones">Zones and lots</a><a href="#buildings">Buildings</a>
-    <a href="#people">People and vehicles</a><a href="#traffic">Traffic</a><a href="#light">Day and night</a><a href="#city">Living city</a>
-    <a href="#process">How we build</a><a href="#touch">Touch</a><a href="#status">Status</a><a href="#download">Download</a>
+    <a href="#services">Services</a><a href="#people">People and vehicles</a><a href="#traffic">Traffic</a><a href="#light">Day and night</a>
+    <a href="#nature">Trees and clouds</a><a href="#city">Living city</a><a href="#process">How we build</a><a href="#touch">Touch</a>
+    <a href="#store">App Store</a><a href="#web">Web demo</a><a href="#status">Status</a><a href="#download">Download</a>
   </nav>
 
   <header class="hero">
     <div class="copy">
-      <span class="label">An original city builder · Mac and iPad · updated 14 Oct 2026</span>
+      <span class="label">An original city builder · iPad, Mac and web · updated 15 Oct 2026</span>
       <h1>Mayor</h1>
       <div class="dash" aria-hidden="true"></div>
       <p class="lead">You lay out the streets, paint the zones, connect power, water and sewage, and the city starts building itself: houses, shops, factories, cars and people. Inspired by Cities: Skylines, written from scratch in TypeScript and Three.js, with models drawn in Blender.</p>
@@ -137,9 +138,10 @@
   </header>
 
   <div class="facts" role="list">
-    <div role="listitem"><b>M35</b><span>released, signed and notarized</span></div>
-    <div role="listitem"><b>800+</b><span>automated tests passing</span></div>
-    <div role="listitem"><b>40 + 36 + 8</b><span>kit buildings, evolved 2×2 and 4×4, landmarks</span></div>
+    <div role="listitem"><b>M35</b><span>Mac release, signed and notarized</span></div>
+    <div role="listitem"><b>Build 3</b><span>in App Store review (iPad)</span></div>
+    <div role="listitem"><b>968</b><span>automated tests passing</span></div>
+    <div role="listitem"><b>84 + 8</b><span>catalog buildings, landmarks</span></div>
     <div role="listitem"><b>36</b><span>vehicle models, plus pedestrians and props</span></div>
     <div role="listitem"><b>0</b><span>servers: the iPad runs the game inside the app</span></div>
   </div>
@@ -341,6 +343,45 @@
     </div>
   </section>
 
+  <section id="services">
+    <div class="sec-head">
+      <span class="label">Services</span>
+      <h2>Every service shows what it serves</h2>
+      <p class="lead">Each service building reports, before you build it and after, how many lots, residents and jobs it serves. One shared function feeds the build tooltip and the inspector, so the two never disagree. Service buildings snap to the street and face it, like the lots.</p>
+    </div>
+    <div class="grid g2">
+      <figure class="plate"><img src="img/services/tooltip_solar_plant.jpg" alt="Build tooltip of the solar plant with cost, upkeep, capacity and homes served at full capacity"><figcaption><b>Before building.</b> Cost, upkeep, capacity and the estimate at full capacity.</figcaption></figure>
+      <figure class="plate"><img src="img/services/inspector_large_power_plant.jpg" alt="Inspector of the large power plant with load, network supply and lots served"><figcaption><b>After building.</b> Share of the network load, supply and demand, lots, residents and jobs served.</figcaption></figure>
+    </div>
+    <div class="grid g3">
+      <figure class="tile"><img src="img/services/tiers_row_day.jpg" alt="Row of small, base and large service buildings"><figcaption><b>Tiers</b>Small, base and large in every family; the new models fill their footprint.</figcaption></figure>
+      <figure class="tile"><img src="img/services/fire_family_train_day.jpg" alt="Fire post, fire station, fire HQ and the train station"><figcaption><b>Fire and rail</b>Fire post, station and HQ; train station with rail lines.</figcaption></figure>
+      <figure class="tile"><img src="img/services/fire_family_train_night.jpg" alt="The same buildings at night"><figcaption><b>At night</b>The same row with lit windows.</figcaption></figure>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>Balanced tiers</h3>
+        <div class="scroll"><table>
+          <thead><tr><th>Building</th><th>Footprint</th><th class="n">Cost</th><th class="n">Capacity</th></tr></thead>
+          <tbody>
+            <tr><td>Solar plant</td><td>2×2</td><td class="n">$1000</td><td class="n">80</td></tr>
+            <tr><td>Water tower</td><td>1×1</td><td class="n">$450</td><td class="n">60</td></tr>
+          </tbody>
+        </table></div>
+        <p class="label">The expansion first shipped solar 180 above coal 120; now small &lt; base &lt; large holds in every family</p>
+      </div>
+      <div class="card">
+        <h3>Street-frame placement</h3>
+        <ul>
+          <li>The nearest road within five tiles picks the side and the angle.</li>
+          <li>The front edge sits on the setback line, on either side of the street.</li>
+          <li>Asphalt, kerbs, sidewalks and junction rings are refused: "No room beside the street here".</li>
+          <li>Old saves keep their buildings exactly where they were.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section id="people">
     <div class="sec-head">
       <span class="label">People and vehicles</span>
@@ -397,6 +438,21 @@
       <div class="card"><h3>With a signal</h3><ul><li>Phases grouped by angle: opposite pairs together.</li><li>Green 3 to 8 s by queue and wait, yellow 2 s, all red 1 s.</li><li>A per-node offset: neighbours do not sync.</li><li>Conflicts in the box hold the car even on green.</li></ul></div>
       <div class="card"><h3>Car following</h3><ul><li>Acceleration 1.15; braking 1.34; standstill gap 0.18 tile.</li><li>A 0.58 s headway and a curvature speed limit.</li><li>A red light becomes a stopped virtual leader.</li><li>Measured: 1657 trips in 600 s at 20 spawns/s, no gridlock.</li></ul></div>
     </div>
+    <div class="card">
+      <h3>Gridlock watchdog</h3>
+      <p>A signalised grid at city demand used to freeze within about ten simulated minutes: two cars inside the junction box each saw the other as the occupant, then queues spilled back over the short links. Four fixes keep it moving.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Fix</th><th>Rule</th></tr></thead>
+        <tbody>
+          <tr><td>Box reach</td><td>Only a car within 0.1 tile of the box holds it; one queued behind its stop line does not</td></tr>
+          <tr><td>Box watchdog</td><td>A car held 8 s at a box crosses without the reservation</td></tr>
+          <tr><td>Exit room</td><td>No entering a signalised box without space on the far side</td></tr>
+          <tr><td>Leader cycle</td><td>In a mutual-leader loop, the lower id ignores the higher id</td></tr>
+          <tr><td>Idle despawn</td><td>A car that has not moved for 90 s leaves the road (counted as abandoned)</td></tr>
+        </tbody>
+      </table></div>
+      <p class="label">Matrix 3000 / 6000 / 9000 residents × street grid / avenue spines: all six cells complete trips every minute. The despawn is a last resort, not a structural cure</p>
+    </div>
   </section>
 
   <section id="light">
@@ -410,6 +466,36 @@
       <figure class="plate"><img src="img/gallery/game-night.jpg" alt="City at night with lit windows"><figcaption><b>Night.</b> Windows light up per floor and per apartment, chimney smoke and lamp light.</figcaption></figure>
     </div>
     <figure class="plate"><img src="img/gallery/game-industrial-row.jpg" alt="A row of factories and warehouses along an avenue"><figcaption><b>Industrial row.</b> Sheds, factories with chimneys and silos, each one facing the street.</figcaption></figure>
+  </section>
+
+  <section id="nature">
+    <div class="sec-head">
+      <span class="label">Trees, ground and clouds</span>
+      <h2>Landscape that reads at game zoom</h2>
+      <p class="lead">Each biome paints the ground with its own set of five texture layers. Four new trees come from a 30,000 to 51,000 triangle Blender pack, cut down to about 200 triangles each. Clouds are soft banks of lit puffs drifting in three layers.</p>
+    </div>
+    <div class="dayNight">
+      <figure class="plate"><img src="img/terrain/plains_game_day_before.jpg" alt="Plains terrain before the ground textures"><figcaption><b>Before.</b> Plains before the per-biome layers.</figcaption></figure>
+      <figure class="plate"><img src="img/terrain/plains_game_day_after.jpg" alt="Plains terrain with the new ground layers"><figcaption><b>After.</b> Grass, soil and stone layers blended per biome.</figcaption></figure>
+    </div>
+    <div class="grid g4">
+      <figure class="tile"><img src="img/flora/tree_pack_broad.png" alt="Broad green maple"><figcaption><b>Maple</b>Broad green crown</figcaption></figure>
+      <figure class="tile"><img src="img/flora/tree_pack_dense.png" alt="Dense deep green maple"><figcaption><b>Dense maple</b>Deep green</figcaption></figure>
+      <figure class="tile"><img src="img/flora/tree_pack_airy.png" alt="Light airy birch"><figcaption><b>Birch</b>Light and airy</figcaption></figure>
+      <figure class="tile"><img src="img/flora/tree_pack_amber.png" alt="Amber autumn maple"><figcaption><b>Autumn maple</b>Amber</figcaption></figure>
+    </div>
+    <div class="grid g6">
+      <figure class="tile"><img src="img/flora/grass_fur_3x3.png" alt="Grass fur ground texture tiled 3 by 3"><figcaption><b>Grass fur</b></figcaption></figure>
+      <figure class="tile"><img src="img/flora/hedge_3x3.png" alt="Hedge ground texture tiled 3 by 3"><figcaption><b>Hedge</b></figcaption></figure>
+      <figure class="tile"><img src="img/flora/limestone_3x3.png" alt="Limestone ground texture tiled 3 by 3"><figcaption><b>Limestone</b></figcaption></figure>
+      <figure class="tile"><img src="img/flora/soil_grey_3x3.png" alt="Grey soil ground texture tiled 3 by 3"><figcaption><b>Grey soil</b></figcaption></figure>
+      <figure class="tile"><img src="img/flora/earth_red_3x3.png" alt="Red earth ground texture tiled 3 by 3"><figcaption><b>Red earth</b></figcaption></figure>
+    </div>
+    <div class="card">
+      <h3>The cloud bug</h3>
+      <p>The first pass used photo cards for clouds; the supplied "cloud" images were mislabelled and drew trees on black in the sky. Clouds are now built in code: about two dozen soft noise-edged puffs per cloud, white on top and blue-grey underneath, one draw call per drift layer and no image files.</p>
+      <p class="label">The ground images (AI-generated) and the Blender tree pack were supplied by the owner; credits in NOTICE.md</p>
+    </div>
   </section>
 
   <section id="city">
@@ -516,7 +602,74 @@
         <div class="row"><i>✓</i><span>The road panel covered the road being edited: it now closes on the first tap on the map</span></div>
         <div class="row"><i>✓</i><span>Upgrade mode hint said "tap a start point": now "tap a road to upgrade it"</span></div>
         <div class="row"><i>✓</i><span>A stray drag could lose the map: reset-view button and a closer zoom limit</span></div>
-        <div class="row open"><i>–</i><span>Held taps on the toolbar sometimes ignored; submenu highlight lags the open tool</span></div>
+        <div class="row"><i>✓</i><span>Toolbar state now comes from one reducer: highlights follow the open tool at once, Zones lights up and takes Residential</span></div>
+        <div class="row"><i>✓</i><span>A long press (450 ms) cancels the draft and can no longer restart it in the same gesture</span></div>
+        <div class="row open"><i>–</i><span>Game clock pacing on the simulator, landscape-locked testing, and hands-on use on a real iPad (TestFlight build 4)</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Menus after the rework</h3>
+      <p>Choosing a road type keeps the road you are drawing and re-plans it. Each flyout has sections, a live summary ("Avenue · Curve · Ground · $45/tile"), costs, usage numbers and the reason a button is disabled; it never covers more than 40 percent of the screen.</p>
+      <div class="grid g2">
+        <figure class="plate"><img src="img/menus/before-roads-1366.jpg" alt="Roads flyout before the rework"><figcaption><b>Before.</b> Roads flyout.</figcaption></figure>
+        <figure class="plate"><img src="img/menus/after-roads-1366-day.jpg" alt="Roads flyout after the rework with sections and a summary"><figcaption><b>After.</b> Type, Draw, Level and Tools sections with the summary.</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="store">
+    <div class="sec-head">
+      <span class="label">App Store</span>
+      <h2>Submitted for review</h2>
+      <p class="lead">The iPad app is a Tauri 2 build with the whole game inside the package. Build 3 went to App Review on 15 October 2026 at 03:05 PDT; build 4, with the new menus, is in TestFlight.</p>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>What was set up</h3>
+        <ul>
+          <li>Bundle <code>com.gutnik.mayor</code> (the first choice was taken by another team), iPad only, landscape.</li>
+          <li>Icon from the MAYOR logo, opaque, every iOS size; About and credits screen in the app.</li>
+          <li>Apple Distribution certificate and the "Mayor App Store" profile; builds 1 to 4 uploaded.</li>
+          <li>Listing in Portuguese (primary) and English, five 2752×2064 screenshots per language.</li>
+          <li>Age rating 4+, App Privacy "Data Not Collected", free in 175 regions, manual release.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Review risks we prepared for</h3>
+        <ul>
+          <li>"Web wrapper" (4.2): the game is bundled and runs offline in Airplane Mode; no remote pages.</li>
+          <li>Third-party content: every CC0 and MIT source is credited in the app.</li>
+          <li>Payments (3.1): the app never mentions the paid web demo.</li>
+          <li>Still open: Export save untested on a device, real-iPad performance not measured.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="web">
+    <div class="sec-head">
+      <span class="label">Web demo</span>
+      <h2>Play in the browser</h2>
+      <p class="lead">A landing page in English and Portuguese, with device mockups and a day and night slider, sells access to the browser build for a one-time $4.99 through Stripe Checkout. Access is a signed cookie; the game files are served only to browsers that carry it.</p>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>How access works</h3>
+        <pre class="mermaid">flowchart LR
+  A[Landing page] --> B[Stripe Checkout, $4.99]
+  B --> C[Demo page checks the paid session and price]
+  C --> D[Signed cookie, one year]
+  D --> E[Game files served]
+  F[New browser] --> G[Restore with receipt email]
+  G --> D</pre>
+      </div>
+      <div class="card">
+        <h3>Open</h3>
+        <ul>
+          <li>Restore by email is not verified end to end, and the email is the only proof.</li>
+          <li>No magic link yet; the refund policy in the FAQ is a placeholder.</li>
+          <li>The game bundle is refreshed by hand from the main branch (last on 15 October 2026).</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -533,17 +686,25 @@
         <div class="row"><i>✓</i><span>Traffic with priority, adaptive signals and IDM</span></div>
         <div class="row"><i>✓</i><span>Demographics, construction states, statistics panel</span></div>
         <div class="row"><i>✓</i><span>Day and night with HDRI, per-floor windows and light pools</span></div>
-        <div class="row"><i>✓</i><span>Notarized Mac app and native iPad app</span></div>
+        <div class="row"><i>✓</i><span>Notarized Mac app (M35); iPad app submitted to the App Store (build 3), build 4 in TestFlight</span></div>
         <div class="row"><i>✓</i><span>Road upgrade (street to avenue) over zoned land, tested at 16 headings including sideways; zones stay attached and in the street frame</span></div>
         <div class="row"><i>✓</i><span>Touch road tool: anchor marker with snap ring, offset tether, long-press cancel, reset-view button, panels close on a map tap</span></div>
+        <div class="row"><i>✓</i><span>One tool-state reducer and sectioned menus with costs, usage numbers and disabled reasons</span></div>
+        <div class="row"><i>✓</i><span>Zone edits on a 96×96 city in under 8 ms (were 46 to 188 ms)</span></div>
+        <div class="row"><i>✓</i><span>Catalog 41 to 84, rail transit, service tiers; services snap to the street and show their usage</span></div>
+        <div class="row"><i>✓</i><span>Gridlock watchdogs: all six test cities keep completing trips every minute</span></div>
+        <div class="row"><i>✓</i><span>Per-biome ground textures, low-poly pack trees, volumetric clouds</span></div>
+        <div class="row"><i>✓</i><span>Paid web demo live with Stripe Checkout</span></div>
       </div>
       <div class="card"><h3>Open</h3>
+        <div class="row open"><i>–</i><span>App Review outcome for build 3</span></div>
+        <div class="row open"><i>–</i><span>Real-iPad performance, and Export save on the iPad, not tested yet</span></div>
+        <div class="row open"><i>–</i><span>Models for most of catalog 41 to 84; parks and sewage outlet use placeholders</span></div>
+        <div class="row open"><i>–</i><span>Avenue gridlock cleared by despawning idle cars, not prevented</span></div>
+        <div class="row open"><i>–</i><span>Web demo: restore by email unverified, no magic link, refund policy placeholder</span></div>
+        <div class="row open"><i>–</i><span>Browser tab crash after about ten world swaps: possible leak</span></div>
         <div class="row open"><i>–</i><span>Procedural buildings for big lots: visually rejected, switched off</span></div>
-        <div class="row open"><i>–</i><span>Measurements on real Mac, Windows and iPad hardware</span></div>
-        <div class="row open"><i>–</i><span>Zone block build on large grids still above 10 ms</span></div>
-        <div class="row open"><i>–</i><span>Touch: road-type panel still covers part of the map on small screens; a tap-to-highlight for the road that will upgrade</span></div>
-        <div class="row open"><i>–</i><span>Game clock pacing when unpaused on the simulator (years in minutes): to check on a real iPad</span></div>
-        <div class="row open"><i>–</i><span>App Store: depends on App Store Connect and distribution certificates</span></div>
+        <div class="row open"><i>–</i><span>Measurements on real Mac and Windows hardware; Windows build</span></div>
       </div>
     </div>
   </section>
@@ -555,14 +716,15 @@
     </div>
     <div class="rel">
       <div class="card"><h3>Mac (Apple Silicon)</h3><p>A disk image signed with Developer ID and notarized, it opens without a warning.</p><a class="btnlike" href="https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m35">Release v0.1.0-m35</a></div>
-      <div class="card"><h3>iPad</h3><p>A native app installed through Xcode, with the game inside the package. No server, it works offline. The browser version is at <span class="mono">mayor.gutnikcrm.com</span>, behind a password.</p></div>
+      <div class="card"><h3>iPad</h3><p>A native app with the game inside the package, no server, works offline. In App Store review; testers get it through TestFlight.</p></div>
+      <div class="card"><h3>Browser</h3><p>The landing page and the paid web demo ($4.99 one-time).</p><a class="btnlike" href="https://mayor-demo.vercel.app">mayor-demo.vercel.app</a></div>
       <div class="card"><h3>Code</h3><p>The repository with the process documents, the quality skill and the attributions.</p><a class="btnlike" href="https://github.com/wsgutnik/mayor">wsgutnik/mayor</a></div>
     </div>
   </section>
 
   <footer>
     <span>Part of the code and ideas comes from the fable-cities project (MIT, rawprogress), with attribution in NOTICE.md. CC0 textures from ambientCG and Poly Haven; models made in Blender.</span>
-    <span class="mono">Mayor · status page · 14 Oct 2026</span>
+    <span class="mono">Mayor · status page · 15 Oct 2026</span>
   </footer>
 </div>
 

@@ -70,8 +70,10 @@ DONO: a página precisa existir e mostrar um contato (e-mail ou formulário) ant
 ## URL de marketing (opcional)
 
 ```text
-https://mayor-demo.vercel.app
+https://github.com/wsgutnik/mayor
 ```
+
+Informada no App Store Connect em 2026-10-15 (repositório público).
 
 ## URL da política de privacidade (obrigatória)
 

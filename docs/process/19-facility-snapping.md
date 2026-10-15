@@ -1,4 +1,4 @@
-# 18 — Facility street-frame snapping
+# 19 — Facility street-frame snapping
 
 Facilities keep their axis-aligned tile mirror for coverage, networks and legacy saves, but new placements use the same local frame as oriented lots.  The pointer selects the nearest ground-road station (within five tiles); its signed normal chooses the side.  Local `+z` faces the road and yaw is `atan2(front.x, front.z)`.
 

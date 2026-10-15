@@ -14,16 +14,21 @@ Updates: when publishing a new version, increment `VERSION` in `public/sw.js`.
 
 Saving: data stays in Safari storage, which iOS may clear. Use **Menu → Export** to keep a file.
 
-## iPad/iPhone (native iOS, Tauri)
+## iPad (native app, Tauri)
 
-Native iOS packaging is prepared but requires full Xcode, iOS signing assets, and provisioning profiles. See
-[IOS.md](IOS.md). Quick commands after prerequisites are installed:
+The native iPad app (`com.gutnik.mayor`, iPad only) is in App Store review since 2026-10-15; testers install it
+through TestFlight (internal group "Equipe"). Building it yourself needs Xcode 26 and the signing assets: see
+[IOS.md](IOS.md). Quick commands:
 
 ```bash
-npm run ios:init
-npm run ios:dev
-npm run ios:build
+npm run ios:dev                                          # simulator or cabled iPad
+npm run ios:build -- --export-method app-store-connect   # signed IPA for App Store Connect
 ```
+
+## Browser (paid web demo)
+
+https://mayor-demo.vercel.app: landing page and the browser build for a one-time $4.99 (Stripe). Operations:
+[WEB-DEMO.md](WEB-DEMO.md).
 
 ## Mac
 
@@ -49,11 +54,13 @@ Prerequisites: Node 22, Rust (stable), and WebView2 (already included with Windo
 
 ## Mac (ready-made dmg)
 
-The M34 release (pre-release tag `v0.1.0-m34`) is on the GitHub Releases page: https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m34
+The latest release is M35 (pre-release tag `v0.1.0-m35`, 2026-10-14): https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m35
 
-- `Mayor-m34-mac-arm64-signed-notarized.dmg`: macOS Apple Silicon, Developer ID signed and notarized. Open the dmg and drag Mayor to Applications.
-- `Mayor-m34-ipad-pwa.zip`: the PWA bundle for iPad.
-- `SHA256SUMS-m34`: checksums for the files above.
+- `Mayor-m35-mac-arm64-signed-notarized.dmg`: macOS Apple Silicon, Developer ID signed and notarized. Open the dmg and drag Mayor to Applications.
+- `Mayor-m35-ipad-pwa.zip`: the PWA bundle for iPad.
+- `SHA256SUMS-m35`: checksums for the files above.
+
+M34 (`v0.1.0-m34`) has the same three files with the `m34` prefix.
 
 Fallback when no notarized build is available: `npm run package:adhoc` writes an ad hoc signed dmg to `release-out/`. It is not notarized, so on first launch use right-click > Open. Signing and notarization steps are in [SIGNING.md](SIGNING.md).
 

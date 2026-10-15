@@ -8,9 +8,13 @@ Visual reference: `screenshots/` (local, outside git). Sources in `SOURCES.md`.
 
 | Platform | Delivery |
 |---|---|
-| iPad | PWA (Add to Home Screen, fullscreen) → later Capacitor/App Store if desired |
-| Mac | Tauri (Rust already installed) or the browser itself |
-| Windows | Tauri (`.msi`/`.exe` build; needs Windows or CI to compile) |
+| iPad | Native Tauri 2 app on the App Store (`com.gutnik.mayor`, iPad only; build 3 in review since 2026-10-15); PWA zip as a fallback |
+| Mac | Tauri, Developer ID signed and notarized dmg on GitHub releases (`v0.1.0-m35`) |
+| Windows | Tauri (`.msi`/`.exe` build; needs a Windows machine; not built yet) |
+| Browser | Paid web demo at https://mayor-demo.vercel.app ($4.99 one-time, Stripe), see `docs/WEB-DEMO.md` |
+
+The iPad app uses Tauri 2 iOS (the same shell as the Mac app), not Capacitor as first planned. The main review risk
+for a WebView game (guideline 4.2) and its mitigations are in `docs/appstore/review-notes.md`.
 
 Why: one codebase, runs on all three platforms, touch + mouse, and can be visually checked here in the embedded browser.
 Godot/Unity would require an editor and per-platform exports. Cost: a lower performance ceiling than a native engine
@@ -49,26 +53,36 @@ CS2 is a game made by roughly 100 people over years. Goal: a **playable core** t
 | M25 | ✅ Detection and texture | Automatic crossing rules, preview, interchange; texture-based Blender roads |
 | M24 | ✅ Level separation | Overpass and underpass without a node, layer-specific traffic |
 | M23 | ✅ Bridges and tunnels | Segment elevation, water and hill spans, deck, pillars, portals |
-| M27 | ✅ default | Oriented zoning: segment-frame blocks, oriented lots, tile mirror, save v2, oriented rendering and painting; default since the P9 cutover |
+| M27 | ✅ only mode | Oriented zoning: segment-frame blocks, oriented lots, tile mirror, save v2, oriented rendering and painting; the only selectable model since `13812a1` (tile-only code still to delete) |
 | M28 | ✅ Visual assets | Audit and strict export, manifests, base/variant registry, rear facades, detailed fleet, v2 reference buildings with LODs (opt-in), 700-triangle budget |
 | UI-1 | ✅ Interface | UI scale/opacity, collapsible persistent panels, road-build readout |
-| UI-2 | ◐ Road builder | Undo/Redo, snapping, upgrade in place, parallel roads done; whole-road upgrade stroke pending |
+| UI-2 | ✅ Road builder | Undo/Redo, pixel-radius snapping, angle guides v4, refusals with reasons, upgrade in place, parallel roads, touch anchor/tether/long-press; whole-road upgrade stroke still open |
 | UI-3 | ◐ Zoning tools | Marquee and Fill done; densities and lot visualisation pending |
-| Junction builder | ◐ in progress | Design in `docs/process/07-junction-builder.md`: sidewalks wrapping corners, crosswalks, stop bars, guide dashes, arrows, lane graph. Unsignalised priority pending |
-| Fable Cities ports | ✅ | MIT ports (signals by angle, IDM, zoning cells and packer, vehicle baking, HDRI, info views v2, UI patterns). `NOTICE.md` currently attributes only the signal and IDM code |
-| Procedural buildings | ◐ experimental | Core and renderer behind `?procBuildings=1`, off by default; rejected visually, rework pending |
-| 0.1.0 (M34) | ✅ released | macOS Apple Silicon, signed and notarized; iPad PWA bundle (GitHub release `v0.1.0-m34`) |
+| UI tool state | ✅ | One reducer (`src/ui/tool-state.ts`), sectioned Roads/Services/Zones/Transit flyouts with costs, usage numbers and disabled reasons (`docs/process/25-tool-state.md`) |
+| Junction builder | ✅ | Sidewalks wrapping corners, crosswalks, stop bars, guide dashes, arrows, lane graph, vehicles on connectors, unsignalised priority, adaptive signals |
+| Traffic robustness | ✅ watchdogs | Signal-box reach and 8 s watchdog, exit-room check, leader cycle breaker, 90 s idle despawn; all six gridlock matrix cells flow. Structural spillback prevention open |
+| Fable Cities ports | ✅ | MIT ports (signals by angle, IDM, zoning cells and packer, vehicle baking, HDRI, info views v2, UI patterns), all listed in `NOTICE.md` and in the in-app credits |
+| City life | ✅ | Construction stages, demographics, lot evolution 1x1..4x4, 8 landmarks |
+| Catalog 41-84 and rail | ◐ | Sim, rail transit and service tiers done; 7 new service models; most 41-84 GLBs missing |
+| Services UX | ✅ | Street-frame facility snapping (`docs/process/19-facility-snapping.md`), usage numbers (`docs/process/24-service-usage.md`) |
+| Environment | ✅ | Per-biome ground textures, pack trees, volumetric clouds (`docs/process/23-flora-assets.md`) |
+| Procedural buildings | off | Core and renderer behind `?procBuildings=1`; rejected visually |
+| 0.1.0 (M34, M35) | ✅ released | macOS Apple Silicon, signed and notarized; iPad PWA bundle (GitHub releases `v0.1.0-m34`, `v0.1.0-m35`) |
+| App Store (iPad) | ◐ in review | Build 3 submitted 2026-10-15 03:05 PDT; build 4 in TestFlight; runbook `docs/appstore/APPSTORE.md` |
+| Web demo | ✅ live | `mayor-demo.vercel.app`, Stripe Checkout $4.99 (`docs/WEB-DEMO.md`) |
 | UI-4 to UI-6 | pending | Inspector diagnostics and economy dashboard, iPad layout and onboarding, themes and districts (see `docs/UI-V2-PLAN.md`) |
 
 ## Next Items
 
-1. Vehicles follow lane connectors (in flight, gt3).
-2. Unsignalised priority at junctions (yield and stop rules).
-3. Wire the adaptive signal controller (`src/sim/signals.ts`) into the sim.
-4. Procedural buildings: pass the visual review (gb3) before any change to the default.
-5. Junction visual gate: critic pass on the hard cases (acute junction, dead end, curve, avenue plus street, bridge ramp), day and night.
-6. App Store and iOS release: blocked until full Xcode 26.1.1 is installed (see `docs/IOS.md`).
-7. M22: pedestrians, polish, validation on Windows and iPad.
+1. App Review of build 3, then manual release; hands-on TestFlight build 4 on a real iPad (Export save, 15-minute big-city run, touch open items).
+2. Store tooling: fix `scripts/appstore-prereq-check.sh` for `tauri.ios.conf.json`, opaque Tauri icon source, versioned screenshots; privacy manifest if Apple asks.
+3. Web demo: verify restore by email, refund policy, magic link decision.
+4. Models for catalog 41-84 and placeholder services (parks, sewage outlet).
+5. Traffic: prevent avenue spillback structurally instead of despawning; per-stop rider counts.
+6. Memory leak hunt (tab crash after about 10 world swaps); delete the unreachable tile-zoning code.
+7. M22: walking pedestrians, Windows build, hardware profiling on Mac and iPad.
+
+Open items with owners and priorities: `docs/STATUS-2026-10-15.md`.
 
 ## Architecture
 
@@ -85,10 +99,10 @@ UI never mutates the world directly and uses `applyTool`.
 
 ## Verification
 
-- `npm test`: simulation rules (connectivity, growth, economy, determinism).
-- `npm run build`: types + bundle.
+- `npm test` / `npx vitest run --exclude '.claude/**'`: simulation rules, geometry invariants, assets, UI reducers (968 passing at `db6c2d9`).
+- `npm run build`: types + bundle; `npm run ci` runs both before every merge.
 - Browser: game screenshots compared with `screenshots/` for UI visuals.
 
 ## Per-Milestone Ritual
 
-When closing a milestone: edit the `DATA` object in `docs/mayor-status.html` (milestone status, checks, log, screenshot in `docs/img/`) and republish the same file to the Artifact https://claude.ai/artifact/VdToX8pcS7bZcKx1m65Abu (passing `files` with the images).
+When closing a milestone: add the entries to `docs/CHANGELOG.md`, update PROGRESS.md, then edit the sections of `docs/mayor-status.html` (status lists, facts, screenshots in `docs/img/`; the page is static HTML, there is no `DATA` object) and republish the same file to the Artifact https://claude.ai/artifact/VdToX8pcS7bZcKx1m65Abu (passing `files` with the images).

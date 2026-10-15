@@ -5,7 +5,7 @@
 | Item | State |
 |---|---|
 | 1024x1024 App Store icon, opaque (no alpha), square (no rounded corners, iOS applies the mask) | Done: `src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png` (idiom `ios-marketing`), copy at `docs/appstore/icon-1024.png`. App Store Connect takes the icon from the uploaded build. |
-| All iPad/iPhone AppIcon sizes (20 to 167 pt, 18 files) | Done, regenerated from the same full-bleed source in both `src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/` (used by Xcode) and `src-tauri/icons/ios/` (Tauri source set). All opaque RGB. |
+| All iPad/iPhone AppIcon sizes (20 to 167 pt, 18 files) | Done in `src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/` (used by Xcode; opaque RGB). Correction 2026-10-15: `src-tauri/icons/ios/AppIcon-512@2x.png` in git is still RGBA, so the prereq script's "Icons opaque" check fails on it; the shipped builds use the Xcode asset catalog. Regenerate the Tauri source set before any `tauri ios init`. |
 | What was wrong before | The Xcode asset catalog held the **default Tauri logo**; the Mayor icon in `src-tauri/icons/ios/` had baked-in white rounded corners. The new icon is the Mayor artwork cropped 72 px per side (past the corner radius) and rescaled to 1024. |
 | Optional improvement | The source artwork is an upscaled AI image and slightly soft at 1024; a crisper redraw (same composition) would look better on the product page. Xcode 26 also accepts an Icon Composer `.icon` file for the iOS 26 "liquid glass" look; not required. |
 
@@ -20,7 +20,8 @@ App Store Connect scales the 13-inch set down when they are missing. 1 to 10 scr
 localization, PNG or JPEG, no alpha. iPhone screenshots are not needed because the app is now iPad
 only.
 
-Produced (landscape 2752x2064, JPEG q90, RGB) in `docs/appstore/screenshots/`:
+Produced (landscape 2752x2064, JPEG q90, RGB) in `docs/appstore/screenshots/` (local only: excluded from git by the
+`screenshots/` pattern in `.gitignore`; present in the owner's main checkout and uploaded to App Store Connect):
 
 | File (en / pt) | Content |
 |---|---|

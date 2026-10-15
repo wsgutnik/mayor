@@ -72,8 +72,11 @@ prefer, use a GitHub issues page or a simple contact page on the same host.
 ## Marketing URL (optional)
 
 ```text
-https://mayor-demo.vercel.app
+https://github.com/wsgutnik/mayor
 ```
+
+Entered in App Store Connect on 2026-10-15 (the public repository; the first draft pointed at the demo site, which
+sells the web demo through Stripe, see review risk 12).
 
 ## Privacy Policy URL (required)
 

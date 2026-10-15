@@ -6,6 +6,7 @@ __pycache__/
 
 # Third-party reference screenshots: local study material, never versioned
 screenshots/
+!docs/appstore/screenshots/
 
 # Junction-gate captures (scripts/showcase-shots.md): local, never versioned
 shots/
