@@ -216,6 +216,21 @@ const PT: Record<string, string> = {
   "supply": "oferta", "demand": "demanda", "Not connected to a road": "Sem ligação com estrada",
   "Relays the network, adds no supply": "Repassa a rede, não acrescenta oferta", "Reach": "Alcance", "Whole city": "Cidade inteira",
   "Road network": "Rede das estradas", "Lines": "Linhas", "seats": "lugares", "day": "dia",
+  // about and credits (src/ui/credits.ts)
+  "About and credits": "Sobre e créditos", "About": "Sobre", "Licences, privacy and acknowledgements": "Licenças, privacidade e agradecimentos",
+  "Mayor is an original city builder. It is inspired by classic city-building games but is not affiliated with, sponsored by, or endorsed by Paradox Interactive or Colossal Order.":
+    "Mayor é um construtor de cidades original. É inspirado em jogos clássicos de construção de cidades, mas não tem vínculo, patrocínio ou endosso da Paradox Interactive ou da Colossal Order.",
+  "Privacy: Mayor collects no data. Cities are saved only on this device; there are no accounts, ads, analytics or tracking.":
+    "Privacidade: o Mayor não coleta dados. As cidades ficam salvas só neste aparelho; não há contas, anúncios, análises nem rastreamento.",
+  "Third-party materials": "Materiais de terceiros",
+  "Some textures, illustrations and the icon were made by the author with the help of AI image tools (Higgsfield, ChatGPT Image, Midjourney) from generic prompts; they are project assets.":
+    "Algumas texturas, ilustrações e o ícone foram feitos pelo autor com ajuda de ferramentas de imagem por IA (Higgsfield, ChatGPT Image, Midjourney) a partir de descrições genéricas; são recursos do projeto.",
+  "Fable Cities licence notice": "Aviso de licença do Fable Cities", "Version": "Versão",
+  "Road props source models": "Modelos de origem dos objetos de rua",
+  "Asphalt texture and sky lighting": "Textura de asfalto e iluminação do céu",
+  "Ground, road and facade textures": "Texturas de solo, vias e fachadas",
+  "Adapted traffic, signal, zoning and rendering code": "Código adaptado de tráfego, semáforos, zoneamento e renderização",
+  "3D rendering library": "Biblioteca de renderização 3D", "Native app shell": "Base do aplicativo nativo",
 };
 
 const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];

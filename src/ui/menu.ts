@@ -4,6 +4,8 @@ import { Lang, getLang, tr } from "../i18n";
 import { BIOMES, Biome } from "../sim/world";
 import type { MapIndex, MapListing } from "../sim/maps";
 import { difficultyKey, localizedDescription, localizedName, sortMapsByDifficulty } from "./maps-list";
+import { creditsHtml } from "./credits";
+import pkg from "../../package.json";
 
 /** Official maps from /maps/index.json, fetched lazily on first menu open. */
 let cachedMaps: MapListing[] | null = null;
@@ -48,7 +50,7 @@ const fmtDate = (t: number) => new Date(t).toLocaleString(undefined, { month: "s
 /** Pause-style menu: save slots, continue, a seeded new city, and preferences. */
 export class Menu {
   private root: HTMLElement;
-  private view: "main" | "prefs" = "main";
+  private view: "main" | "prefs" | "about" = "main";
   private biome: Biome = "plains";
   private selectedMap: string | null = null;
   private draft: Prefs | null = null;
@@ -86,10 +88,13 @@ export class Menu {
     this.root.innerHTML = `<div class="panel menu">
       <img class="menu-logo" src="/ui/brand-banner.png" alt="Mayor">
       <div class="menu-body">${inner}</div>
-      <button class="menu-close">${tr(this.view === "prefs" ? "OK" : "Back to the city")}</button></div>`;
+      <button class="menu-close">${tr(this.view === "main" ? "Back to the city" : "OK")}</button></div>`;
     this.root.querySelector(".menu-close")!.addEventListener("click", () => {
       if (this.view === "prefs") {
         if (this.draft) { this.hooks.onPrefs({ ...this.draft }); this.draft = null; }
+        this.view = "main";
+        this.render();
+      } else if (this.view === "about") {
         this.view = "main";
         this.render();
       } else this.close();
@@ -99,6 +104,7 @@ export class Menu {
 
   private render(): void {
     if (this.view === "prefs") { this.renderPrefs(); return; }
+    if (this.view === "about") { this.frame(creditsHtml(pkg.version)); return; }
     const rows: string[] = [];
     const auto = this.hooks.info("auto");
     const meta = (i: SlotInfo) => `${fmtDate(i.saved)} · ${tr("Population")} ${i.pop.toLocaleString("en-US")} · $${i.money.toLocaleString("en-US")}`;
@@ -120,6 +126,8 @@ export class Menu {
       <input id="menu-file" type="file" accept=".json,.mayor.json,application/json" hidden></span></div>`);
     rows.push(`<div class="menu-row"><div><b>${tr("Preferences")}</b><small>${tr("Language")}, ${tr("Graphics quality")}</small></div>
       <button data-prefs>${tr("Preferences")}</button></div>`);
+    rows.push(`<div class="menu-row"><div><b>${tr("About and credits")}</b><small>${tr("Licences, privacy and acknowledgements")}</small></div>
+      <button data-about>${tr("About")}</button></div>`);
     this.frame(rows.join(""));
 
     const body = this.root;
@@ -155,6 +163,7 @@ export class Menu {
       if (this.selectedMap) { this.hooks.onNewMap(this.selectedMap); this.close(); }
     });
     body.querySelector("[data-prefs]")!.addEventListener("click", () => { this.view = "prefs"; this.render(); });
+    body.querySelector("[data-about]")!.addEventListener("click", () => { this.view = "about"; this.render(); });
   }
 
   /** Official maps section; empty when the index hasn't loaded (or failed), so the menu hides it. */

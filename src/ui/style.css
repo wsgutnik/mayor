@@ -474,3 +474,12 @@ body {
 .legend-stats .row { display: flex; justify-content: space-between; font-size: 12px; }
 .legend-stats .k { color: var(--muted); }
 .legend-stats .v { font-variant-numeric: tabular-nums; }
+
+/* About and credits (src/ui/credits.ts) */
+.menu .about { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.4; }
+.menu .about p { margin: 0; }
+.menu .about .credits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.menu .about .credits li { padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.05); }
+.menu .about .credits small, .menu .about small { display: block; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.menu .about summary { cursor: pointer; min-height: var(--ui-min-touch, 44px); display: flex; align-items: center; }
+.menu .about pre.licence { white-space: pre-wrap; font-size: 10px; color: var(--muted); margin: 4px 0 0; }
