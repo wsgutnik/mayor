@@ -1044,6 +1044,30 @@ function refsAround(set: ZoneBlockSet, ref: CellRef, radius: number): CellRef[] 
   return out;
 }
 
+/**
+ * A zoned cell must hang off the road: painting a cell at depth d also zones the valid cells between it and the
+ * road in the same row (depth 0..d-1), like the Cities: Skylines grid where a lot always starts at the street.
+ * Clearing (bulldoze) never expands.
+ */
+function withFrontage(set: ZoneBlockSet, refs: CellRef[], expand: boolean): CellRef[] {
+  if (!expand) return refs;
+  const seen = new Set<string>();
+  const out: CellRef[] = [];
+  const add = (r: CellRef): void => {
+    const k = `${r.seg}:${r.side}:${r.block}:${r.row}:${r.col}`;
+    if (seen.has(k)) return;
+    seen.add(k); out.push(r);
+  };
+  for (const r of refs) {
+    const b = set.blocks.get(blockKey(r));
+    if (!b) { add(r); continue; }
+    for (let c = 0; c <= r.col; c++) {
+      if (c === r.col || b.valid[cellIndex(r.row, c)]) add({ seg: r.seg, side: r.side, block: r.block, row: r.row, col: c });
+    }
+  }
+  return out;
+}
+
 export function applyZoneAt(s: CityState, zone: ZoneType | 0, x: number, z: number, brush: ZoneBrush = { radius: 0 }): ToolResult {
   const w = s.world;
   // Tile mode has no cells: the brush paints the tile under the point through the tile tool (same rules, same lots).
@@ -1053,7 +1077,7 @@ export function applyZoneAt(s: CityState, zone: ZoneType | 0, x: number, z: numb
   const set = getZoneBlocks(w);
   const picked = zoneHooks.nearestCell(set, x, z, 0.75);
   if (!picked) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
-  const refs = refsAround(set, picked, brush.radius);
+  const refs = withFrontage(set, refsAround(set, picked, brush.radius), zone !== 0);
   const pending = refs.filter((ref) => {
     const b = set.blocks.get(blockKey(ref));
     return !!b && b.valid[cellIndex(ref.row, ref.col)] && b.zone[cellIndex(ref.row, ref.col)] !== zone;
@@ -1377,6 +1401,26 @@ function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: numb
       }
     }
     if (!mapped) fail("Zones must be within 4 tiles of a road");
+    if (tool !== "bulldoze" && out.cells.length) {
+      // Frontage fill: a painted cell drags in the valid cells between it and the road (same block row).
+      const have = new Set<string>();
+      const keyOf = (b: ZoneBlock, i: number): string => `${b.seg}:${b.side}:${b.block}:${i}`;
+      for (const c of out.cells) have.add(keyOf(c.b, c.i));
+      const extra: BulkCell[] = [];
+      for (const c of out.cells) {
+        const col = c.i % CELL_DEPTH;
+        const rowBase = c.i - col;
+        for (let k = 0; k < col; k++) {
+          const j = rowBase + k;
+          if (!c.b.valid[j] || c.b.zone[j] === ZONE_OF_TOOL[tool]) continue;
+          const key = keyOf(c.b, j);
+          if (have.has(key)) continue;
+          have.add(key);
+          extra.push({ b: c.b, i: j });
+        }
+      }
+      for (const e of extra) out.cells.push(e);
+    }
     return out;
   }
   const frontage = tool === "bulldoze" ? null : getFrontage(w);

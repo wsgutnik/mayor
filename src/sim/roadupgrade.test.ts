@@ -257,8 +257,11 @@ describe("road upgrade", () => {
     t.world.zoning = "oriented";
     t.money = 1e7;
     road(t, 1, [[3.5, ey + 0.5], [20.5, ey + 0.5]]);
-    // Far cells survive the widening.
+    // A far cell drags in the cells between it and the road (frontage fill), so the kerb cells block the widening...
     expect(applyZoneAt(t, ZONE.RES, 10.5, ey + 3.5, { radius: 0 }).ok).toBe(true);
+    expect(upgradeRoad(t, segAt(t, 8, ey).id, 2)).toEqual({ ok: false, reason: "Road would crush lots" });
+    // ...until the player clears the strip next to the road: the far cells survive the widening.
+    for (let y = ey + 1; y <= ey + 2; y++) for (let x = 3; x <= 21; x++) applyTool(t, "bulldoze", x, y);
     expect(upgradeRoad(t, segAt(t, 8, ey).id, 2).ok).toBe(true);
     syncLots(t);
     expect(t.world.olots).toBeDefined();
