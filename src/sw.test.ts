@@ -59,8 +59,8 @@ describe("service worker", () => {
     const h = harness();
     await h.run("install");
     const names = [...h.stores.keys()];
-    expect(names).toEqual(["mayor-v1"]);
-    expect([...h.stores.get("mayor-v1")!.keys()].map((u) => new URL(u).pathname)).toContain("/index.html");
+    expect(names).toEqual(["mayor-v2"]);
+    expect([...h.stores.get("mayor-v2")!.keys()].map((u) => new URL(u).pathname)).toContain("/index.html");
   });
 
   it("drops caches from older versions on activate", async () => {
@@ -68,7 +68,7 @@ describe("service worker", () => {
     h.stores.set("mayor-v0", new Map());
     await h.run("install");
     await h.run("activate");
-    expect([...h.stores.keys()]).toEqual(["mayor-v1"]);
+    expect([...h.stores.keys()]).toEqual(["mayor-v2"]);
   });
 
   it("serves the game offline: navigation falls back to the cached shell", async () => {
