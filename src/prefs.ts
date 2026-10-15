@@ -99,9 +99,9 @@ export function loadPrefs(): Prefs {
       tips: typeof p.tips === "boolean" ? p.tips : d.tips,
       autosave: typeof p.autosave === "boolean" ? p.autosave : d.autosave,
       dayNight: typeof p.dayNight === "boolean" ? p.dayNight : d.dayNight,
-      // Prefs written before the street-aligned cutover (no zoningV) stored "tiles" only because it was the default.
-      zoning: (p as { zoningV?: number }).zoningV === ZONING_PREF_VERSION && (p.zoning === "oriented" || p.zoning === "tiles")
-        ? p.zoning : d.zoning,
+      // Street-aligned zoning is the only supported model: tile zoning ignores street angles, so a stored
+      // "tiles" is never honoured (the owner's iPad kept it after the cutover).
+      zoning: "oriented",
       uiScale: p.uiScale === undefined ? d.uiScale : clampUiScale(p.uiScale),
       uiOpacity: p.uiOpacity === undefined ? d.uiOpacity : clampUiOpacity(p.uiOpacity),
     };

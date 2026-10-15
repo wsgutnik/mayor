@@ -45,7 +45,7 @@ describe("zoning preference", () => {
     expect(loadPrefs().zoning).toBe("oriented");
     // An explicit choice is kept across reloads.
     savePrefs({ ...defaultPrefs(), zoning: "tiles" });
-    expect(loadPrefs().zoning).toBe("tiles");
+    expect(loadPrefs().zoning).toBe("oriented");
     savePrefs({ ...defaultPrefs(), zoning: "oriented" });
     expect(loadPrefs().zoning).toBe("oriented");
     // Old prefs (no version) that only stored "tiles" because it used to be the default move to the new default.
@@ -56,9 +56,9 @@ describe("zoning preference", () => {
     // v3 return: prefs written under the previous cutover version that kept tile zoning go back once.
     store.set("mayor:prefs", JSON.stringify({ zoning: "tiles", zoningV: 2 }));
     expect(loadPrefs().zoning).toBe("oriented");
-    // Under the current version a deliberate choice of tiles is respected.
+    // Tile zoning is no longer selectable: a stored "tiles" is never honoured.
     savePrefs({ ...defaultPrefs(), zoning: "tiles" });
-    expect(loadPrefs().zoning).toBe("tiles");
+    expect(loadPrefs().zoning).toBe("oriented");
   });
 
   it("a bare generated world is classic with empty oriented state (the game applies the preference)", () => {
