@@ -168,6 +168,7 @@ body {
 
 /* M4: road menu */
 .fly .sep { width: 1px; background: var(--panel-border); margin: 4px 4px; }
+.fly .svc-group { flex-basis: 100%; font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 4px 2px 0; }
 /* UI-2: road-draft snap toggles on their own wrapping flyout row. */
 .fly.snap-wrap { flex-wrap: wrap; }
 .snap-group {

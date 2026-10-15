@@ -10,7 +10,8 @@ export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
 export const FAC = {
   NONE: 0, POWER: 1, WATER: 2, SEWAGE: 3, LANDFILL: 4,
   POLICE: 5, FIRE: 6, CLINIC: 7, SCHOOL: 8, PARK: 9, METRO: 10,
-  HOSPITAL: 11, HIGHSCHOOL: 12, LIBRARY: 13, COMMUNITY: 14, MUSEUM: 15, CITYHALL: 16, SUBSTATION: 17,
+  HOSPITAL: 11, HIGHSCHOOL: 12, LIBRARY: 13, COMMUNITY: 14, MUSEUM: 15, CITYHALL: 16, SUBSTATION: 17, TRAIN_STATION: 18,
+  POWER_SOLAR: 19, POWER_LARGE: 20, WATER_TOWER: 21, WATER_LARGE: 22, FIRE_POST: 23, FIRE_HQ: 24,
 } as const;
 export type FacilityType = (typeof FAC)[keyof typeof FAC];
 export type FacilityKind = Exclude<FacilityType, 0>;
@@ -56,6 +57,15 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.CITYHALL]: { name: "City hall", cost: 2500, upkeep: 150, radius: 0, footprint: 2, capacity: 0, bit: 0, nearWater: false },
   /** Extends the power network without adding supply. */
   [FAC.SUBSTATION]: { name: "Substation", cost: 300, upkeep: 20, radius: 14, capacity: 0, bit: COVER.POWER, nearWater: false },
+  /** Regional rail: bigger catchment and cost than metro, surface trains. */
+  [FAC.TRAIN_STATION]: { name: "Train station", cost: 2000, upkeep: 90, radius: 12, footprint: 2, capacity: 0, bit: COVER.TRANSIT, nearWater: false },
+  /** Tiered services: same network/coverage bits as their base kind, more output per tile. */
+  [FAC.POWER_SOLAR]: { name: "Solar plant", cost: 1600, upkeep: 50, radius: 16, footprint: 2, capacity: 180, bit: COVER.POWER, nearWater: false },
+  [FAC.POWER_LARGE]: { name: "Large power plant", cost: 3200, upkeep: 140, radius: 18, footprint: 2, capacity: 380, bit: COVER.POWER, nearWater: false },
+  [FAC.WATER_TOWER]: { name: "Water tower", cost: 900, upkeep: 45, radius: 12, footprint: 1, capacity: 160, bit: COVER.WATER, nearWater: false },
+  [FAC.WATER_LARGE]: { name: "Large water plant", cost: 1500, upkeep: 80, radius: 14, footprint: 2, capacity: 260, bit: COVER.WATER, nearWater: true },
+  [FAC.FIRE_POST]: { name: "Fire post", cost: 300, upkeep: 25, radius: 8, footprint: 1, capacity: 0, bit: COVER.FIRE, nearWater: false },
+  [FAC.FIRE_HQ]: { name: "Fire headquarters", cost: 1500, upkeep: 110, radius: 20, footprint: 2, capacity: 0, bit: COVER.FIRE, nearWater: false },
 };
 
 /** `x/y/w/h` are the conservative tile mirror; pose is optional for old saves. */
@@ -79,7 +89,7 @@ export function facilityAnchorAt(w: World, tile: number): FacilityAnchor | undef
 /** Walking reach of a bus stop, in tiles. */
 export const BUS_STOP_RADIUS = 6;
 
-export type TransitKind = "bus" | "metro";
+export type TransitKind = "bus" | "metro" | "train";
 export interface Stop { id: number; kind: TransitKind; tile: number }
 export interface TransitLine {
   id: number;
@@ -488,7 +498,7 @@ export function updateCoverage(w: World): void {
       const f = w.facility[i] as FacilityType;
       if (!f) continue;
       // Power, water and sewage cover through the road network, not by radius.
-      if (f === FAC.POWER || f === FAC.WATER || f === FAC.SEWAGE || f === FAC.SUBSTATION) continue;
+      if (f === FAC.POWER || f === FAC.WATER || f === FAC.SEWAGE || f === FAC.SUBSTATION || f === FAC.POWER_SOLAR || f === FAC.POWER_LARGE || f === FAC.WATER_TOWER || f === FAC.WATER_LARGE) continue;
       const anchor = facilityAnchorAt(w, i);
       if (anchor && (anchor.x !== x || anchor.y !== y)) continue;
       const info = FACILITY_INFO[f as FacilityKind];

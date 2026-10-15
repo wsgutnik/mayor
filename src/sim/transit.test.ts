@@ -241,3 +241,53 @@ describe("review fixes", () => {
     expect(createLine(s, "bus", [id, id]).ok).toBe(false);
   });
 });
+
+describe("railway (train) lines", () => {
+  it("places a train station, registers a train stop and creates a train line", async () => {
+    const { transitTotals, DAILY_CAPACITY, VEHICLE_COST } = await import("./transit");
+    const { s, ey } = town();
+    expect(applyTool(s, "trainstation", 6, ey - 4).ok).toBe(true);
+    expect(applyTool(s, "trainstation", 20, ey - 4).ok).toBe(true);
+    const a = s.world.stops.find((x) => x.kind === "train")!;
+    const all = s.world.stops.filter((x) => x.kind === "train");
+    expect(all).toHaveLength(2);
+    expect(createLine(s, "train", [all[0].id]).ok).toBe(false);
+    expect(createLine(s, "bus", [all[0].id, all[1].id]).ok).toBe(false);
+    const before = s.money;
+    expect(createLine(s, "train", [all[0].id, all[1].id]).ok).toBe(true);
+    expect(before - s.money).toBe(200 + VEHICLE_COST.train);
+    const line = s.world.lines.find((l) => l.kind === "train")!;
+    expect(line.name).toMatch(/^Train \d+$/);
+    const totals = transitTotals(s.world);
+    expect(totals.lines).toBeGreaterThanOrEqual(1);
+    expect(totals.dailyCapacity).toBeGreaterThanOrEqual(DAILY_CAPACITY.train);
+    expect(a.kind).toBe("train");
+  });
+
+  it("bulldozing a train station removes its stop and line", () => {
+    const { s, ey } = town();
+    applyTool(s, "trainstation", 6, ey - 4);
+    applyTool(s, "trainstation", 20, ey - 4);
+    const all = s.world.stops.filter((x) => x.kind === "train");
+    createLine(s, "train", [all[0].id, all[1].id]);
+    expect(s.world.lines.some((l) => l.kind === "train")).toBe(true);
+    applyTool(s, "bulldoze", 6, ey - 4);
+    expect(s.world.stops.some((x) => x.id === all[0].id)).toBe(false);
+    expect(s.world.lines.some((l) => l.kind === "train")).toBe(false);
+  });
+});
+
+describe("railway save round-trip", () => {
+  it("saves and reloads a train station and its line", async () => {
+    const { serialize, deserialize } = await import("./save");
+    const { s, ey } = town();
+    applyTool(s, "trainstation", 6, ey - 4);
+    applyTool(s, "trainstation", 20, ey - 4);
+    const all = s.world.stops.filter((x) => x.kind === "train");
+    createLine(s, "train", [all[0].id, all[1].id]);
+    const back = deserialize(serialize(s));
+    expect(back.world.stops.filter((x) => x.kind === "train")).toHaveLength(2);
+    expect(back.world.lines.some((l) => l.kind === "train")).toBe(true);
+    expect(back.world.facility[idx(back.world, 6, ey - 4)]).toBe(FAC.TRAIN_STATION);
+  });
+});

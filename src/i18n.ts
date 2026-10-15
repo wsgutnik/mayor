@@ -33,7 +33,7 @@ const PT: Record<string, string> = {
   "No room for a roundabout here": "Não há espaço para uma rotatória aqui",
   "Power plant": "Usina", "Water pump": "Bomba d'água", "Sewage outlet": "Saída de esgoto", "Landfill": "Aterro",
   "Police station": "Delegacia", "Fire station": "Bombeiros", "Clinic": "Clínica", "School": "Escola", "Park": "Parque",
-  "Bus stop": "Ponto de ônibus", "Metro": "Metrô", "Metro station": "Estação de metrô", "Bus line": "Linha de ônibus", "Metro line": "Linha de metrô",
+  "Bus stop": "Ponto de ônibus", "Metro": "Metrô", "Metro station": "Estação de metrô", "Bus line": "Linha de ônibus", "Metro line": "Linha de metrô", "Train": "Trem", "Train station": "Estação de trem", "Train line": "Linha de trem", "lines": "linhas", "vehicles": "veículos", "Solar plant": "Usina solar", "Large power plant": "Usina de grande porte", "Water tower": "Reservatório elevado", "Large water plant": "Estação de água grande", "Fire post": "Posto dos bombeiros", "Fire headquarters": "Quartel central", "Safety": "Segurança", "Health & schools": "Saúde e escolas", "City": "Cidade",
   "Off": "Desligado",
   // hints
   "Drag to move the camera": "Arraste para mover a câmera",
@@ -55,6 +55,9 @@ const PT: Record<string, string> = {
   "Metro station: 2x2 footprint (radius 9)": "Estação de metrô: área 2x2 (raio 9)",
   "Tap bus stops in order, then Create line": "Toque nos pontos em ordem e depois em Criar linha",
   "Tap metro stations in order, then Create line": "Toque nas estações em ordem e depois em Criar linha",
+  "Train station: 2x2 footprint (radius 12)": "Estação de trem: área 2x2 (raio 12)",
+  "Tap train stations in order, then Create line": "Toque nas estações de trem em ordem e depois em Criar linha",
+  "Tap a train station": "Toque em uma estação de trem",
   "Drag to paint road tiles": "Arraste para pintar trechos de estrada",
   "Tap a start, then an end": "Toque no início e depois no fim",
   "Tap start, a bend point, then the end": "Toque no início, na curva e no fim",
@@ -68,7 +71,7 @@ const PT: Record<string, string> = {
   "Tap to upgrade to {name} (${cost})": "Toque para converter em {name} (${cost})",
   "Tap {what}s in the order the line should run ({n} picked)": "Toque nos {what} na ordem da linha ({n} escolhidos)",
   "{n} stops. Tap more, or Create line (the route loops)": "{n} paradas. Toque em mais, ou em Criar linha (a rota é circular)",
-  "bus stop": "ponto de ônibus", "metro station": "estação de metrô",
+  "bus stop": "ponto de ônibus", "metro station": "estação de metrô", "train station": "estação de trem",
   "Tap a {kind} {what}": "Toque em um {what}",
   // buttons
   "Finish road": "Terminar estrada", "Cancel": "Cancelar", "Create line": "Criar linha",
@@ -244,8 +247,8 @@ export function trReason(reason: string): string {
   if (lang === "en") return reason;
   const m = /^(.+) must be within 3 tiles of water$/.exec(reason);
   if (m) return `${tr(m[1])} precisa estar a até 3 trechos da água`;
-  const u = /^Use only (bus|metro) stops$/.exec(reason);
-  if (u) return u[1] === "bus" ? "Use apenas pontos de ônibus" : "Use apenas estações de metrô";
+  const u = /^Use only (bus|metro|train) stops$/.exec(reason);
+  if (u) return u[1] === "bus" ? "Use apenas pontos de ônibus" : u[1] === "train" ? "Use apenas estações de trem" : "Use apenas estações de metrô";
   return tr(reason);
 }
 
@@ -255,7 +258,7 @@ export function monthName(i: number): string {
 
 /** Line names are stored as "Bus 1" / "Metro 2"; show them in the current language. */
 export function lineName(stored: string): string {
-  const m = /^(Bus|Metro) (\d+)$/.exec(stored);
+  const m = /^(Bus|Metro|Train) (\d+)$/.exec(stored);
   if (!m) return stored;
-  return lang === "pt" ? `${m[1] === "Bus" ? "Ônibus" : "Metrô"} ${m[2]}` : stored;
+  return lang === "pt" ? `${m[1] === "Bus" ? "Ônibus" : m[1] === "Train" ? "Trem" : "Metrô"} ${m[2]}` : stored;
 }

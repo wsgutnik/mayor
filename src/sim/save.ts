@@ -201,7 +201,7 @@ function validateCommon(f: SaveFile, n: number): void {
   }
   const stopIds = new Set<number>();
   for (const st of f.stops) {
-    if (!st || !tile(st.tile) || (st.kind !== "bus" && st.kind !== "metro") || !finite(st.id)) bad();
+    if (!st || !tile(st.tile) || (st.kind !== "bus" && st.kind !== "metro" && st.kind !== "train") || !finite(st.id)) bad();
     if (stopIds.has(st.id)) bad();
     stopIds.add(st.id);
   }
@@ -293,7 +293,7 @@ function validateFacilityAnchors(w: World): void {
   const anchorKeys = new Set<string>();
   for (const a of anchors) {
     if (!a || !Number.isInteger(a.x) || !Number.isInteger(a.y) || !Number.isInteger(a.w) || !Number.isInteger(a.h)) bad();
-    if (!Number.isInteger(a.kind) || a.kind <= FAC.NONE || a.kind > FAC.SUBSTATION) bad();
+    if (!Number.isInteger(a.kind) || a.kind <= FAC.NONE || a.kind > FAC.FIRE_HQ) bad();
     const fp = facilityFootprint(a.kind as FacilityKind);
     if (a.w < 1 || a.h < 1 || a.w > fp + 1 || a.h > fp + 1) bad();
     if ((a.cx !== undefined || a.cz !== undefined || a.yaw !== undefined) &&
@@ -407,7 +407,7 @@ export function deserialize(json: string): CityState {
   w.zone.set(bytes(f.zone, n * n));
   w.level.set(bytes(f.level, n * n));
   w.facility.set(bytes(f.facility, n * n));
-  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 5) || w.facility.some((v) => v > FAC.SUBSTATION)) {
+  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 5) || w.facility.some((v) => v > FAC.FIRE_HQ)) {
     throw new SaveError("The save file is damaged");
   }
   if (f.facilityAnchors !== undefined && !Array.isArray(f.facilityAnchors)) throw new SaveError("The save file is damaged");

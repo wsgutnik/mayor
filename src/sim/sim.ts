@@ -1,6 +1,6 @@
 import { makeRng } from "./rng";
 import { isRaining } from "./weather";
-import { placeBusStop, registerMetroStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
+import { placeBusStop, registerMetroStation, registerTrainStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
   isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
@@ -32,13 +32,15 @@ export { ZONE_DEPTH } from "./blocks";
 
 export type FacilityTool =
   | "power" | "water" | "sewage" | "landfill"
-  | "police" | "fire" | "clinic" | "school" | "park" | "metro"
+  | "police" | "fire" | "clinic" | "school" | "park" | "metro" | "trainstation"
+  | "solar" | "powerlarge" | "watertower" | "waterlarge" | "firepost" | "firehq"
   | "hospital" | "highschool" | "library" | "community" | "museum" | "cityhall" | "substation";
-export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | "roundabout" | FacilityTool;
+export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | "trainline" | "roundabout" | FacilityTool;
 
 export const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   power: FAC.POWER, water: FAC.WATER, sewage: FAC.SEWAGE, landfill: FAC.LANDFILL,
-  police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK, metro: FAC.METRO,
+  police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK, metro: FAC.METRO, trainstation: FAC.TRAIN_STATION,
+  solar: FAC.POWER_SOLAR, powerlarge: FAC.POWER_LARGE, watertower: FAC.WATER_TOWER, waterlarge: FAC.WATER_LARGE, firepost: FAC.FIRE_POST, firehq: FAC.FIRE_HQ,
   hospital: FAC.HOSPITAL, highschool: FAC.HIGHSCHOOL, library: FAC.LIBRARY, community: FAC.COMMUNITY,
   museum: FAC.MUSEUM, cityhall: FAC.CITYHALL, substation: FAC.SUBSTATION,
 };
@@ -57,6 +59,13 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
   school: FACILITY_INFO[FAC.SCHOOL].cost,
   park: FACILITY_INFO[FAC.PARK].cost,
   metro: FACILITY_INFO[FAC.METRO].cost,
+  trainstation: FACILITY_INFO[FAC.TRAIN_STATION].cost,
+  solar: FACILITY_INFO[FAC.POWER_SOLAR].cost,
+  powerlarge: FACILITY_INFO[FAC.POWER_LARGE].cost,
+  watertower: FACILITY_INFO[FAC.WATER_TOWER].cost,
+  waterlarge: FACILITY_INFO[FAC.WATER_LARGE].cost,
+  firepost: FACILITY_INFO[FAC.FIRE_POST].cost,
+  firehq: FACILITY_INFO[FAC.FIRE_HQ].cost,
   hospital: FACILITY_INFO[FAC.HOSPITAL].cost,
   highschool: FACILITY_INFO[FAC.HIGHSCHOOL].cost,
   library: FACILITY_INFO[FAC.LIBRARY].cost,
@@ -67,6 +76,7 @@ export const COST: Record<Exclude<ToolId, "pan">, number> = {
   busstop: 100,
   busline: 0,
   metroline: 0,
+  trainline: 0,
   roundabout: 150,
 };
 
@@ -1215,12 +1225,12 @@ function clearFacilityAt(w: World, tile: number): void {
   if (a) {
     for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) {
       const t = idx(w, x, y); if (facilityAnchorAt(w, t) !== a) continue;
-      if (a.kind === FAC.METRO) removeStopAt(w, t);
+      if (a.kind === FAC.METRO || a.kind === FAC.TRAIN_STATION) removeStopAt(w, t);
       w.facility[t] = 0;
     }
     w.facilityAnchors = (w.facilityAnchors ?? []).filter((b) => b !== a);
   } else {
-    if (w.facility[tile] === FAC.METRO) removeStopAt(w, tile);
+    if (w.facility[tile] === FAC.METRO || w.facility[tile] === FAC.TRAIN_STATION) removeStopAt(w, tile);
     w.facility[tile] = 0;
   }
 }
@@ -1228,7 +1238,7 @@ function clearFacilityAt(w: World, tile: number): void {
 /** Apply a tool to one tile. All world mutation from the player goes through here. */
 export function applyTool(s: CityState, tool: ToolId, x: number, y: number, roadType: RoadType = 1): ToolResult {
   const w = s.world;
-  if (tool === "pan" || tool === "busline" || tool === "metroline") return { ok: true };
+  if (tool === "pan" || tool === "busline" || tool === "metroline" || tool === "trainline") return { ok: true };
   if (!inBounds(w, x, y)) return { ok: false, reason: "Outside the map" };
   const i = idx(w, x, y);
   if (tool === "busstop") return placeBusStop(s, x, y);
@@ -1321,6 +1331,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     for (const t of tiles) { const tx = t % w.size, ty = (t / w.size) | 0; x0 = Math.min(x0, tx); y0 = Math.min(y0, ty); x1 = Math.max(x1, tx); y1 = Math.max(y1, ty); }
     (w.facilityAnchors ??= []).push({ x: x0, y: y0, kind: type, w: x1 - x0 + 1, h: y1 - y0 + 1, cx: placement.cx, cz: placement.cz, yaw: placement.yaw });
     if (type === FAC.METRO) registerMetroStation(w, i);
+    if (type === FAC.TRAIN_STATION) registerTrainStation(w, i);
     w.coverageDirty = true;
     dirtyObstacles(w);
     if (w.zoning === "oriented") reconcileZones(s);

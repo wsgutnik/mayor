@@ -5,16 +5,16 @@ import { findPath } from "./traffic";
 export const BUS_STOP_COST = 100;
 export const LINE_COST = 200;
 export const MAX_LINE_VEHICLES = 8;
-export const VEHICLE_COST: Record<TransitKind, number> = { bus: 400, metro: 1500 };
-export const VEHICLE_UPKEEP: Record<TransitKind, number> = { bus: 40, metro: 120 };
+export const VEHICLE_COST: Record<TransitKind, number> = { bus: 400, metro: 1500, train: 1000 };
+export const VEHICLE_UPKEEP: Record<TransitKind, number> = { bus: 40, metro: 120, train: 90 };
 export const BUS_STOP_UPKEEP = 5;
 /** Passengers one vehicle moves per day (capacity × trips). */
-export const DAILY_CAPACITY: Record<TransitKind, number> = { bus: 30 * 8, metro: 120 * 6 };
-export const FARE: Record<TransitKind, number> = { bus: 1, metro: 1.5 };
+export const DAILY_CAPACITY: Record<TransitKind, number> = { bus: 30 * 8, metro: 120 * 6, train: 200 * 6 };
+export const FARE: Record<TransitKind, number> = { bus: 1, metro: 1.5, train: 2 };
 export const LINE_COLORS = ["#e5584f", "#3d8bff", "#35b86b", "#f0a030", "#a064e0", "#20b8c8", "#e0508c", "#8a9a30"];
 
-const RADIUS: Record<TransitKind, number> = { bus: BUS_STOP_RADIUS, metro: FACILITY_INFO[FAC.METRO].radius };
-const NAME: Record<TransitKind, string> = { bus: "Bus", metro: "Metro" };
+const RADIUS: Record<TransitKind, number> = { bus: BUS_STOP_RADIUS, metro: FACILITY_INFO[FAC.METRO].radius, train: FACILITY_INFO[FAC.TRAIN_STATION].radius };
+const NAME: Record<TransitKind, string> = { bus: "Bus", metro: "Metro", train: "Train" };
 
 export const stopAt = (w: World, tile: number): Stop | undefined => w.stops.find((s) => s.tile === tile);
 
@@ -48,6 +48,18 @@ export function registerMetroStation(w: World, tile: number): void {
   w.stops.push({ id: w.nextTransitId++, kind: "metro", tile });
 }
 
+/** Register the stop that belongs to a freshly built train station. */
+export function registerTrainStation(w: World, tile: number): void {
+  w.stops.push({ id: w.nextTransitId++, kind: "train", tile });
+}
+
+/** Live totals for the transport panel: fleet, daily capacity and monthly vehicle/stop upkeep. */
+export function transitTotals(w: World): { lines: number; vehicles: number; dailyCapacity: number; monthlyUpkeep: number; stops: number } {
+  let vehicles = 0, dailyCapacity = 0;
+  for (const l of w.lines) { vehicles += l.vehicles; dailyCapacity += l.vehicles * DAILY_CAPACITY[l.kind]; }
+  return { lines: w.lines.length, vehicles, dailyCapacity, monthlyUpkeep: transitUpkeep(w), stops: w.stops.length };
+}
+
 /** Remove the stop at a tile, and any line left with fewer than two stops. */
 export function removeStopAt(w: World, tile: number): boolean {
   const stop = stopAt(w, tile);
@@ -73,7 +85,7 @@ export function straightTiles(w: World, a: number, b: number): number[] {
 
 /** Can a vehicle of this line get from one stop to the next? Buses need a road route. */
 function legReachable(s: CityState, kind: TransitKind, a: Stop, b: Stop): boolean {
-  if (kind === "metro") return true;
+  if (kind !== "bus") return true;
   const w = s.world;
   return findPath(w, new Uint16Array(w.size * w.size), a.tile, b.tile) !== null;
 }
@@ -157,7 +169,7 @@ const reachCache = new WeakMap<TransitLine, { revision: number; ok: boolean }>()
 
 /** Whether every leg of a bus line still has a road route; re-checked only when the world changes. */
 function lineIsServiceable(s: CityState, line: TransitLine): boolean {
-  if (line.kind === "metro") return true;
+  if (line.kind !== "bus") return true;
   const hit = reachCache.get(line);
   if (hit && hit.revision === s.world.revision) return hit.ok;
   const stops = line.stops.map((id) => s.world.stops.find((x) => x.id === id));

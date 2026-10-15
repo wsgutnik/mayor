@@ -139,7 +139,7 @@ function makeHud(): Hud {
   },
   onMenu: () => { menu.toggle(); hud.tooltip.suspend(menu.isOpen); },
   onCreateLine: () => {
-    const kind = tool === "metroline" ? "metro" : "bus";
+    const kind = tool === "metroline" ? "metro" : tool === "trainline" ? "train" : "bus";
     const res = attempt(() => createLine(state, kind, lineDraft));
     if (res.ok) { hud.notify("success", tr("Line created")); cancelDraft(); } else hud.notify("error", trReason(res.reason));
   },
@@ -293,7 +293,7 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 }
 if (slotInfo(AUTOSAVE)) setTimeout(() => hud.notify("warning", tr("Autosave found: open the menu to continue")), 800);
 
-const lineTool = () => tool === "busline" || tool === "metroline";
+const lineTool = () => tool === "busline" || tool === "metroline" || tool === "trainline";
 const placing = () => tool === "road" || lineTool() || tool === "roundabout";
 
 function cancelDraft(): void {
@@ -325,7 +325,7 @@ function cancelDraft(): void {
 function onLineTap(cx: number, cy: number): void {
   const raw = renderer.pickPoint(cx, cy);
   if (!raw) return;
-  const kind = tool === "metroline" ? "metro" : "bus";
+  const kind = tool === "metroline" ? "metro" : tool === "trainline" ? "train" : "bus";
   const w = state.world;
   const tx = Math.floor(raw.x), ty = Math.floor(raw.z);
   let found = null;
@@ -335,11 +335,11 @@ function onLineTap(cx: number, cy: number): void {
     const st = stopAt(w, y * w.size + x);
     if (st && st.kind === kind) { found = st; break; }
   }
-  if (!found) { hud.showToast(tr(kind === "bus" ? "Tap a bus stop" : "Tap a metro station")); return; }
+  if (!found) { hud.showToast(tr(kind === "bus" ? "Tap a bus stop" : kind === "train" ? "Tap a train station" : "Tap a metro station")); return; }
   if (lineDraft[lineDraft.length - 1] === found.id) return;
   lineDraft.push(found.id);
   renderer.setStopMarks(lineDraft.map((id) => w.stops.find((s) => s.id === id)!.tile),
-    kind === "metro" ? "#b9a3ff" : "#ffd84a");
+    kind === "metro" ? "#b9a3ff" : kind === "train" ? "#ffb37a" : "#ffd84a");
   hud.showFinish(true, "Cancel");
   hud.showCreateLine(lineDraft.length >= 2);
   refreshHint();
@@ -349,7 +349,7 @@ function refreshHint(): void {
   if (!placing()) return;
   if (tool === "roundabout") { hud.setHint(tr("Tap a junction to stamp a roundabout")); return; }
   if (lineTool()) {
-    const what = tr(tool === "metroline" ? "metro station" : "bus stop");
+    const what = tr(tool === "metroline" ? "metro station" : tool === "trainline" ? "train station" : "bus stop");
     hud.setHint(lineDraft.length < 2
       ? tr("Tap {what}s in the order the line should run ({n} picked)", { what, n: lineDraft.length })
       : tr("{n} stops. Tap more, or Create line (the route loops)", { n: lineDraft.length }));

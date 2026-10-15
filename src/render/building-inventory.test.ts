@@ -20,9 +20,9 @@ function parseGLB(file: string): Promise<void> {
 }
 
 describe("Mayor building asset completeness", () => {
-  it("keeps precisely 40 stable catalog identifiers", () => {
+  it("keeps precisely 84 stable catalog identifiers (GLB kit covers 1-40; 41-84 are procedural/catalog)", () => {
     expect(CATALOG.map(entry => entry.n).sort((a, b) => a - b))
-      .toEqual(Array.from({ length: 40 }, (_, i) => i + 1));
+      .toEqual(Array.from({ length: 84 }, (_, i) => i + 1));
   });
 
   it("has a GLB file for every one of the 40 catalog buildings", () => {

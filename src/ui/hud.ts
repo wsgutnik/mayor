@@ -1,5 +1,5 @@
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH } from "../sim/sim";
-import { MAX_LINE_VEHICLES } from "../sim/transit";
+import { MAX_LINE_VEHICLES, transitTotals } from "../sim/transit";
 import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
@@ -41,6 +41,8 @@ const T: Record<string, ToolDef> = {
   metro: { id: "metro", label: "Metro station", hint: "Metro station: 2x2 footprint (radius 9)", color: "#9b7bff", icon: { img: "kit/ico-trem" } },
   busline: { id: "busline", label: "Bus line", hint: "Tap bus stops in order, then Create line", color: "#3d8bff", icon: { glyph: "➰", color: "#3d8bff" } },
   metroline: { id: "metroline", label: "Metro line", hint: "Tap metro stations in order, then Create line", color: "#9b7bff", icon: { glyph: "➿", color: "#9b7bff" } },
+  trainstation: { id: "trainstation", label: "Train station", hint: "Train station: 2x2 footprint (radius 12)", color: "#e07a3f", icon: { img: "kit/ico-trem" } },
+  trainline: { id: "trainline", label: "Train line", hint: "Tap train stations in order, then Create line", color: "#e07a3f", icon: { glyph: "🚆", color: "#e07a3f" } },
   hospital: { id: "hospital", label: "Hospital", hint: "General hospital: 2x2 footprint (radius 18)", color: "#f2f6fb", icon: { img: "kit/ico-maleta" } },
   highschool: { id: "highschool", label: "High school", hint: "Secondary school: 2x2 footprint (radius 20)", color: "#f59a4a", icon: { img: "kit/ico-formatura" } },
   library: { id: "library", label: "Library", hint: "Public library: culture and happiness (radius 12)", color: "#d98a55", icon: { img: "kit/ico-governo" } },
@@ -48,6 +50,12 @@ const T: Record<string, ToolDef> = {
   museum: { id: "museum", label: "Museum", hint: "City museum: culture and land value (radius 16)", color: "#efe6d2", icon: { img: "kit/ico-trofeu" } },
   cityhall: { id: "cityhall", label: "City hall", hint: "City hall (2x2, one per city): happiness and tax income", color: "#4f5f86", icon: { img: "kit/ico-martelo" } },
   substation: { id: "substation", label: "Substation", hint: "Substation: relays power to nearby roads", color: "#cfd3d6", icon: { img: "kit/ico-energia" } },
+  solar: { id: "solar", label: "Solar plant", hint: "Solar plant: clean power (2x2, capacity 180)", color: "#f2c230", icon: { img: "kit/ico-energia" } },
+  powerlarge: { id: "powerlarge", label: "Large power plant", hint: "Large power plant: 2x2, capacity 380", color: "#e08a3c", icon: { img: "kit/ico-energia" } },
+  watertower: { id: "watertower", label: "Water tower", hint: "Water tower: capacity 160, no water tile needed", color: "#39b6e8", icon: { img: "kit/ico-agua" } },
+  waterlarge: { id: "waterlarge", label: "Large water plant", hint: "Large water plant near water (2x2, capacity 260)", color: "#2a86cc", icon: { img: "kit/ico-agua" } },
+  firepost: { id: "firepost", label: "Fire post", hint: "Fire post: fast local cover (radius 8)", color: "#ee5a4c", icon: { img: "kit/ico-extintor" } },
+  firehq: { id: "firehq", label: "Fire headquarters", hint: "Fire headquarters: 2x2, wide cover (radius 20)", color: "#c22f28", icon: { img: "kit/ico-extintor" } },
   bulldoze: { id: "bulldoze", label: "Bulldoze", hint: "Remove roads, zones and facilities", color: "#e5584f", icon: { img: "kit/ico-lixeira" } },
   roundabout: { id: "roundabout", label: "Roundabout", hint: "Stamp a roundabout on a junction", color: "#9aa3b2", icon: { glyph: "⟳", color: "#9aa3b2" } },
 };
@@ -59,11 +67,15 @@ const ZONE_MODES: { mode: ZoneMode; label: string; glyph: string }[] = [
   { mode: "marquee", label: "Marquee", glyph: "⛶" },
   { mode: "fill", label: "Fill", glyph: "🪣" },
 ];
-const SERVICE_TOOLS = [
-  "power", "substation", "water", "sewage", "landfill", "police", "fire", "clinic", "hospital", "school", "highschool",
-  "park", "library", "community", "museum", "cityhall",
+/** Services grouped by type, tiers side by side: one lean flyout, no tool lost. */
+const SERVICE_GROUPS: { label: string; tools: string[] }[] = [
+  { label: "Power", tools: ["power", "solar", "powerlarge", "substation"] },
+  { label: "Water", tools: ["water", "watertower", "waterlarge", "sewage"] },
+  { label: "Safety", tools: ["police", "firepost", "fire", "firehq"] },
+  { label: "Health & schools", tools: ["clinic", "hospital", "school", "highschool"] },
+  { label: "City", tools: ["park", "library", "community", "museum", "cityhall", "landfill"] },
 ];
-const TRANSIT_TOOLS = ["busstop", "metro", "busline", "metroline"];
+const TRANSIT_TOOLS = ["busstop", "metro", "trainstation", "busline", "metroline", "trainline"];
 
 const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }[] = [
   { mode: "line", label: "Line", glyph: "╱", hint: "Tap a start, then an end" },
@@ -421,7 +433,7 @@ export class Hud {
   }
 
   private toolButton(t: ToolDef, big = false): HTMLElement {
-    const free = t.id === "pan" || t.id === "busline" || t.id === "metroline";
+    const free = t.id === "pan" || t.id === "busline" || t.id === "metroline" || t.id === "trainline";
     const price = free ? 0 : COST[t.id as Exclude<ToolId, "pan">];
     const cost = free ? "" : `<small>$${price}</small>`;
     const b = el("button", "tool", `${iconHtml(t.icon)}<span>${tr(t.label)}</span>${big ? "" : cost}`);
@@ -515,7 +527,10 @@ export class Hud {
     bar.appendChild(this.group("zones", "Zones", { img: "kit/ico-zonas" }, flyZones));
 
     const flyServices = el("div", "panel fly wrap");
-    for (const id of SERVICE_TOOLS) flyServices.appendChild(this.toolButton(T[id]));
+    for (const g of SERVICE_GROUPS) {
+      flyServices.appendChild(el("span", "svc-group", tr(g.label)));
+      for (const id of g.tools) flyServices.appendChild(this.toolButton(T[id]));
+    }
     bar.appendChild(this.group("services", "Services", { img: "kit/ico-governo" }, flyServices));
 
     const flyTransit = el("div", "panel fly");
@@ -849,7 +864,7 @@ export class Hud {
     this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === t));
     const group = (names: string[], key: string) => this.groupBtns.get(key)?.classList.toggle("active", names.includes(t));
     group(ZONE_TOOLS, "zones");
-    group(SERVICE_TOOLS, "services");
+    group(SERVICE_GROUPS.flatMap((g) => g.tools), "services");
     group(TRANSIT_TOOLS, "transit");
     if (T[t]) this.hint.textContent = tr(T[t].hint);
   }
@@ -931,11 +946,18 @@ export class Hud {
 
   /** Rebuild the lines list when lines or vehicle counts change. */
   private updateLines(s: CityState): void {
-    const sig = s.world.lines.map((l) => `${l.id}:${l.vehicles}:${l.stops.length}`).join("|");
+    const sig = s.world.lines.map((l) => `${l.id}:${l.vehicles}:${l.stops.length}`).join("|") + `#${s.world.stops.length}`;
     if (sig === this.linesSig) return;
     this.linesSig = sig;
     this.linesPanel.classList.toggle("has", s.world.lines.length > 0);
     this.linesBody.innerHTML = "";
+    if (s.world.lines.length) {
+      const t = transitTotals(s.world);
+      const head = el("div", "line-row transit-summary",
+        `<span class="ln">${t.lines} ${tr("lines")} · ${t.vehicles} ${tr("vehicles")}</span>` +
+        `<span class="lm">${t.dailyCapacity}/day · $${t.monthlyUpkeep}/mo</span>`);
+      this.linesBody.appendChild(head);
+    }
     for (const l of s.world.lines) {
       const row = el("div", "line-row",
         `<i style="background:${l.color}"></i><span class="ln">${lineName(l.name)}</span><span class="lm">${l.stops.length} ${tr("stops")}</span>` +

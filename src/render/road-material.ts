@@ -18,9 +18,9 @@ export type RoadLayer = "asphalt" | "kerb" | "flat";
 /** Which detail layer a road vertex colour belongs to (mirrors src/render/roads.ts palette). */
 export function roadLayerForColor(hex: string): RoadLayer {
   switch (hex.toLowerCase()) {
-    case "#c4c7cc": return "kerb"; // KERB band (kerb + sidewalk)
-    case "#3b3f46": // ASPHALT
-    case "#4a4f57": return "asphalt"; // HW_ASPHALT
+    case "#c4c7cc": case "#ccd0d6": return "kerb"; // KERB band (kerb + sidewalk)
+    case "#3b3f46": case "#31353c": // ASPHALT
+    case "#4a4f57": case "#41464e": return "asphalt"; // HW_ASPHALT
     default: return "flat"; // markings, median, zebra, highway edge: tint only
   }
 }

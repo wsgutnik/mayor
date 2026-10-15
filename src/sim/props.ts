@@ -105,7 +105,7 @@ export function planProps(w: World, density = 1): PropPlacement[] {
     const cx = tx + 0.5, cz = ty + 0.5;
     const road = nearestRoad(cx, cz);
     if (!road) continue;
-    if (stop.kind === "metro") {
+    if (stop.kind !== "bus") {
       // Station occupies its own tile: use the first clear neighbouring entry apron.
       const choices = [[-road.dz, road.dx], [road.dz, -road.dx], [road.dx, road.dz], [-road.dx, -road.dz]];
       for (const [sx, sz] of choices) {
