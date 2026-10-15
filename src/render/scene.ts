@@ -21,6 +21,7 @@ import {
 } from "./lots";
 import { rectOnRoad, roadSurface, setbackGap } from "../sim/roadsurface";
 import { loadGlb, LoadedModel } from "./glb-models";
+import { createPostFx, type PostFx } from "./postfx";
 import { visualV2PreviewEnabled } from "./visual-v2";
 import { loadManifestGatedModel } from "./visual-v2-manifest";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
@@ -248,6 +249,8 @@ export class CityRenderer {
   private lodAt = new THREE.Vector3(1e9, 0, 0);
   private lodStatsCache = { total: 0, near: 0, boxed: 0, culled: 0 };
   private fogBase = 0.0042;
+  private postFx: PostFx | null = null;
+  private bloomWanted = QUALITY_PROFILE.high.bloom;
   private lampGlowWarmed = false;
   private ambience!: Ambience;
   private asphaltTex!: THREE.Texture;
@@ -1487,7 +1490,8 @@ export class CityRenderer {
     else this.sun.color.copy(this.atmosphereSunColor).lerp(_warmSun, dusk * 0.6).lerp(_moonSun, night * 0.7);
     if (under) this.renderer.toneMappingExposure = 1.05;
     this.hemi.intensity = under ? 1.8 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
-    this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.1;
+    // Bright enough to cross the bloom threshold after dark (see postfx.ts).
+    this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.7;
     this.nightGlow = this.winMat.emissiveIntensity;
     if (this.streetLightFx) this.streetLightFx.setNight(this.nightGlow);
     for (const g of this.glowMats) {
@@ -2008,6 +2012,7 @@ export class CityRenderer {
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.setSize(w, h);
     this.rig.resize(w / h);
+    this.postFx?.setSize(w, h, this.pixelRatio);
   }
 
   get viewportHeight(): number {
@@ -2073,6 +2078,9 @@ export class CityRenderer {
       this.sun.shadow.map?.dispose();
       this.sun.shadow.map = null;
     }
+    // Bloom follows the tier too: high only, so iPad tiers keep the direct path.
+    this.bloomWanted = profile.bloom;
+    this.postFx?.setEnabled(profile.bloom);
     // Terrain splat follows the tier; low renders flat vertex colours.
     if (profile.splat !== this.splatTier) {
       this.splatTier = profile.splat;
@@ -2244,6 +2252,11 @@ export class CityRenderer {
     // Height-flavoured fog: thin haze from high above, thicker at street level.
     const fog = this.scene.fog as THREE.FogExp2;
     fog.density = this.fogBase * THREE.MathUtils.clamp(1.25 - this.rig.camera.position.y / 140, 0.65, 1.25);
-    this.renderer.render(this.scene, this.rig.camera);
+    if (!this.postFx) {
+      this.postFx = createPostFx(this.renderer, this.scene, this.rig.camera);
+      this.postFx.setEnabled(this.bloomWanted);
+      this.resize();
+    }
+    this.postFx.render();
   }
 }

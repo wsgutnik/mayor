@@ -11,7 +11,7 @@ export function updateAtmosphereState(out: AtmosphereState, sky: THREE.Color, to
   sky.set("#0a1224").lerp(_daySky, out.day).lerp(_duskSky, out.dusk * 0.45);
   if (raining) sky.lerp(_rainSky, 0.55);
   background.copy(sky);
-  out.exposure = 0.85 + out.day * 0.2 - out.dusk * 0.05;
+  out.exposure = 0.9 + out.day * 0.25 - out.dusk * 0.05;
 }
 const _daySky = new THREE.Color("#a9c8e8");
 const _duskSky = new THREE.Color("#f0a070");

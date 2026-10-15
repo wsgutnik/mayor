@@ -74,12 +74,14 @@ export interface QualityProfile {
   veg: number;
   /** Full-detail radius in tiles around the camera target. */
   lodDist: number;
+  /** Cinematic bloom post-processing (high tier only; costly on iPad GPUs). */
+  bloom: boolean;
 }
 
 export const QUALITY_PROFILE: Record<Quality, QualityProfile> = {
-  low: { pixelCap: 1, aniso: 2, tex: "sd", shadow: 0, padTex: false, splat: "off", veg: 0.45, lodDist: 30 },
-  medium: { pixelCap: 1.5, aniso: 4, tex: "sd", shadow: 1024, padTex: true, splat: "md", veg: 0.75, lodDist: 45 },
-  high: { pixelCap: 2, aniso: 8, tex: "hd", shadow: 2048, padTex: true, splat: "hd", veg: 1, lodDist: 70 },
+  low: { pixelCap: 1, aniso: 2, tex: "sd", shadow: 0, padTex: false, splat: "off", veg: 0.45, lodDist: 30, bloom: false },
+  medium: { pixelCap: 1.5, aniso: 4, tex: "sd", shadow: 1024, padTex: true, splat: "md", veg: 0.75, lodDist: 45, bloom: false },
+  high: { pixelCap: 2, aniso: 8, tex: "hd", shadow: 2048, padTex: true, splat: "hd", veg: 1, lodDist: 70, bloom: true },
 };
 
 /** Tier back from a pixel cap (mirrors QUALITY_PIXEL_CAP; the scene only gets the cap). */
