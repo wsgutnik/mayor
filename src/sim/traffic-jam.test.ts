@@ -41,6 +41,20 @@ describe("signalised grid never gridlocks", () => {
     for (const n of perMinute) expect(n).toBeGreaterThan(40);
   }, 120000);
 
+  it("keeps flowing with avenue spines at city-scale demand and never holds a car longer than the watchdog", () => {
+    const { s, t } = fixture(true);
+    s.population = 9000;
+    const perMinute: number[] = [];
+    let last = 0, worstIdle = 0;
+    for (let i = 0; i < 4800; i++) {
+      tickTraffic(s, t, 0.1);
+      for (const v of t.vehicles) worstIdle = Math.max(worstIdle, v.idle ?? 0);
+      if (i % 600 === 599) { perMinute.push(t.completed - last); last = t.completed; }
+    }
+    for (const n of perMinute) expect(n).toBeGreaterThan(40);
+    expect(worstIdle).toBeLessThanOrEqual(90.5);
+  }, 180000);
+
   it("is deterministic", () => {
     const run = () => {
       const { s, t } = fixture(false);

@@ -63,6 +63,8 @@ export interface Vehicle {
   boxWait?: number;
   /** Movement index whose box reservation timed out: crossed without it. */
   boxSkip?: number;
+  /** Seconds without moving (despawn watchdog, never saved). */
+  idle?: number;
 }
 
 /**
@@ -139,6 +141,8 @@ export interface TrafficState {
   prioTimeouts: number;
   /** Signal-box reservation watchdog firings (diagnostic). */
   boxTimeouts?: number;
+  /** Cars removed by the idle watchdog (diagnostic). */
+  abandoned?: number;
   /** Vehicles that reached the box without a granted claim (diagnostic; should stay 0). */
   prioOverruns: number;
   /**
@@ -307,6 +311,8 @@ const IDM_STOP_ZERO = 0.031;   // 0.35 m: snap to a stop inside this of the line
 const IDM_V_STOP = 0.135;      // 0.6 m/s: below this counts as stopped
 /** Seconds a car may sit held only by a signal-box reservation before it crosses anyway. */
 const BOX_TIMEOUT = 8;
+/** Seconds without moving before a car leaves the road (gridlock breaker). */
+const IDLE_DESPAWN = 90;
 /** A car this close to the box start already reserves it; one queued behind its stop line (0.06) does not. */
 const BOX_REACH = 0.1;
 const IDM_SPAWN_GAP = 0.31;    // 3.5 m: extra spawn clearance
@@ -594,6 +600,9 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
       if (Math.abs(rx * hz - rz * hx) > 0.45) continue;
       if (hx * ohx + hz * ohz < 0.3) continue;
       const gap = long - myHalf - halfLength(o.kind);
+      // Overlapped cars on different headings (turning/crossing inside a box) can each see the other as
+      // 'ahead': a mutual-leader cycle no light or timeout resolves. The lower id ignores the higher id there.
+      if (gap < -0.02 && o.id > v.id && hx * ohx + hz * ohz < 0.95) continue;
       if (gap < leadGap) { leadGap = gap; leadV = o.v ?? 0; }
     }
   }
@@ -1448,6 +1457,12 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     const tile = v.tiles[at];
     if (!w.road[tile]) continue;
     if (v.progress >= v.tiles.length - 1) { t.completed++; continue; }
+    // Last-resort gridlock breaker: a full-grid spillback cycle no signal can resolve. A car that has not
+    // moved for IDLE_DESPAWN seconds leaves the road (as if it took a side street), freeing its queue.
+    if ((v.v ?? 0) < 0.03) {
+      v.idle = (v.idle ?? 0) + dt;
+      if (v.idle >= IDLE_DESPAWN) { t.abandoned = (t.abandoned ?? 0) + 1; continue; }
+    } else v.idle = 0;
     if (v.stuck) slow++;
     alive.push(v);
   }
