@@ -1,23 +1,27 @@
-import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH, FACILITY_OF_TOOL, isFacilityTool } from "../sim/sim";
+import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH, FACILITY_OF_TOOL, facilityToolFootprint, isFacilityTool } from "../sim/sim";
 import { facilityUsage } from "../sim/facility-usage";
 import { usageRows } from "./facility-usage-view";
 import { MAX_LINE_VEHICLES, transitTotals } from "../sim/transit";
-import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType, ROAD_COST, ROAD_NAME } from "../sim/world";
+import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
 import { lineName, monthName, tr } from "../i18n";
 import { PanelId, PanelState, loadPanelState, savePanelState, setPanelsHidden, togglePanelCollapsed } from "./panel-state";
 import type { RoadReadoutRow } from "./road-readout";
 import { cityEvents } from "./events";
 import { ToastsView, type ToastInput, type ToastTone } from "./toasts";
-import { Tooltip } from "./tooltip";
+import { Tooltip, type TooltipContent } from "./tooltip";
 import { LegendView } from "./legend";
 import { OnboardingCard, type OnboardingSnapshot } from "./onboarding";
 import { DEFAULT_ROAD_SNAP, type AngleSnap, type LengthSnap, type RoadSnapOptions } from "./road-snap";
 import type { ZoneMode } from "./zone-tools";
 import { DEFAULT_ROAD_PARALLEL, type ParallelGap, type ParallelSide, type RoadParallelOptions } from "./road-parallel";
+import {
+  initialToolState, isRoadGroupTool, ZONE_TOOLS, type FlyoutId, type RoadLevel, type RoadMode, type ToolEvent, type ToolState,
+} from "./tool-state";
+import { ROAD_LEVEL_LABEL, ROAD_MODE_LABEL, roadFacts, roadSummary } from "./road-facts";
+import { toolAvailability } from "./tool-availability";
 
-export type RoadMode = "paint" | "line" | "curve";
-export type RoadLevel = "ground" | "elevated" | "tunnel";
+export type { RoadLevel, RoadMode } from "./tool-state";
 
 /** Art from the brand sheet (public/ui) or a plain glyph. */
 interface Icon { img?: string; glyph?: string; color?: string }
@@ -65,7 +69,13 @@ const T: Record<string, ToolDef> = {
 /** Every tool label and hint (translated in src/i18n.ts; facility-usage-view.test.ts checks pt-BR coverage). */
 export const TOOL_I18N_KEYS: string[] = Object.values(T).flatMap((t) => [t.label, t.hint]);
 
-const ZONE_TOOLS = ["res", "com", "ind"];
+/** Section titles and row labels the flyouts render (strings.test.ts checks pt-BR). */
+export const FLYOUT_I18N_KEYS: string[] = [
+  "Type", "Draw", "Level", "Tools", "Zone", "Shape", "Stops", "Lines", "Lanes", "Width", "One-way", "per tile", "Footprint",
+  "Tap a start, then an end", "Tap start, a bend point, then the end", "Tap a bridge crossing to stamp an interchange",
+  "Tap a road to change its class", "Press E to cycle", "Both legs are planned together and undo as one",
+  "Interchange", "Upgrade road", "Roundabout", "Infoview", "On", "Off",
+];
 
 const ZONE_MODES: { mode: ZoneMode; label: string; glyph: string }[] = [
   { mode: "paint", label: "Paint", glyph: "🖌" },
@@ -73,25 +83,32 @@ const ZONE_MODES: { mode: ZoneMode; label: string; glyph: string }[] = [
   { mode: "fill", label: "Fill", glyph: "🪣" },
 ];
 /** Services grouped by type, tiers side by side: one lean flyout, no tool lost. */
-const SERVICE_GROUPS: { label: string; tools: string[] }[] = [
-  { label: "Power", tools: ["power", "solar", "powerlarge", "substation"] },
-  { label: "Water", tools: ["water", "watertower", "waterlarge", "sewage"] },
-  { label: "Safety", tools: ["police", "firepost", "fire", "firehq"] },
-  { label: "Health & schools", tools: ["clinic", "hospital", "school", "highschool"] },
-  { label: "City", tools: ["park", "library", "community", "museum", "cityhall", "landfill"] },
+const SERVICE_GROUPS: { label: string; icon: string; tools: string[] }[] = [
+  { label: "Power", icon: "kit/ico-energia", tools: ["power", "solar", "powerlarge", "substation"] },
+  { label: "Water", icon: "kit/ico-agua", tools: ["water", "watertower", "waterlarge", "sewage"] },
+  { label: "Safety", icon: "kit/ico-escudo", tools: ["police", "firepost", "fire", "firehq"] },
+  { label: "Health & schools", icon: "kit/ico-maleta", tools: ["clinic", "hospital", "school", "highschool"] },
+  { label: "City", icon: "kit/ico-governo", tools: ["park", "library", "community", "museum", "cityhall", "landfill"] },
 ];
-const TRANSIT_TOOLS = ["busstop", "metro", "trainstation", "busline", "metroline", "trainline"];
+const SERVICE_TOOLS = SERVICE_GROUPS.flatMap((g) => g.tools);
+const TRANSIT_GROUPS: { label: string; tools: string[] }[] = [
+  { label: "Stops", tools: ["busstop", "metro", "trainstation"] },
+  { label: "Lines", tools: ["busline", "metroline", "trainline"] },
+];
+const TRANSIT_TOOLS = TRANSIT_GROUPS.flatMap((g) => g.tools);
 
-const ROAD_MODES: { mode: RoadMode; label: string; glyph: string; hint: string }[] = [
-  { mode: "line", label: "Line", glyph: "╱", hint: "Tap a start, then an end" },
-  { mode: "curve", label: "Curve", glyph: "⌒", hint: "Tap start, a bend point, then the end" },
+const ROAD_MODES: { mode: RoadMode; glyph: string; hint: string }[] = [
+  { mode: "line", glyph: "╱", hint: "Tap a start, then an end" },
+  { mode: "curve", glyph: "⌒", hint: "Tap start, a bend point, then the end" },
 ];
 
-const ROAD_LEVELS: { level: RoadLevel; label: string; glyph: string }[] = [
-  { level: "ground", label: "Ground", glyph: "─" },
-  { level: "elevated", label: "Elevated", glyph: "⌒" },
-  { level: "tunnel", label: "Underground", glyph: "⌄" },
+const ROAD_LEVELS: { level: RoadLevel; glyph: string }[] = [
+  { level: "ground", glyph: "─" },
+  { level: "elevated", glyph: "⌒" },
+  { level: "tunnel", glyph: "⌄" },
 ];
+
+const ROAD_GLYPH: Record<RoadType, string> = { 1: "─", 2: "═", 3: "≡", 4: "→", 5: "⇒" };
 
 const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string; img?: string }[] = [
   { layer: 0, label: "Off", glyph: "○", color: "#ffffff" },
@@ -124,9 +141,8 @@ const iconHtml = (i: Icon) =>
 
 export interface HudHooks {
   onMenu(): void;
-  onRoad(type: RoadType, mode: RoadMode, level?: RoadLevel): void;
-  /** Stamp a diamond interchange on the next tapped bridge crossing. */
-  onInterchange?(): void;
+  /** Every tool, flyout, road and zoning choice goes through the tool state machine (src/ui/tool-state.ts). */
+  onEvent(e: ToolEvent): void;
   onCreateLine(): void;
   onLineVehicles(id: number, delta: number): void;
   onRemoveLine(id: number): void;
@@ -135,11 +151,6 @@ export interface HudHooks {
   onSnap?(opts: RoadSnapOptions): void;
   /** Parallel-road options changed (toggle / gap / side). */
   onParallel?(opts: RoadParallelOptions): void;
-  /** The road flyout's Upgrade toggle changed: taps on existing roads convert them while it is on. */
-  onUpgradeMode?(on: boolean): void;
-  onTool(t: ToolId): void;
-  /** Zoning shape changed (paint brush / marquee rectangle / fill); applies to res/com/ind and bulldoze. */
-  onZoneMode?(mode: ZoneMode): void;
   onSpeed(s: number): void;
   onUndo(): void;
   /** Reset the camera to the default overview (a stray gesture can lose the map). */
@@ -225,10 +236,13 @@ export class Hud {
   private roadModeBtns = new Map<RoadMode, HTMLElement>();
   private roadLevelBtns = new Map<RoadLevel, HTMLElement>();
   private zoneModeBtns = new Map<ZoneMode, HTMLElement>();
-  private zoneMode: ZoneMode = "paint";
-  private roadType: RoadType = 1;
-  private roadMode: RoadMode = "line";
-  private roadLevel: RoadLevel = "ground";
+  private upgradeBtn!: HTMLButtonElement;
+  private interchangeBtn!: HTMLButtonElement;
+  private roadSummaryEl!: HTMLElement;
+  /** The rendered tool state; main.ts owns the real one and calls render() after every event. */
+  private ui: ToolState = initialToolState();
+  /** Why each build button is greyed out right now (null = usable); refreshed from the city each frame. */
+  private avail = new Map<ToolId, string | null>();
   private snap: RoadSnapOptions = { ...DEFAULT_ROAD_SNAP };
   private snapAngleBtns = new Map<AngleSnap, HTMLButtonElement>();
   private snapLengthBtns = new Map<LengthSnap, HTMLButtonElement>();
@@ -246,7 +260,6 @@ export class Hud {
   private trafficFill!: HTMLElement;
   private trafficVal!: HTMLElement;
   private tips = true;
-  private currentTool: ToolId = "road";
 
   constructor(parent: HTMLElement, private hooks: HudHooks) {
     this.root = el("div", "hud");
@@ -272,6 +285,7 @@ export class Hud {
     this.readout = el("div", "road-readout");
     this.readout.hidden = true;
     this.root.appendChild(this.readout);
+    this.render(this.ui);
   }
 
   destroy(): void {
@@ -437,37 +451,47 @@ export class Hud {
     return row;
   }
 
+  /** Tooltip body of a build button: description, cost, footprint and the facility's numbers of use. */
+  private toolTip(t: ToolDef): TooltipContent {
+    const free = t.id === "pan" || t.id === "busline" || t.id === "metroline" || t.id === "trainline";
+    const price = free ? 0 : COST[t.id as Exclude<ToolId, "pan">];
+    // Service buildings show their numbers of use before placing: upkeep, capacity or radius, homes served.
+    const usage = isFacilityTool(t.id) ? facilityUsage(FACILITY_OF_TOOL[t.id]) : null;
+    const fp = isFacilityTool(t.id) ? facilityToolFootprint(t.id) : 0;
+    const reason = this.avail.get(t.id);
+    return {
+      icon: t.icon.glyph, title: tr(t.label), desc: tr(t.hint),
+      cost: free ? undefined : price, color: t.color,
+      upkeep: usage?.upkeep, rows: usage ? usageRows(usage) : undefined,
+      badge: fp ? `${fp}×${fp}` : undefined,
+      warn: reason ? tr(reason) : undefined,
+    };
+  }
+
   private toolButton(t: ToolDef, big = false): HTMLElement {
     const free = t.id === "pan" || t.id === "busline" || t.id === "metroline" || t.id === "trainline";
     const price = free ? 0 : COST[t.id as Exclude<ToolId, "pan">];
     const cost = free ? "" : `<small>$${price}</small>`;
-    const b = el("button", "tool", `${iconHtml(t.icon)}<span>${tr(t.label)}</span>${big ? "" : cost}`);
+    const fp = isFacilityTool(t.id) ? facilityToolFootprint(t.id) : 0;
+    const badge = fp ? `<em class="fp" aria-label="${tr("Footprint")} ${fp}x${fp}">${fp}×${fp}</em>` : "";
+    const b = el("button", "tool", `${iconHtml(t.icon)}<span>${tr(t.label)}</span>${big ? "" : cost}${badge}`);
     b.title = tr(t.hint);
     b.addEventListener("click", () => {
-      this.hooks.onTool(t.id);
-      this.setTool(t.id);
-      this.closeFlyouts();
+      const reason = this.avail.get(t.id);
+      // A greyed button says why instead of arming a tool the map would refuse anyway.
+      if (reason) { this.toasts.push({ kind: "warning", title: tr(t.label), text: tr(reason) }); return; }
+      this.hooks.onEvent({ kind: "tool", tool: t.id });
     });
-    this.tooltip.attach(b, () => {
-      // Service buildings show their numbers of use before placing: upkeep, capacity or radius, homes served.
-      const usage = isFacilityTool(t.id) ? facilityUsage(FACILITY_OF_TOOL[t.id]) : null;
-      return {
-        icon: t.icon.glyph, title: tr(t.label), desc: tr(t.hint),
-        cost: free ? undefined : price, color: t.color,
-        upkeep: usage?.upkeep, rows: usage ? usageRows(usage) : undefined,
-      };
-    });
+    this.tooltip.attach(b, () => this.toolTip(t));
     this.toolBtns.set(t.id, b);
     return b;
   }
 
   /** A toolbar category button that opens a flyout. */
-  private group(name: string, label: string, icon: Icon, fly: HTMLElement, onOpen?: () => void): HTMLElement {
+  private group(name: FlyoutId, label: string, icon: Icon, fly: HTMLElement): HTMLElement {
     const b = el("button", "tool", `${iconHtml(icon)}<span>${tr(label)}</span><small>▴</small>`);
-    b.addEventListener("click", () => {
-      this.toggleFly(name);
-      onOpen?.();
-    });
+    b.setAttribute("aria-haspopup", "true");
+    b.addEventListener("click", () => this.hooks.onEvent({ kind: "group", flyout: name }));
     this.tooltip.attach(b, () => ({ title: tr(label), icon: icon.glyph }));
     this.groupBtns.set(name, b);
     this.flyouts.set(name, fly);
@@ -475,93 +499,138 @@ export class Hud {
     return b;
   }
 
+  /** A flyout panel: optional header, a scrolling body of titled sections, each one row of buttons. */
+  private flyout(cls: string): { fly: HTMLElement; body: HTMLElement; section: (title: string, icon?: string) => HTMLElement } {
+    const fly = el("div", `panel fly ${cls}`);
+    const body = el("div", "fly-body");
+    fly.appendChild(body);
+    const section = (title: string, icon?: string): HTMLElement => {
+      const s = el("section", "fly-sec");
+      s.setAttribute("role", "group");
+      s.setAttribute("aria-label", title);
+      s.appendChild(el("span", "fly-sec-title", `${icon ? `<img class="ic-img xs" src="/ui/${icon}.png" alt="">` : ""}${title}`));
+      const row = el("div", "fly-row");
+      s.appendChild(row);
+      body.appendChild(s);
+      return row;
+    };
+    return { fly, body, section };
+  }
+
   private buildBottom(): void {
     const bar = el("div", "panel toolbar");
     bar.appendChild(this.toolButton(T.pan));
 
-    // Roads: class and drawing mode
-    const flyRoad = el("div", "panel fly snap-wrap");
+    // Roads: header with the live selection, then type | draw mode | level | tools | snap | parallel.
+    const road = this.flyout("road-fly");
+    const head = el("div", "fly-head", `<span class="fly-title">${tr("Roads")}</span>`);
+    this.roadSummaryEl = el("span", "fly-summary");
+    this.roadSummaryEl.setAttribute("aria-live", "polite");
+    head.appendChild(this.roadSummaryEl);
+    road.fly.insertBefore(head, road.body);
+
+    const typeRow = road.section(tr("Type"));
     for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
-      const glyph = t === 1 ? "─" : t === 2 ? "═" : t === 3 ? "≡" : t === 4 ? "→" : "⇒";
-      const b = el("button", "tool", `<span class="ic">${glyph}</span><span>${tr(ROAD_NAME[t])}</span><small>$${ROAD_COST[t]}/${tr("tile")}</small>`);
-      b.addEventListener("click", () => { this.setRoadChoice(t, this.roadMode); this.hooks.onTool("road"); this.setTool("road"); });
+      const f = roadFacts(t);
+      const b = el("button", "tool", `<span class="ic">${ROAD_GLYPH[t]}</span><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small>`);
+      b.addEventListener("click", () => this.hooks.onEvent({ kind: "roadType", roadType: t }));
+      this.tooltip.attach(b, () => ({
+        icon: ROAD_GLYPH[t], title: tr(f.name), color: T.road.color,
+        badge: f.oneWay ? tr("One-way") : undefined,
+        cost: f.costPerTile, unit: ` / ${tr("tile")}`,
+        upkeep: f.upkeepPerTile, per: `${tr("tile")} · ${tr("mo")}`,
+        rows: [
+          { k: tr("Lanes"), v: String(f.lanes) },
+          { k: tr("Capacity"), v: `${f.capacity} ${tr("cars")} ${tr("per tile")}` },
+          { k: tr("Width"), v: `${f.widthTiles} ${tr(f.widthTiles === 1 ? "tile" : "tiles")}` },
+        ],
+      }));
       this.roadTypeBtns.set(t, b);
-      flyRoad.appendChild(b);
+      typeRow.appendChild(b);
     }
-    flyRoad.appendChild(this.toolButton(T.roundabout));
-    flyRoad.appendChild(el("span", "sep"));
+    const drawRow = road.section(tr("Draw"));
     for (const m of ROAD_MODES) {
-      const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(m.label)}</span>`);
+      const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(ROAD_MODE_LABEL[m.mode])}</span>`);
       b.title = tr(m.hint);
-      b.addEventListener("click", () => { this.setRoadChoice(this.roadType, m.mode); this.hooks.onTool("road"); this.setTool("road"); });
+      b.addEventListener("click", () => this.hooks.onEvent({ kind: "roadMode", mode: m.mode }));
+      this.tooltip.attach(b, () => ({ icon: m.glyph, title: tr(ROAD_MODE_LABEL[m.mode]), desc: tr(m.hint), color: T.road.color }));
       this.roadModeBtns.set(m.mode, b);
-      flyRoad.appendChild(b);
+      drawRow.appendChild(b);
     }
-    flyRoad.appendChild(el("span", "sep"));
-    const lvlLabel = el("span", "level-label", tr("Level"));
-    flyRoad.appendChild(lvlLabel);
+    const levelRow = road.section(tr("Level"));
     for (const lv of ROAD_LEVELS) {
-      const b = el("button", "tool", `<span class="ic">${lv.glyph}</span><span>${tr(lv.label)}</span>`);
-      b.addEventListener("click", () => { this.setRoadLevel(lv.level); this.hooks.onTool("road"); this.setTool("road"); });
+      const b = el("button", "tool", `<span class="ic">${lv.glyph}</span><span>${tr(ROAD_LEVEL_LABEL[lv.level])}</span>`);
+      b.title = `${tr(ROAD_LEVEL_LABEL[lv.level])} (${tr("Press E to cycle")})`;
+      b.addEventListener("click", () => this.hooks.onEvent({ kind: "roadLevel", level: lv.level }));
+      this.tooltip.attach(b, () => ({ icon: lv.glyph, title: tr(ROAD_LEVEL_LABEL[lv.level]), key: "E", desc: tr("Press E to cycle"), color: T.road.color }));
       this.roadLevelBtns.set(lv.level, b);
-      flyRoad.appendChild(b);
+      levelRow.appendChild(b);
     }
+    const toolsRow = road.section(tr("Tools"));
+    toolsRow.appendChild(this.toolButton(T.roundabout));
     const trevo = el("button", "tool", `<span class="ic">✥</span><span>${tr("Interchange")}</span>`);
     trevo.title = tr("Tap a bridge crossing to stamp an interchange");
-    trevo.addEventListener("click", () => { this.hooks.onInterchange?.(); this.closeFlyouts(); });
-    flyRoad.appendChild(trevo);
-    flyRoad.appendChild(this.buildSnapGroup());
-    flyRoad.appendChild(this.buildParallelGroup());
-    flyRoad.appendChild(this.buildUpgradeGroup());
-    const roads = this.group("road", "Roads", T.road.icon, flyRoad, () => {
-      this.hooks.onTool("road");
-      this.setTool("road");
-      this.hooks.onRoad(this.roadType, this.roadMode, this.roadLevel);
-    });
+    trevo.setAttribute("aria-pressed", "false");
+    trevo.addEventListener("click", () => this.hooks.onEvent({ kind: "interchange" }));
+    this.tooltip.attach(trevo, () => ({ icon: "✥", title: tr("Interchange"), desc: tr("Tap a bridge crossing to stamp an interchange"), color: T.road.color }));
+    this.interchangeBtn = trevo;
+    toolsRow.appendChild(trevo);
+    const up = el("button", "tool", `<span class="ic">⇪</span><span>${tr("Upgrade road")}</span><small>${tr("Off")}</small>`);
+    up.title = tr("Tap a road to change its class");
+    up.setAttribute("aria-pressed", "false");
+    up.addEventListener("click", () => this.hooks.onEvent({ kind: "upgrade", on: !this.ui.upgradeMode }));
+    this.tooltip.attach(up, () => ({ icon: "⇪", title: tr("Upgrade road"), desc: tr("Tap a road to change its class"), color: T.road.color }));
+    this.upgradeBtn = up;
+    toolsRow.appendChild(up);
+    road.body.appendChild(this.buildSnapGroup());
+    road.body.appendChild(this.buildParallelGroup());
+    const roads = this.group("road", "Roads", T.road.icon, road.fly);
     this.toolBtns.set("road", roads);
     bar.appendChild(roads);
-    this.setRoadChoice(1, "line", false);
-    this.setRoadLevel("ground", false);
 
-    const flyZones = el("div", "panel fly wrap");
-    for (const id of ZONE_TOOLS) flyZones.appendChild(this.toolButton(T[id]));
-    flyZones.appendChild(el("span", "sep"));
+    const zones = this.flyout("wrap");
+    const zoneRow = zones.section(tr("Zone"));
+    for (const id of ZONE_TOOLS) zoneRow.appendChild(this.toolButton(T[id]));
+    const shapeRow = zones.section(tr("Shape"));
     for (const m of ZONE_MODES) {
       const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(m.label)}</span>`);
       b.title = tr(m.label);
-      b.addEventListener("click", () => this.setZoneMode(m.mode));
+      b.addEventListener("click", () => this.hooks.onEvent({ kind: "zoneMode", mode: m.mode }));
       this.zoneModeBtns.set(m.mode, b);
-      flyZones.appendChild(b);
+      shapeRow.appendChild(b);
     }
-    this.setZoneMode("paint", false);
-    bar.appendChild(this.group("zones", "Zones", { img: "kit/ico-zonas" }, flyZones));
+    bar.appendChild(this.group("zones", "Zones", { img: "kit/ico-zonas" }, zones.fly));
 
-    const flyServices = el("div", "panel fly wrap");
+    const services = this.flyout("wrap services-fly");
     for (const g of SERVICE_GROUPS) {
-      flyServices.appendChild(el("span", "svc-group", tr(g.label)));
-      for (const id of g.tools) flyServices.appendChild(this.toolButton(T[id]));
+      const row = services.section(tr(g.label), g.icon);
+      for (const id of g.tools) row.appendChild(this.toolButton(T[id]));
     }
-    bar.appendChild(this.group("services", "Services", { img: "kit/ico-governo" }, flyServices));
+    bar.appendChild(this.group("services", "Services", { img: "kit/ico-governo" }, services.fly));
 
-    const flyTransit = el("div", "panel fly");
-    for (const id of TRANSIT_TOOLS) flyTransit.appendChild(this.toolButton(T[id]));
-    bar.appendChild(this.group("transit", "Transit", { img: "kit/ico-onibus" }, flyTransit));
+    const transit = this.flyout("wrap");
+    for (const g of TRANSIT_GROUPS) {
+      const row = transit.section(tr(g.label));
+      for (const id of g.tools) row.appendChild(this.toolButton(T[id]));
+    }
+    bar.appendChild(this.group("transit", "Transit", { img: "kit/ico-onibus" }, transit.fly));
 
     bar.appendChild(this.toolButton(T.bulldoze, true));
 
-    const flyView = el("div", "panel fly wrap");
+    const view = this.flyout("wrap");
+    const viewRow = view.section(tr("Infoview"));
     for (const l of LAYERS) {
       const b = el("button", "tool", `${iconHtml(l.img ? { img: l.img } : { glyph: l.glyph, color: l.color })}<span>${tr(l.label)}</span>`);
       b.addEventListener("click", () => {
         this.hooks.onOverlay(l.layer);
         this.setOverlay(l.layer);
-        this.closeFlyouts();
+        this.hooks.onEvent({ kind: "closeFlyouts" });
       });
       this.layerBtns.push(b);
-      flyView.appendChild(b);
+      viewRow.appendChild(b);
     }
     this.layerBtns[0].classList.add("active");
-    this.viewBtn = this.group("view", "Infoview", { img: "kit/ico-busca" }, flyView);
+    this.viewBtn = this.group("view", "Infoview", { img: "kit/ico-busca" }, view.fly);
     bar.appendChild(this.viewBtn);
 
     const eco = el("button", "tool", `<img class="ic-img" src="/ui/kit/ico-dinheiro.png" alt=""><span>${tr("Economy")}</span>`);
@@ -649,26 +718,6 @@ export class Hud {
     return group;
   }
 
-  /** Upgrade toggle: off by default so a tap on an existing road starts a draft (branching) as before. */
-  private buildUpgradeGroup(): HTMLElement {
-    const group = el("div", "snap-group");
-    group.setAttribute("role", "group");
-    group.setAttribute("aria-label", tr("Upgrade road"));
-    group.appendChild(el("span", "snap-title", tr("Upgrade road")));
-    const b = el("button", "tool snap-btn", `<span>${tr("Off")}</span>`);
-    b.title = tr("Tap a road to change its class");
-    b.setAttribute("aria-pressed", "false");
-    b.addEventListener("click", () => {
-      const on = b.getAttribute("aria-pressed") !== "true";
-      b.setAttribute("aria-pressed", String(on));
-      b.classList.toggle("active", on);
-      b.querySelector("span")!.textContent = on ? tr("On") : tr("Off");
-      this.hooks.onUpgradeMode?.(on);
-    });
-    group.appendChild(b);
-    return group;
-  }
-
   /** Compact parallel-road controls (toggle / gap / side) next to the snap group. */
   private buildParallelGroup(): HTMLElement {
     const group = el("div", "snap-group");
@@ -685,7 +734,7 @@ export class Hud {
     };
     const toggleRow = row(tr("Parallel"));
     const toggle = el("button", "tool snap-btn", `<span>${tr("Off")}</span>`);
-    toggle.title = tr("Parallel");
+    toggle.title = tr("Both legs are planned together and undo as one");
     toggle.setAttribute("aria-pressed", String(this.parallel.enabled));
     toggle.addEventListener("click", () => this.setParallel({ ...this.parallel, enabled: !this.parallel.enabled }));
     this.parallelToggleBtn = toggle;
@@ -741,23 +790,43 @@ export class Hud {
 
   // ------------------------------------------------------------------ state
 
-  /** Highlight the active zoning shape (paint brush / marquee / fill). */
-  setZoneMode(mode: ZoneMode, notify = true): void {
-    this.zoneMode = mode;
-    this.zoneModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
-    if (notify) this.hooks.onZoneMode?.(mode);
+  /**
+   * Reflect the tool state: active tool and group, road choices, armed modes, the open flyout and the
+   * selection summary. Pure DOM writes; main.ts calls it after every dispatched event.
+   */
+  render(s: ToolState): void {
+    this.ui = s;
+    this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === s.tool));
+    const lit = (key: FlyoutId, on: boolean) => this.groupBtns.get(key)?.classList.toggle("active", on);
+    lit("road", isRoadGroupTool(s.tool));
+    lit("zones", ZONE_TOOLS.includes(s.tool));
+    lit("services", SERVICE_TOOLS.includes(s.tool));
+    lit("transit", TRANSIT_TOOLS.includes(s.tool));
+    this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === s.roadType));
+    this.roadModeBtns.forEach((b, m) => b.classList.toggle("active", m === s.roadMode));
+    this.roadLevelBtns.forEach((b, l) => b.classList.toggle("active", l === s.roadLevel));
+    this.zoneModeBtns.forEach((b, m) => b.classList.toggle("active", m === s.zoneMode));
+    this.upgradeBtn.classList.toggle("active", s.upgradeMode);
+    this.upgradeBtn.setAttribute("aria-pressed", String(s.upgradeMode));
+    this.upgradeBtn.querySelector("small")!.textContent = s.upgradeMode ? tr("On") : tr("Off");
+    this.interchangeBtn.classList.toggle("active", s.pendingInterchange);
+    this.interchangeBtn.setAttribute("aria-pressed", String(s.pendingInterchange));
+    this.flyouts.forEach((f, name) => f.classList.toggle("open", name === s.flyout));
+    this.groupBtns.forEach((b, name) => b.setAttribute("aria-expanded", String(name === s.flyout)));
+    this.roadSummaryEl.textContent = roadSummary(s, tr);
+    this.placeHint();
   }
 
-  getZoneMode(): ZoneMode { return this.zoneMode; }
+  /** The tool's own one-line description (the resting hint for tools the state machine has no hint for). */
+  toolHint(t: ToolId): string {
+    return T[t] ? tr(T[t].hint) : "";
+  }
 
   /** Restore the controls after the HUD was rebuilt (language change). */
-  restore(opts: { tool: ToolId; speed: number; taxRate: number; roadType: RoadType; roadMode: RoadMode; roadLevel?: RoadLevel; snap: RoadSnapOptions; parallel?: RoadParallelOptions; tips: boolean; zoneMode?: ZoneMode; overlay?: OverlayLayer }): void {
+  restore(opts: { ui: ToolState; speed: number; taxRate: number; snap: RoadSnapOptions; parallel?: RoadParallelOptions; tips: boolean; overlay?: OverlayLayer }): void {
     this.setSnap(opts.snap, false);
     if (opts.parallel) this.setParallel(opts.parallel, false);
-    this.setRoadChoice(opts.roadType, opts.roadMode, false);
-    if (opts.roadLevel) this.setRoadLevel(opts.roadLevel, false);
-    if (opts.zoneMode) this.setZoneMode(opts.zoneMode, false);
-    this.setTool(opts.tool);
+    this.render(opts.ui);
     this.setSpeed(opts.speed);
     this.setTips(opts.tips);
     if (opts.overlay !== undefined) this.setOverlay(opts.overlay);
@@ -771,46 +840,16 @@ export class Hud {
     this.hint.hidden = !on;
   }
 
-  private toggleFly(name: string): void {
-    const f = this.flyouts.get(name)!;
-    const open = f.classList.contains("open");
-    this.closeFlyouts();
-    if (!open) f.classList.add("open");
-    this.placeHint();
-  }
-
-  /** Close any open toolbar flyout (a tap on the map dismisses it so it never hides the work). */
-  dismissFlyouts(): void { this.closeFlyouts(); }
-
-  private closeFlyouts(): void {
-    this.flyouts.forEach((f) => f.classList.remove("open"));
-    this.placeHint();
-  }
-
-  /** Keep the tool hint above an open flyout (the road flyout is several rows tall) instead of under it. */
+  /** Keep the tool hint and the Finish / Create pills above an open flyout instead of under it. */
   private placeHint(): void {
     let top = 0;
     this.flyouts.forEach((f) => { if (f.classList.contains("open")) top = Math.max(top, f.offsetHeight); });
-    // Flyout bottom sits 96px up; the default hint position (196px) already clears a one-row flyout.
-    this.hint.style.bottom = top > 90 ? `calc(${96 + top + 10}px + var(--safe-bottom))` : "";
+    // Flyout bottom sits 96px up; the default positions (hint 196px, finish 210px, create 250px) already clear a one-row flyout.
+    const lift = top > 90 ? 96 + top + 10 : 0;
+    this.hint.style.bottom = lift ? `calc(${lift}px + var(--safe-bottom))` : "";
+    this.finishBtn.style.bottom = lift ? `calc(${lift + 20}px + var(--safe-bottom))` : "";
+    this.createBtn.style.bottom = lift ? `calc(${lift + 60}px + var(--safe-bottom))` : "";
   }
-
-  setRoadChoice(type: RoadType, mode: RoadMode, notify = true): void {
-    if (mode === "paint") mode = "line";
-    this.roadType = type;
-    this.roadMode = mode;
-    this.roadTypeBtns.forEach((b, t) => b.classList.toggle("active", t === type));
-    this.roadModeBtns.forEach((b, m) => b.classList.toggle("active", m === mode));
-    if (notify) this.hooks.onRoad(type, mode, this.roadLevel);
-  }
-
-  setRoadLevel(level: RoadLevel, notify = true): void {
-    this.roadLevel = level;
-    this.roadLevelBtns.forEach((b, l) => b.classList.toggle("active", l === level));
-    if (notify) this.hooks.onRoad(this.roadType, this.roadMode, level);
-  }
-
-  getRoadLevel(): RoadLevel { return this.roadLevel; }
 
   /** Apply snap options to the toggle buttons (exactly one pressed per group). */
   setSnap(opts: RoadSnapOptions, notify = true): void {
@@ -859,24 +898,6 @@ export class Hud {
       b.setAttribute("aria-pressed", String(on));
     });
     if (notify) this.hooks.onParallel?.({ ...this.parallel });
-  }
-
-  /** Cycle Solo → Elevado → Subterrâneo (key E). */
-  cycleRoadLevel(): RoadLevel {
-    const order: RoadLevel[] = ["ground", "elevated", "tunnel"];
-    const next = order[(order.indexOf(this.roadLevel) + 1) % order.length];
-    this.setRoadLevel(next);
-    return next;
-  }
-
-  setTool(t: ToolId): void {
-    this.currentTool = t;
-    this.toolBtns.forEach((b, id) => b.classList.toggle("active", id === t));
-    const group = (names: string[], key: string) => this.groupBtns.get(key)?.classList.toggle("active", names.includes(t));
-    group(ZONE_TOOLS, "zones");
-    group(SERVICE_GROUPS.flatMap((g) => g.tools), "services");
-    group(TRANSIT_TOOLS, "transit");
-    if (T[t]) this.hint.textContent = tr(T[t].hint);
   }
 
   setSpeed(s: number): void {
@@ -981,6 +1002,18 @@ export class Hud {
     }
   }
 
+  /** Grey out build buttons the city cannot use right now (balance, one city hall); DOM writes only on change. */
+  private refreshAvailability(s: CityState): void {
+    for (const [id, btn] of this.toolBtns) {
+      if (id === "road" || id === "pan") continue;
+      const reason = toolAvailability(id, s);
+      if (reason === (this.avail.get(id) ?? null)) continue;
+      this.avail.set(id, reason);
+      btn.classList.toggle("disabled", reason !== null);
+      btn.setAttribute("aria-disabled", String(reason !== null));
+    }
+  }
+
   /** The running city was swapped (load / new / undo): the guide re-seeds on the next frame. */
   onCitySwapped(): void {
     this.lastState = null;
@@ -998,7 +1031,7 @@ export class Hud {
       if (zone[i] !== 0) zoned++;
       if (level[i] > 0) buildings++;
     }
-    return { roads: s.world.segments.length, zoned, speed: this.speedVal, tool: this.currentTool, buildings };
+    return { roads: s.world.segments.length, zoned, speed: this.speedVal, tool: this.ui.tool, buildings };
   }
 
   update(s: CityState): void {
@@ -1011,6 +1044,7 @@ export class Hud {
     this.legend.refresh(s);
     this.tooltip.tick();
     this.guide.tick(performance.now());
+    this.refreshAvailability(s);
     const d = dateOf(s.day);
     this.dateEl.textContent = `${d.day} ${monthName(d.month)} ${d.year}`;
     this.popEl.textContent = fmt(s.population);
@@ -1071,6 +1105,6 @@ export class Hud {
     exp.textContent = money(s.lastMonth.expenses);
   }
 
-  get tool(): ToolId { return this.currentTool; }
+  get tool(): ToolId { return this.ui.tool; }
   get tipsOn(): boolean { return this.tips; }
 }

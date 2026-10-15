@@ -3,7 +3,7 @@ import { getLang, hasTranslation, setLang } from "../i18n";
 import { facilityUsage } from "../sim/facility-usage";
 import { FAC, FACILITY_INFO, FacilityKind } from "../sim/world";
 import { USAGE_STRING_KEYS, usageRows } from "./facility-usage-view";
-import { TOOL_I18N_KEYS } from "./hud";
+import { FLYOUT_I18N_KEYS, TOOL_I18N_KEYS } from "./hud";
 
 const KINDS = Object.keys(FACILITY_INFO).map(Number) as FacilityKind[];
 
@@ -34,7 +34,7 @@ describe("usage rows", () => {
     } finally { setLang(prev); }
   });
 
-  it("has pt-BR for every usage string and every tool label and hint", () => {
-    for (const k of [...USAGE_STRING_KEYS, ...TOOL_I18N_KEYS]) expect(hasTranslation(k), k).toBe(true);
+  it("has pt-BR for every usage string, every tool label and hint, and every flyout label", () => {
+    for (const k of [...USAGE_STRING_KEYS, ...TOOL_I18N_KEYS, ...FLYOUT_I18N_KEYS]) expect(hasTranslation(k), k).toBe(true);
   });
 });

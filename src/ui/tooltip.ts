@@ -19,6 +19,10 @@ export interface TooltipContent {
   per?: string;
   rows?: TooltipRow[];
   color?: string;
+  /** Short badge after the title (footprint "2×2", "One-way"). */
+  badge?: string;
+  /** Why the control is disabled right now; rendered last, in the warning colour. */
+  warn?: string;
 }
 
 export interface TipAnchor { left: number; top: number; bottom: number; width: number }
@@ -93,6 +97,12 @@ export class Tooltip {
     title.className = "tip-title";
     title.textContent = content.title;
     head.appendChild(title);
+    if (content.badge) {
+      const badge = document.createElement("span");
+      badge.className = "tip-badge";
+      badge.textContent = content.badge;
+      head.appendChild(badge);
+    }
     if (content.key) {
       const key = document.createElement("span");
       key.className = "tip-key";
@@ -113,6 +123,12 @@ export class Tooltip {
       this.el.appendChild(this.row(tr("Upkeep"), `${tipMoney(content.upkeep)} / ${content.per ?? tr("mo")}`));
     }
     for (const r of content.rows ?? []) this.el.appendChild(this.row(r.k, r.v));
+    if (content.warn) {
+      const warn = document.createElement("div");
+      warn.className = "tip-warn";
+      warn.textContent = content.warn;
+      this.el.appendChild(warn);
+    }
   }
 
   private row(k: string, v: string): HTMLElement {
@@ -179,6 +195,13 @@ export class Tooltip {
     });
     target.addEventListener("mouseleave", () => { if (!this.pinned) this.hide(); });
     target.addEventListener("mousedown", () => { if (!this.pinned) this.hide(); });
+    // Keyboard and switch control: the tip follows focus the way it follows the pointer.
+    target.addEventListener("focus", () => {
+      if (this.pinned || this.suspended || !target.matches(":focus-visible")) return;
+      window.clearTimeout(this.timer);
+      this.timer = window.setTimeout(() => this.show(target, content), 120);
+    });
+    target.addEventListener("blur", () => { if (!this.pinned) this.hide(); });
     // Touch (iPad): long-press shows the tip, release hides it.
     target.addEventListener("touchstart", () => {
       if (this.pinned || this.suspended) return;

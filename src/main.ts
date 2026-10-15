@@ -13,7 +13,8 @@ import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
 import { bindInput } from "./input";
-import { Hud, RoadMode, RoadLevel, toolColor } from "./ui/hud";
+import { Hud, toolColor } from "./ui/hud";
+import { checkToolState, hintFor, initialToolState, reduceTool, renderHint, type ToolEvent, type ToolState } from "./ui/tool-state";
 import { cityEvents } from "./ui/events";
 import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
@@ -47,21 +48,28 @@ const renderer = new CityRenderer(view, state);
 let traffic: TrafficState = newTraffic(state.world.size);
 renderer.setTraffic(traffic);
 renderer.setQualityCap(QUALITY_PIXEL_CAP[prefs.quality]);
-let tool: ToolId = "road";
+/**
+ * Tool, flyout, road and zoning selection: one state machine (src/ui/tool-state.ts) written only by dispatch().
+ * The mirrors below are read by the handlers in this file and refreshed after every event; never assign them.
+ */
+let ui: ToolState = initialToolState();
+let tool: ToolId = ui.tool;
 /** Zoning shape for res/com/ind and bulldoze (zone submenu). */
-let zoneMode: ZoneMode = "paint";
+let zoneMode: ZoneMode = ui.zoneMode;
+let roadType: RoadType = ui.roadType;
+let roadMode: ToolState["roadMode"] = ui.roadMode;
+let roadLevel: ToolState["roadLevel"] = ui.roadLevel;
+/** Road flyout "Upgrade" toggle: taps on existing roads convert them instead of starting a draft. */
+let upgradeMode = ui.upgradeMode;
+/** Next road-tool tap stamps a diamond interchange instead of drawing. */
+let pendingInterchange = ui.pendingInterchange;
 /** Marquee drag corners while a marquee stroke is active. */
 let marqueeAnchor: ZoneTile | null = null;
 let marqueeCurrent: ZoneTile | null = null;
 let overlay: OverlayLayer = 0;
 let speed = 1;
-let roadType: RoadType = 1;
-let roadMode: RoadMode = "line";
-let roadLevel: RoadLevel = "ground";
 
-/** Next road-tool tap stamps a diamond interchange instead of drawing. */
-let pendingInterchange = false;
-/** Points already placed for the road being drawn (start, and the bend in curve mode). */
+/** Points already placed for the road being drawn (start, and the bend in curve mode); `ui.draft` counts them. */
 let draft: Pt[] = [];
 /** Road-draft snap options (angle / length / road), persisted across sessions. */
 let snapOpts: RoadSnapOptions = loadRoadSnap();
@@ -91,31 +99,11 @@ let cursor: Pt | null = null;
 
 function makeHud(): Hud {
   return new Hud(app, {
-  onTool: (t) => {
-    tool = t;
-    if (t === "pan") renderer.setHover(null); else inspector.hide();
-    if (t !== "road") cancelDraft();
-    refreshHint();
-    refreshZoneHint();
-    cityEvents.emit("tool:changed");
-  },
-  onZoneMode: (m) => {
-    zoneMode = m;
-    cancelDraft();
-    refreshZoneHint();
-  },
+  onEvent: (e) => dispatch(e),
   onSpeed: (s) => { speed = s; hud.setSpeed(s); cityEvents.emit("time:speed"); },
   onTax: (r) => { state.taxRate = r; },
   onOverlay: (layer) => { overlay = layer; renderer.setOverlay(layer); },
-  onRoad: (t, m, lvl) => { roadType = t; roadMode = m; if (lvl) roadLevel = lvl; cancelDraft(); refreshHint(); },
-  onInterchange: () => {
-    tool = "road";
-    cancelDraft();
-    pendingInterchange = true;
-    hud.setTool("road");
-    hud.setHint(tr("Tap a bridge crossing to stamp an interchange"));
-  },
-  onFinishRoad: () => cancelDraft(),
+  onFinishRoad: () => dispatch({ kind: "cancel" }),
   onHomeView: () => {
     const rig = renderer.rig;
     rig.target.set(state.world.entry.x + 8, 0, state.world.entry.y);
@@ -127,11 +115,6 @@ function makeHud(): Hud {
     saveRoadSnap(o);
     refreshDraftPoint();
   },
-  onUpgradeMode: (on) => {
-    upgradeMode = on;
-    if (!on) hud.hideRoadReadout();
-    refreshHint();
-  },
   onParallel: (o) => {
     parallelOpts = o;
     saveRoadParallel(o);
@@ -141,7 +124,7 @@ function makeHud(): Hud {
   onCreateLine: () => {
     const kind = tool === "metroline" ? "metro" : tool === "trainline" ? "train" : "bus";
     const res = attempt(() => createLine(state, kind, lineDraft));
-    if (res.ok) { hud.notify("success", tr("Line created")); cancelDraft(); } else hud.notify("error", trReason(res.reason));
+    if (res.ok) { hud.notify("success", tr("Line created")); dispatch({ kind: "cancel" }); } else hud.notify("error", trReason(res.reason));
   },
   onLineVehicles: (id, delta) => {
     const line = state.world.lines.find((l) => l.id === id);
@@ -160,12 +143,42 @@ function makeHud(): Hud {
   });
 }
 let hud = makeHud();
-hud.setTool(tool);
+hud.render(ui);
 hud.setSpeed(speed);
 hud.setSnap(snapOpts, false);
 hud.setParallel(parallelOpts, false);
 hud.setTips(prefs.tips);
 refreshHistoryButtons();
+refreshHint();
+
+/**
+ * The only writer of the tool state: run the event through the reducer, refresh the mirrors, apply the effects
+ * (draft geometry, inspector, ghosts, listeners), re-render the HUD and restore the resting hint.
+ */
+function dispatch(e: ToolEvent): void {
+  const { state: next, fx } = reduceTool(ui, e);
+  ui = next;
+  tool = ui.tool; zoneMode = ui.zoneMode; roadType = ui.roadType; roadMode = ui.roadMode; roadLevel = ui.roadLevel;
+  upgradeMode = ui.upgradeMode; pendingInterchange = ui.pendingInterchange;
+  if (fx.clearDraft) clearDraftGeometry();
+  if (fx.trimDraft) { draft = draft.slice(0, 1); cursor = null; }
+  if (fx.toolChanged) {
+    if (tool === "pan") renderer.setHover(null); else inspector.hide();
+    renderer.setFacilityHover(null);
+    renderer.setHoverCell(null);
+    cityEvents.emit("tool:changed");
+  }
+  if (fx.upgradeOff) hud.hideRoadReadout();
+  hud.render(ui);
+  if (fx.replan && draft.length) {
+    if (lastHover) refreshDraftPoint(); else updatePreview();
+  } else refreshHint();
+  if (import.meta.env.DEV) {
+    const bad = checkToolState(ui);
+    if (ui.draft !== draft.length) bad.push(`ui.draft ${ui.draft} but ${draft.length} draft points`);
+    if (bad.length) console.warn("tool state", e, bad);
+  }
+}
 
 /**
  * Run a one-shot player mutation with undo support: the pre-action snapshot is
@@ -208,8 +221,8 @@ function restoreSnapshot(snap: string, msg: string): void {
 function rebuildHud(): void {
   hud.destroy();
   hud = makeHud();
-  hud.restore({ tool, speed, taxRate: state.taxRate, roadType, roadMode, roadLevel, snap: snapOpts, parallel: parallelOpts, tips: prefs.tips, zoneMode, overlay });
-  cancelDraft();
+  hud.restore({ ui, speed, taxRate: state.taxRate, snap: snapOpts, parallel: parallelOpts, tips: prefs.tips, overlay });
+  dispatch({ kind: "cancel" });
   menu.raise();
   menu.refresh();
   refreshHistoryButtons();
@@ -230,7 +243,7 @@ function swapCity(next: CityState): void {
   traffic = newTraffic(state.world.size);
   renderer.setWorld(state.world);
   renderer.setTraffic(traffic);
-  cancelDraft();
+  dispatch({ kind: "citySwapped" });
   inspector.hide();
   renderer.setHover(null);
   seenFires = state.fires;
@@ -296,8 +309,8 @@ if (slotInfo(AUTOSAVE)) setTimeout(() => hud.notify("warning", tr("Autosave foun
 const lineTool = () => tool === "busline" || tool === "metroline" || tool === "trainline";
 const placing = () => tool === "road" || lineTool() || tool === "roundabout";
 
-function cancelDraft(): void {
-  pendingInterchange = false;
+/** Drop the draft geometry and its on-screen traces; the tool state itself is reduced by dispatch(). */
+function clearDraftGeometry(): void {
   draft = [];
   lineDraft = [];
   cursor = null;
@@ -305,8 +318,11 @@ function cancelDraft(): void {
   lastHover = null;
   lastSnap = null;
   touchTether = null;
-  if (touchDrag) window.clearTimeout(touchDrag.timer);
-  touchDrag = null;
+  if (touchDrag) {
+    // A press still on the screen must not turn into a tap that restarts the draft when it lifts.
+    window.clearTimeout(touchDrag.timer);
+    touchDrag.cancelled = true;
+  }
   snapHold = null;
   startRef = null;
   marqueeAnchor = null;
@@ -342,24 +358,13 @@ function onLineTap(cx: number, cy: number): void {
     kind === "metro" ? "#b9a3ff" : kind === "train" ? "#ffb37a" : "#ffd84a");
   hud.showFinish(true, "Cancel");
   hud.showCreateLine(lineDraft.length >= 2);
-  refreshHint();
+  dispatch({ kind: "lineStop", count: lineDraft.length });
 }
 
+/** The resting hint for the tool state (hover previews overwrite it until the next event). */
 function refreshHint(): void {
-  if (!placing()) return;
-  if (tool === "roundabout") { hud.setHint(tr("Tap a junction to stamp a roundabout")); return; }
-  if (lineTool()) {
-    const what = tr(tool === "metroline" ? "metro station" : tool === "trainline" ? "train station" : "bus stop");
-    hud.setHint(lineDraft.length < 2
-      ? tr("Tap {what}s in the order the line should run ({n} picked)", { what, n: lineDraft.length })
-      : tr("{n} stops. Tap more, or Create line (the route loops)", { n: lineDraft.length }));
-    return;
-  }
-  const name = tr(ROAD_NAME[roadType]);
-  if (draft.length === 0 && upgradeMode) hud.setHint(tr("{name}: tap a road to upgrade it", { name }));
-  else if (draft.length === 0) hud.setHint(tr("{name}: tap a start point (or an existing road to connect)", { name }));
-  else if (roadMode === "curve" && draft.length === 1) hud.setHint(tr("{name}: tap the bend point", { name }));
-  else hud.setHint(tr("{name}: tap the end point", { name }));
+  const h = hintFor(ui);
+  hud.setHint(h ? renderHint(h, tr) : hud.toolHint(ui.tool));
 }
 
 /**
@@ -488,7 +493,7 @@ function showUpgradeReadout(raw: Pt, cx: number, cy: number): void {
 /** Stamp diamond ramps where a deck crosses a ground road (the Trevo button's tap). */
 function stampInterchangeAt(cx: number, cy: number): void {
   const raw = renderer.pickPoint(cx, cy);
-  pendingInterchange = false;
+  dispatch({ kind: "interchangeDone" });
   if (!raw) return;
   const w = state.world;
   const tx = Math.floor(raw.x), ty = Math.floor(raw.z);
@@ -579,14 +584,15 @@ function onTap(cx: number, cy: number): void {
     snapHold = null;
     draft = [p];
     hud.showFinish(true);
-    if (touchPointer) hud.setHint(tr("Tap again to start")); else refreshHint();
+    dispatch({ kind: "draftPoint" });
+    if (touchPointer) hud.setHint(tr("Tap again to start"));
     updatePreview({ x: cx, y: cy });
     return;
   }
   if (roadMode === "curve" && draft.length === 1) {
     draft.push(p);
     cursor = null;
-    refreshHint();
+    dispatch({ kind: "draftPoint" });
     return;
   }
   const seg = currentSegment()!;
@@ -626,7 +632,7 @@ function onTap(cx: number, cy: number): void {
     cursor = null;
     renderer.setRoadPreview(null);
     hud.hideRoadReadout();
-    refreshHint();
+    dispatch({ kind: "draftCommit" });
   } else {
     hud.showToast(trReason(res.reason));
     updatePreview({ x: cx, y: cy });
@@ -640,8 +646,6 @@ const isZoneLike = (t: ToolId): boolean =>
   (ZONE_BY_TOOL as Record<string, number | undefined>)[t] !== undefined || t === "bulldoze";
 let lastPaintCell = "";
 let strokeActive = false;
-/** Road flyout "Upgrade" toggle: taps on existing roads convert them instead of starting a draft. */
-let upgradeMode = false;
 let strokeOk = false;
 
 function zoneDisplayName(): string {
@@ -658,9 +662,7 @@ function refreshZoneHint(count?: number, cost?: number): void {
     hud.setHint(tr("{name}: {n} tiles, ${cost}", { name: zoneDisplayName(), n: count, cost }));
     return;
   }
-  if (zoneMode === "marquee") hud.setHint(tr(tool === "bulldoze" ? "Drag to clear a rectangle" : "Drag to zone a rectangle"));
-  else if (zoneMode === "fill") hud.setHint(tr(tool === "bulldoze" ? "Tap to clear the connected zones" : "Tap to fill the connected area"));
-  else hud.setTool(tool);
+  refreshHint();
 }
 
 /** A paint/drag stroke is ONE history entry: push on stroke start… */
@@ -800,7 +802,8 @@ function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
 // Finger/pen vs mouse decides the snap radius (36 vs 16 CSS px).
 renderer.canvas.addEventListener("pointerdown", (e) => {
   touchPointer = e.pointerType !== "mouse";
-  hud.dismissFlyouts();
+  // A tap on the map dismisses any flyout so it never hides the work.
+  if (ui.flyout) dispatch({ kind: "mapDown" });
   // A second stationary press on the anchor is a deliberate cancel. Moving it
   // becomes a preview-only drag; release never commits, preserving click-click.
   if (e.pointerType === "touch" && tool === "road" && draft.length && !pendingInterchange) {
@@ -808,7 +811,7 @@ renderer.canvas.addEventListener("pointerdown", (e) => {
     d.timer = window.setTimeout(() => {
       if (!touchDrag || touchDrag !== d || !isTouchLongPress(d.down, performance.now(), d.moved)) return;
       d.cancelled = true;
-      cancelDraft();
+      dispatch({ kind: "cancel" });
       hud.showToast(tr("Tap again to start"));
     }, 450);
     touchDrag = d;
@@ -841,6 +844,9 @@ renderer.canvas.addEventListener("pointerup", (e) => {
     touchTether = null;
     e.stopImmediatePropagation();
   }
+}, { capture: true });
+renderer.canvas.addEventListener("pointercancel", (e) => {
+  if (touchDrag && touchDrag.id === e.pointerId) { window.clearTimeout(touchDrag.timer); touchDrag = null; touchTether = null; }
 }, { capture: true });
 
 bindInput(renderer, {
@@ -906,13 +912,13 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (menu.isOpen) menu.close();
     else if (inspector.isOpen) { inspector.hide(); renderer.setHover(null); }
-    else cancelDraft();
+    else dispatch({ kind: "cancel" });
   } else if (e.key === "u" || e.key === "U") {
     overlay = overlay === UNDERGROUND_LAYER ? 0 : UNDERGROUND_LAYER;
     renderer.setOverlay(overlay);
     hud.setOverlay(overlay);
-  } else if (e.key === "e" || e.key === "E") {
-    if (tool === "road") { roadLevel = hud.cycleRoadLevel(); cancelDraft(); refreshHint(); }
+  } else if ((e.key === "e" || e.key === "E") && !isEditingText(e)) {
+    dispatch({ kind: "cycleLevel" });
   } else if ((e.key === "h" || e.key === "H") && !e.repeat && !isEditingText(e)) {
     hud.togglePanelsHidden();
   }
@@ -983,6 +989,9 @@ requestAnimationFrame(frame);
 (window as unknown as { __city: unknown }).__city = {
   get state() { return state; },
   get traffic() { return traffic; },
+  get ui() { return ui; },
+  get draftPoints() { return draft.length; },
+  dispatch,
   renderer, tileHeight,
   setTod: (v: number) => { tod = v; },
 };

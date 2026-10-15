@@ -24,6 +24,10 @@ const PT: Record<string, string> = {
   "Touch offset": "Deslocamento do toque",
   "Parallel": "Paralela",
   "Upgrade road": "Melhorar via",
+  // flyout sections and road facts (src/ui/hud.ts FLYOUT_I18N_KEYS, src/ui/road-facts.ts)
+  "Type": "Tipo", "Draw": "Traçado", "Tools": "Ferramentas", "Zone": "Zona", "Shape": "Forma", "Stops": "Paradas",
+  "Lanes": "Faixas", "Width": "Largura", "One-way": "Mão única", "per tile": "por trecho",
+  "Press E to cycle": "Tecla E alterna", "Both legs are planned together and undo as one": "As duas vias são planejadas juntas e desfeitas de uma vez",
   "Tap a road to change its class": "Toque numa via para mudar a classe", "Gap": "Espaço", "Side": "Lado", "On": "Ligado", "Left": "Esquerda", "Right": "Direita",
   "Ground": "Solo", "Elevated": "Elevado",
   "One-way street": "Rua de mão única", "One-way avenue": "Avenida de mão única", "Roundabout": "Rotatória",

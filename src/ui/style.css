@@ -475,6 +475,44 @@ body {
 .legend-stats .k { color: var(--muted); }
 .legend-stats .v { font-variant-numeric: tabular-nums; }
 
+/* UI-4: sectioned flyouts (src/ui/hud.ts flyout()). Docked above the toolbar, never taller than 40% of the
+ * screen: the body scrolls, so on an iPad in landscape the road being drawn stays visible above the menu. */
+.fly.open { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.fly { max-height: calc(40vh / var(--ui-scale, 1)); width: max-content; max-width: calc((100% - 16px) / var(--ui-scale, 1)); }
+.fly-head {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--panel-border); flex: none;
+}
+.fly-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.fly-summary { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fly-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 14px; padding: 6px; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+.fly-sec { display: flex; flex-direction: column; gap: 2px; }
+.fly-sec-title { display: flex; align-items: center; gap: 4px; font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 2px 4px 0; }
+.fly-sec-title .ic-img { width: 14px; height: 14px; }
+.fly-row { display: flex; flex-wrap: wrap; gap: 2px; }
+.fly-body .snap-group { flex-basis: 100%; margin-top: 0; }
+.road-fly { width: min(calc(760px / var(--ui-scale, 1)), calc((100% - 16px) / var(--ui-scale, 1))); }
+.fly.wrap .fly-sec { flex: 1 1 auto; }
+.fly.wrap.services-fly { width: min(calc(680px / var(--ui-scale, 1)), calc((100% - 16px) / var(--ui-scale, 1))); max-width: calc((100% - 16px) / var(--ui-scale, 1)); }
+.services-fly .fly-sec { flex: 1 1 280px; }
+/* Footprint badge (1×1 / 2×2) in the corner of a build button. */
+.tool { position: relative; }
+.tool .fp {
+  position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 9px; line-height: 1;
+  padding: 2px 4px; border-radius: 6px; background: rgba(255,255,255,.12); color: var(--muted);
+}
+/* Greyed build button: the tooltip and a tap say why (balance, one city hall). */
+.tool.disabled { opacity: .45; }
+.tool.disabled small { color: var(--bad); }
+.tool.disabled .fp { opacity: 0; }
+/* Armed stamps (Interchange) and the Upgrade toggle share the active style; the toggle's state is its small label. */
+.tool[aria-pressed="true"] small { color: var(--accent); font-weight: 700; }
+.tip-badge {
+  font-size: 10px; font-weight: 700; color: var(--muted); border: 1px solid var(--panel-border);
+  border-radius: 6px; padding: 1px 5px; white-space: nowrap;
+}
+.tip-warn { color: var(--bad); font-size: 12px; font-weight: 600; margin-top: 6px; }
+
 /* About and credits (src/ui/credits.ts) */
 .menu .about { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.4; }
 .menu .about p { margin: 0; }

@@ -10,7 +10,11 @@ Driven with single-finger taps and paths through the simulator control tool.
   median drawn, zoned cells re-seated against the new kerb on both sides, undo enabled.
 - With `built=1` the upgrade is refused with a reason (built lots), as designed.
 
-## Difficulties found (open)
+## Difficulties found
+
+Items 1, 2, 4 (state shown at once) and 5 are addressed by the tool state machine and the sectioned flyouts
+(docs/process/25-tool-state.md): picks close the flyout, it is capped at 40 % of the screen, the hint comes from
+the state, and Zones lights up and takes Residential when opened. 3, 6 and 7 remain open.
 
 | # | Where | Problem | Proposed fix |
 |---|---|---|---|
