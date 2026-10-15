@@ -15,6 +15,12 @@ export interface RoadGuideOverlayInput {
   snapKind: "node" | "segment" | "free";
   /** Direction of the preceding leg, when a chained road has one. */
   prevDir: number | null;
+  /** Touch anchor remains visible even before a draft has a meaningful length. */
+  anchorPending?: boolean;
+  /** World-space snap radius, rendered as a faint touch affordance. */
+  snapRadius?: number;
+  /** Screen-offset draft endpoint, joined back to the finger's true world pick. */
+  tether?: Pt | null;
 }
 
 /** Pure endpoint recipe, shared by the renderer tests. */
@@ -96,6 +102,19 @@ export class GuideOverlay {
     const s = 0.22;
     this.segment(cursor.x - s, cursor.z, cursor.x + s, cursor.z, mr, mg, mb);
     this.segment(cursor.x, cursor.z - s, cursor.x, cursor.z + s, mr, mg, mb);
+    if (input.anchorPending) {
+      // 12 chords are visually round while staying safely inside the preallocated store.
+      const r = input.snapRadius ?? 0.5;
+      for (let i = 0; i < 12; i++) {
+        const a = i * Math.PI * 2 / 12, b = (i + 1) * Math.PI * 2 / 12;
+        this.segment(anchor.x + Math.cos(a) * r, anchor.z + Math.sin(a) * r,
+          anchor.x + Math.cos(b) * r, anchor.z + Math.sin(b) * r, .72, .86, 1);
+      }
+      const q = .3;
+      this.segment(anchor.x - q, anchor.z, anchor.x + q, anchor.z, 1, 1, 1);
+      this.segment(anchor.x, anchor.z - q, anchor.x, anchor.z + q, 1, 1, 1);
+    }
+    if (input.tether) this.segment(cursor.x, cursor.z, input.tether.x, input.tether.z, .75, .88, 1);
     // Direction chevrons make the pending carriageway's intended travel explicit.
     const dx = cursor.x - anchor.x, dz = cursor.z - anchor.z, len = Math.hypot(dx, dz);
     if (len > 0.7) {

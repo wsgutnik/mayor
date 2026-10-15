@@ -19,7 +19,7 @@ const lenOf = (p: { x: number; z: number }) => Math.hypot(p.x - prev.x, p.z - pr
 describe("snapPoint", () => {
   it("returns the raw point for the draft's first point (no anchor)", () => {
     const raw = { x: 3.2, z: 7.9 };
-    expect(snapPoint(null, raw, { angle: 45, length: 4, roads: true, guides: true })).toBe(raw);
+    expect(snapPoint(null, raw, { angle: 45, length: 4, roads: true, guides: true, touchOffset: true })).toBe(raw);
   });
 
   it("leaves the point alone when everything is off", () => {
@@ -93,14 +93,14 @@ describe("snapToRoadTile", () => {
 
 describe("snap options", () => {
   it("defaults to road snap only, like before UI-2", () => {
-    expect(DEFAULT_ROAD_SNAP).toEqual({ angle: 0, length: 0, roads: true, guides: true });
+    expect(DEFAULT_ROAD_SNAP).toEqual({ angle: 0, length: 0, roads: true, guides: true, touchOffset: true });
   });
 
   it("repairs stored garbage field by field", () => {
     expect(normalizeRoadSnap(null)).toEqual(DEFAULT_ROAD_SNAP);
     expect(normalizeRoadSnap("45")).toEqual(DEFAULT_ROAD_SNAP);
-    expect(normalizeRoadSnap({ angle: 30, length: 2, roads: "yes" })).toEqual({ angle: 0, length: 2, roads: true, guides: true });
-    expect(normalizeRoadSnap({ angle: 15, length: 4, roads: false, guides: false })).toEqual({ angle: 15, length: 4, roads: false, guides: false });
+    expect(normalizeRoadSnap({ angle: 30, length: 2, roads: "yes" })).toEqual({ angle: 0, length: 2, roads: true, guides: true, touchOffset: true });
+    expect(normalizeRoadSnap({ angle: 15, length: 4, roads: false, guides: false })).toEqual({ angle: 15, length: 4, roads: false, guides: false, touchOffset: true });
   });
 
   it("round-trips through storage and survives blocked storage", () => {
@@ -110,8 +110,8 @@ describe("snap options", () => {
       setItem: (k: string, v: string) => { store.set(k, v); },
     };
     expect(loadRoadSnap()).toEqual(DEFAULT_ROAD_SNAP);
-    saveRoadSnap({ angle: 45, length: 2, roads: false, guides: false });
-    expect(loadRoadSnap()).toEqual({ angle: 45, length: 2, roads: false, guides: false });
+    saveRoadSnap({ angle: 45, length: 2, roads: false, guides: false, touchOffset: false });
+    expect(loadRoadSnap()).toEqual({ angle: 45, length: 2, roads: false, guides: false, touchOffset: false });
     store.set("mayor:road-snap", "{oops");
     expect(loadRoadSnap()).toEqual(DEFAULT_ROAD_SNAP);
     (globalThis as unknown as { localStorage: unknown }).localStorage = {
@@ -119,7 +119,7 @@ describe("snap options", () => {
       setItem: () => { throw new Error("blocked"); },
     };
     expect(loadRoadSnap()).toEqual(DEFAULT_ROAD_SNAP);
-    expect(() => saveRoadSnap({ angle: 45, length: 1, roads: true, guides: true })).not.toThrow();
+    expect(() => saveRoadSnap({ angle: 45, length: 1, roads: true, guides: true, touchOffset: true })).not.toThrow();
   });
 });
 

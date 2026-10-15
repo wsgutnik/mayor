@@ -215,6 +215,7 @@ export class Hud {
   private snapLengthBtns = new Map<LengthSnap, HTMLButtonElement>();
   private snapRoadsBtn: HTMLButtonElement | null = null;
   private snapGuidesBtn: HTMLButtonElement | null = null;
+  private snapTouchOffsetBtn: HTMLButtonElement | null = null;
   private parallel: RoadParallelOptions = { ...DEFAULT_ROAD_PARALLEL };
   private parallelToggleBtn: HTMLButtonElement | null = null;
   private parallelGapBtns = new Map<ParallelGap, HTMLButtonElement>();
@@ -604,6 +605,14 @@ export class Hud {
     guides.addEventListener("click", () => this.setSnap({ ...this.snap, guides: !this.snap.guides }));
     this.snapGuidesBtn = guides;
     guidesRow.appendChild(guides);
+    const offsetRow = row(tr("Touch offset"));
+    const offset = el("button", "tool snap-btn", `<span>${tr("Touch offset")}</span>`);
+    offset.title = tr("Touch offset");
+    offset.setAttribute("aria-pressed", String(this.snap.touchOffset));
+    offset.addEventListener("click", () => this.setSnap({ ...this.snap, touchOffset: !this.snap.touchOffset }));
+    offsetRow.appendChild(offset);
+    // It is not otherwise queried outside this flyout, so retain it with the other snap controls.
+    this.snapTouchOffsetBtn = offset;
     this.setSnap(this.snap, false);
     return group;
   }
@@ -788,6 +797,10 @@ export class Hud {
     if (this.snapGuidesBtn) {
       this.snapGuidesBtn.classList.toggle("active", opts.guides);
       this.snapGuidesBtn.setAttribute("aria-pressed", String(opts.guides));
+    }
+    if (this.snapTouchOffsetBtn) {
+      this.snapTouchOffsetBtn.classList.toggle("active", opts.touchOffset);
+      this.snapTouchOffsetBtn.setAttribute("aria-pressed", String(opts.touchOffset));
     }
     if (notify) this.hooks.onSnap?.({ ...this.snap });
   }

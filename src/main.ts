@@ -18,6 +18,7 @@ import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmen
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
 import { exitAngle, loadRoadSnap, resolveRoadSnap, saveRoadSnap, snapRadiusTiles, worldPerPixel, type RoadSnapOptions, type SnapHit, type SnapTarget } from "./ui/road-snap";
 import { guideAngles, resolveGuide, type RoadGuide } from "./ui/road-guides";
+import { isTouchLongPress, touchDraftPoint } from "./ui/touch-road";
 import { loadRoadParallel, offsetPolyline, parallelOffset, saveRoadParallel, type RoadParallelOptions } from "./ui/road-parallel";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { floodFill, rectangleTiles, ZONE_FILL_CAP, type ZoneMode, type ZoneTile } from "./ui/zone-tools";
@@ -78,6 +79,9 @@ let startRef: number | null = null;
 let touchPointer = false;
 /** Last pointer position over the canvas while drafting, for re-snapping without a new event. */
 let lastHover: { x: number; y: number } | null = null;
+let lastSnapRadius = 0.5;
+let touchTether: Pt | null = null;
+let touchDrag: { id: number; down: number; moved: boolean; cancelled: boolean; timer: number } | null = null;
 /** Stop ids picked so far for the transit line being built. */
 let lineDraft: number[] = [];
 let cursor: Pt | null = null;
@@ -291,6 +295,9 @@ function cancelDraft(): void {
   lastSegDir = null;
   lastHover = null;
   lastSnap = null;
+  touchTether = null;
+  if (touchDrag) window.clearTimeout(touchDrag.timer);
+  touchDrag = null;
   snapHold = null;
   startRef = null;
   marqueeAnchor = null;
@@ -358,6 +365,7 @@ function resolveDraftPoint(raw: Pt): Pt {
   const h = heightAt(state.world, raw.x, raw.z);
   const camTo = Math.hypot(cam.position.x - raw.x, cam.position.y - h, cam.position.z - raw.z);
   const radius = snapRadiusTiles(touchPointer, worldPerPixel(camTo, cam.fov, renderer.viewportHeight));
+  lastSnapRadius = radius;
   const hit = resolveRoadSnap(state.world, raw, {
     roadType, radius, opts: snapOpts, anchor, refAngle: lastSegDir ?? startRef, prev: snapHold,
   });
@@ -407,10 +415,11 @@ function updatePreview(at?: { x: number; y: number }): void {
   renderer.setRoadPreview({ type: roadType, pts: seg.pts }, plan.ok, marks,
     twinPts ? { pts: twinPts, valid: twinOk } : null);
   const anchor = draft[draft.length - 1];
-  const showGuides = tool === "road" && snapOpts.guides && !!cursor && !altDown && !shiftDown;
+  const showGuides = tool === "road" && !!cursor && (!altDown && !shiftDown) && (snapOpts.guides || touchPointer);
   renderer.setRoadGuides(showGuides ? {
-    anchor, guides: guideAngles(anchor, lastSegDir ?? startRef), activeGuide: guideHold,
+    anchor, guides: snapOpts.guides ? guideAngles(anchor, lastSegDir ?? startRef) : [], activeGuide: guideHold,
     cursor: cursor!, snapKind: lastSnap?.kind ?? "free", prevDir: lastSegDir,
+    anchorPending: touchPointer, snapRadius: lastSnapRadius, tether: touchTether,
   } : null);
   const len = segmentLength(seg.pts);
   if (!at || len < 0.5) {
@@ -560,7 +569,7 @@ function onTap(cx: number, cy: number): void {
     snapHold = null;
     draft = [p];
     hud.showFinish(true);
-    refreshHint();
+    if (touchPointer) hud.setHint(tr("Tap again to start")); else refreshHint();
     updatePreview({ x: cx, y: cy });
     return;
   }
@@ -779,8 +788,49 @@ function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
 }
 
 // Finger/pen vs mouse decides the snap radius (36 vs 16 CSS px).
-renderer.canvas.addEventListener("pointerdown", (e) => { touchPointer = e.pointerType !== "mouse"; }, { capture: true });
+renderer.canvas.addEventListener("pointerdown", (e) => {
+  touchPointer = e.pointerType !== "mouse";
+  // A second stationary press on the anchor is a deliberate cancel. Moving it
+  // becomes a preview-only drag; release never commits, preserving click-click.
+  if (e.pointerType === "touch" && tool === "road" && draft.length && !pendingInterchange) {
+    const d = { id: e.pointerId, down: performance.now(), moved: false, cancelled: false, timer: 0 };
+    d.timer = window.setTimeout(() => {
+      if (!touchDrag || touchDrag !== d || !isTouchLongPress(d.down, performance.now(), d.moved)) return;
+      d.cancelled = true;
+      cancelDraft();
+      hud.showToast(tr("Tap again to start"));
+    }, 450);
+    touchDrag = d;
+  }
+}, { capture: true });
 renderer.canvas.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") touchPointer = false; }, { capture: true });
+renderer.canvas.addEventListener("pointermove", (e) => {
+  const d = touchDrag;
+  if (!d || d.id !== e.pointerId || d.cancelled) return;
+  const dx = e.clientX - (lastHover?.x ?? e.clientX), dy = e.clientY - (lastHover?.y ?? e.clientY);
+  if (Math.hypot(dx, dy) < 4 && !d.moved) return;
+  d.moved = true;
+  window.clearTimeout(d.timer);
+  const finger = renderer.pickPoint(e.clientX, e.clientY);
+  const q = touchDraftPoint({ x: e.clientX, y: e.clientY }, snapOpts.touchOffset);
+  const raw = renderer.pickPoint(q.x, q.y);
+  if (!raw) return;
+  lastHover = q;
+  touchTether = finger;
+  cursor = resolveDraftPoint(raw);
+  updatePreview(q);
+  e.stopImmediatePropagation();
+}, { capture: true });
+renderer.canvas.addEventListener("pointerup", (e) => {
+  const d = touchDrag;
+  if (!d || d.id !== e.pointerId) return;
+  window.clearTimeout(d.timer);
+  touchDrag = null;
+  if (d.moved || d.cancelled) {
+    touchTether = null;
+    e.stopImmediatePropagation();
+  }
+}, { capture: true });
 
 bindInput(renderer, {
   paintsWithPrimary: () => tool !== "pan" && !placing(),

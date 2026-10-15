@@ -570,6 +570,8 @@ export interface RoadUpgradePlan {
   newTiles: number;
   /** Cost difference at the segment's elevation (0 for downgrades). */
   cost: number;
+  /** Empty zoned tile cells covered by newly widened asphalt and cleared without refund. */
+  clearedZones: number;
 }
 
 /**
@@ -579,10 +581,10 @@ export interface RoadUpgradePlan {
  */
 export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadType): RoadUpgradePlan {
   const w = s.world;
-  const bad = (reason: string): RoadUpgradePlan => ({ ok: false, reason, tiles: [], newTiles: 0, cost: 0 });
+  const bad = (reason: string): RoadUpgradePlan => ({ ok: false, reason, tiles: [], newTiles: 0, cost: 0, clearedZones: 0 });
   const seg = segById(w, segmentId);
   if (!seg || ![1, 2, 3, 4, 5].includes(newType)) return bad("Unknown road");
-  if (seg.type === newType) return { ok: true, tiles: [...seg.tiles], newTiles: 0, cost: 0 };
+  if (seg.type === newType) return { ok: true, tiles: [...seg.tiles], newTiles: 0, cost: 0, clearedZones: 0 };
   if (seg.fixed) return bad("Cannot remove the highway entry");
   if (seg.roundabout) return bad("Cannot upgrade a roundabout");
   const elev = segElevation(seg);
@@ -591,13 +593,17 @@ export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadTy
   const old = new Set(seg.tiles);
   const added = tiles.filter((t) => !old.has(t));
   if (elev !== "tunnel") {
-    // Same ground rules as planWithSpan, except zones are refused instead of
-    // cleared: an upgrade must never crush lots. Tunnels leave the surface alone.
+    // Empty zoning is cleared by reconcileZones after the wider raster lands.
+    // Only an actual building or a construction already under way blocks it.
     for (const t of added) {
       const x = t % w.size, y = (t / w.size) | 0;
       if (elev === "ground" && !isLand(w, x, y)) return bad("Road would cross water");
       if (w.facility[t]) return bad("Road would cross a building");
-      if (w.zone[t] || w.level[t]) return bad("Road would crush lots");
+      const lot = w.lots.find((l) => t >= l.y * w.size + l.x && t < (l.y + l.h) * w.size + l.x && (t % w.size) >= l.x && (t % w.size) < l.x + l.w);
+      const olot = (w.olots ?? []).find((l) => l.id === w.lotAt[t]);
+      if (w.level[t] > 0 || lot?.level || olot?.level ||
+        (lot?.construction && lot.construction.state !== "planned") ||
+        (olot?.construction && olot.construction.state !== "planned")) return bad("Road would crush lots");
     }
   }
   const newBase = baseRoadType(newType), oldBase = baseRoadType(seg.type);
@@ -643,8 +649,9 @@ export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadTy
     const step = ROAD_COST[newType] - (cur ? ROAD_COST[cur as RoadType] : 0);
     if (step > 0) { cost += step * mult; newTiles++; }
   }
-  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles, newTiles, cost };
-  return { ok: true, tiles, newTiles, cost };
+  const clearedZones = elev === "ground" ? added.filter((t) => !!w.zone[t]).length : 0;
+  if (s.money < cost) return { ok: false, reason: "Not enough money", tiles, newTiles, cost, clearedZones };
+  return { ok: true, tiles, newTiles, cost, clearedZones };
 }
 
 /**

@@ -8,6 +8,8 @@ import { History } from "./history";
 import { deserialize, serialize } from "./save";
 import { placeBusStop } from "./transit";
 import { cidx, idx, ROAD, rasterizeRoad, ZONE } from "./world";
+import { getZoneBlocks } from "./sim";
+import { checkZoneInvariant, invariantClean } from "./zoneinvariant";
 
 /** Dry, flat ground for a wide band around the entry row. */
 function flat(s: CityState) {
@@ -84,24 +86,31 @@ describe("road upgrade", () => {
     expect(broke.cost).toBe(plan.cost);
   });
 
-  it("refuses widening onto zones, buildings and facilities", () => {
+  it("clears empty zoning while refusing built lots, buildings and facilities", () => {
     const s = newCity(3);
     const ey = flat(s);
     road(s, 1, [[3.5, ey + 0.5], [12.5, ey + 0.5]]);
     const id = segAt(s, 8, ey).id;
     expect(applyTool(s, "res", 6, ey + 1).ok).toBe(true);
-    expect(upgradeRoad(s, id, 2)).toEqual({ ok: false, reason: "Road would crush lots" });
-    expect(applyTool(s, "bulldoze", 6, ey + 1).ok).toBe(true);
+    const plan = planRoadUpgrade(s, id, 2);
+    expect(plan).toMatchObject({ ok: true });
+    expect(plan.clearedZones).toBeGreaterThan(0);
+    expect(upgradeRoad(s, id, 2)).toEqual({ ok: true });
+    expect(s.world.zone[idx(s.world, 6, ey + 1)]).toBe(0);
+    expect(invariantClean(checkZoneInvariant(s.world, getZoneBlocks(s.world)))).toBe(true);
 
-    s.world.zone[idx(s.world, 7, ey + 1)] = ZONE.COM;
-    s.world.level[idx(s.world, 7, ey + 1)] = 2;
-    expect(upgradeRoad(s, id, 2)).toEqual({ ok: false, reason: "Road would crush lots" });
-    s.world.zone[idx(s.world, 7, ey + 1)] = 0;
-    s.world.level[idx(s.world, 7, ey + 1)] = 0;
+    // A real building level remains protected.
+    const built = newCity(3); flat(built);
+    road(built, 1, [[3.5, ey + 0.5], [12.5, ey + 0.5]]);
+    built.world.zone[idx(built.world, 7, ey + 1)] = ZONE.COM;
+    built.world.level[idx(built.world, 7, ey + 1)] = 2;
+    expect(upgradeRoad(built, segAt(built, 8, ey).id, 2)).toEqual({ ok: false, reason: "Road would crush lots" });
 
-    expect(applyTool(s, "power", 8, ey + 1).ok).toBe(true);
-    expect(upgradeRoad(s, id, 2)).toEqual({ ok: false, reason: "Road would cross a building" });
-    expect(segAt(s, 8, ey).type).toBe(1);
+    const facility = newCity(3); flat(facility);
+    road(facility, 1, [[3.5, ey + 0.5], [12.5, ey + 0.5]]);
+    expect(applyTool(facility, "power", 8, ey + 1).ok).toBe(true);
+    expect(upgradeRoad(facility, segAt(facility, 8, ey).id, 2)).toEqual({ ok: false, reason: "Road would cross a building" });
+    expect(segAt(facility, 8, ey).type).toBe(1);
   });
 
   it("refuses a highway upgrade that meets streets or strands lots", () => {
@@ -241,33 +250,27 @@ describe("road upgrade", () => {
     expect(fwd.money).toBe(s.money);
   });
 
-  it("keeps oriented zoning consistent", () => {
+  it("clears empty oriented zoning, and round-trips it through save and history", () => {
     const s = newCity(3);
     const ey = flat(s);
     s.world.zoning = "oriented";
     s.money = 1e7;
     road(s, 1, [[3.5, ey + 0.5], [20.5, ey + 0.5]]);
-    // Kerb cells crush under the widening: refused through the tile mirror.
+    // Kerb cells are empty: widening clears their cell state and mirror.
     expect(applyZoneAt(s, ZONE.RES, 10.5, ey + 1.5, { radius: 0 }).ok).toBe(true);
     const id = segAt(s, 8, ey).id;
-    expect(upgradeRoad(s, id, 2)).toEqual({ ok: false, reason: "Road would crush lots" });
-
-    const t = newCity(3);
-    flat(t);
-    t.world.zoning = "oriented";
-    t.money = 1e7;
-    road(t, 1, [[3.5, ey + 0.5], [20.5, ey + 0.5]]);
-    // A far cell drags in the cells between it and the road (frontage fill), so the kerb cells block the widening...
-    expect(applyZoneAt(t, ZONE.RES, 10.5, ey + 3.5, { radius: 0 }).ok).toBe(true);
-    expect(upgradeRoad(t, segAt(t, 8, ey).id, 2)).toEqual({ ok: false, reason: "Road would crush lots" });
-    // ...until the player clears the strip next to the road: the far cells survive the widening.
-    for (let y = ey + 1; y <= ey + 2; y++) for (let x = 3; x <= 21; x++) applyTool(t, "bulldoze", x, y);
-    expect(upgradeRoad(t, segAt(t, 8, ey).id, 2).ok).toBe(true);
-    syncLots(t);
-    expect(t.world.olots).toBeDefined();
-    const b = deserialize(serialize(t));
+    const before = serialize(s);
+    expect(upgradeRoad(s, id, 2)).toEqual({ ok: true });
+    syncLots(s);
+    expect(invariantClean(checkZoneInvariant(s.world, getZoneBlocks(s.world)))).toBe(true);
+    const b = deserialize(serialize(s));
     expect(b.world.segments.find((sg) => !sg.fixed)!.type).toBe(2);
-    expect(b.world.olots!.length).toBe(t.world.olots!.length);
+    expect(invariantClean(checkZoneInvariant(b.world, getZoneBlocks(b.world)))).toBe(true);
+    const h = new History(); h.push(before);
+    const undone = deserialize(h.undo(serialize(s))!);
+    expect(undone.world.segments.find((sg) => !sg.fixed)!.type).toBe(1);
+    const redone = deserialize(h.redo(serialize(undone))!);
+    expect(redone.world.segments.find((sg) => !sg.fixed)!.type).toBe(2);
   });
 
   it("finds the tap target on tarmac only, preferring the nearer centreline", () => {

@@ -17,10 +17,12 @@ export interface RoadSnapOptions {
   roads: boolean;
   /** Faint 45° guide rays; unlike legacy angle snap these never force a stroke outside their cone. */
   guides: boolean;
+  /** Lift a touch draft endpoint above the finger so it remains visible. */
+  touchOffset: boolean;
 }
 
 /** Out of the box the draft behaves as before UI-2: only road snap is on. */
-export const DEFAULT_ROAD_SNAP: RoadSnapOptions = { angle: 0, length: 0, roads: true, guides: true };
+export const DEFAULT_ROAD_SNAP: RoadSnapOptions = { angle: 0, length: 0, roads: true, guides: true, touchOffset: true };
 
 const ANGLES: readonly AngleSnap[] = [0, 15, 45];
 const LENGTHS: readonly LengthSnap[] = [0, 1, 2, 4];
@@ -36,6 +38,7 @@ export function normalizeRoadSnap(v: unknown): RoadSnapOptions {
     roads: typeof o.roads === "boolean" ? o.roads : d.roads,
     // Old preferences had only `angle`; retain it and make the new optional guide visible by default.
     guides: typeof o.guides === "boolean" ? o.guides : d.guides,
+    touchOffset: typeof o.touchOffset === "boolean" ? o.touchOffset : d.touchOffset,
   };
 }
 
