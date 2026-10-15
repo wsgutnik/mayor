@@ -974,6 +974,13 @@ requestAnimationFrame(frame);
   setTod: (v: number) => { tod = v; },
 };
 
+// Dev-only scripted scenario (?scenario=upgrade): staged city, fixed camera, paused.
+if (import.meta.env.DEV && new URLSearchParams(location.search).has("scenario")) {
+  void import("./dev/scenario").then((m) => m.initScenario({
+    useCity, renderer, pause: () => { speed = 0; hud.setSpeed(0); },
+  }, new URLSearchParams(location.search)));
+}
+
 // Dev-only junction showcase (docs/process/junction-gate.md G1): lazy-loaded
 // only when the flag is present, so normal play never pays for it.
 if (import.meta.env.DEV && new URLSearchParams(location.search).get("showcase") === "1") {

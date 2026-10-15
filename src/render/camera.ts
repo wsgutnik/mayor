@@ -7,6 +7,8 @@ export class CameraRig {
   yaw = Math.PI * 0.25;
   pitch = 0.9;
   dist = 38;
+  /** Dev scenarios freeze the view so scripted touches cannot pan, rotate or zoom it. */
+  locked = false;
   private bounds: number;
 
   constructor(aspect: number, mapSize: number) {
@@ -31,6 +33,7 @@ export class CameraRig {
 
   /** Pan by screen-space pixels; scales with distance so the ground follows the cursor. */
   panPixels(dx: number, dy: number, viewportH: number): void {
+    if (this.locked) return;
     const worldPerPx = (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * this.dist) / viewportH;
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw); // screen right
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw); // screen up (into the map)
@@ -41,6 +44,7 @@ export class CameraRig {
 
   /** Pan in world units along the camera's ground axes (keyboard). */
   panWorld(right: number, forward: number): void {
+    if (this.locked) return;
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     this.target.x += right * rx + forward * fx;
@@ -49,12 +53,14 @@ export class CameraRig {
   }
 
   rotate(dyaw: number, dpitch = 0): void {
+    if (this.locked) return;
     this.yaw += dyaw;
     this.pitch += dpitch;
     this.apply();
   }
 
   zoom(factor: number): void {
+    if (this.locked) return;
     this.dist *= factor;
     this.apply();
   }
