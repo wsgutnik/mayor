@@ -173,7 +173,8 @@ A cell is invalid when any of the following holds, tested in this order; `valid`
     returns and corner sidewalk). Nodes with >= 3 ground arms but no layout fall back to the disc
     `max(drawHalf + sidewalk + cornerR)`;
   - the tile raster (`blocksBuilding(tileOf(centre))`) only for decks and non-ground roads (`roadSurface == 0` or
-    `roadDeck != 0`), or for every road tile when the analytic test is skipped (> 1000 ground segments). The raster
+    `roadDeck != 0`). (The old shortcut that skipped the analytic test above 1000 ground segments is gone since zperf,
+    §1.9: the indexed exact path is fast enough at any size.) The raster
     marks every tile a centreline touches; on a diagonal such a tile reaches ~1.4 tiles from the centreline, so the
     old centre-tile test rejected the depth-0 cell of every other row beside its own road and the cut-off (e) then
     emptied the row: the "zone floats off the road" defect. Tunnels never invalidate (`isTunnelTile`).
@@ -292,6 +293,32 @@ the nearest valid cell instead of silently dropping them.
 strips sit 0.06 inside the lot and are drawn only within 0.2 of a road's setback line and off the surface (on
 diagonals classic kerbs were drawn on tile edges up to a tile away from the ribbon). `orientedKerb` sits 0.075 behind
 the front edge (its face 0.015 inside, outside the band validity keeps off junction rings).
+
+### 1.9 Incremental, exact rebuilds (task zperf)
+
+A road or zone edit must not hitch the iPad (AGENTS rule 4). `buildZoneBlocks` and `reconcileZones` keep the exact
+rules above but stop recomputing the whole city on every edit; results are byte-identical to the pre-zperf code
+(`src/sim/zone-perf.diff.test.ts` runs the frozen copy in `src/sim/zone-oracle/` through `zoneHooks` and compares zone
+blocks, valid/zone/level/lot bytes, tile index, lots and mirror after every operation of the random scenarios, the
+benchmark fixtures, facility on/off, terrain pokes and natural terrain). What is cached, per world:
+
+- **Block templates** per segment (frame, edge) while the segment's id, type and points stay; per template the cell
+  geometry (centres, Float32 corners, area test, slope road points, tile boxes).
+- **Road test bits** (§1.4 c) per block, reused unless a road that can be a candidate of one of its cells (raster within
+  2 tiles of a cell tile) changed type/points/tiles/flat ends, a junction ring or disc near it changed, or its own
+  segment's straight continuations changed. Exact tests use per-road chunk boxes and squared-distance pre-checks; the
+  sampled arithmetic is unchanged.
+- **Terrain bits** per template, reused unless a heights grid point or tile (facility, raster, deck, tunnel) the test
+  reads changed since the previous build (snapshots compared on every build: heights change without a revision).
+- **Conflict neighbours** of §1.5 per template cell (symmetric, purely geometric, alive cells only), recomputed only near
+  templates that appeared, vanished or changed their alive cells. The greedy order is emitted in linear time when the
+  distinct depths are > 1e-6 apart (otherwise the tolerant comparator sort runs as before).
+- `corridorsOf` reuses unchanged segment corridors; `roadSurface` reuses curve shapes and buckets pieces in chunks;
+  lot-rectangle answers (`lotRectOnRoad`) are remembered per surface and carried over edits that cannot reach them.
+- `tileIndex` is built on first read from a snapshot; migration uses a bucket index with the linear scan's tie rule.
+
+`ZPERF=1 npx vitest run src/sim/zone-perf.bench.test.ts` prints ms per phase per fixture; an always-on guard keeps a
+road edit and a 2000-tile repaint on the 96x96 grid fixture under a loose 40 ms.
 
 ### 1.7 World fields (additive, `world.ts:143-207`)
 

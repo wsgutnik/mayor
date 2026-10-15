@@ -17,11 +17,12 @@ import { cornerRadiusFor } from "./junction";
 import {
   BlockInfo, getBlocks, getFrontage, lotsReadyToBuild, planLots,
 } from "./blocks";
-import { rasterizeMirror } from "./mirror";
-import { lotRectOnRoad, roadSurface, tileOnRoad } from "./roadsurface";
-import { lotsReady, planOrientedLots } from "./orientedlots";
+import { zpEnd, zpStart } from "./zoneprof";
+import { zoneHooks } from "./zonehooks";
+import { tileOnRoad } from "./roadsurface";
+import { lotsReady } from "./orientedlots";
 import { evolveOrientedLot } from "./lot-evolution";
-import { buildZoneBlocks, cellIndex, cellPose, nearestCell, type ZoneBlockSet } from "./zoneblocks";
+import { cellIndex, cellPose, type ZoneBlockSet } from "./zoneblocks";
 import { CELL_DEPTH } from "./zonecells";
 import type { CellRef, ConstructionPhase, ConstructionState, OrientedLot, ZoneBlock } from "./zonecells";
 import { applyLandmarkLandValue, LANDMARKS, landmarkCap, landmarkHappiness, landmarkJobs, landmarkRoll, LANDMARK_COOLDOWN } from "./landmarks";
@@ -749,7 +750,7 @@ function blockKey(ref: Pick<CellRef, "seg" | "side" | "block">): string {
 export function getZoneBlocks(w: World): ZoneBlockSet {
   const prev = w.cells as unknown as ZoneBlockSet | undefined;
   if (prev && prev.graphRevision === w.graphRevision && (prev as { obstacleRevision?: number }).obstacleRevision === w.obstacleRevision) return prev;
-  const next = buildZoneBlocks(w, prev);
+  const next = zoneHooks.buildZoneBlocks(w, prev);
   (next as { obstacleRevision?: number }).obstacleRevision = w.obstacleRevision;
   w.cells = next as unknown as World["cells"];
   return next;
@@ -819,7 +820,7 @@ export function setOLotLevel(w: World, lot: OrientedLot, level: number): void {
     const i = cellIndex(row, col);
     b.level[i] = level;
   }
-  rasterizeMirror(w, set, w.olots ?? []);
+  zoneHooks.rasterizeMirror(w, set, w.olots ?? []);
 }
 
 /**
@@ -836,10 +837,13 @@ export function refreshOrientedLots(s: CityState): void {
   const keep = w.olots ?? [];
   // A lot is drawn as one rigid rectangle (pads, kerb, ground plan, building): it must stay off the road (05 §1.8).
   // The planner asks only for lots on curved frames; the surface is built on first use (cached per graph revision).
-  let surface: ReturnType<typeof roadSurface> | undefined;
+  // lotRectOnRoad remembers its answers per surface (and carries them over road edits that cannot reach them).
+  let surface: ReturnType<typeof zoneHooks.roadSurface> | undefined;
   const rectOk = (p: { cx: number; cz: number; yaw: number; w: number; d: number }): boolean =>
-    !lotRectOnRoad(surface ??= roadSurface(w), p.cx, p.cz, p.w, p.d, p.yaw, LOT_SURFACE_EPS);
-  const lots = planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep, seed: s.rngState, rectOk });
+    !zoneHooks.lotRectOnRoad(surface ??= zoneHooks.roadSurface(w), p.cx, p.cz, p.w, p.d, p.yaw, LOT_SURFACE_EPS);
+  let tp = zpStart();
+  const lots = zoneHooks.planOrientedLots(set.blocks, { rng: makeRng((s.rngState ^ 0x85ebca6b) >>> 0), keep, seed: s.rngState, rectOk });
+  zpEnd("planLots", tp);
   const keptIds = new Set(keep.map((lot) => lot.id));
   // New lots get fresh ids above every id ever issued. The remap is built first and applied to the cells in one
   // pass: renaming in place let a renamed lot's cells be renamed again by the next lot (5 -> 6, then 6 -> 7), so a
@@ -855,7 +859,9 @@ export function refreshOrientedLots(s: CityState): void {
   }
   for (const lot of lots) w.nextOLotId = Math.max(w.nextOLotId, lot.id + 1);
   w.olots = lots;
-  rasterizeMirror(w, set, lots);
+  tp = zpStart();
+  zoneHooks.rasterizeMirror(w, set, lots);
+  zpEnd("mirror", tp);
   w.lotsDirty = false;
 }
 
@@ -949,7 +955,7 @@ function scrubCells(set: ZoneBlockSet): number {
  * road. Everything else is cleared (CS1: zones vanish under and beside removed roads). Returns the count.
  */
 function scrubTiles(w: World): number {
-  const surface = roadSurface(w, "kerb");
+  const surface = zoneHooks.roadSurface(w, "kerb");
   const front = getFrontage(w);
   let n = 0;
   for (let i = 0; i < w.zone.length; i++) {
@@ -988,7 +994,7 @@ export function setZoningMode(s: CityState, mode: World["zoning"]): void {
     const set = getZoneBlocks(w);
     for (let t = 0; t < oldZone.length; t++) {
       if (!oldZone[t]) continue;
-      const ref = nearestCell(set, (t % w.size) + 0.5, ((t / w.size) | 0) + 0.5, 0.75);
+      const ref = zoneHooks.nearestCell(set, (t % w.size) + 0.5, ((t / w.size) | 0) + 0.5, 0.75);
       const b = ref ? set.blocks.get(blockKey(ref)) : undefined;
       if (!ref || !b) continue;
       const i = cellIndex(ref.row, ref.col);
@@ -1006,13 +1012,19 @@ export function setZoningMode(s: CityState, mode: World["zoning"]): void {
 
 export function reconcileZones(s: CityState): void {
   const w = s.world;
+  const t0 = zpStart();
   if (w.zoning === "oriented") {
-    scrubCells(getZoneBlocks(w));
+    const set = getZoneBlocks(w);
+    const tp = zpStart();
+    scrubCells(set);
+    zpEnd("scrub", tp);
     refreshOrientedLots(s);
+    zpEnd("reconcile", t0);
     return;
   }
   if (scrubTiles(w)) w.zoneRevision++;
   refreshLots(s);
+  zpEnd("reconcile", t0);
 }
 
 export interface ZoneBrush { radius: 0 | 1 | 2 }
@@ -1039,7 +1051,7 @@ export function applyZoneAt(s: CityState, zone: ZoneType | 0, x: number, z: numb
     return applyTool(s, zone === 0 ? "bulldoze" : zone === ZONE.RES ? "res" : zone === ZONE.COM ? "com" : "ind", Math.floor(x), Math.floor(z));
   }
   const set = getZoneBlocks(w);
-  const picked = nearestCell(set, x, z, 0.75);
+  const picked = zoneHooks.nearestCell(set, x, z, 0.75);
   if (!picked) return { ok: false, reason: "Zones must be within 4 tiles of a road" };
   const refs = refsAround(set, picked, brush.radius);
   const pending = refs.filter((ref) => {
@@ -1079,7 +1091,7 @@ export function bulldozeAt(s: CityState, x: number, z: number): ToolResult {
     return applyTool(s, "bulldoze", tx, ty);
   }
   const set = getZoneBlocks(w);
-  const ref = nearestCell(set, x, z, 0.75);
+  const ref = zoneHooks.nearestCell(set, x, z, 0.75);
   if (!ref) return { ok: true };
   const b = set.blocks.get(blockKey(ref));
   if (!b) return { ok: true };
@@ -1296,7 +1308,7 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (w.zoning === "oriented") return applyZoneAt(s, ZONE_OF_TOOL[tool], x + 0.5, y + 0.5, { radius: 0 });
     const z = ZONE_OF_TOOL[tool];
     // The drawn road (asphalt, kerb, sidewalk) covers more than its raster on diagonals and curves (05 §1.8).
-    if (blocksBuilding(w, i) || tileOnRoad(roadSurface(w, "kerb"), x, y)) return { ok: false, reason: "Tile is a road" };
+    if (blocksBuilding(w, i) || tileOnRoad(zoneHooks.roadSurface(w, "kerb"), x, y)) return { ok: false, reason: "Tile is a road" };
     if (w.facility[i]) return { ok: false, reason: "Tile is occupied" };
     if (w.zone[i] === z) return { ok: true };
     // Zoning hugs the street grid: a tile needs street frontage within ZONE_DEPTH, like blocks in Cities: Skylines.
@@ -1331,7 +1343,7 @@ export function isFillOpenTile(w: World, tool: ZoneBulkTool, x: number, y: numbe
   const i = idx(w, x, y);
   if (!isLand(w, x, y) || blocksBuilding(w, i) || w.facility[i]) return false;
   if (tool === "bulldoze") return w.zone[i] !== 0;
-  if (w.zoning === "tiles" && tileOnRoad(roadSurface(w, "kerb"), x, y)) return false;
+  if (w.zoning === "tiles" && tileOnRoad(zoneHooks.roadSurface(w, "kerb"), x, y)) return false;
   if (w.zone[i] !== 0 && w.zone[i] !== ZONE_OF_TOOL[tool]) return false;
   return getFrontage(w).road[i] >= 0;
 }
@@ -1368,7 +1380,7 @@ function collectZoneBulk(w: World, tool: ZoneBulkTool, tiles: readonly { x: numb
     return out;
   }
   const frontage = tool === "bulldoze" ? null : getFrontage(w);
-  const surface = roadSurface(w, "kerb");
+  const surface = zoneHooks.roadSurface(w, "kerb");
   let already = 0;
   for (const t of tiles) {
     if (!inBounds(w, t.x, t.y)) { fail("Outside the map"); continue; }
@@ -1674,7 +1686,7 @@ export function step(s: CityState): void {
           // Evolution is atomic: the existing anchor ID survives and all
           // absorbed neighbours disappear before the mirror is rebuilt.
           const evolved = evolveOrientedLot(w, getZoneBlocks(w), w.olots ?? [], lot as OrientedLot, lvl + 1);
-          if (evolved) { rasterizeMirror(w, getZoneBlocks(w), w.olots ?? []); beginConstruction(lot, true); changed = true; }
+          if (evolved) { zoneHooks.rasterizeMirror(w, getZoneBlocks(w), w.olots ?? []); beginConstruction(lot, true); changed = true; }
         } else { setLotLevel(w, lot as WorldLot, lvl + 1); changed = true; }
       }
       else if (d < -0.3 && rng() < 0.01) { oriented ? setOLotLevel(w, lot as OrientedLot, lvl - 1) : setLotLevel(w, lot as WorldLot, lvl - 1); changed = true; }

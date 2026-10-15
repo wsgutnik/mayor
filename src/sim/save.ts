@@ -2,8 +2,8 @@ import {
   CityState, newCity, refreshDerived,
 } from "./sim";
 import { lotPose } from "./orientedlots";
-import { rasterizeMirror } from "./mirror";
-import { buildZoneBlocks, cellIndex, nearestCell, type MigrationReport, type ZoneBlockSet } from "./zoneblocks";
+import { zoneHooks } from "./zonehooks";
+import { cellIndex, type MigrationReport, type ZoneBlockSet } from "./zoneblocks";
 import { adoptNodes } from "./roads";
 import type { OrientedLot, Side } from "./zonecells";
 import { landmarkById, type LandmarkId } from "./landmarks";
@@ -134,7 +134,7 @@ export function serialize(s: CityState): string {
     entry: w.entry,
   };
   if (w.zoning === "oriented") {
-    const set = w.cells as unknown as ZoneBlockSet | undefined ?? buildZoneBlocks(w);
+    const set = w.cells as unknown as ZoneBlockSet | undefined ?? zoneHooks.buildZoneBlocks(w);
     const cells: SaveCell[] = [];
     for (const b of set.blocks.values()) {
       let used = false;
@@ -357,12 +357,12 @@ export function migrateV1Cells(w: import("./world").World): MigrationReport {
   const oldLevel = new Uint8Array(w.level);
   adoptNodes(w);
   rebuildRoadRaster(w);
-  const set = buildZoneBlocks(w);
+  const set = zoneHooks.buildZoneBlocks(w);
   const report: MigrationReport = { moved: 0, dropped: [], lotsBroken: [] };
   for (let y = 0; y < w.size; y++) for (let x = 0; x < w.size; x++) {
     const tile = y * w.size + x;
     if (!oldZone[tile]) continue;
-    const ref = nearestCell(set, x + 0.5, y + 0.5, 0.75);
+    const ref = zoneHooks.nearestCell(set, x + 0.5, y + 0.5, 0.75);
     if (!ref) { report.dropped.push({ seg: -1, side: 1, block: -1, row: y, col: x }); continue; }
     const b = set.blocks.get(`${ref.seg}:${ref.side}:${ref.block}`)!;
     const i = cellIndex(ref.row, ref.col);
@@ -425,12 +425,12 @@ export function deserialize(json: string): CityState {
         // the nodes left over from newCity() gave wrong junctions and the lot check then cleared valid zoned cells.
         adoptNodes(w);
         rebuildRoadRaster(w);
-        const set = buildZoneBlocks(w);
+        const set = zoneHooks.buildZoneBlocks(w);
         copySavedCells(f2, set);
         w.cells = set as unknown as typeof w.cells;
         w.olots = hydrateSavedLots(f2, set);
         w.nextOLotId = Math.max(f2.nextOLotId, ...w.olots.map((l) => l.id + 1), 1);
-        rasterizeMirror(w, set, w.olots);
+        zoneHooks.rasterizeMirror(w, set, w.olots);
         // refreshDerived reconciles (05 §1.8): saved zone bytes on cells that are invalid under the current rules
         // are cleared, and kept lots whose footprint now touches a road are replanned. Valid lots keep their ids.
         w.lotsDirty = true;

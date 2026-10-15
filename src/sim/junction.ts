@@ -26,6 +26,7 @@ import {
 import { nodeArms, nodeById, segById } from "./roads";
 import { corridorsOf, profileOf } from "./corridor";
 import { buildLaneConnectors, type LaneArrow, type LaneConnector } from "./lanes";
+import { zpEnd, zpStart } from "./zoneprof";
 
 // ---------------------------------------------------------------- constants
 
@@ -1770,6 +1771,7 @@ export function junctionsOf(w: World): { graphRevision: number; byNode: Map<numb
   const rev = w.graphRevision ?? 0;
   const hit = junctionCache.get(w);
   if (hit && hit.rev === rev) return { graphRevision: hit.rev, byNode: hit.map };
+  const tp = zpStart();
   const sig = new Map<number, string>();
   const changed = new Set<number>();
   for (const n of w.nodes) {
@@ -1788,5 +1790,6 @@ export function junctionsOf(w: World): { graphRevision: number; byNode: Map<numb
     if (l) map.set(id, l);
   }
   junctionCache.set(w, { rev, map, sig });
+  zpEnd("junctionsOf", tp);
   return { graphRevision: rev, byNode: map };
 }

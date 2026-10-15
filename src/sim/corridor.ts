@@ -219,6 +219,16 @@ function buildSegmentCorridor(seg: RoadSegment): SegmentCorridor {
   return { segId: seg.id, type: seg.type, centre, offsets };
 }
 
+/** True when `c` was built from exactly this segment's id, type and points (buildSegmentCorridor reads nothing else). */
+function corridorFits(c: SegmentCorridor, seg: RoadSegment, pts: readonly Pt[] | undefined): boolean {
+  if (!pts || c.segId !== seg.id || c.type !== seg.type || pts.length !== seg.pts.length) return false;
+  for (let i = 0; i < pts.length; i++) if (pts[i].x !== seg.pts[i].x || pts[i].z !== seg.pts[i].z) return false;
+  return true;
+}
+
+/** Points each cached corridor was built from (copies: segments are edited in place). */
+const corridorSource = new WeakMap<SegmentCorridor, Pt[]>();
+
 export function corridorsOf(w: World): CorridorSet {
   const graphRevision = w.graphRevision ?? 0;
   const hit = corridorCache.get(w);
@@ -226,7 +236,13 @@ export function corridorsOf(w: World): CorridorSet {
   const bySeg = new Map<number, SegmentCorridor>();
   for (const seg of [...w.segments].sort((a, b) => a.id - b.id)) {
     if (segElevation(seg) !== "ground") continue;
-    bySeg.set(seg.id, buildSegmentCorridor(seg));
+    // A graph revision rarely touches more than a few segments: unchanged ones keep their corridor (a pure function
+    // of id, type and points), instead of re-offsetting every segment of the city on each edit.
+    const old = hit?.bySeg.get(seg.id);
+    if (old && corridorFits(old, seg, corridorSource.get(old))) { bySeg.set(seg.id, old); continue; }
+    const c = buildSegmentCorridor(seg);
+    corridorSource.set(c, seg.pts.map((p) => ({ x: p.x, z: p.z })));
+    bySeg.set(seg.id, c);
   }
   const set = { graphRevision, bySeg };
   corridorCache.set(w, set);
