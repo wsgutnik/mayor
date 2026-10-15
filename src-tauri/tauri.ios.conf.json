@@ -1,3 +1,8 @@
 {
-  "identifier": "com.gutnik.mayor"
+  "identifier": "com.gutnik.mayor",
+  "bundle": {
+    "iOS": {
+      "bundleVersion": "2"
+    }
+  }
 }

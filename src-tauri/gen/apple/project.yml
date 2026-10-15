@@ -12,6 +12,7 @@ settingGroups:
     base:
       PRODUCT_NAME: Mayor
       PRODUCT_BUNDLE_IDENTIFIER: com.gutnik.mayor
+      TARGETED_DEVICE_FAMILY: "2"
       DEVELOPMENT_TEAM: 4AFHZKZYQ6
 targetTemplates:
   app:
