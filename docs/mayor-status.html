@@ -120,7 +120,7 @@
   <nav class="index" aria-label="Sections">
     <a href="#play">How to play</a><a href="#roads">Roads</a><a href="#zones">Zones and lots</a><a href="#buildings">Buildings</a>
     <a href="#people">People and vehicles</a><a href="#traffic">Traffic</a><a href="#light">Day and night</a><a href="#city">Living city</a>
-    <a href="#process">How we build</a><a href="#status">Status</a><a href="#download">Download</a>
+    <a href="#process">How we build</a><a href="#touch">Touch</a><a href="#status">Status</a><a href="#download">Download</a>
   </nav>
 
   <header class="hero">
@@ -500,6 +500,27 @@
     </div>
   </section>
 
+  <section id="touch">
+    <div class="sec-head">
+      <span class="label">Touch operation</span>
+      <h2>Driving the game with a finger</h2>
+    </div>
+    <div class="status">
+      <div class="card"><h3>Verified on the iPad simulator</h3>
+        <div class="row"><i>✓</i><span>First tap sets the anchor with a snap ring and a Finish road button</span></div>
+        <div class="row"><i>✓</i><span>Drag shows the draft with cost, length and slope</span></div>
+        <div class="row"><i>✓</i><span>Street to Avenue in one tap: median drawn, zones re-seated, undo ready</span></div>
+        <div class="row"><i>✓</i><span>Highway over zoned strips is refused with a reason, nothing changes</span></div>
+      </div>
+      <div class="card"><h3>Difficulties found and fixed</h3>
+        <div class="row"><i>✓</i><span>The road panel covered the road being edited: it now closes on the first tap on the map</span></div>
+        <div class="row"><i>✓</i><span>Upgrade mode hint said "tap a start point": now "tap a road to upgrade it"</span></div>
+        <div class="row"><i>✓</i><span>A stray drag could lose the map: reset-view button and a closer zoom limit</span></div>
+        <div class="row open"><i>–</i><span>Held taps on the toolbar sometimes ignored; submenu highlight lags the open tool</span></div>
+      </div>
+    </div>
+  </section>
+
   <section id="status">
     <div class="sec-head">
       <span class="label">Status</span>
@@ -513,13 +534,15 @@
         <div class="row"><i>✓</i><span>Demographics, construction states, statistics panel</span></div>
         <div class="row"><i>✓</i><span>Day and night with HDRI, per-floor windows and light pools</span></div>
         <div class="row"><i>✓</i><span>Notarized Mac app and native iPad app</span></div>
+        <div class="row"><i>✓</i><span>Road upgrade (street to avenue) over zoned land, tested at 16 headings including sideways; zones stay attached and in the street frame</span></div>
+        <div class="row"><i>✓</i><span>Touch road tool: anchor marker with snap ring, offset tether, long-press cancel, reset-view button, panels close on a map tap</span></div>
       </div>
       <div class="card"><h3>Open</h3>
-        <div class="row open"><i>–</i><span>Zones invading roads in some sequences (road drawn after zoning): two agents are on it now</span></div>
         <div class="row open"><i>–</i><span>Procedural buildings for big lots: visually rejected, switched off</span></div>
         <div class="row open"><i>–</i><span>Measurements on real Mac, Windows and iPad hardware</span></div>
         <div class="row open"><i>–</i><span>Zone block build on large grids still above 10 ms</span></div>
-        <div class="row open"><i>–</i><span>A tip marker before the touch on the iPad (there is no hover)</span></div>
+        <div class="row open"><i>–</i><span>Touch: road-type panel still covers part of the map on small screens; a tap-to-highlight for the road that will upgrade</span></div>
+        <div class="row open"><i>–</i><span>Game clock pacing when unpaused on the simulator (years in minutes): to check on a real iPad</span></div>
         <div class="row open"><i>–</i><span>App Store: depends on App Store Connect and distribution certificates</span></div>
       </div>
     </div>
