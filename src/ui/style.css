@@ -5,6 +5,8 @@
   --text: #eef3fb;
   --muted: #9fb0c8;
   --accent: #5cb8ff;
+  --gold: #e9b949;
+  --gold-ink: #1a1405;
   --good: #5fd08a;
   --bad: #ff6b60;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -521,3 +523,64 @@ body {
 .menu .about .credits small, .menu .about small { display: block; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 .menu .about summary { cursor: pointer; min-height: var(--ui-min-touch, 44px); display: flex; align-items: center; }
 .menu .about pre.licence { white-space: pre-wrap; font-size: 10px; color: var(--muted); margin: 4px 0 0; }
+
+/* Menu redesign: deep glass, crown-gold primary actions, clear hierarchy */
+.menu-backdrop { background: rgba(3, 8, 16, .62); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.menu {
+  width: min(500px, 100%); padding: 18px; gap: 14px; border-radius: 18px;
+  border: 1px solid rgba(233, 185, 73, .22);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5), 0 4px 16px rgba(0, 0, 0, .35);
+}
+.menu::-webkit-scrollbar { width: 8px; }
+.menu::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .16); border-radius: 99px; }
+.menu-logo { border-radius: 12px; box-shadow: 0 0 0 1px rgba(233, 185, 73, .35), 0 10px 28px rgba(0, 0, 0, .45); }
+.menu-body { gap: 8px; }
+.menu-row, .menu-block {
+  padding: 11px 12px; border-radius: 12px;
+  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .06);
+}
+.menu-row b { font-size: 14.5px; letter-spacing: .01em; }
+.menu-row small { font-size: 11.5px; margin-top: 1px; }
+.menu button {
+  min-height: 38px; padding: 8px 14px; border-radius: 9px;
+  background: rgba(255, 255, 255, .09); border: 1px solid rgba(255, 255, 255, .07);
+  font-weight: 500; transition: background .15s, border-color .15s;
+}
+.menu button:hover:not(:disabled) { background: rgba(255, 255, 255, .16); }
+.menu button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.menu button[data-save], .menu button[data-load="auto"], .menu button[data-new] {
+  background: var(--gold); border-color: transparent; color: var(--gold-ink); font-weight: 700;
+}
+.menu button[data-save]:hover:not(:disabled), .menu button[data-load="auto"]:hover:not(:disabled),
+.menu button[data-new]:hover:not(:disabled) { background: #f2c65c; }
+.menu-close {
+  min-height: 46px; border-radius: 11px; font-size: 15px;
+  background: var(--gold) !important; color: var(--gold-ink) !important; font-weight: 700;
+}
+.menu-close:hover { background: #f2c65c !important; }
+.menu input {
+  min-height: 38px; border-radius: 9px; background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .12);
+}
+.menu input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.maps-title {
+  color: var(--gold); font-weight: 700; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .09em; padding: 8px 2px 0;
+}
+.menu .map-card {
+  border-radius: 12px; background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .06); padding: 10px;
+  transition: border-color .15s, background .15s;
+}
+.menu .map-card:hover { border-color: rgba(233, 185, 73, .45); }
+.menu .map-card.on { border-color: var(--gold); background: rgba(233, 185, 73, .12); }
+.map-card img { border-radius: 8px; }
+.menu .map-play {
+  min-height: 46px; border-radius: 11px; font-size: 15px;
+  background: var(--gold); color: var(--gold-ink); font-weight: 700; border: 0;
+}
+.menu .map-play:hover:not(:disabled) { background: #f2c65c; }
+.menu .terrain-pick button { border-radius: 10px; }
+.menu .terrain-pick button.on { border-color: var(--gold); background: rgba(233, 185, 73, .14); }
+.menu .prefs nav button { border-radius: 9px; }
+.menu .prefs nav button.on { background: rgba(233, 185, 73, .14); box-shadow: inset 3px 0 0 var(--gold); }
