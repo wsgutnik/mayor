@@ -11,14 +11,8 @@ export class Ambience {
   private readonly maxPuffs = 720;
   private d = new THREE.Object3D();
   private c = new THREE.Color();
-  private scene: THREE.Scene;
   private size = 96;
-  /** Photo cloud sprites (public/textures/flora/cloud_N.png): flat cards high above the city, one pool per image. */
-  private sprites: { mesh: THREE.InstancedMesh; mat: THREE.MeshBasicMaterial; data: { x: number; z: number; y: number; s: number; yaw: number; speed: number }[] }[] = [];
-  private spritesReady = false;
-
   constructor(scene: THREE.Scene) {
-    this.scene = scene;
     const blob = new THREE.IcosahedronGeometry(1, 1);
     this.clouds = new THREE.InstancedMesh(
       blob,
@@ -37,42 +31,127 @@ export class Ambience {
     this.smoke.frustumCulled = false;
     this.smoke.renderOrder = 2;
     scene.add(this.smoke);
-    this.loadSprites();
+    this.makeBanks(scene);
   }
 
-  private loadSprites(): void {
-    if (typeof document === "undefined") return; // headless tests keep the low-poly clouds
-    const loader = new THREE.TextureLoader();
-    const geo = new THREE.PlaneGeometry(1, 1);
-    geo.rotateX(-Math.PI / 2);
-    let pending = 4;
-    for (let n = 1; n <= 4; n++) {
-      loader.load(`/textures/flora/cloud_${n}.png`, (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.92, fog: false });
-        const mesh = new THREE.InstancedMesh(geo, mat, 24);
-        mesh.frustumCulled = false;
-        mesh.renderOrder = 4;
-        mesh.count = 0;
-        this.scene.add(mesh);
-        this.sprites.push({ mesh, mat, data: [] });
-        if (--pending === 0) { this.spritesReady = true; this.layoutSprites(); }
-      }, undefined, () => { pending--; });
-    }
-  }
+  /** Volumetric cloud banks: soft shaded puffs (see makeCloudBanks), three drift layers, one draw call each. */
+  private banks: { points: THREE.Points; speed: number; wrap: number }[] = [];
+  private bankMat?: THREE.ShaderMaterial;
+  private bankLayout: { speed: number; n: number }[] = [];
 
-  private layoutSprites(): void {
-    if (!this.sprites.length) return;
-    let seed = 313;
+
+  /** Soft cloud puff alpha map: radial falloff broken up by fractal noise (canvas, 128 px, no asset). */
+  private puffTexture(): THREE.Texture | null {
+    if (typeof document === "undefined") return null;
+    const n = 128;
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = n;
+    const ctx = cv.getContext("2d");
+    if (!ctx) return null;
+    const img = ctx.createImageData(n, n);
+    let seed = 7;
     const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-    const total = Math.max(8, Math.round(this.size / 8));
-    for (const sp of this.sprites) sp.data = [];
-    for (let i = 0; i < total; i++) {
-      const sp = this.sprites[i % this.sprites.length];
-      sp.data.push({ x: rnd() * this.size * 1.5 - this.size * 0.25, z: rnd() * this.size * 1.5 - this.size * 0.25, y: 30 + rnd() * 10, s: 14 + rnd() * 14, yaw: rnd() * Math.PI * 2, speed: 0.25 + rnd() * 0.25 });
+    const g = 9, grid = new Float32Array((g + 1) * (g + 1));
+    for (let i = 0; i < grid.length; i++) grid[i] = rnd();
+    const val = (x: number, y: number, f: number) => {
+      const gx = (x * f) % g, gy = (y * f) % g, x0 = Math.floor(gx), y0 = Math.floor(gy), tx = gx - x0, ty = gy - y0;
+      const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+      const a = grid[y0 * (g + 1) + x0], b = grid[y0 * (g + 1) + x0 + 1], c = grid[(y0 + 1) * (g + 1) + x0], d = grid[(y0 + 1) * (g + 1) + x0 + 1];
+      return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+    };
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const u = x / n, v = y / n, dx = u - 0.5, dy = v - 0.5;
+        const r = Math.sqrt(dx * dx + dy * dy) * 2;
+        const noise = 0.55 * val(u, v, 2) + 0.3 * val(u, v, 4) + 0.15 * val(u, v, 8);
+        let a = Math.max(0, 1 - r) * (0.55 + 0.9 * noise);
+        a = Math.min(1, a * 1.6);
+        a = a * a * (3 - 2 * a);
+        const i = (y * n + x) * 4;
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = 255;
+        img.data[i + 3] = Math.round(a * 255);
+      }
     }
-    // the low-poly puffs thin out once photo clouds exist
-    this.clouds.count = Math.floor(this.cloudData.length * 0.3);
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  /**
+   * Cumulus banks: each cloud is ~24 overlapping soft puffs in a flattened-bottom ellipsoid, lit from above
+   * (white crown, blue-grey base), drawn as point sprites with per-puff size. Three layers drift at three speeds.
+   */
+  private makeBanks(scene: THREE.Scene): void {
+    const tex = this.puffTexture();
+    if (!tex) return; // headless: low-poly blobs remain
+    this.bankMat = new THREE.ShaderMaterial({
+      uniforms: { uMap: { value: tex }, uViewH: { value: 800 }, uTint: { value: new THREE.Color(1, 1, 1) }, uOpacity: { value: 0.9 } },
+      transparent: true, depthWrite: false,
+      vertexShader: `
+        attribute float aSize; attribute vec3 aColor; varying vec3 vColor;
+        uniform float uViewH;
+        void main() {
+          vColor = aColor;
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = aSize * projectionMatrix[1][1] * uViewH * 0.5 / max(0.5, -mv.z);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        uniform sampler2D uMap; uniform vec3 uTint; uniform float uOpacity; varying vec3 vColor;
+        void main() {
+          vec4 t = texture2D(uMap, gl_PointCoord);
+          gl_FragColor = vec4(vColor * uTint, t.a * uOpacity);
+        }`,
+    });
+    const layers = [{ speed: 0.18, n: 7 }, { speed: 0.3, n: 7 }, { speed: 0.45, n: 6 }];
+    this.bankLayout = layers.map((l) => ({ ...l }));
+    for (let li = 0; li < layers.length; li++) {
+      const geo = new THREE.BufferGeometry();
+      const pts = new THREE.Points(geo, this.bankMat);
+      pts.frustumCulled = false;
+      pts.renderOrder = 4;
+      scene.add(pts);
+      this.banks.push({ points: pts, speed: layers[li].speed, wrap: 0 });
+    }
+  }
+
+  private layoutBanks(): void {
+    if (!this.bankMat) return;
+    let seed = 4242;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const gauss = () => (rnd() + rnd() + rnd() - 1.5) / 1.5;
+    const span = this.size * 1.6;
+    for (let li = 0; li < this.banks.length; li++) {
+      const bank = this.banks[li];
+      const clouds = Math.max(3, Math.round((this.bankLayout[li].n * this.size) / 96));
+      const per = 44;
+      const pos = new Float32Array(clouds * per * 3), size = new Float32Array(clouds * per), col = new Float32Array(clouds * per * 3);
+      let k = 0;
+      for (let c = 0; c < clouds; c++) {
+        const cx = rnd() * span - span * 0.3, cz = rnd() * this.size * 1.4 - this.size * 0.2, cy = 26 + li * 4 + rnd() * 8;
+        const w = 5 + rnd() * 7, d = 3 + rnd() * 4, h = 1.8 + rnd() * 2.4;
+        for (let p = 0; p < per; p++) {
+          const gx = gauss(), gz = gauss(), gy = Math.abs(gauss());
+          // taller toward the middle: a cumulus dome on a flat base
+          const dome = 1 - Math.min(1, (gx * gx + gz * gz) * 0.8);
+          const y = gy * h * (0.4 + dome);
+          pos[k * 3] = cx + gx * w; pos[k * 3 + 1] = cy + y - h * 0.3; pos[k * 3 + 2] = cz + gz * d;
+          size[k] = (2.2 + rnd() * 3.0) * (0.7 + 0.6 * dome);
+          const lit = Math.min(1, 0.62 + (y / (h * 1.4)) * 0.5 + rnd() * 0.06);
+          col[k * 3] = 0.78 + 0.28 * lit; col[k * 3 + 1] = 0.82 + 0.22 * lit; col[k * 3 + 2] = 0.92 + 0.12 * lit;
+          k++;
+        }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute("aSize", new THREE.BufferAttribute(size, 1));
+      geo.setAttribute("aColor", new THREE.BufferAttribute(col, 3));
+      bank.points.geometry.dispose();
+      bank.points.geometry = geo;
+      bank.wrap = span;
+      bank.points.position.x = 0;
+    }
   }
 
   /** Lay out a cloud field over a map of the given size. */
@@ -93,8 +172,8 @@ export class Ambience {
         });
       }
     }
-    this.clouds.count = this.cloudData.length;
-    if (this.spritesReady) this.layoutSprites();
+    this.clouds.count = this.bankMat ? 0 : this.cloudData.length;
+    this.layoutBanks();
   }
 
   setSources(sources: SmokeSource[]): void {
@@ -107,6 +186,16 @@ export class Ambience {
     // clouds slide along +x and wrap around the map; they dim at night and fade away in the evening
     const tint = 0.25 + 0.75 * day;
     (this.clouds.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.1 + 0.25 * day;
+    if (this.bankMat) {
+      const u = this.bankMat.uniforms;
+      u.uViewH.value = (typeof window !== "undefined" ? window.innerHeight * Math.min(window.devicePixelRatio || 1, 2) : 800);
+      (u.uTint.value as THREE.Color).setScalar(0.2 + 0.8 * day);
+      u.uOpacity.value = 0.45 + 0.35 * day;
+      for (const b of this.banks) {
+        b.points.position.x += b.speed * dt;
+        if (b.points.position.x > b.wrap * 0.5) b.points.position.x -= b.wrap;
+      }
+    }
     for (let i = 0; i < this.cloudData.length; i++) {
       const k = this.cloudData[i];
       k.x += k.speed * dt;
@@ -120,21 +209,7 @@ export class Ambience {
     }
     this.clouds.instanceMatrix.needsUpdate = true;
     if (this.clouds.instanceColor) this.clouds.instanceColor.needsUpdate = true;
-    for (const sp of this.sprites) {
-      sp.mat.color.setScalar(0.18 + 0.82 * day);
-      sp.mesh.count = sp.data.length;
-      for (let i = 0; i < sp.data.length; i++) {
-        const k = sp.data[i];
-        k.x += k.speed * dt;
-        if (k.x > this.size * 1.3) k.x -= span;
-        d.position.set(k.x, k.y, k.z);
-        d.rotation.set(0, k.yaw, 0);
-        d.scale.set(k.s, 1, k.s * 0.7);
-        d.updateMatrix();
-        sp.mesh.setMatrixAt(i, d.matrix);
-      }
-      sp.mesh.instanceMatrix.needsUpdate = true;
-    }
+
 
     // smoke: each source sends three puffs that rise, widen and blend into the sky
     let n = 0;
