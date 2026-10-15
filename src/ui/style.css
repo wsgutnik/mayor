@@ -710,3 +710,4 @@ body {
 .road-fly .fly-level .fly-sec { width: 100%; box-sizing: border-box; }
 .build-road { width: 100%; margin-top: 2px; }
 .build-road { position: sticky; bottom: 0; z-index: 2; box-shadow: 0 -8px 20px rgba(0,0,0,.35), 0 6px 18px rgba(223,169,46,.3); }
+.road-thumb { width: 100%; height: 44px; object-fit: cover; border-radius: 7px; display: block; }

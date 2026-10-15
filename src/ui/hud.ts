@@ -491,14 +491,22 @@ export class Hud {
   /** A service building as a thumbnail card (Services level 2): photo, name, price, footprint. */
   private buildingCard(t: ToolDef): HTMLElement {
     const entry = isFacilityTool(t.id) ? facilityEntry(FACILITY_OF_TOOL[t.id]) : undefined;
+    // Atlas thumbnails for kit entries without a photo (expansion set) and for Park.
+    const override: Partial<Record<ToolId, string>> = {
+      solar: "/ui/thumbs/solar.jpg", watertower: "/ui/thumbs/watertower.jpg",
+      firehq: "/ui/thumbs/fire.jpg", firepost: "/ui/thumbs/fire.jpg",
+      waterlarge: "/ui/thumbs/waterpump.jpg", park: "/ui/thumbs/park.jpg",
+    };
     const price = COST[t.id as Exclude<ToolId, "pan">];
     const fp = isFacilityTool(t.id) ? facilityToolFootprint(t.id) : 0;
     const badge = fp ? `<em class="fp" aria-label="${tr("Footprint")} ${fp}x${fp}">${fp}×${fp}</em>` : "";
     const name = entry ? (getLang() === "pt" ? entry.name : entry.nameEn) : tr(t.label);
-    // Kit thumbnails exist for entries 1-40; expansion entries fall back to the tool icon.
-    const thumb = entry && entry.n <= 40
-      ? `<img class="build-thumb" src="${thumbnailOf(entry.n)}" alt="" draggable="false">`
-      : `<span class="build-thumb build-thumb-icon">${iconHtml(t.icon)}</span>`;
+    // Kit thumbnails exist for entries 1-40; expansion entries use the atlas override or the tool icon.
+    const thumb = override[t.id]
+      ? `<img class="build-thumb" src="${override[t.id]}" alt="" draggable="false">`
+      : entry && entry.n <= 40
+        ? `<img class="build-thumb" src="${thumbnailOf(entry.n)}" alt="" draggable="false">`
+        : `<span class="build-thumb build-thumb-icon">${iconHtml(t.icon)}</span>`;
     // Miniature lot: the building block grows with the footprint, and a 2x2
     // lot also shows its parking strip, like the grown cities in CS2/Fable.
     const lot = `<span class="build-lot lot${fp}" aria-hidden="true"><i class="lot-b"></i>${fp > 1 ? `<i class="lot-p"></i>` : ""}</span>`;
@@ -560,7 +568,8 @@ export class Hud {
     for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
       const f = roadFacts(t);
       const lanes = Array.from({ length: f.lanes }, () => "<i></i>").join("");
-      const b = el("button", "tool", `<span class="ic">${ROAD_GLYPH[t]}</span><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small><span class="road-mini" aria-hidden="true">${lanes}</span>`);
+      const roadThumb = ["/ui/thumbs/road-street.jpg", "/ui/thumbs/road-avenue.jpg", "/ui/thumbs/road-highway.jpg", "/ui/thumbs/road-street.jpg", "/ui/thumbs/road-avenue.jpg"][t - 1];
+      const b = el("button", "tool", `<img class="road-thumb" src="${roadThumb}" alt="" draggable="false"><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small><span class="road-mini" aria-hidden="true">${lanes}</span>`);
       b.addEventListener("click", () => {
         pendingRoadType = t;
         this.roadTypeBtns.forEach((x, k) => x.classList.toggle("active", k === t));
