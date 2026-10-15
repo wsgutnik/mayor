@@ -8,7 +8,7 @@ import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
 import { Menu } from "./ui/menu";
 import { Inspector } from "./ui/inspector";
 import { describeTile } from "./sim/inspect";
-import { AUTOSAVE, exportFile, importFile, loadFrom, saveTo, slotInfo } from "./storage";
+import { AUTOSAVE, exportFile, importFile, loadGame, migrateLegacySaves, saveGame, slotInfoCached } from "./storage";
 import { createLine, setLineVehicles, removeLine, stopAt } from "./sim/transit";
 import { CityRenderer } from "./render/scene";
 import type { OverlayLayer } from "./render/scene";
@@ -271,14 +271,16 @@ async function startMap(id: string): Promise<void> {
 const inspector = new Inspector(app, { onClose: () => renderer.setHover(null) });
 
 const menu = new Menu(app, {
-  info: (slot) => slotInfo(slot),
+  info: (slot) => slotInfoCached(slot),
   onSave: (n) => {
-    const r = saveTo(String(n), state);
-    hud.notify(r.ok ? "success" : "error", r.ok ? tr("Saved to slot {n}", { n }) : trReason(r.reason));
+    void saveGame(String(n), state).then((r) => {
+      hud.notify(r.ok ? "success" : "error", r.ok ? tr("Saved to slot {n}", { n }) : trReason(r.reason));
+    });
   },
   onLoad: (slot) => {
-    const r = loadFrom(slot);
-    if (r.ok) { useCity(r.state); hud.notify("success", tr("City loaded")); } else hud.notify("error", trReason(r.reason));
+    void loadGame(slot).then((r) => {
+      if (r.ok) { useCity(r.state); hud.notify("success", tr("City loaded")); } else hud.notify("error", trReason(r.reason));
+    });
   },
   onNew: (seed, biome) => { useCity(newCity(seed, 96, biome)); hud.notify("success", tr("New city, seed {n}", { n: seed })); },
   onNewMap: (id) => { void startMap(id); },
@@ -304,7 +306,9 @@ const menu = new Menu(app, {
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => { navigator.serviceWorker.register("/sw.js").catch(() => {}); });
 }
-if (slotInfo(AUTOSAVE)) setTimeout(() => hud.notify("warning", tr("Autosave found: open the menu to continue")), 800);
+void migrateLegacySaves().then(() => {
+  if (slotInfoCached(AUTOSAVE)) setTimeout(() => hud.notify("warning", tr("Autosave found: open the menu to continue")), 800);
+});
 
 const lineTool = () => tool === "busline" || tool === "metroline" || tool === "trainline";
 const placing = () => tool === "road" || lineTool() || tool === "roundabout";
@@ -968,7 +972,7 @@ function frame(now: number) {
   const month = Math.floor(state.day / 30);
   if (month !== lastMonthSaved) {
     lastMonthSaved = month;
-    if (prefs.autosave) saveTo(AUTOSAVE, state);
+    if (prefs.autosave) void saveGame(AUTOSAVE, state);
   }
   if (state.fires !== seenFires) {
     hud.notify("warning", tr("Fire! A building burned down. Build a fire station."));
@@ -983,6 +987,15 @@ function frame(now: number) {
   renderer.render();
   requestAnimationFrame(frame);
 }
+
+// Flush the autosave when the tab or app goes away, so closing between
+// monthly saves does not lose the city built since the last one.
+window.addEventListener("pagehide", () => {
+  if (prefs.autosave) void saveGame(AUTOSAVE, state);
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && prefs.autosave) void saveGame(AUTOSAVE, state);
+});
 requestAnimationFrame(frame);
 
 // Debug/test hook.

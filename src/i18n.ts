@@ -178,11 +178,11 @@ const PT: Record<string, string> = {
   "Getting started": "Primeiros passos", "Dismiss the guide": "Dispensar o guia",
   "Draw your first road": "Desenhe sua primeira estrada", "Zone homes beside it": "Zoneie casas ao lado",
   "Let the clock run": "Deixe o relógio correr", "Watch them move in": "Veja os moradores chegarem",
-  "Roads is the first button below. Open it, then drag across the ground — everything in a city grows along a street.": "Estradas é o primeiro botão abaixo. Abra e arraste pelo chão — tudo na cidade cresce ao longo de uma rua.",
+  "Roads is the first button below. Open it, tap a start point on the ground, then tap the end point — everything in a city grows along a street.": "Estradas é o primeiro botão abaixo. Abra, toque num ponto inicial no chão e depois no ponto final — tudo na cidade cresce ao longo de uma rua.",
   "Open Zones, take Residential, and drag over the ground next to your road.": "Abra Zonas, escolha Residencial e arraste pelo chão ao lado da estrada.",
   "Nothing is built while time crawls. Push the speed to 2× up in the clock — the plots start building straight away.": "Nada é construído com o tempo parado. Aumente a velocidade para 2× no relógio — os lotes começam a construir na hora.",
   "Buildings rise on each plot, then residents arrive. The RCI bars top-left tell you what to zone next.": "Prédios sobem em cada lote e os moradores chegam. As barras RCI no canto mostram o que zonear em seguida.",
-  "Road tool ready. Drag across the ground to lay it, and release to build.": "Ferramenta de estrada pronta. Arraste pelo chão para traçar e solte para construir.",
+  "Road tool ready. Tap a start point, then tap the end point to build.": "Ferramenta de estrada pronta. Toque num ponto inicial e depois no ponto final para construir.",
   "That is the whole loop": "Esse é o ciclo todo",
   "Road, zone, let time run. Watch the RCI bars and add services as people arrive.": "Estrada, zona, deixe o tempo correr. Acompanhe as barras RCI e adicione serviços com a chegada do povo.",
   // infoview legend

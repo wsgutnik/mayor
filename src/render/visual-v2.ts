@@ -1,7 +1,8 @@
 /**
- * Visual V2 prototype selection.
- * Production remains on /models/NN.glb unless explicitly opted in with
- * ?visualV2=1 AND the prototype has been exported to public/models/v2/.
+ * Visual V2 building selection.
+ * Reference buildings in public/models/v2/ are the production default;
+ * ?visualV2=0 opts out to /models/NN.glb. Loading always falls back to the
+ * legacy GLB when a V2 asset is missing or fails.
  *
  * Deliberately separate from sim/catalog.ts: saves store functional IDs,
  * not visual model paths or detail levels.
@@ -24,7 +25,7 @@ export function visualV2Url(id: number, lod: VisualLod): string | null {
 
 export function visualV2PreviewEnabled(search?: string): boolean {
   const query = search ?? (typeof window !== "undefined" ? window.location.search : "");
-  return new URLSearchParams(query).get("visualV2") === "1";
+  return new URLSearchParams(query).get("visualV2") !== "0";
 }
 
 /** Explicit candidate chain, so missing/unexported V2 GLBs cannot erase buildings. */

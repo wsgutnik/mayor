@@ -38,10 +38,10 @@ describe("Visual V2 reference asset resolver", () => {
     expect(() => legacyBuildingUrl(1.5)).toThrow(RangeError);
   });
 
-  it("enables only with an explicit query parameter", () => {
-    expect(visualV2PreviewEnabled("")).toBe(false);
+  it("is on by default and only disabled with visualV2=0", () => {
+    expect(visualV2PreviewEnabled("")).toBe(true);
     expect(visualV2PreviewEnabled("?visualV2=1")).toBe(true);
-    expect(visualV2PreviewEnabled("?visualV2=true")).toBe(false);
+    expect(visualV2PreviewEnabled("?visualV2=0")).toBe(false);
   });
 
   it("returns the legacy GLB if a reference asset does not load", async () => {

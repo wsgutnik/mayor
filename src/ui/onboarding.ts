@@ -131,14 +131,14 @@ export const STEP_TITLE: Record<string, string> = {
 };
 
 export const STEP_TEXT: Record<string, string> = {
-  road: "Roads is the first button below. Open it, then drag across the ground — everything in a city grows along a street.",
+  road: "Roads is the first button below. Open it, tap a start point on the ground, then tap the end point — everything in a city grows along a street.",
   zone: "Open Zones, take Residential, and drag over the ground next to your road.",
   speed: "Nothing is built while time crawls. Push the speed to 2× up in the clock — the plots start building straight away.",
   grow: "Buildings rise on each plot, then residents arrive. The RCI bars top-left tell you what to zone next.",
 };
 
 export const STEP_ARMED: Record<string, string> = {
-  road: "Road tool ready. Drag across the ground to lay it, and release to build.",
+  road: "Road tool ready. Tap a start point, then tap the end point to build.",
 };
 
 export interface OnboardingTargets {
