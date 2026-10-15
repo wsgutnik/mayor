@@ -4,7 +4,8 @@ import { usageRows } from "./facility-usage-view";
 import { MAX_LINE_VEHICLES, transitTotals } from "../sim/transit";
 import { COVER, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, RoadType } from "../sim/world";
 import type { OverlayLayer } from "../render/scene";
-import { lineName, monthName, tr } from "../i18n";
+import { getLang, lineName, monthName, tr } from "../i18n";
+import { facilityEntry, thumbnailOf } from "../sim/catalog";
 import { PanelId, PanelState, loadPanelState, savePanelState, setPanelsHidden, togglePanelCollapsed } from "./panel-state";
 import type { RoadReadoutRow } from "./road-readout";
 import { cityEvents } from "./events";
@@ -74,7 +75,7 @@ export const FLYOUT_I18N_KEYS: string[] = [
   "Type", "Draw", "Level", "Tools", "Zone", "Shape", "Stops", "Lines", "Lanes", "Width", "One-way", "per tile", "Footprint",
   "Tap a start, then an end", "Tap start, a bend point, then the end", "Tap a bridge crossing to stamp an interchange",
   "Tap a road to change its class", "Press E to cycle", "Both legs are planned together and undo as one",
-  "Interchange", "Upgrade road", "Roundabout", "Infoview", "On", "Off",
+  "Interchange", "Upgrade road", "Roundabout", "Infoview", "On", "Off", "Back", "Buildings",
 ];
 
 const ZONE_MODES: { mode: ZoneMode; label: string; glyph: string }[] = [
@@ -487,6 +488,32 @@ export class Hud {
     return b;
   }
 
+  /** A service building as a thumbnail card (Services level 2): photo, name, price, footprint. */
+  private buildingCard(t: ToolDef): HTMLElement {
+    const entry = isFacilityTool(t.id) ? facilityEntry(FACILITY_OF_TOOL[t.id]) : undefined;
+    const price = COST[t.id as Exclude<ToolId, "pan">];
+    const fp = isFacilityTool(t.id) ? facilityToolFootprint(t.id) : 0;
+    const badge = fp ? `<em class="fp" aria-label="${tr("Footprint")} ${fp}x${fp}">${fp}×${fp}</em>` : "";
+    const name = entry ? (getLang() === "pt" ? entry.name : entry.nameEn) : tr(t.label);
+    // Kit thumbnails exist for entries 1-40; expansion entries fall back to the tool icon.
+    const thumb = entry && entry.n <= 40
+      ? `<img class="build-thumb" src="${thumbnailOf(entry.n)}" alt="" draggable="false">`
+      : `<span class="build-thumb build-thumb-icon">${iconHtml(t.icon)}</span>`;
+    // Miniature lot: the building block grows with the footprint, and a 2x2
+    // lot also shows its parking strip, like the grown cities in CS2/Fable.
+    const lot = `<span class="build-lot lot${fp}" aria-hidden="true"><i class="lot-b"></i>${fp > 1 ? `<i class="lot-p"></i>` : ""}</span>`;
+    const b = el("button", "build-card", `${thumb}<span class="build-info"><span>${name}</span><small>$${price}</small></span>${lot}${badge}`);
+    b.title = tr(t.hint);
+    b.addEventListener("click", () => {
+      const reason = this.avail.get(t.id);
+      if (reason) { this.toasts.push({ kind: "warning", title: tr(t.label), text: tr(reason) }); return; }
+      this.hooks.onEvent({ kind: "tool", tool: t.id });
+    });
+    this.tooltip.attach(b, () => this.toolTip(t));
+    this.toolBtns.set(t.id, b);
+    return b;
+  }
+
   /** A toolbar category button that opens a flyout. */
   private group(name: FlyoutId, label: string, icon: Icon, fly: HTMLElement): HTMLElement {
     const b = el("button", "tool", `${iconHtml(icon)}<span>${tr(label)}</span><small>▴</small>`);
@@ -532,8 +559,13 @@ export class Hud {
     const typeRow = road.section(tr("Type"));
     for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
       const f = roadFacts(t);
-      const b = el("button", "tool", `<span class="ic">${ROAD_GLYPH[t]}</span><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small>`);
-      b.addEventListener("click", () => this.hooks.onEvent({ kind: "roadType", roadType: t }));
+      const lanes = Array.from({ length: f.lanes }, () => "<i></i>").join("");
+      const b = el("button", "tool", `<span class="ic">${ROAD_GLYPH[t]}</span><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small><span class="road-mini" aria-hidden="true">${lanes}</span>`);
+      b.addEventListener("click", () => {
+        pendingRoadType = t;
+        this.roadTypeBtns.forEach((x, k) => x.classList.toggle("active", k === t));
+        showRoadConfig();
+      });
       this.tooltip.attach(b, () => ({
         icon: ROAD_GLYPH[t], title: tr(f.name), color: T.road.color,
         badge: f.oneWay ? tr("One-way") : undefined,
@@ -584,6 +616,33 @@ export class Hud {
     toolsRow.appendChild(up);
     road.body.appendChild(this.buildSnapGroup());
     road.body.appendChild(this.buildParallelGroup());
+    // Roads is two levels too: level 1 picks the road type, level 2 configures it
+    // (draw, level, tools, snap, parallel) as grouped miniature cards.
+    const roadHome = el("div", "fly-level");
+    const roadConfig = el("div", "fly-level");
+    roadConfig.hidden = true;
+    let pendingRoadType: RoadType = 1;
+    const showRoadConfig = () => { roadHome.hidden = true; roadConfig.hidden = false; };
+    const roadBack = el("button", "fly-back", `← ${tr("Back")}`);
+    roadBack.addEventListener("click", () => { roadConfig.hidden = true; roadHome.hidden = false; });
+    const roadBuild = el("button", "build-road map-play", tr("Build"));
+    roadBuild.addEventListener("click", () => this.hooks.onEvent({ kind: "roadType", roadType: pendingRoadType }));
+    // Config picks apply at once (and close the flyout by the flyout rule);
+    // reopen at the config level so the player can keep configuring, then Build.
+    roadConfig.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest(".fly-back, .build-road")) return;
+      setTimeout(() => { if (!this.ui.flyout) this.hooks.onEvent({ kind: "group", flyout: "road" }); }, 0);
+    });
+    roadConfig.append(roadBack);
+    const typeSection = typeRow.parentElement as HTMLElement;
+    const configSections = [drawRow, levelRow, toolsRow].map((r) => r.parentElement as HTMLElement);
+    const snapEl = road.body.children[road.body.children.length - 2] as HTMLElement;
+    const parallelEl = road.body.children[road.body.children.length - 1] as HTMLElement;
+    roadHome.appendChild(typeSection);
+    for (const s of configSections) roadConfig.appendChild(s);
+    roadConfig.append(snapEl, parallelEl);
+    road.body.append(roadHome, roadConfig);
+    roadConfig.appendChild(roadBuild);
     const roads = this.group("road", "Roads", T.road.icon, road.fly);
     this.toolBtns.set("road", roads);
     bar.appendChild(roads);
@@ -601,10 +660,32 @@ export class Hud {
     }
     bar.appendChild(this.group("zones", "Zones", { img: "kit/ico-zonas" }, zones.fly));
 
+    // Services is two levels: level 1 picks a type, level 2 shows its buildings as thumbnail cards.
     const services = this.flyout("wrap services-fly");
+    const svcHome = el("div", "fly-level svc-cats");
+    const svcDetail = el("div", "fly-level svc-detail");
+    svcDetail.hidden = true;
+    services.body.append(svcHome, svcDetail);
+    const showSvcGroup = (label: string) => {
+      const g = SERVICE_GROUPS.find((x) => x.label === label);
+      if (!g) return;
+      svcDetail.replaceChildren();
+      const head = el("div", "svc-detail-head");
+      const back = el("button", "fly-back", `← ${tr("Back")}`);
+      back.addEventListener("click", () => { svcDetail.hidden = true; svcHome.hidden = false; });
+      head.append(back, el("span", "fly-sec-title", tr(g.label)));
+      svcDetail.appendChild(head);
+      const cards = el("div", "build-cards");
+      for (const id of g.tools) cards.appendChild(this.buildingCard(T[id]));
+      svcDetail.appendChild(cards);
+      svcHome.hidden = true;
+      svcDetail.hidden = false;
+    };
     for (const g of SERVICE_GROUPS) {
-      const row = services.section(tr(g.label), g.icon);
-      for (const id of g.tools) row.appendChild(this.toolButton(T[id]));
+      const cat = el("button", "svc-cat",
+        `<img class="ic-img" src="/ui/${g.icon}.png" alt="" draggable="false"><span class="svc-cat-info"><span>${tr(g.label)}</span><small>${g.tools.length} ${tr("Buildings")}</small></span><span class="svc-cat-arrow">›</span>`);
+      cat.addEventListener("click", () => showSvcGroup(g.label));
+      svcHome.appendChild(cat);
     }
     bar.appendChild(this.group("services", "Services", { img: "kit/ico-governo" }, services.fly));
 

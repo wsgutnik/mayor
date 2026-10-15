@@ -86,7 +86,7 @@ const PT: Record<string, string> = {
   "Created at the start of each month": "Criado no início de cada mês",
   "Save": "Salvar", "Load": "Carregar", "New city": "Nova cidade", "Map seed": "Semente do mapa", "Generate": "Gerar",
   "Save file": "Arquivo de save", "Keep a copy or move it to another device": "Guarde uma cópia ou leve para outro aparelho",
-  "Export": "Exportar", "Import": "Importar", "Back to the city": "Voltar à cidade",
+  "Export": "Exportar", "Import": "Importar", "Back to the city": "Voltar à cidade", "Back": "Voltar", "Buildings": "Prédios", "Build": "Construir",
   "Terrain": "Terreno", "Plains": "Planície", "Forest": "Floresta", "River": "Rio", "Coast": "Litoral", "Mountain": "Montanha", "Desert": "Deserto",
   "Could not load the map": "Não foi possível carregar o mapa",
   "Hospital": "Hospital", "High school": "Escola secundária", "Library": "Biblioteca", "Community centre": "Centro comunitário",
