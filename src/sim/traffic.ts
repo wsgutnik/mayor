@@ -59,6 +59,10 @@ export interface Vehicle {
   prioSkip?: number;
   /** Right-of-way stop distance for this substep (front bumper to stop line), or Infinity. */
   prioStop?: number;
+  /** Seconds this car has been held only by a signal-box reservation (recovery watchdog, never saved). */
+  boxWait?: number;
+  /** Movement index whose box reservation timed out: crossed without it. */
+  boxSkip?: number;
 }
 
 /**
@@ -133,6 +137,8 @@ export interface TrafficState {
   prioStamp: number;
   /** Claims dropped by the 12 s inside-the-box timeout (diagnostic). */
   prioTimeouts: number;
+  /** Signal-box reservation watchdog firings (diagnostic). */
+  boxTimeouts?: number;
   /** Vehicles that reached the box without a granted claim (diagnostic; should stay 0). */
   prioOverruns: number;
   /**
@@ -299,6 +305,10 @@ const IDM_B_BACK = 0.65;       // 1.6 m/s²: backward vmax pass
 const IDM_STOP_LINE = 0.06;    // 0.7 m: stop line ahead of the junction tile
 const IDM_STOP_ZERO = 0.031;   // 0.35 m: snap to a stop inside this of the line
 const IDM_V_STOP = 0.135;      // 0.6 m/s: below this counts as stopped
+/** Seconds a car may sit held only by a signal-box reservation before it crosses anyway. */
+const BOX_TIMEOUT = 8;
+/** A car this close to the box start already reserves it; one queued behind its stop line (0.06) does not. */
+const BOX_REACH = 0.1;
 const IDM_SPAWN_GAP = 0.31;    // 3.5 m: extra spawn clearance
 const IDM_QUEUE_GAP = 0.79;    // 9 m: held brake lamps reach this far in a queue
 const IDM_LOOKAHEAD = 4;       // route tiles scanned for leaders and red lights
@@ -640,6 +650,17 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
     v.stuckTime = (v.stuckTime ?? 0) + h;
     if (v.stuckTime >= 20) { nv = Math.min(v0, 0.3); v.stuckTime = 0; }
   } else v.stuckTime = 0;
+  // Recovery: a car held ONLY by a signal-box reservation (no leader, no red, no right-of-way stop) for
+  // BOX_TIMEOUT seconds crosses without it, so a mutual reservation cycle can never freeze the city.
+  if (nv < 0.05 && leadGap > 0.6 && signalStop < Infinity && stopDist === signalStop) {
+    v.boxWait = (v.boxWait ?? 0) + h;
+    if (v.boxWait >= BOX_TIMEOUT) {
+      v.boxWait = 0;
+      const mm = v.moves;
+      if (mm) for (let j = v.moveAt ?? 0; j < mm.n; j++) { if (hasSignal(w, mm.node[j]) && !t.prioNodes.has(mm.node[j])) { v.boxSkip = j; break; } }
+      t.boxTimeouts = (t.boxTimeouts ?? 0) + 1;
+    }
+  } else v.boxWait = 0;
   v.v = nv;
   if (arcDriven) {
     v.arc = Math.min(arcs[arcs.length - 1], routeS + nv * h);
@@ -727,8 +748,12 @@ function signalBoxStop(w: World, t: TrafficState, k: number, v: Vehicle, s: numb
   for (let j = v.moveAt ?? 0; j < m.n; j++) {
     const node = m.node[j];
     if (t.prioNodes.has(node) || !hasSignal(w, node)) continue;
+    if (v.boxSkip === j) continue;
     const d = arcs[m.i0[j]] - (s + half);
     if (d < -0.15) continue;
+    // Never enter a signalised box whose exit lane is already held by a stopped queue (box blocking
+    // is what turns a short link spillback into a circular wait across the whole grid).
+    if (d > 0.02 && exitBlocked(w, t, k, v, arcs[m.i1[j]])) return Math.max(0, d - IDM_STOP_LINE);
     const tab = priorityTableOf(m.layouts[j]);
     for (let q = 0; q < t.vehicles.length; q++) {
       if (q === k) continue;
@@ -742,7 +767,9 @@ function signalBoxStop(w: World, t: TrafficState, k: number, v: Vehicle, s: numb
         const oa = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
         // Keep the reservation briefly beyond the connector: a truck's rear
         // and a crossing car's nose can otherwise overlap at the exit taper.
-        if (os + oh <= oa[om.i0[r]] - IDM_SPAWN_GAP || os - oh >= oa[om.i1[r]] + IDM_SPAWN_GAP) continue;
+        // Only a car whose nose has physically reached the connector (or is still clearing it) holds the box:
+        // a car queued behind its red line must not block the green cross movement (mutual-stop deadlock).
+        if (os + oh <= oa[om.i0[r]] - BOX_REACH || os - oh >= oa[om.i1[r]] + IDM_SPAWN_GAP) continue;
         if (tab.conflict[m.conn[j] * tab.k + om.conn[r]]) return Math.max(0, d - IDM_STOP_LINE);
       }
     }
