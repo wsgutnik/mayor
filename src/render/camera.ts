@@ -20,7 +20,7 @@ export class CameraRig {
   apply(): void {
     this.target.x = THREE.MathUtils.clamp(this.target.x, 0, this.bounds);
     this.target.z = THREE.MathUtils.clamp(this.target.z, 0, this.bounds);
-    this.dist = THREE.MathUtils.clamp(this.dist, 8, 140);
+    this.dist = THREE.MathUtils.clamp(this.dist, 8, 90);
     this.pitch = THREE.MathUtils.clamp(this.pitch, 0.25, 1.4);
     const cp = Math.cos(this.pitch);
     this.camera.position.set(

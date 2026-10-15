@@ -72,7 +72,8 @@ const PT: Record<string, string> = {
   "Tap a {kind} {what}": "Toque em um {what}",
   // buttons
   "Finish road": "Terminar estrada", "Cancel": "Cancelar", "Create line": "Criar linha",
-  "Undo": "Desfazer", "Redo": "Refazer",
+  "Undo": "Desfazer", "Redo": "Refazer", "Reset view": "Voltar à visão inicial",
+  "{name}: tap a road to upgrade it": "{name}: toque numa via para melhorá-la",
   // menu
   "Autosave": "Autosave", "Continue": "Continuar", "Slot {n}": "Slot {n}", "Empty": "Vazio",
   "Created at the start of each month": "Criado no início de cada mês",

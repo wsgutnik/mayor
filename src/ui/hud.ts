@@ -125,6 +125,8 @@ export interface HudHooks {
   onZoneMode?(mode: ZoneMode): void;
   onSpeed(s: number): void;
   onUndo(): void;
+  /** Reset the camera to the default overview (a stray gesture can lose the map). */
+  onHomeView?(): void;
   onRedo(): void;
   onTax(rate: number): void;
   onOverlay(layer: OverlayLayer): void;
@@ -299,6 +301,11 @@ export class Hud {
     redo.addEventListener("click", () => this.hooks.onRedo());
     speed.appendChild(redo);
     this.redoBtn = redo;
+    const home = el("button", "speed-btn home-btn", "⌂");
+    home.title = tr("Reset view");
+    home.setAttribute("aria-label", tr("Reset view"));
+    home.addEventListener("click", () => this.hooks.onHomeView?.());
+    speed.appendChild(home);
     const menu = el("button", "speed-btn menu-btn", `<img class="ic-img sm" src="/ui/kit/ico-engrenagem.png" alt="">`);
     menu.title = tr("Menu: save, load, new city");
     menu.setAttribute("aria-label", tr("Menu: save, load, new city"));
@@ -746,6 +753,9 @@ export class Hud {
     if (!open) f.classList.add("open");
     this.placeHint();
   }
+
+  /** Close any open toolbar flyout (a tap on the map dismisses it so it never hides the work). */
+  dismissFlyouts(): void { this.closeFlyouts(); }
 
   private closeFlyouts(): void {
     this.flyouts.forEach((f) => f.classList.remove("open"));

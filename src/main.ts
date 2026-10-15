@@ -115,6 +115,12 @@ function makeHud(): Hud {
     hud.setHint(tr("Tap a bridge crossing to stamp an interchange"));
   },
   onFinishRoad: () => cancelDraft(),
+  onHomeView: () => {
+    const rig = renderer.rig;
+    rig.target.set(state.world.entry.x + 8, 0, state.world.entry.y);
+    rig.dist = 38; rig.pitch = 0.9; rig.yaw = Math.PI * 0.25;
+    rig.apply();
+  },
   onSnap: (o) => {
     snapOpts = o;
     saveRoadSnap(o);
@@ -349,7 +355,8 @@ function refreshHint(): void {
     return;
   }
   const name = tr(ROAD_NAME[roadType]);
-  if (draft.length === 0) hud.setHint(tr("{name}: tap a start point (or an existing road to connect)", { name }));
+  if (draft.length === 0 && upgradeMode) hud.setHint(tr("{name}: tap a road to upgrade it", { name }));
+  else if (draft.length === 0) hud.setHint(tr("{name}: tap a start point (or an existing road to connect)", { name }));
   else if (roadMode === "curve" && draft.length === 1) hud.setHint(tr("{name}: tap the bend point", { name }));
   else hud.setHint(tr("{name}: tap the end point", { name }));
 }
@@ -792,6 +799,7 @@ function paintGroundPoint(p: { x: number; z: number }, first: boolean): void {
 // Finger/pen vs mouse decides the snap radius (36 vs 16 CSS px).
 renderer.canvas.addEventListener("pointerdown", (e) => {
   touchPointer = e.pointerType !== "mouse";
+  hud.dismissFlyouts();
   // A second stationary press on the anchor is a deliberate cancel. Moving it
   // becomes a preview-only drag; release never commits, preserving click-click.
   if (e.pointerType === "touch" && tool === "road" && draft.length && !pendingInterchange) {
