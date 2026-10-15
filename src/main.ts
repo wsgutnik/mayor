@@ -33,6 +33,8 @@ let prefs: Prefs = loadPrefs();
 setLang(prefs.lang);
 applyUiPrefs(prefs);
 let state: CityState = newCity(1337);
+// The boot city skips swapCity, so it must adopt the player's zoning model here (otherwise it stays on tile zoning).
+setZoningMode(state, prefs.zoning);
 /** Snapshot history of player actions (undo/redo); the simulation itself is untouched. */
 const history = new History();
 const app = document.getElementById("app")!;
