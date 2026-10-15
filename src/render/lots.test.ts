@@ -64,6 +64,19 @@ describe("lot layout", () => {
     expect(cells[3].z).toBeCloseTo(19.5);
   });
 
+  it("keeps every model cell inside its lot rectangle for any lot size and yaw", () => {
+    for (let w = 1; w <= 4; w++) for (let d = 1; d <= 4; d++) for (const yaw of [0, 0.7, -2.1]) {
+      const f = { cx: 10, cz: 20, yaw, w, d };
+      const s = Math.sin(yaw), c = Math.cos(yaw);
+      for (const m of orientedModelCells(f)) {
+        const dx = m.x - f.cx, dz = m.z - f.cz;
+        const u = dx * c - dz * s, v = dx * s + dz * c; // inverse of rotateCell
+        expect(Math.abs(u) + 0.5).toBeLessThanOrEqual(w / 2 + 1e-6);
+        expect(Math.abs(v) + 0.5).toBeLessThanOrEqual(d / 2 + 1e-6);
+      }
+    }
+  });
+
   it("returns oriented kerb and pad transforms", () => {
     // zinv: strip centre 0.075 behind the front edge (its front face 0.015 inside the lot, off junction rings).
     expect(orientedKerb({ cx: 10, cz: 20, yaw: 0, w: 3, d: 2 })).toEqual({ x: 10, z: 20.925, len: 3, yaw: 0 });

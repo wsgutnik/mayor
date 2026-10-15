@@ -78,13 +78,17 @@ function rotateCell(f: LotFrame, ax: number, dz: number): { x: number; z: number
   return { x: f.cx + ax * c + dz * s, z: f.cz - ax * s + dz * c };
 }
 
-/** Rotated world positions where composed 1x1 models sit. */
+/**
+ * Rotated world positions where composed 1x1 models sit. At most 2 x 2 models, spread evenly over the whole lot so each
+ * stays inside its own rectangle (a 1 x 4 lot gets two models down its depth, never a 2-wide pair spilling sideways).
+ */
 export function orientedModelCells(f: LotFrame): { x: number; z: number }[] {
-  const cols = f.w <= 2 && f.d <= 2 ? f.w : 2;
-  const rows = f.w <= 2 && f.d <= 2 ? f.d : 2;
+  const cols = Math.max(1, Math.min(2, Math.round(f.w)));
+  const rows = Math.max(1, Math.min(2, Math.round(f.d)));
+  const sx = f.w / cols, sz = f.d / rows;
   const out: { x: number; z: number }[] = [];
   for (let z = 0; z < rows; z++) {
-    for (let x = 0; x < cols; x++) out.push(rotateCell(f, x - (cols - 1) / 2, z - (rows - 1) / 2));
+    for (let x = 0; x < cols; x++) out.push(rotateCell(f, (x - (cols - 1) / 2) * sx, (z - (rows - 1) / 2) * sz));
   }
   return out;
 }
