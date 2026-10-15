@@ -491,11 +491,18 @@ export class Hud {
   /** A service building as a thumbnail card (Services level 2): photo, name, price, footprint. */
   private buildingCard(t: ToolDef): HTMLElement {
     const entry = isFacilityTool(t.id) ? facilityEntry(FACILITY_OF_TOOL[t.id]) : undefined;
-    // Atlas thumbnails for kit entries without a photo (expansion set) and for Park.
+    // Diorama thumbnails from the Mayor asset sheets (consistent style across services).
     const override: Partial<Record<ToolId, string>> = {
-      solar: "/ui/thumbs/solar.jpg", watertower: "/ui/thumbs/watertower.jpg",
-      firehq: "/ui/thumbs/fire.jpg", firepost: "/ui/thumbs/fire.jpg",
-      waterlarge: "/ui/thumbs/waterpump.jpg", park: "/ui/thumbs/park.jpg",
+      solar: "/ui/thumbs/svc-solar2.jpg", watertower: "/ui/thumbs/svc-watertower2.jpg",
+      firehq: "/ui/thumbs/svc-fire.jpg", firepost: "/ui/thumbs/svc-fire.jpg", fire: "/ui/thumbs/svc-fire.jpg",
+      water: "/ui/thumbs/svc-waterpump2.jpg", waterlarge: "/ui/thumbs/svc-waterpump2.jpg",
+      park: "/ui/thumbs/svc-park2.jpg", cityhall: "/ui/thumbs/svc-cityhall.jpg",
+      police: "/ui/thumbs/svc-police.jpg", hospital: "/ui/thumbs/svc-hospital.jpg",
+      clinic: "/ui/thumbs/svc-clinic.jpg", school: "/ui/thumbs/svc-school.jpg",
+      highschool: "/ui/thumbs/svc-university.jpg", sewage: "/ui/thumbs/svc-sewage.jpg",
+      substation: "/ui/thumbs/svc-substation.jpg", landfill: "/ui/thumbs/svc-garbage.jpg",
+      metro: "/ui/thumbs/tr-metroentrance.jpg", trainstation: "/ui/thumbs/tr-trainstation.jpg",
+      busstop: "/ui/thumbs/tr-busstop.jpg",
     };
     const price = COST[t.id as Exclude<ToolId, "pan">];
     const fp = isFacilityTool(t.id) ? facilityToolFootprint(t.id) : 0;
@@ -568,7 +575,7 @@ export class Hud {
     for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
       const f = roadFacts(t);
       const lanes = Array.from({ length: f.lanes }, () => "<i></i>").join("");
-      const roadThumb = ["/ui/thumbs/road-street.jpg", "/ui/thumbs/road-avenue.jpg", "/ui/thumbs/road-highway.jpg", "/ui/thumbs/road-street.jpg", "/ui/thumbs/road-avenue.jpg"][t - 1];
+      const roadThumb = ["/ui/thumbs/rd-two.jpg", "/ui/thumbs/rd-four.jpg", "/ui/thumbs/rd-highway.jpg", "/ui/thumbs/rd-two.jpg", "/ui/thumbs/rd-four.jpg"][t - 1];
       const b = el("button", "tool", `<img class="road-thumb" src="${roadThumb}" alt="" draggable="false"><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small><span class="road-mini" aria-hidden="true">${lanes}</span>`);
       b.addEventListener("click", () => {
         pendingRoadType = t;
@@ -591,7 +598,7 @@ export class Hud {
     }
     const drawRow = road.section(tr("Draw"));
     for (const m of ROAD_MODES) {
-      const b = el("button", "tool", `<span class="ic">${m.glyph}</span><span>${tr(ROAD_MODE_LABEL[m.mode])}</span>`);
+      const b = el("button", "tool", `${m.mode === "curve" ? `<img class="road-thumb" src="/ui/thumbs/rd-curved.jpg" alt="" draggable="false">` : `<span class="ic">${m.glyph}</span>`}<span>${tr(ROAD_MODE_LABEL[m.mode])}</span>`);
       b.title = tr(m.hint);
       b.addEventListener("click", () => this.hooks.onEvent({ kind: "roadMode", mode: m.mode }));
       this.tooltip.attach(b, () => ({ icon: m.glyph, title: tr(ROAD_MODE_LABEL[m.mode]), desc: tr(m.hint), color: T.road.color }));
@@ -600,7 +607,7 @@ export class Hud {
     }
     const levelRow = road.section(tr("Level"));
     for (const lv of ROAD_LEVELS) {
-      const b = el("button", "tool", `<span class="ic">${lv.glyph}</span><span>${tr(ROAD_LEVEL_LABEL[lv.level])}</span>`);
+      const b = el("button", "tool", `${lv.level === "tunnel" ? `<img class="road-thumb" src="/ui/thumbs/rd-tunnel.jpg" alt="" draggable="false">` : `<span class="ic">${lv.glyph}</span>`}<span>${tr(ROAD_LEVEL_LABEL[lv.level])}</span>`);
       b.title = `${tr(ROAD_LEVEL_LABEL[lv.level])} (${tr("Press E to cycle")})`;
       b.addEventListener("click", () => this.hooks.onEvent({ kind: "roadLevel", level: lv.level }));
       this.tooltip.attach(b, () => ({ icon: lv.glyph, title: tr(ROAD_LEVEL_LABEL[lv.level]), key: "E", desc: tr("Press E to cycle"), color: T.road.color }));
@@ -608,7 +615,11 @@ export class Hud {
       levelRow.appendChild(b);
     }
     const toolsRow = road.section(tr("Tools"));
-    toolsRow.appendChild(this.toolButton(T.roundabout));
+    const roundaboutBtn = this.toolButton(T.roundabout);
+    const roundaboutImg = document.createElement("img");
+    roundaboutImg.className = "road-thumb"; roundaboutImg.src = "/ui/thumbs/rd-roundabout.jpg"; roundaboutImg.alt = ""; roundaboutImg.draggable = false;
+    roundaboutBtn.prepend(roundaboutImg);
+    toolsRow.appendChild(roundaboutBtn);
     const trevo = el("button", "tool", `<span class="ic">✥</span><span>${tr("Interchange")}</span>`);
     trevo.title = tr("Tap a bridge crossing to stamp an interchange");
     trevo.setAttribute("aria-pressed", "false");
@@ -698,10 +709,22 @@ export class Hud {
     }
     bar.appendChild(this.group("services", "Services", { img: "kit/ico-governo" }, services.fly));
 
-    const transit = this.flyout("wrap");
+    const transit = this.flyout("wrap services-fly");
     for (const g of TRANSIT_GROUPS) {
       const row = transit.section(tr(g.label));
-      for (const id of g.tools) row.appendChild(this.toolButton(T[id]));
+      for (const id of g.tools) {
+        if (g.label === "Stops") { row.appendChild(this.buildingCard(T[id])); continue; }
+        const btn = this.toolButton(T[id]);
+        const lineThumb: Partial<Record<string, string>> = {
+          busline: "/ui/thumbs/tr-citybus.jpg", metroline: "/ui/thumbs/tr-metroentrance.jpg", trainline: "/ui/thumbs/tr-train.jpg",
+        };
+        if (lineThumb[id]) {
+          const img = document.createElement("img");
+          img.className = "road-thumb"; img.src = lineThumb[id]; img.alt = ""; img.draggable = false;
+          btn.prepend(img);
+        }
+        row.appendChild(btn);
+      }
     }
     bar.appendChild(this.group("transit", "Transit", { img: "kit/ico-onibus" }, transit.fly));
 
