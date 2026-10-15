@@ -31,6 +31,14 @@ Every file under `public/textures/` is covered by this repository's texture cred
 retain their prior credits in `NOTICE.md`.
 
 Credit coverage marker for the complete shipped texture tree: `public/textures/**`.
+
+## Owner-supplied flora images
+
+| Project files | Source | Status |
+|---|---|---|
+| `public/textures/flora/maple.png`, `maple_dense.png`, `birch.png`, `autumn_maple.png` | Owner-supplied ChatGPT Image studio tree renders | Project asset; alpha extracted and resized by `scripts/make_flora_assets.py` |
+| `public/textures/flora/cloud_*.png` | Owner-supplied ChatGPT Image cloud renders | Project asset; soft alpha extracted |
+| `public/textures/flora/grass_fur_*`, `hedge_*`, `limestone_*`, `soil_grey_*`, `earth_red_*` | Owner-supplied Midjourney material renders | Project asset; seamless edge blend and resize by `scripts/make_flora_assets.py` |
 | `mayor-road-kit/` | "MAYOR Road Kit" v0.1.0 (user-provided, generated for this project; "usable in MAYOR") — props, tunnel portal, bridge pieces only | project-internal |
 | `mayor-transport-pack/` | "Mayor Transport Blender Pack v01" (55 vehicles and street furniture GLBs, user-provided, generated for this project) — conversion source only | project-internal |
 | `mayor-city-hall/` | "Mayor City Hall" 6.5k-triangle GLB (user-provided) — reference for kit entry 21 | project-internal |

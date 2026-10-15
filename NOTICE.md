@@ -82,3 +82,9 @@ artwork by design (prompts describe generic materials).
 Selected files in `public/textures/*_hd.png` are resized colour maps from Fable Cities' public CC0 asset set;
 per-file source and upstream credits are recorded in `third_party/README.md`. Only ambientCG CC0 sources were used
 for this port; no non-CC0 Fable asset was copied.
+
+## Owner-supplied flora imagery (2026-10-14)
+
+`public/textures/flora/` contains derivative, budgeted PNGs made from tree, cloud, grass, hedge, limestone and soil images supplied by the project owner. The tree and cloud images were generated with ChatGPT Image; the ground images were generated with Midjourney. They are project assets, not third-party artwork, and are not offered under an open license.
+
+`public/models/props/tree_maple.glb`, `tree_maple_dense.glb`, `tree_birch.glb` and `tree_autumn_maple.glb` are low-poly reductions (`blender/make_pack_trees.py`: foliage cards clustered into icosahedron clumps, tapered trunk and limbs, vertex colours sampled from the source) of the four procedural trees in `trees_blender_pack` supplied by the project owner.

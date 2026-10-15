@@ -110,18 +110,19 @@ const _moonSun = new THREE.Color("#9db8ff");
 const _underSky = new THREE.Color("#5a4330");
 
 /** Which Blender prop a scattered plant uses, with cumulative weights per terrain preset. */
-const TREE_SPECIES = ["tree_oak", "tree_pine", "tree_poplar", "tree_cherry", "tree_autumn", "tree_palm", "bush", "bush_flowers", "rock"] as const;
+const TREE_SPECIES = ["tree_oak", "tree_pine", "tree_poplar", "tree_cherry", "tree_autumn", "tree_maple", "tree_maple_dense", "tree_birch", "tree_autumn_maple", "tree_palm", "bush", "bush_flowers", "rock"] as const;
 type Species = (typeof TREE_SPECIES)[number];
 const SPECIES_WEIGHTS: Record<Biome, [Species, number][]> = {
-  plains: [["tree_oak", 0.4], ["tree_poplar", 0.15], ["bush", 0.2], ["bush_flowers", 0.08], ["tree_cherry", 0.06], ["tree_autumn", 0.06], ["rock", 0.05]],
-  forest: [["tree_pine", 0.42], ["tree_oak", 0.33], ["tree_poplar", 0.05], ["bush", 0.1], ["tree_autumn", 0.06], ["rock", 0.04]],
-  river: [["tree_oak", 0.38], ["tree_poplar", 0.25], ["bush", 0.18], ["tree_cherry", 0.1], ["bush_flowers", 0.04], ["rock", 0.05]],
-  coast: [["tree_palm", 0.35], ["tree_oak", 0.2], ["bush", 0.22], ["bush_flowers", 0.08], ["rock", 0.1], ["tree_poplar", 0.05]],
-  mountain: [["tree_pine", 0.58], ["rock", 0.24], ["tree_oak", 0.1], ["bush", 0.08]],
+  plains: [["tree_oak", .26], ["tree_poplar", .10], ["tree_maple", .12], ["tree_maple_dense", .08], ["tree_birch", .08], ["tree_autumn_maple", .03], ["bush", .2], ["bush_flowers", .08], ["tree_cherry", .03], ["rock", .02]],
+  forest: [["tree_pine", .34], ["tree_oak", .22], ["tree_maple_dense", .12], ["tree_maple", .08], ["tree_birch", .08], ["tree_autumn_maple", .03], ["bush", .08], ["tree_autumn", .02], ["rock", .03]],
+  river: [["tree_oak", .25], ["tree_poplar", .17], ["tree_maple", .16], ["tree_birch", .12], ["tree_maple_dense", .06], ["tree_autumn_maple", .03], ["bush", .13], ["tree_cherry", .05], ["rock", .03]],
+  coast: [["tree_palm", .35], ["tree_oak", .18], ["tree_maple", .07], ["tree_birch", .05], ["bush", .22], ["bush_flowers", .08], ["rock", .05]],
+  mountain: [["tree_pine", .55], ["rock", .24], ["tree_oak", .08], ["tree_birch", .04], ["tree_autumn_maple", .02], ["bush", .07]],
   desert: [["tree_palm", 0.18], ["bush", 0.32], ["rock", 0.5]],
 };
 const SPECIES_SCALE: Record<Species, [number, number]> = {
   tree_oak: [0.9, 1.5], tree_pine: [0.9, 1.6], tree_poplar: [0.9, 1.4], tree_cherry: [0.9, 1.3], tree_autumn: [0.9, 1.4],
+  tree_maple: [0.9, 1.4], tree_maple_dense: [0.9, 1.4], tree_birch: [0.9, 1.45], tree_autumn_maple: [0.9, 1.4],
   tree_palm: [0.9, 1.3], bush: [0.8, 1.4], bush_flowers: [0.9, 1.3], rock: [0.6, 1.5],
 };
 /** Vehicle props: which GLB each kind of mover uses. */

@@ -11,9 +11,14 @@ export class Ambience {
   private readonly maxPuffs = 720;
   private d = new THREE.Object3D();
   private c = new THREE.Color();
+  private scene: THREE.Scene;
   private size = 96;
+  /** Photo cloud sprites (public/textures/flora/cloud_N.png): flat cards high above the city, one pool per image. */
+  private sprites: { mesh: THREE.InstancedMesh; mat: THREE.MeshBasicMaterial; data: { x: number; z: number; y: number; s: number; yaw: number; speed: number }[] }[] = [];
+  private spritesReady = false;
 
   constructor(scene: THREE.Scene) {
+    this.scene = scene;
     const blob = new THREE.IcosahedronGeometry(1, 1);
     this.clouds = new THREE.InstancedMesh(
       blob,
@@ -32,6 +37,42 @@ export class Ambience {
     this.smoke.frustumCulled = false;
     this.smoke.renderOrder = 2;
     scene.add(this.smoke);
+    this.loadSprites();
+  }
+
+  private loadSprites(): void {
+    if (typeof document === "undefined") return; // headless tests keep the low-poly clouds
+    const loader = new THREE.TextureLoader();
+    const geo = new THREE.PlaneGeometry(1, 1);
+    geo.rotateX(-Math.PI / 2);
+    let pending = 4;
+    for (let n = 1; n <= 4; n++) {
+      loader.load(`/textures/flora/cloud_${n}.png`, (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.92, fog: false });
+        const mesh = new THREE.InstancedMesh(geo, mat, 24);
+        mesh.frustumCulled = false;
+        mesh.renderOrder = 4;
+        mesh.count = 0;
+        this.scene.add(mesh);
+        this.sprites.push({ mesh, mat, data: [] });
+        if (--pending === 0) { this.spritesReady = true; this.layoutSprites(); }
+      }, undefined, () => { pending--; });
+    }
+  }
+
+  private layoutSprites(): void {
+    if (!this.sprites.length) return;
+    let seed = 313;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const total = Math.max(8, Math.round(this.size / 8));
+    for (const sp of this.sprites) sp.data = [];
+    for (let i = 0; i < total; i++) {
+      const sp = this.sprites[i % this.sprites.length];
+      sp.data.push({ x: rnd() * this.size * 1.5 - this.size * 0.25, z: rnd() * this.size * 1.5 - this.size * 0.25, y: 30 + rnd() * 10, s: 14 + rnd() * 14, yaw: rnd() * Math.PI * 2, speed: 0.25 + rnd() * 0.25 });
+    }
+    // the low-poly puffs thin out once photo clouds exist
+    this.clouds.count = Math.floor(this.cloudData.length * 0.3);
   }
 
   /** Lay out a cloud field over a map of the given size. */
@@ -53,6 +94,7 @@ export class Ambience {
       }
     }
     this.clouds.count = this.cloudData.length;
+    if (this.spritesReady) this.layoutSprites();
   }
 
   setSources(sources: SmokeSource[]): void {
@@ -78,6 +120,21 @@ export class Ambience {
     }
     this.clouds.instanceMatrix.needsUpdate = true;
     if (this.clouds.instanceColor) this.clouds.instanceColor.needsUpdate = true;
+    for (const sp of this.sprites) {
+      sp.mat.color.setScalar(0.18 + 0.82 * day);
+      sp.mesh.count = sp.data.length;
+      for (let i = 0; i < sp.data.length; i++) {
+        const k = sp.data[i];
+        k.x += k.speed * dt;
+        if (k.x > this.size * 1.3) k.x -= span;
+        d.position.set(k.x, k.y, k.z);
+        d.rotation.set(0, k.yaw, 0);
+        d.scale.set(k.s, 1, k.s * 0.7);
+        d.updateMatrix();
+        sp.mesh.setMatrixAt(i, d.matrix);
+      }
+      sp.mesh.instanceMatrix.needsUpdate = true;
+    }
 
     // smoke: each source sends three puffs that rise, widen and blend into the sky
     let n = 0;
