@@ -1,6 +1,6 @@
 name: app
 options:
-  bundleIdPrefix: com.mayor.game
+  bundleIdPrefix: com.gutnik.mayor
   deploymentTarget:
     iOS: 15.0
 fileGroups: [../../src]
@@ -11,7 +11,7 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: Mayor
-      PRODUCT_BUNDLE_IDENTIFIER: com.mayor.game
+      PRODUCT_BUNDLE_IDENTIFIER: com.gutnik.mayor
       DEVELOPMENT_TEAM: 4AFHZKZYQ6
 targetTemplates:
   app:

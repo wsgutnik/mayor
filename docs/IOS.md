@@ -4,7 +4,7 @@ Mayor can be prepared for iPad/iPhone with Tauri 2, but `tauri ios init`, Xcode 
 
 ## Current Configuration
 
-- Bundle identifier: `com.mayor.game`, matching the Mac app.
+- Bundle identifier: iOS `com.gutnik.mayor` (`src-tauri/tauri.ios.conf.json`; `com.mayor.game` belongs to another developer team and cannot be registered); the Mac app keeps `com.mayor.game`.
 - Apple Developer team: `4AFHZKZYQ6`.
 - Minimum iOS version: `15.0`.
 - Orientation: landscape left/right only for iPhone and iPad.
@@ -52,7 +52,7 @@ The owner must create iOS signing assets in the Apple Developer portal or Xcode.
 
 1. Create an Apple Development certificate for device testing.
 2. Create an iOS Distribution certificate for TestFlight/App Store or ad hoc distribution.
-3. Register the App ID `com.mayor.game`.
+3. Register the App ID `com.gutnik.mayor` (done 2026-10-15, name "Mayor"; profile "Mayor App Store").
 4. Create a development provisioning profile for local devices.
 5. Create an App Store provisioning profile for TestFlight, and an ad hoc profile if direct device installs are needed outside TestFlight.
 
@@ -79,7 +79,7 @@ The owner must create iOS signing assets in the Apple Developer portal or Xcode.
 | Rust target missing | iOS std libraries are not installed. | Run `rustup target add aarch64-apple-ios aarch64-apple-ios-sim`. |
 | CocoaPods missing | Tauri cannot install iOS pods. | Run `sudo gem install cocoapods`. |
 | XcodeGen missing | Tauri cannot generate the Xcode project. | Run `brew install xcodegen`. |
-| Signing fails on a device | Certificate/profile/App ID mismatch. | Use team `4AFHZKZYQ6`, App ID `com.mayor.game`, and a profile that includes the target device. |
+| Signing fails on a device | Certificate/profile/App ID mismatch. | Use team `4AFHZKZYQ6`, App ID `com.gutnik.mayor`, and a profile that includes the target device. |
 | Black or unstable WebGL view | Device texture/GPU limits are lower than desktop. | Use the in-game graphics quality menu; high shadows are capped on iOS by the renderer. |
 
 ## Known toolchain pin
