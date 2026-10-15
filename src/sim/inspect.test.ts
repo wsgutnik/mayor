@@ -13,9 +13,9 @@ const city = () => {
 };
 
 describe("catalog", () => {
-  it("lists the 40 kit buildings once each, numbered 1 to 40", () => {
-    expect(CATALOG).toHaveLength(40);
-    expect(CATALOG.map((c) => c.n)).toEqual(Array.from({ length: 40 }, (_, i) => i + 1));
+  it("lists the 84 kit buildings once each, numbered 1 to 84", () => {
+    expect(CATALOG).toHaveLength(84);
+    expect(CATALOG.map((c) => c.n)).toEqual(Array.from({ length: 84 }, (_, i) => i + 1));
     expect(entryByNumber(24)?.name).toBe("Delegacia");
   });
 

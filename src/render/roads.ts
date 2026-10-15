@@ -22,9 +22,9 @@ const NODE_ASPHALT_LIFT = ROAD_LIFT + 0.02;
 /** Markings drawn on a junction patch must ride above its asphalt. */
 const NODE_MARK_LIFT = NODE_ASPHALT_LIFT + 0.004;
 
-const ASPHALT = "#3b3f46";
-const KERB = "#c4c7cc";
-const HW_ASPHALT = "#4a4f57";
+const ASPHALT = "#31353c";
+const KERB = "#ccd0d6";
+const HW_ASPHALT = "#41464e";
 const HW_EDGE = "#b8bec6";
 const LINE = "#d8d4b0";
 const AVE_LINE = "#e8e4c8";

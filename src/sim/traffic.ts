@@ -97,6 +97,7 @@ export interface TransitVehicle {
 }
 
 const METRO_SPEED = 8;
+const TRAIN_SPEED = 10;
 const DWELL_SECONDS = 1.2;
 
 export interface TrafficState {
@@ -1227,13 +1228,13 @@ function planLeg(w: World, t: TrafficState, v: TransitVehicle): boolean {
   if (!from || !to) return false;
   let tiles: number[] | null;
   let layers: Uint8Array | undefined;
-  if (line.kind === "metro") tiles = straightTiles(w, from.tile, to.tile);
+  if (line.kind !== "bus") tiles = straightTiles(w, from.tile, to.tile);
   else { const lp = findLayeredPath(w, t.load, from.tile, to.tile); tiles = lp?.tiles ?? null; layers = lp?.layers; }
   if (!tiles) return false;
   if (tiles.length < 2) tiles = [from.tile, to.tile];
   v.tiles = tiles;
   v.layers = layers;
-  v.pts = line.kind === "metro" ? centres(w, tiles) : routePath(w, tiles);
+  v.pts = line.kind !== "bus" ? centres(w, tiles) : routePath(w, tiles);
   v.progress = 0;
   return true;
 }
@@ -1335,7 +1336,7 @@ function moveTransit(w: World, t: TrafficState, dt: number, weather: number): vo
     if (v.dwell > 0) { v.dwell -= dt; continue; }
     if (!v.tiles.length) continue;
     const tile = v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))];
-    let speed = METRO_SPEED;
+    let speed = v.kind === "train" ? TRAIN_SPEED : METRO_SPEED;
     if (v.kind === "bus") {
       const cls = w.road[tile];
       if (!cls) { v.progress = v.tiles.length; continue; }

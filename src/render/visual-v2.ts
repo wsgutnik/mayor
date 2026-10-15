@@ -11,7 +11,7 @@ export type VisualV2ReferenceId = (typeof VISUAL_V2_REFERENCE_IDS)[number];
 export type VisualLod = 0 | 1 | 2;
 
 export function legacyBuildingUrl(id: number): string {
-  if (!Number.isInteger(id) || id < 1 || id > 40) {
+  if (!Number.isInteger(id) || id < 1 || id > 84) {
     throw new RangeError(`Invalid Mayor catalog building ID: ${id}`);
   }
   return `/models/${String(id).padStart(2, "0")}.glb`;

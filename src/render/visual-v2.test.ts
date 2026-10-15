@@ -34,7 +34,7 @@ describe("Visual V2 reference asset resolver", () => {
 
   it("rejects invalid catalog IDs rather than fetching fabricated paths", () => {
     expect(() => legacyBuildingUrl(0)).toThrow(RangeError);
-    expect(() => legacyBuildingUrl(41)).toThrow(RangeError);
+    expect(() => legacyBuildingUrl(85)).toThrow(RangeError);
     expect(() => legacyBuildingUrl(1.5)).toThrow(RangeError);
   });
 

@@ -30,8 +30,8 @@ interface NetDef {
  */
 function netDefs(): NetDef[] {
   return [
-    { kind: "power", coverBit: COVER.POWER, netBit: NET.POWER, sources: [FAC.POWER, FAC.SUBSTATION] },
-    { kind: "water", coverBit: COVER.WATER, netBit: NET.WATER, sources: [FAC.WATER] },
+    { kind: "power", coverBit: COVER.POWER, netBit: NET.POWER, sources: [FAC.POWER, FAC.POWER_SOLAR, FAC.POWER_LARGE, FAC.SUBSTATION] },
+    { kind: "water", coverBit: COVER.WATER, netBit: NET.WATER, sources: [FAC.WATER, FAC.WATER_TOWER, FAC.WATER_LARGE] },
     { kind: "sewage", coverBit: COVER.SEWAGE, netBit: NET.SEWAGE, sources: [FAC.SEWAGE] },
   ];
 }

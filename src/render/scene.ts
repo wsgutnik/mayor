@@ -1289,7 +1289,7 @@ export class CityRenderer {
     const w = this.world;
     const tracks: { type: RoadType; pts: Pt[]; width: number; color: string; lift: number }[] = [];
     for (const line of w.lines) {
-      if (line.kind !== "metro") continue;
+      if (line.kind === "bus") continue;
       const n = line.stops.length;
       for (let i = 0; i < n; i++) {
         const a = w.stops.find((x) => x.id === line.stops[i]);

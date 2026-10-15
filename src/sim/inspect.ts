@@ -4,7 +4,7 @@ import { COVER, FAC, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, fac
 import { landmarkById } from "./landmarks";
 
 /** Utilities served through the road network have no radius to report. */
-const NETWORKED = new Set<FacilityKind>([FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.SUBSTATION]);
+const NETWORKED = new Set<FacilityKind>([FAC.POWER, FAC.WATER, FAC.SEWAGE, FAC.SUBSTATION, FAC.POWER_SOLAR, FAC.POWER_LARGE, FAC.WATER_TOWER, FAC.WATER_LARGE]);
 
 /** What the inspector card shows about one tile. Plain data, so the UI needs no simulation knowledge. */
 export interface TileInfo {

@@ -11,12 +11,14 @@ export const PAINT_COLOURS: [number, number][] = [
   [0.065, 0x122a5e], [0.045, 0x14589e], [0.026, 0x2a86cc], [0.06, 0x8e1015],
   [0.038, 0xc4291d], [0.022, 0x5a0f19], [0.038, 0x123f27], [0.022, 0x0d7150],
   [0.024, 0xc38f07], [0.02, 0x7d3d0f], [0.014, 0xc4531a], [0.01, 0x452063],
+  [0.012, 0x1f7a6d], [0.01, 0x365f7d], [0.01, 0x6d7d2a], [0.008, 0x8a5a12], [0.008, 0x4a4e57],
 ];
 
 /** Van bodies, truck cargo boxes, bus roofs: mostly white fleet livery. */
 export const BOX_COLOURS: number[] = [
   0xeceded, 0xd9dcda, 0xbcc1c3, 0xe3e6e3, 0xc6ced4, 0xe5e0d3,
   0xcbd2cf, 0x8ea4b6, 0x14508f, 0x9a2b26, 0x1f6440, 0xd09a12,
+  0x2a7d6d, 0xe07a3f, 0x53677d,
 ];
 
 export interface WeightedPalette {
