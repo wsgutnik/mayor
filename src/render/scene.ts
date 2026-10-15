@@ -26,6 +26,20 @@ import { loadManifestGatedModel } from "./visual-v2-manifest";
 import { BUS_LOOKS, CAR_LOOKS, FLEET_BY_ROLE, TRUCK_LOOKS, pickLook } from "./fleet";
 import { WaterSurface, makeNoiseTexture, tierForPixelCap } from "./water";
 import { Ambience, SmokeSource } from "./ambience";
+
+/**
+ * One compatibility boundary for civic buildings: anchors from old saves retain
+ * their grid-centred, unrotated transform, while posed anchors use street-frame
+ * coordinates. Keeping this pure makes the placement contract renderer-testable.
+ */
+export function facilityModelTransform(anchor: { x: number; y: number; w: number; h: number; cx?: number; cz?: number; yaw?: number } | undefined, x: number, z: number, fallbackScale: number): { x: number; z: number; yaw: number; scale: number } {
+  return {
+    x: anchor?.cx ?? (anchor ? anchor.x + anchor.w / 2 : x + .5),
+    z: anchor?.cz ?? (anchor ? anchor.y + anchor.h / 2 : z + .5),
+    yaw: anchor?.yaw ?? 0,
+    scale: anchor ? fallbackScale : 1,
+  };
+}
 import { TrafficState, pointAtRouteArc, routeArcLengths } from "../sim/traffic";
 import { buildCoverageField, coverageRamp, isCoverageLayer } from "../sim/coverage-field";
 import { CoverageOverlay } from "./coverage-overlay";
@@ -874,11 +888,10 @@ export class CityRenderer {
           if (kind === 1) smoke.push({ x: anchor ? anchor.x + 1.2 : x + 0.7, y: h + 0.85, z: anchor ? anchor.y + 1.2 : y + 0.72, strength: 1 });
           const mesh = this.fMeshes.get(kind);
           if (mesh) {
-            const scale = anchor && !this.fX2Loaded.has(kind) ? 1.8 : 1;
-            const px = anchor?.cx ?? (anchor ? anchor.x + anchor.w / 2 : x + 0.5);
-            const pz = anchor?.cz ?? (anchor ? anchor.y + anchor.h / 2 : y + 0.5);
+            const transform = facilityModelTransform(anchor, x, y, anchor && !this.fX2Loaded.has(kind) ? 1.8 : 1);
+            const { x: px, z: pz, yaw, scale } = transform;
             const ph = anchor ? heightAt(w, px, pz) : h;
-            this.placeModel(mesh, counts, px, pz, ph, scale, 1, tint.setScalar(1), x, y, anchor?.yaw);
+            this.placeModel(mesh, counts, px, pz, ph, scale, 1, tint.setScalar(1), x, y, yaw);
           }
         } else if (blocksBuilding(w, i)) {
           // Drawn as ribbons (see buildRoadGeometry). Tunnels fall through: ground above keeps its trees.

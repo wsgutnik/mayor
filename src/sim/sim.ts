@@ -1329,7 +1329,8 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     }
     let x0 = w.size, y0 = w.size, x1 = -1, y1 = -1;
     for (const t of tiles) { const tx = t % w.size, ty = (t / w.size) | 0; x0 = Math.min(x0, tx); y0 = Math.min(y0, ty); x1 = Math.max(x1, tx); y1 = Math.max(y1, ty); }
-    (w.facilityAnchors ??= []).push({ x: x0, y: y0, kind: type, w: x1 - x0 + 1, h: y1 - y0 + 1, cx: placement.cx, cz: placement.cz, yaw: placement.yaw });
+    (w.facilityAnchors ??= []).push({ x: x0, y: y0, kind: type, w: x1 - x0 + 1, h: y1 - y0 + 1,
+      ...(placement.snapped ? { cx: placement.cx, cz: placement.cz, yaw: placement.yaw } : {}) });
     if (type === FAC.METRO) registerMetroStation(w, i);
     if (type === FAC.TRAIN_STATION) registerTrainStation(w, i);
     w.coverageDirty = true;

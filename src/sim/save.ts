@@ -8,7 +8,7 @@ import { adoptNodes } from "./roads";
 import type { OrientedLot, Side } from "./zonecells";
 import { landmarkById, type LandmarkId } from "./landmarks";
 import {
-  BIOMES, FAC, Biome, FacilityAnchor, FacilityKind, facilityFootprint, generateWorld, idx, inBounds,
+  BIOMES, FAC, FACILITY_INFO, Biome, FacilityAnchor, FacilityKind, facilityFootprint, generateWorld, idx, inBounds,
   rebuildRoadRaster, RoadSegment, Roundabout, Stop, TransitLine, World, WorldLot,
 } from "./world";
 
@@ -124,7 +124,12 @@ export function serialize(s: CityState): string {
     zone: toB64(w.zone),
     level: toB64(w.level),
     facility: toB64(w.facility),
-    ...(w.facilityAnchors?.length ? { facilityAnchors: w.facilityAnchors } : {}),
+    // Persist an explicit pose even for a pre-snapping grid anchor. In memory
+    // those fields remain optional so truly old saves preserve their old path;
+    // on disk this makes the transform contract stable for every facility kind.
+    ...(w.facilityAnchors?.length ? { facilityAnchors: w.facilityAnchors.map((a) => ({
+      ...a, cx: a.cx ?? a.x + a.w / 2, cz: a.cz ?? a.y + a.h / 2, yaw: a.yaw ?? 0,
+    })) } : {}),
     segments: w.segments,
     roundabouts: w.roundabouts,
     stops: w.stops,
@@ -293,10 +298,13 @@ function validateFacilityAnchors(w: World): void {
   const anchorKeys = new Set<string>();
   for (const a of anchors) {
     if (!a || !Number.isInteger(a.x) || !Number.isInteger(a.y) || !Number.isInteger(a.w) || !Number.isInteger(a.h)) bad();
-    if (!Number.isInteger(a.kind) || a.kind <= FAC.NONE || a.kind > FAC.FIRE_HQ) bad();
+    // Do not couple save validation to the last enum member: every catalogued
+    // facility, including later service tiers, uses the same placement format.
+    if (!Number.isInteger(a.kind) || a.kind <= FAC.NONE || !FACILITY_INFO[a.kind as FacilityKind]) bad();
     const fp = facilityFootprint(a.kind as FacilityKind);
     if (a.w < 1 || a.h < 1 || a.w > fp + 1 || a.h > fp + 1) bad();
-    if ((a.cx !== undefined || a.cz !== undefined || a.yaw !== undefined) &&
+    const hasPose = a.cx !== undefined || a.cz !== undefined || a.yaw !== undefined;
+    if (hasPose &&
       (!Number.isFinite(a.cx) || !Number.isFinite(a.cz) || !Number.isFinite(a.yaw) || Math.abs(a.yaw!) > Math.PI * 2)) bad();
     if (!inBounds(w, a.x, a.y) || a.x + a.w > w.size || a.y + a.h > w.size) bad();
     const key = `${a.x}:${a.y}`;
@@ -407,12 +415,15 @@ export function deserialize(json: string): CityState {
   w.zone.set(bytes(f.zone, n * n));
   w.level.set(bytes(f.level, n * n));
   w.facility.set(bytes(f.facility, n * n));
-  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 5) || w.facility.some((v) => v > FAC.FIRE_HQ)) {
+  if (w.zone.some((v) => v > 3) || w.level.some((v) => v > 5) || w.facility.some((v) => v !== FAC.NONE && !FACILITY_INFO[v as FacilityKind])) {
     throw new SaveError("The save file is damaged");
   }
   if (f.facilityAnchors !== undefined && !Array.isArray(f.facilityAnchors)) throw new SaveError("The save file is damaged");
-  w.facilityAnchors = (f.facilityAnchors ?? []).map((a) => ({ x: a.x, y: a.y, kind: a.kind, w: a.w, h: a.h,
-    ...(Number.isFinite(a.cx) && Number.isFinite(a.cz) && Number.isFinite(a.yaw) ? { cx: a.cx, cz: a.cz, yaw: a.yaw } : {}) }));
+  w.facilityAnchors = (f.facilityAnchors ?? []).map((a) => {
+    const legacyPose = a.cx === a.x + a.w / 2 && a.cz === a.y + a.h / 2 && a.yaw === 0;
+    return { x: a.x, y: a.y, kind: a.kind, w: a.w, h: a.h,
+      ...(!legacyPose && (a.cx !== undefined || a.cz !== undefined || a.yaw !== undefined) ? { cx: a.cx, cz: a.cz, yaw: a.yaw } : {}) };
+  });
   validateFacilityAnchors(w);
   w.segments = f.segments;
   w.roundabouts = f.roundabouts ?? [];

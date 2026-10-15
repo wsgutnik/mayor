@@ -121,6 +121,7 @@ const PT: Record<string, string> = {
   // sim reasons
   "Not enough money": "Dinheiro insuficiente", "Cannot build on water": "Não é possível construir na água",
   "Facility footprint is outside the map": "A instalação não cabe no mapa", "Facility must be within 5 tiles of a connected road": "A instalação deve ficar a até 5 trechos de uma estrada conectada",
+  "No room beside the street here": "Não há espaço ao lado da rua aqui",
   "Tile is a road": "O terreno é uma estrada", "Zones must be within 4 tiles of a road": "A zona deve ficar a até 4 lotes de uma estrada", "Tile is zoned": "O terreno é uma zona", "Tile is occupied": "O terreno está ocupado",
   "Outside the map": "Fora do mapa", "Cannot remove the highway entry": "A entrada da autoestrada não pode ser removida",
   "Road would cross water": "A estrada cruzaria a água", "Road would cross a building": "A estrada cruzaria uma construção",

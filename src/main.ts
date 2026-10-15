@@ -880,6 +880,9 @@ bindInput(renderer, {
       const fp = facilityToolFootprint(tool);
       const p = t ? planFacilityPlacement(state.world, FACILITY_OF_TOOL[tool], t.x + .5, t.y + .5) : null;
       renderer.setFacilityHover(p ? { cx: p.cx, cz: p.cz, yaw: p.yaw, side: fp } : null, p?.ok ? toolColor(tool) : "#e45454");
+      // The red ghost alone is ambiguous at an acute corner; retain the exact
+      // simulator refusal in the persistent tool hint as roads do.
+      if (p && !p.ok && p.reason) hud.setHint(trReason(p.reason));
       return;
     }
     if (isZoneLike(tool) && zoneMode === "fill") updateFillHint(cx, cy);
