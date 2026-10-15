@@ -289,10 +289,194 @@ function ringCompute(ring: Pt[]): Tri[] {
   return out;
 }
 
+/** Pad triangles keep at least this minimum angle (degrees) where possible. */
+export const PAD_MIN_ANGLE = 2;
+const SIN_MIN = Math.sin((PAD_MIN_ANGLE * Math.PI) / 180);
+const STEINER_STEP = 0.6;
+const STEINER_CLEAR = 0.25;
+const STEINER_ROUNDS = 6;
+
+function segDist2(p: Pt, a: Pt, b: Pt): number {
+  const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz;
+  const t = l2 < 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2));
+  const x = a.x + dx * t - p.x, z = a.z + dz * t - p.z;
+  return x * x + z * z;
+}
+
+/**
+ * Refine an ear-clipped ring triangulation (docs: pad triangles keep a
+ * PAD_MIN_ANGLE minimum angle). Indexed mesh with triangle adjacency:
+ *  1. worklist Lawson flips to the constrained Delaunay triangulation (ring
+ *     edges have no neighbour, so they never flip); each flip only queues the
+ *     quad's four outer edges;
+ *  2. only if a triangle is still under PAD_MIN_ANGLE: interior grid points
+ *     (world-anchored grid, STEINER_STEP then halved every two rounds, kept
+ *     >= the matching clearance from the ring) inside the grown bounding boxes
+ *     of the triangles still bad, each located by walking the adjacency from
+ *     that triangle, split in, and flipped locally (worklist); at most
+ *     STEINER_ROUNDS rounds.
+ * Steiner points never sit on the ring, so the outline and its seams with the
+ * ribbons are unchanged. Cost stays near the ear clip on pads that need no
+ * Steiner points (most), and local where they do.
+ */
+function refineRing(ring: Pt[], tris: Tri[]): Tri[] {
+  if (tris.length < 2) return tris;
+  const P: Pt[] = [];
+  const id = new Map<Pt, number>();
+  const tv: number[] = [];
+  const vid = (p: Pt): number => {
+    let k = id.get(p);
+    if (k === undefined) { k = P.length; id.set(p, k); P.push(p); }
+    return k;
+  };
+  for (const t of tris) {
+    const a = vid(t[0]), b = vid(t[1]), c = vid(t[2]);
+    if (orient(t[0], t[1], t[2]) > 0) tv.push(a, b, c); else tv.push(a, c, b);
+  }
+  let nT = tris.length;
+  const tn: number[] = new Array(nT * 3).fill(-1);
+  // Twin lookup via per-vertex outgoing half-edge lists (no hashing).
+  const first = new Int32Array(P.length).fill(-1), nextOut = new Int32Array(nT * 3);
+  for (let e = 0; e < nT * 3; e++) {
+    const t = (e / 3) | 0, i = e % 3;
+    const a = tv[t * 3 + (i + 1) % 3], b = tv[t * 3 + (i + 2) % 3];
+    for (let f = first[b]; f >= 0; f = nextOut[f]) {
+      const ft = (f / 3) | 0, fi = f % 3;
+      if (tv[ft * 3 + (fi + 2) % 3] === a && tn[f] < 0) { tn[e] = f; tn[f] = e; break; }
+    }
+    nextOut[e] = first[a]; first[a] = e;
+  }
+  // tn stores the neighbour's half-edge slot (tri*3+i); -1 on the ring.
+  const inCircle = (a: Pt, b: Pt, c: Pt, d: Pt): number => {
+    const ax = a.x - d.x, az = a.z - d.z, bx = b.x - d.x, bz = b.z - d.z, cx = c.x - d.x, cz = c.z - d.z;
+    return (ax * ax + az * az) * (bx * cz - cx * bz) - (bx * bx + bz * bz) * (ax * cz - cx * az)
+      + (cx * cx + cz * cz) * (ax * bz - bx * az);
+  };
+  const setN = (slot: number, to: number): void => { tn[slot] = to; if (to >= 0) tn[to] = slot; };
+  const work: number[] = [];
+  const flipAll = (): void => {
+    let guard = 64 * nT + 64;
+    while (work.length > 0 && guard-- > 0) {
+      const e = work.pop()!;
+      const opp = tn[e];
+      if (opp < 0) continue;
+      const t = (e / 3) | 0, i = e % 3, s = (opp / 3) | 0, j = opp % 3;
+      const u = tv[t * 3 + i], a = tv[t * 3 + (i + 1) % 3], b = tv[t * 3 + (i + 2) % 3];
+      const wv = tv[s * 3 + j];
+      const U = P[u], A = P[a], B = P[b], W = P[wv];
+      const scale = Math.max(dist2(A, B), dist2(U, W), 1e-12);
+      if (inCircle(U, A, B, W) <= 1e-9 * scale * scale) continue;
+      if (orient(U, A, W) <= 1e-12 || orient(U, W, B) <= 1e-12) continue;
+      const nA = tn[t * 3 + (i + 1) % 3], nB = tn[t * 3 + (i + 2) % 3];
+      const sB = tn[s * 3 + (j + 1) % 3], sA = tn[s * 3 + (j + 2) % 3];
+      // t = (u, a, w), s = (u, w, b), slot 0 opposite u, 1 opposite a|w, 2 opposite w|b.
+      tv[t * 3] = u; tv[t * 3 + 1] = a; tv[t * 3 + 2] = wv;
+      tv[s * 3] = u; tv[s * 3 + 1] = wv; tv[s * 3 + 2] = b;
+      setN(t * 3, sB); setN(t * 3 + 1, s * 3 + 2); setN(t * 3 + 2, nB);
+      setN(s * 3, sA); setN(s * 3 + 1, nA);
+      work.push(t * 3, t * 3 + 2, s * 3, s * 3 + 1);
+    }
+    work.length = 0;
+  };
+  for (let e = 0; e < nT * 3; e++) if (tn[e] > e) work.push(e);
+  flipAll();
+
+  const bad = (t: number): boolean => {
+    const A = P[tv[t * 3]], B = P[tv[t * 3 + 1]], C = P[tv[t * 3 + 2]];
+    const ab = dist2(A, B), bc = dist2(B, C), ca = dist2(C, A);
+    const area2 = Math.abs(orient(A, B, C));
+    // Smallest angle is opposite the shortest edge: sin = area2 / (product of the other two).
+    const m = Math.min(ab, bc, ca);
+    const other = m === ab ? bc * ca : m === bc ? ab * ca : ab * bc;
+    return other <= 0 || area2 / Math.sqrt(other) < SIN_MIN;
+  };
+  const locate = (p: Pt, start: number): number => {
+    let t = start;
+    for (let steps = 0; steps < nT + 4; steps++) {
+      let moved = false;
+      for (let i = 0; i < 3; i++) {
+        const a = P[tv[t * 3 + (i + 1) % 3]], b = P[tv[t * 3 + (i + 2) % 3]];
+        if (orient(a, b, p) < -1e-12) {
+          const n = tn[t * 3 + i];
+          if (n < 0) return -1;
+          t = (n / 3) | 0; moved = true; break;
+        }
+      }
+      if (!moved) return t;
+    }
+    return -1;
+  };
+  const tried = new Set<number>();
+  let last = 0;
+  for (let round = 0; round < STEINER_ROUNDS; round++) {
+    const bads: number[] = [];
+    for (let t = 0; t < nT; t++) if (bad(t)) bads.push(t);
+    if (bads.length === 0) break;
+    let added = 0;
+    // Coarse grid first; every two rounds halve the step (and clearance) so
+    // slivers tucked into a fillet corner still find a point.
+    const level = Math.min(2, round >> 1);
+    const step = STEINER_STEP / (1 << level), clear = STEINER_CLEAR / (1 << level), clear2 = clear * clear;
+    for (const t of bads) {
+      // Earlier insertions this round may already have fixed it (indices are
+      // reused by flips, so re-test what sits at t now).
+      if (!bad(t)) continue;
+      // Bad triangle's box grown by one grid step per round, so a tiny sliver still sees a grid point.
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (let k = 0; k < 3; k++) {
+        const q = P[tv[t * 3 + k]];
+        x0 = Math.min(x0, q.x); z0 = Math.min(z0, q.z); x1 = Math.max(x1, q.x); z1 = Math.max(z1, q.z);
+      }
+      const grow = step * ((round & 1) + 1);
+      x0 -= grow; z0 -= grow; x1 += grow; z1 += grow;
+      for (let ix = Math.ceil(x0 / step); ix * step < x1; ix++) {
+        for (let iz = Math.ceil(z0 / step); iz * step < z1; iz++) {
+          const key = (ix * 1000003 + iz) * 4 + level;
+          if (tried.has(key)) continue;
+          tried.add(key);
+          const p = { x: ix * step, z: iz * step };
+          const at = locate(p, t < nT ? t : last);
+          if (at < 0) continue;
+          let near = false;
+          for (let r = 0; r < ring.length && !near; r++) {
+            const a = ring[r], b = ring[r + 1 === ring.length ? 0 : r + 1];
+            // Box reject first: most ring edges are far from p.
+            if (p.x < Math.min(a.x, b.x) - clear || p.x > Math.max(a.x, b.x) + clear
+              || p.z < Math.min(a.z, b.z) - clear || p.z > Math.max(a.z, b.z) + clear) continue;
+            near = segDist2(p, a, b) < clear2;
+          }
+          if (near) continue;
+          const v0 = tv[at * 3], v1 = tv[at * 3 + 1], v2 = tv[at * 3 + 2];
+          if (orient(P[v0], P[v1], p) <= 1e-9 || orient(P[v1], P[v2], p) <= 1e-9 || orient(P[v2], P[v0], p) <= 1e-9) continue;
+          const pv = P.length; P.push(p);
+          const n0 = tn[at * 3], n1 = tn[at * 3 + 1], n2 = tn[at * 3 + 2];
+          const t1 = nT, t2 = nT + 1;
+          nT += 2;
+          tv.push(v1, v2, pv, v2, v0, pv);
+          tn.push(-1, -1, -1, -1, -1, -1);
+          tv[at * 3] = v0; tv[at * 3 + 1] = v1; tv[at * 3 + 2] = pv;
+          // at = (v0, v1, p): opp v0 -> t1, opp v1 -> t2, opp p -> n2.
+          setN(at * 3, t1 * 3 + 1); setN(at * 3 + 1, t2 * 3); setN(at * 3 + 2, n2);
+          // t1 = (v1, v2, p): opp v1 -> t2, opp p -> n0.   t2 = (v2, v0, p): opp p -> n1.
+          setN(t1 * 3, t2 * 3 + 1); setN(t1 * 3 + 2, n0);
+          setN(t2 * 3 + 2, n1);
+          work.push(at * 3 + 2, t1 * 3 + 2, t2 * 3 + 2);
+          flipAll();
+          last = at;
+          added++;
+        }
+      }
+    }
+  }
+  const out: Tri[] = [];
+  for (let t = 0; t < nT; t++) out.push([P[tv[t * 3]], P[tv[t * 3 + 1]], P[tv[t * 3 + 2]]]);
+  return out;
+}
+
 export function triangulateRing(ring: Pt[]): Tri[] {
   const e = ringCache.get(ring);
   if (e !== undefined && sameSample(sampleRing(ring), e.s)) return e.out;
-  const out = ringCompute(ring);
+  const out = refineRing(ring, ringCompute(ring));
   ringCache.set(ring, { s: sampleRing(ring), out });
   return out;
 }

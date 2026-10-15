@@ -5,6 +5,7 @@ import { nodeArms, segById } from "./roads";
 import { buildJunction } from "./junction";
 import { Pt, curvePoints, heightAt, segElevation, segmentLength } from "./world";
 import { buildRoadNetworkGeometry, junctionDebugGeometry } from "../render/roads";
+import { triangulateRing } from "../render/earclip";
 import {
   SHOWCASE_CASES, SHOWCASE_GRID, SHOWCASE_TITLES, Tri, buildCaseWorld, buildShowcaseWorld,
   coveredByTris, fanTris, intersectionArea, minTriAngleDeg, pointInPoly, polyArea,
@@ -237,11 +238,20 @@ function checkCase(name: ShowcaseCaseName): CaseMetrics {
     // flip this to an assertion (docs/process/junction-gate.md G3).
     if (ringSelfIntersects(d.asphalt)) m.nonSimple++;
     expect(polyArea(d.asphalt), `${name}: node ${node.id} ring has no area`).toBeGreaterThan(1e-6);
-    for (const t of fanTris(l.centre.x, l.centre.z, d.asphalt)) {
+    const padTris = l.kind === "taper"
+      ? triangulateRing(d.asphalt).map(([a, b, c]): Tri => ({
+        ax: a.x, az: a.z, bx: b.x, bz: b.z, cx: c.x, cz: c.z,
+      }))
+      : fanTris(l.centre.x, l.centre.z, d.asphalt);
+    for (const t of padTris) {
       const a = triArea2(t) / 2;
+      const angle = minTriAngleDeg(t);
       m.minFanArea = Math.min(m.minFanArea, a);
-      m.minFanAngle = Math.min(m.minFanAngle, minTriAngleDeg(t));
-      expect(a, `${name}: node ${node.id} fan sliver`).toBeGreaterThan(1e-9);
+      m.minFanAngle = Math.min(m.minFanAngle, angle);
+      expect(a, `${name}: node ${node.id} pad sliver`).toBeGreaterThan(1e-9);
+      if (l.kind === "taper") {
+        expect(angle, `${name}: node ${node.id} taper ear-clip angle`).toBeGreaterThanOrEqual(2);
+      }
     }
     for (const line of d.kerbs) {
       for (const p of line) {

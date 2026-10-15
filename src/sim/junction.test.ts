@@ -189,7 +189,7 @@ describe("junction builder P2", () => {
     expectCCW(l);
   });
 
-  it("leaves middle nodes and straight transitions without geometry", () => {
+  it("leaves middle nodes empty and builds straight tapers", () => {
     const w = blank();
     addSegment(w, 1, [{ x: 4.5, z: 20.5 }, { x: 20.5, z: 20.5 }]);
     addSegment(w, 1, [{ x: 20.5, z: 20.5 }, { x: 36.5, z: 20.5 }]);
@@ -203,9 +203,11 @@ describe("junction builder P2", () => {
     addSegment(t, 1, [{ x: 4.5, z: 20.5 }, { x: 20.5, z: 20.5 }]);
     addSegment(t, 2, [{ x: 20.5, z: 20.5 }, { x: 36.5, z: 20.5 }]);
     const tr = buildJunction(t, near(t, 20.5, 20.5))!;
-    expect(tr.kind).toBe("transition");
+    expect(tr.kind).toBe("taper");
     expect(tr.template).toBe("straight");
-    expect(tr.asphalt).toEqual([]);
+    expect(tr.asphalt).toHaveLength(4);
+    expect(tr.taper?.length).toBeCloseTo(2.58, 3);
+    expect(tr.connectors.length).toBeGreaterThan(0);
     expectClean(tr);
   });
 
@@ -233,8 +235,8 @@ describe("junction builder P2", () => {
     // Asymmetric corner: each arm's trim comes from the OTHER arm's offset.
     const ave = l.arms.find((a) => a.type === 2)!;
     const stem = l.arms.find((a) => a.type === 1)!;
-    expect(Math.max(ave.trimNeg.asphalt, ave.trimPos.asphalt)).toBeCloseTo(0.98, 3);
-    expect(Math.min(stem.trimNeg.asphalt, stem.trimPos.asphalt)).toBeCloseTo(1.41, 3);
+    expect(Math.max(ave.trimNeg.asphalt, ave.trimPos.asphalt)).toBeCloseTo(0.83, 3);
+    expect(Math.min(stem.trimNeg.asphalt, stem.trimPos.asphalt)).toBeCloseTo(1.26, 3);
     expectClean(l);
     expectCCW(l);
   });

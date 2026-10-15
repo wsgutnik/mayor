@@ -22,6 +22,7 @@ state: [docs/STATUS-2026-10-15.md](docs/STATUS-2026-10-15.md). Every change sinc
 | M25 Crossing detection and textured roads | done | automatic highway rules, marker preview, interchange; road atlas |
 | M26 CS1 zone-cell rules | done | nearer road wins, oldest segment on ties, slope limit, row cut behind obstacles |
 | M27 Oriented zoning | done, **only mode** | street-aligned zoning is the only selectable model since `13812a1` (tile code still in the repo, unreachable) |
+| Roads cycle 1A | done on branch `agent/roads-render` | road profile table, honest junctions, tapers, one-way full width, highway 3+3 texture, bridges; design `docs/process/26-roads-cycle1.md` |
 | M28 Visual assets | done | audit, strict export, manifests, rear facades, detailed fleet, v2 references behind `?visualV2=1` |
 | Junction builder | done | sidewalks wrapping corners, crosswalks, stop bars, guide dashes, arrows, lane graph; vehicles follow connectors; unsignalised priority (`816cc01`) |
 | Zone integrity (zinv) | done | single `reconcileZones`, physical road-surface oracle, zones never invade roads (`8afbab1`); frontage fill (`da3e75d`); incremental pipeline, 46-188 ms down to under 8 ms per edit (`cf1d484`) |

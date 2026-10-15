@@ -1,5 +1,6 @@
 /** Facts the road menu shows per class (one source: world.ts costs, corridor.ts profiles, traffic.ts capacity). */
 import { profileOf } from "../sim/corridor";
+import { specOf } from "../sim/roadprofile";
 import { ROAD_CAPACITY } from "../sim/traffic";
 import { isOneWayType, ROAD_COST, ROAD_NAME, ROAD_TILE_WIDTH, ROAD_UPKEEP, type RoadType } from "../sim/world";
 import type { RoadLevel, RoadMode, ToolState } from "./tool-state";
@@ -16,12 +17,16 @@ export interface RoadFacts {
   widthTiles: number;
   /** Cars a tile carries at free flow (traffic.ts ROAD_CAPACITY). */
   capacity: number;
+  lanesPerDir: [number, number];
+  /** i18n key: one-sentence description for the card. */
+  descKey: string;
 }
 
 export function roadFacts(type: RoadType): RoadFacts {
   return {
     type, name: ROAD_NAME[type], costPerTile: ROAD_COST[type], upkeepPerTile: ROAD_UPKEEP[type],
     lanes: profileOf(type).lanes, oneWay: isOneWayType(type), widthTiles: ROAD_TILE_WIDTH[type], capacity: ROAD_CAPACITY[type],
+    lanesPerDir: specOf(type).lanesPerDir, descKey: specOf(type).descKey,
   };
 }
 

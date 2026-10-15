@@ -4,9 +4,10 @@ import {
   makeDeckSampler, segElevation, DeckSampler,
 } from "../sim/world";
 import { nodeArms, nodeById } from "../sim/roads";
-import { junctionsOf, type JunctionLayout } from "../sim/junction";
+import { junctionsOf, type JunctionLayout, type JunctionMouthLayer, type JunctionMouthSide } from "../sim/junction";
 import { profileOf, sidewalkEdge } from "../sim/corridor";
-import { inboundArmOffset } from "../sim/lanes";
+import { inboundArmOffset, pointInPolygon } from "../sim/lanes";
+import { specOf } from "../sim/roadprofile";
 import { asIndexed, sampleRing, sameSample, triangulateBand, triangulateRing } from "./earclip";
 import type { RingSample } from "./earclip";
 
@@ -18,9 +19,7 @@ import type { RingSample } from "./earclip";
 export const ROAD_LIFT = 0.06;
 const KERB_LIFT = ROAD_LIFT + 0.006;
 const MARK_LIFT = ROAD_LIFT + 0.004;
-const NODE_ASPHALT_LIFT = ROAD_LIFT + 0.02;
-/** Markings drawn on a junction patch must ride above its asphalt. */
-const NODE_MARK_LIFT = NODE_ASPHALT_LIFT + 0.004;
+export const MARK_LIFT_FOR_TESTS = MARK_LIFT;
 
 const ASPHALT = "#31353c";
 const KERB = "#ccd0d6";
@@ -31,9 +30,14 @@ const AVE_LINE = "#e8e4c8";
 const MEDIAN = "#5f8a4a";
 const ZEBRA = "#f1f1ea";
 const CONCRETE = "#a8adb5";
+/** Concrete at the foot of a face: gentle vertical shading, no texture. */
+const CONCRETE_LOW = "#949aa2";
+const SLAB_UNDER = "#7b8189";
 const PILLAR = "#8b9098";
+const PILLAR_LOW = "#767b83";
 const PORTAL_DARK = "#0b0d12";
-const DECK_SHADOW = "#46555f";
+/** Neutral dark tint (no blue cast) for the deck shadow over water. */
+const DECK_SHADOW = "#2c2d2e";
 
 export interface StripSeg {
   type: RoadType;
@@ -49,11 +53,20 @@ export interface StripSeg {
 export const ROAD_CLASS = {
   FLAT: 0, STREET: 1, AVENUE: 2, ONEWAY_STREET: 3, ONEWAY_AVENUE: 4,
   HIGHWAY: 5, JUNCTION: 6, CROSSWALK: 7, STOP_BAR: 8, ARROW: 9,
+  /** Structures (bridge barrier, slab, piers, tunnel portal, deck shadow):
+   * plain vertex colour, never the atlas nor the asphalt/kerb detail maps. */
+  PLAIN: 10,
 } as const;
 /** World units covered by one cross-section texture tile along the road. */
 export const ROAD_TILE_LENGTH = 4;
-/** World units covered by one junction-asphalt tile (world-space UV). */
+/** World units covered by one junction-asphalt tile (world-space UV), across x. */
 export const JUNCTION_TILE = 2;
+/** ...and along z: junction_asphalt.png is 512x1024, so square texels need 2x. */
+export const JUNCTION_TILE_V = 4;
+/** Atlas-tier pad kerb/sidewalk colour: the decoded mean of every road_*.png kerb+sidewalk zone. */
+export const ATLAS_SIDEWALK = "#a7abb1";
+/** Atlas-tier median nose colour: road_avenue.png planted-median mean. */
+export const ATLAS_MEDIAN = "#567a42";
 
 export function roadClassFor(type: RoadType, dirSign: number): number {
   const base = baseRoadType(type);
@@ -236,7 +249,23 @@ interface RibbonOpts {
   eANeg: number; eAPos: number;
   eKNeg: number; eKPos: number;
   eSNeg: number; eSPos: number;
+  /** Across-mouth lines (junction ring crossings) at the near / far end. */
+  mA?: RibbonMouth;
+  mB?: RibbonMouth;
 }
+
+/**
+ * A junction layer ring's across-mouth edge in the ribbon frame: stations
+ * measured from that ribbon end inward, ring points on the -/+ side edges at
+ * lateral offset R. Ribbon layers start ON this edge, so ribbon and pad never
+ * cover the same ground at the same height.
+ */
+interface MouthLine {
+  nS: number; pS: number; nP?: Pt; pP?: Pt; R: number;
+  /** Inner-layer ring corners at an offset, used verbatim when they lie on this edge. */
+  snaps?: { off: number; n: JunctionMouthSide; p: JunctionMouthSide }[];
+}
+interface RibbonMouth { asphalt: MouthLine; band: MouthLine }
 
 /** Junction rings for tests and SVG dumps: thin adapter over JunctionLayout. */
 export interface JunctionDebugGeometry {
@@ -262,102 +291,182 @@ function ribbon(
   const samples = sampleCurve(pts);
   const total = samples[samples.length - 1].s;
   if (total < 1e-6) return;
-  if (atlas && !tint) {
-    // One textured strip for the whole cross-section: two triangles per
-    // sample, u across the full width, v along the length in texture tiles.
-    // The strip spans the sidewalk edge so mid-block meets junction flush.
-    const walkA = makeWalker(samples);
-    const fw = sidewalkEdge(type);
-    const cls = roadClassFor(type, dirSign);
-    const stations = [0];
-    let dense = pts.length > 2;
-    if (!dense && total > 0.5) {
-      const pa = walkA(0), pm = walkA(total / 2), pb = walkA(total);
-      const ya = groundY(pa.x, pa.z), ym = groundY(pm.x, pm.z), yb = groundY(pb.x, pb.z);
-      dense = Math.max(ya, ym, yb) - Math.min(ya, ym, yb) > 0.06;
-    }
-    if (dense) for (const p of samples) if (p.s > 0.01 && p.s < total - 0.01) stations.push(p.s);
-    stations.push(total);
-    let prev: number[] | null = null;
-    for (const s of stations) {
-      const p = walkA(s);
-      const nx = -p.dz, nz = p.dx;
-      const v = (dirSign < 0 ? total - s : s) / ROAD_TILE_LENGTH;
-      const lft = g.vert(p.x + nx * fw, groundY(p.x + nx * fw, p.z + nz * fw) + ROAD_LIFT, p.z + nz * fw, "#ffffff", [0, v], cls);
-      const rgt = g.vert(p.x - nx * fw, groundY(p.x - nx * fw, p.z - nz * fw) + ROAD_LIFT, p.z - nz * fw, "#ffffff", [1, v], cls);
-      if (prev) { g.tri(prev[0], prev[1], lft); g.tri(prev[1], rgt, lft); }
-      prev = [lft, rgt];
-    }
-    // One-way arrows as textured quads (arrow_oneway alpha texture).
-    if (dirSign !== 0) {
-      for (let s = 0.9; s < total - 0.3; s += 3.6) {
-        const p = walkA(s);
-        const tx = p.dx * dirSign, tz = p.dz * dirSign;
-        const nx = -tz, nz = tx;
-        const c = (off: number, side: number) => ({ x: p.x + tx * off + nx * side, z: p.z + tz * off + nz * side });
-        g.texQuad([c(-0.35, -0.14), c(-0.35, 0.14), c(0.35, 0.14), c(0.35, -0.14)], MARK_LIFT + 0.002, groundY, ROAD_CLASS.ARROW);
-      }
-    }
-    g.force = null;
-    return;
-  }
   const prof = profileOf(type);
   const hw = prof.asphaltHalf;
   const kw = prof.kerb;
   const sw = prof.sidewalk;
   const walk = makeWalker(samples);
-  // Half-strip from the centreline to one edge, starting at arclength s0.
+  const endpointFrame = (start: boolean, s: number): { x: number; z: number; dx: number; dz: number } => {
+    const tip = start ? pts[0] : pts[pts.length - 1];
+    const candidates = start ? pts.slice(1) : pts.slice(0, -1).reverse();
+    const inner = candidates.find((p) => Math.hypot(p.x - tip.x, p.z - tip.z) > 1e-6) ?? tip;
+    let dx = start ? inner.x - tip.x : tip.x - inner.x;
+    let dz = start ? inner.z - tip.z : tip.z - inner.z;
+    const len = Math.hypot(dx, dz) || 1;
+    dx /= len; dz /= len;
+    const d = start ? s : s - total;
+    return { x: tip.x + dx * d, z: tip.z + dz * d, dx, dz };
+  };
+  // Half-strip between two offsets. Endpoint offsets may use different
+  // stations, so layer handoffs and asymmetric junction mouths need a
+  // trapezoidal first/last row rather than a centreline-normal row.
+  // Half-strip between two offsets. Endpoint rows may use different stations
+  // (and exact ring points), so asymmetric junction mouths get a trapezoidal
+  // first/last row rather than a centreline-normal row.
+  type RowEnd = { inner: number; outer: number; pi?: Pt; po?: Pt; anchor?: boolean };
   const half = (
-    side: -1 | 1, s0: number, s1: number, inner: number, outer: number,
-    y: number, color: string,
+    side: -1 | 1, st: RowEnd, en: RowEnd,
+    inner: number, outer: number,
+    y: number, color: string, uv?: (off: number) => number, cls = 0,
   ): void => {
-    const a = Math.max(0, Math.min(total, s0));
-    const b = Math.max(0, Math.min(total, s1));
-    if (b - a < 0.02) return;
-    const stations = [a];
+    const clamp = (s: number): number => Math.max(0, Math.min(total, s));
+    const si = clamp(st.inner), so = clamp(st.outer);
+    const ei = clamp(en.inner), eo = clamp(en.outer);
+    if (Math.max(ei - si, eo - so) < 0.02) return;
+    const rows: RowEnd[] = [{ inner: si, outer: so, pi: st.pi, po: st.po }];
     // Straight roads on flat ground need no intermediate stations; curves and
     // slopes follow the samples so the ribbon hugs the terrain.
     let dense = pts.length > 2;
+    const a = Math.min(si, so), b = Math.max(ei, eo);
     if (!dense && b - a > 0.5) {
       const pa = walk(a), pm = walk((a + b) / 2), pb = walk(b);
       const ya = groundY(pa.x, pa.z), ym = groundY(pm.x, pm.z), yb = groundY(pb.x, pb.z);
       dense = Math.max(ya, ym, yb) - Math.min(ya, ym, yb) > 0.06;
     }
     if (dense) {
-      for (const p of samples) if (p.s > a + 0.01 && p.s < b - 0.01) stations.push(p.s);
-    }
-    stations.push(b);
-    let prev: number[] | null = null;
-    const c = g.colorFor(color);
-    for (const s of stations) {
-      const p = walk(s);
-      const nx = -p.dz * side, nz = p.dx * side;
-      const i0 = g.vertFast(p.x + nx * inner, groundY(p.x + nx * inner, p.z + nz * inner) + y, p.z + nz * inner, c);
-      const i1 = g.vertFast(p.x + nx * outer, groundY(p.x + nx * outer, p.z + nz * outer) + y, p.z + nz * outer, c);
-      if (prev) {
-        g.tri(prev[0], prev[1], i0);
-        g.tri(prev[1], i1, i0);
+      const commonStart = Math.max(si, so), commonEnd = Math.min(ei, eo);
+      for (const p of samples) {
+        if (p.s > commonStart + 0.01 && p.s < commonEnd - 0.01) rows.push({ inner: p.s, outer: p.s });
       }
-      prev = [i0, i1];
+    }
+    rows.push({ inner: ei, outer: eo, pi: en.pi, po: en.po });
+    let prev0 = -1, prev1 = -1;
+    const c = g.colorFor(uv ? "#ffffff" : color);
+    const anchorStart = st.anchor !== false, anchorEnd = en.anchor !== false;
+    const at = (s: number, off: number, atStart: boolean, atEnd: boolean, fixed?: Pt): Pt => {
+      if (fixed) return fixed;
+      const f = atStart ? endpointFrame(true, s) : atEnd ? endpointFrame(false, s) : walk(s);
+      return { x: f.x - f.dz * side * off, z: f.z + f.dx * side * off };
+    };
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const atStart = ri === 0 && anchorStart;
+      const atEnd = ri === rows.length - 1 && anchorEnd;
+      const pi = at(row.inner, inner, atStart, atEnd, row.pi);
+      const po = at(row.outer, outer, atStart, atEnd, row.po);
+      const vi = (dirSign < 0 ? total - row.inner : row.inner) / ROAD_TILE_LENGTH;
+      const vo = (dirSign < 0 ? total - row.outer : row.outer) / ROAD_TILE_LENGTH;
+      const i0 = uv
+        ? g.vertFast(pi.x, groundY(pi.x, pi.z) + y, pi.z, c, [uv(side * inner), vi], cls)
+        : g.vertFast(pi.x, groundY(pi.x, pi.z) + y, pi.z, c);
+      const i1 = uv
+        ? g.vertFast(po.x, groundY(po.x, po.z) + y, po.z, c, [uv(side * outer), vo], cls)
+        : g.vertFast(po.x, groundY(po.x, po.z) + y, po.z, c);
+      if (prev0 >= 0) {
+        g.tri(prev0, prev1, i0);
+        g.tri(prev1, i1, i0);
+      }
+      prev0 = i0; prev1 = i1;
     }
   };
-  const endA = (side: -1 | 1): number => total - (side < 0 ? o.eANeg : o.eAPos);
-  const endK = (side: -1 | 1): number => total - (side < 0 ? o.eKNeg : o.eKPos);
-  const endS = (side: -1 | 1): number => total - (side < 0 ? o.eSNeg : o.eSPos);
-  for (const side of [-1, 1] as const) {
-    const sA = side < 0 ? o.aNeg : o.aPos;
-    const sK = side < 0 ? o.kNeg : o.kPos;
-    const sS = side < 0 ? o.sNeg : o.sPos;
-    half(side, sA, endA(side), 0, hw, ROAD_LIFT, type === 3 ? HW_ASPHALT : ASPHALT);
-    if (kw > 0) half(side, sK, endK(side), hw, hw + kw, KERB_LIFT, KERB);
-    // Sidewalk band outside the kerb (same lift and material): mid-block
-    // sidewalks run into the junction sidewalk ring with no step.
-    if (sw > 0) half(side, sS, endS(side), hw + kw, hw + kw + sw, KERB_LIFT, KERB);
-  }
-  // Markings above the asphalt: dashes, avenue median, highway lines.
+  // Mouth lines: every layer starts on its junction ring's across-mouth edge
+  // (junction.ts `attachMouths`). Without a layout the line is station 0.
+  const bandR = hw + kw + sw;
+  const mA: RibbonMouth = o.mA ?? { asphalt: { nS: 0, pS: 0, R: hw }, band: { nS: 0, pS: 0, R: bandR } };
+  const mB: RibbonMouth = o.mB ?? { asphalt: { nS: 0, pS: 0, R: hw }, band: { nS: 0, pS: 0, R: bandR } };
+  /** Row end on line L at offsets [inner, outer] of side; ribbon stations. */
+  const rowOn = (L: MouthLine, side: -1 | 1, inner: number, outer: number, start: boolean): RowEnd => {
+    const cS = (L.nS + L.pS) / 2, sS = side < 0 ? L.nS : L.pS;
+    const P = side < 0 ? L.nP : L.pP;
+    const pt = (off: number): { s: number; p?: Pt } => {
+      const f = L.R > 1e-9 ? off / L.R : 0;
+      const s = cS + (sS - cS) * f;
+      if (!L.nP || !L.pP || !P) return { s };
+      for (const sn of L.snaps ?? []) {
+        const q = side < 0 ? sn.n : sn.p;
+        if (Math.abs(sn.off - off) < 1e-9 && Math.abs(q.s - s) < 1e-6) return { s, p: q.p };
+      }
+      const cx = (L.nP.x + L.pP.x) / 2, cz = (L.nP.z + L.pP.z) / 2;
+      return { s, p: { x: cx + (P.x - cx) * f, z: cz + (P.z - cz) * f } };
+    };
+    const a = pt(inner), b = pt(outer);
+    return start
+      ? { inner: a.s, outer: b.s, pi: a.p, po: b.p }
+      : { inner: total - a.s, outer: total - b.s, pi: a.p, po: b.p };
+  };
+  const startMouth = (mA.asphalt.nS + mA.asphalt.pS) / 2;
+  const endMouth = total - (mB.asphalt.nS + mB.asphalt.pS) / 2;
+  // A zero-station reflex mouth passes through the node centre. Radially
+  // shrinking a pad leaves that centre fixed, so retaining a centre vertex
+  // there is also an ambiguous seam for overlap tests. Start/end with one
+  // full-width cell in that case, then split into halves outside the pad.
+  const zeroStart = startMouth < 1e-9;
+  const zeroEnd = total - endMouth < 1e-9;
+  const bridgeDepth = Math.min(0.25, Math.max(0, (endMouth - startMouth) / 2));
+  const startCentre = zeroStart ? startMouth + bridgeDepth : startMouth;
+  const endCentre = zeroEnd ? endMouth - bridgeDepth : endMouth;
+  const atlasUv = atlas && !tint ? (off: number): number => 0.5 + off / (2 * sidewalkEdge(type)) : undefined;
+  const atlasCls = roadClassFor(type, dirSign);
   const aMin = Math.min(o.aNeg, o.aPos);
   const eMin = Math.min(o.eANeg, o.eAPos);
   const mEnd = total - eMin;
+  /** Full-width asphalt cell from a mouth row to a centreline-normal row. */
+  const asphaltBridge = (mouth: MouthLine, start: boolean, depth: number, uv?: (off: number) => number, cls = 0): void => {
+    if (depth < 0.02) return;
+    const c = g.colorFor(uv ? "#ffffff" : type === 3 ? HW_ASPHALT : ASPHALT);
+    const vertex = (side: -1 | 1, r: RowEnd | null, s: number): number => {
+      let x: number, z: number;
+      if (r?.po) { x = r.po.x; z = r.po.z; s = r.outer; } else {
+        const p = s < 1e-9 ? endpointFrame(true, s) : total - s < 1e-9 ? endpointFrame(false, s) : walk(s);
+        x = p.x - p.dz * side * hw; z = p.z + p.dx * side * hw;
+      }
+      const v = (dirSign < 0 ? total - s : s) / ROAD_TILE_LENGTH;
+      return uv
+        ? g.vertFast(x, groundY(x, z) + ROAD_LIFT, z, c, [uv(side * hw), v], cls)
+        : g.vertFast(x, groundY(x, z) + ROAD_LIFT, z, c);
+    };
+    const rn = rowOn(mouth, -1, 0, hw, start), rp = rowOn(mouth, 1, 0, hw, start);
+    const sMouth = start ? Math.max(0, Math.min(rn.outer, rp.outer)) : Math.min(total, Math.max(rn.outer, rp.outer));
+    const sIn = start ? startCentre : endCentre;
+    const aNeg = vertex(-1, rn, sMouth), aPos = vertex(1, rp, sMouth);
+    const bNeg = vertex(-1, null, sIn), bPos = vertex(1, null, sIn);
+    if (start) { g.tri(aNeg, aPos, bNeg); g.tri(aPos, bPos, bNeg); }
+    else { g.tri(bNeg, bPos, aNeg); g.tri(bPos, aPos, aNeg); }
+  };
+  const surface = (uv?: (off: number) => number, cls = 0): void => {
+    if (zeroStart) asphaltBridge(mA.asphalt, true, bridgeDepth, uv, cls);
+    if (zeroEnd) asphaltBridge(mB.asphalt, false, bridgeDepth, uv, cls);
+    const asphaltCol = type === 3 ? HW_ASPHALT : ASPHALT;
+    for (const side of [-1, 1] as const) {
+      half(side,
+        zeroStart ? { inner: startCentre, outer: startCentre, anchor: false } : rowOn(mA.asphalt, side, 0, hw, true),
+        zeroEnd ? { inner: endCentre, outer: endCentre, anchor: false } : rowOn(mB.asphalt, side, 0, hw, false),
+        0, hw, ROAD_LIFT, asphaltCol, uv, cls);
+      // Kerb and sidewalk both start on the outermost band ring's mouth edge:
+      // the pad bands fill everything between the asphalt ring and it.
+      if (kw > 0) half(side, rowOn(mA.band, side, hw, hw + kw, true), rowOn(mB.band, side, hw, hw + kw, false),
+        hw, hw + kw, KERB_LIFT, KERB, uv, cls);
+      if (sw > 0) half(side, rowOn(mA.band, side, hw + kw, bandR, true), rowOn(mB.band, side, hw + kw, bandR, false),
+        hw + kw, bandR, KERB_LIFT, KERB, uv, cls);
+    }
+  };
+  surface(atlasUv, atlasCls);
+  if (atlasUv) {
+    // One-way arrows are atlas decals; keep them clear of both junction pads.
+    if (dirSign !== 0) {
+      for (let s = Math.max(0.9, aMin + 0.4); s < mEnd - 0.3; s += 3.6) {
+        const p = walk(s);
+        const tx = p.dx * dirSign, tz = p.dz * dirSign;
+        const nx = -tz, nz = tx;
+        const c = (off: number, side: number) => ({ x: p.x + tx * off + nx * side, z: p.z + tz * off + nz * side });
+        g.texQuad([c(-0.35, -0.14), c(-0.35, 0.14), c(0.35, 0.14), c(0.35, -0.14)],
+          MARK_LIFT + 0.002, groundY, ROAD_CLASS.ARROW);
+      }
+    }
+    g.force = null;
+    return;
+  }
+  // Markings above the asphalt: dashes, avenue median, highway lines.
   const mark = (offset: number, halfW: number, color: string): void => {
     const every = 4, on = 2;
     const a = aMin;
@@ -405,9 +514,15 @@ function ribbon(
     }
   };
   const base = baseRoadType(type);
+  const laneLines = (): void => {
+    const c = prof.laneCentres;
+    for (let i = 0; i < c.length - 1; i++) {
+      if (dirSign !== 0 || (c[i] > 0) === (c[i + 1] > 0)) mark((c[i] + c[i + 1]) / 2, 0.012, AVE_LINE);
+    }
+  };
   if (dirSign !== 0) {
     // One-way: amber chevrons along the centreline point the way traffic flows.
-    if (base === 2) { mark(hw * 0.5, 0.012, AVE_LINE); mark(-hw * 0.5, 0.012, AVE_LINE); }
+    laneLines();
     for (let s = aMin + 0.7; s < mEnd - 0.2; s += 1.8) {
       const p = walk(s);
       const tx = p.dx * dirSign, tz = p.dz * dirSign;
@@ -420,13 +535,13 @@ function ribbon(
   } else if (base === 1) mark(0, 0.012, LINE);
   else if (base === 2) {
     // Median then the two carriageway dashes.
-    strip(g, samples, aMin, mEnd, 0.16, MARK_LIFT, MEDIAN, groundY);
-    mark(hw * 0.5, 0.012, AVE_LINE);
-    mark(-hw * 0.5, 0.012, AVE_LINE);
+    strip(g, samples, aMin, mEnd, prof.medianHalf, MARK_LIFT, MEDIAN, groundY);
+    laneLines();
   } else {
-    strip(g, samples, aMin, mEnd, 0.14, MARK_LIFT, HW_EDGE, groundY);
-    mark(profileOf(3).drawHalf * 0.5, 0.012, LINE);
-    mark(-profileOf(3).drawHalf * 0.5, 0.012, LINE);
+    strip(g, samples, aMin, mEnd, prof.medianHalf, MARK_LIFT, HW_EDGE, groundY);
+    mark(prof.asphaltHalf - prof.shoulder, 0.012, LINE);
+    mark(-(prof.asphaltHalf - prof.shoulder), 0.012, LINE);
+    laneLines();
   }
   g.force = null;
 }
@@ -491,48 +606,149 @@ function strip(
 /** Solid box with absolute heights, yawed around Y. Winding is irrelevant (the road mesh is double-sided). */
 function box(
   g: Geo, cx: number, cz: number, baseY: number,
-  sx: number, sy: number, sz: number, yaw: number, color: string,
+  sx: number, sy: number, sz: number, yaw: number, color: string, low = color,
 ): void {
+  // Plain concrete (PLAIN class), one vertex set per face so edges stay crisp;
+  // the foot of each side face is a shade darker (gentle vertical shading).
   const c = Math.cos(yaw), s = Math.sin(yaw);
-  const at = (lx: number, y: number, lz: number): number =>
-    g.vert(cx + lx * c + lz * s, y, cz - lx * s + lz * c, color);
-  const hx = sx / 2, hz = sz / 2, top = baseY + sy;
-  const b0 = at(-hx, baseY, -hz), b1 = at(hx, baseY, -hz), b2 = at(hx, baseY, hz), b3 = at(-hx, baseY, hz);
-  const t0 = at(-hx, top, -hz), t1 = at(hx, top, -hz), t2 = at(hx, top, hz), t3 = at(-hx, top, hz);
-  g.tri(t0, t1, t2);
-  g.tri(t0, t2, t3);
-  g.tri(b0, t0, t1);
-  g.tri(b0, t1, b1);
-  g.tri(b1, t1, t2);
-  g.tri(b1, t2, b2);
-  g.tri(b2, t2, t3);
-  g.tri(b2, t3, b3);
-  g.tri(b3, t3, t0);
-  g.tri(b3, t0, b0);
+  const top = g.colorFor(color), foot = g.colorFor(low);
+  const at = (lx: number, y: number, lz: number, col: THREE.Color): number =>
+    g.vertFast(cx + lx * c + lz * s, y, cz - lx * s + lz * c, col, undefined, ROAD_CLASS.PLAIN);
+  const hx = sx / 2, hz = sz / 2, y1 = baseY + sy;
+  const corners: [number, number][] = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]];
+  const t = corners.map(([x, z]) => at(x, y1, z, top));
+  g.tri(t[0], t[1], t[2]);
+  g.tri(t[0], t[2], t[3]);
+  for (let k = 0; k < 4; k++) {
+    const [ax, az] = corners[k], [bx, bz] = corners[(k + 1) % 4];
+    const b0 = at(ax, baseY, az, foot), b1 = at(bx, baseY, bz, foot);
+    const t0 = at(ax, y1, az, top), t1 = at(bx, y1, bz, top);
+    g.tri(b0, t0, t1);
+    g.tri(b0, t1, b1);
+  }
 }
 
-/** Parapet walls along both deck edges, following the deck profile. */
-function parapets(g: Geo, type: RoadType, deck: DeckSampler): void {
-  const off = sidewalkEdge(type) + 0.03;
+/** Barrier height (tile) and the fade that opens the ramp mouth at grade. */
+export const BRIDGE_BARRIER_H = 0.14;
+const BARRIER_BASE = 0.03;
+const BARRIER_CAP = 0.03;
+/** The barrier is gone wherever the deck is this close to the ground. */
+const BARRIER_OPEN = 0.06;
+const BARRIER_FULL = 0.3;
+/** Slab depth under the deck; fascia and underside only where the deck clears the ground by more. */
+export const BRIDGE_SLAB_DEPTH = 0.12;
+const SLAB_MIN_CLEAR = 0.2;
+
+type DeckRow = { s: number; x: number; z: number; dx: number; dz: number; y: number; clear: number };
+
+/** Deck rows at <= 0.4 spacing plus exact rows where the clearance crosses the barrier and slab thresholds. */
+function deckRows(deck: DeckSampler, groundY: GroundY): DeckRow[] {
+  const row = (s: number): DeckRow => {
+    const p = deck.pos(s);
+    const q = deck.pos(Math.min(deck.length, s + 0.05));
+    const r = s + 0.05 > deck.length ? deck.pos(Math.max(0, s - 0.05)) : null;
+    let dx = r ? p.x - r.x : q.x - p.x, dz = r ? p.z - r.z : q.z - p.z;
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l; dz /= l;
+    const y = deck.yAt(s);
+    return { s, x: p.x, z: p.z, dx, dz, y, clear: y - groundY(p.x, p.z) };
+  };
   const n = Math.max(1, Math.ceil(deck.length / 0.4));
-  for (const side of [-1, 1] as const) {
-    let prev: [number, number] | null = null;
-    for (let i = 0; i <= n; i++) {
-      const s = (deck.length * i) / n;
-      const p = deck.pos(s);
-      const q = deck.pos(Math.min(deck.length, s + 0.05));
-      let dx = q.x - p.x, dz = q.z - p.z;
-      const l = Math.hypot(dx, dz) || 1;
-      dx /= l; dz /= l;
-      const x = p.x - dz * side * off, z = p.z + dx * side * off;
-      const y = deck.yAt(s);
-      const cur: [number, number] = [g.vert(x, y + 0.03, z, CONCRETE), g.vert(x, y + 0.45, z, CONCRETE)];
-      if (prev) {
-        g.tri(prev[0], cur[0], prev[1]);
-        g.tri(prev[1], cur[0], cur[1]);
+  const rows: DeckRow[] = [];
+  for (let i = 0; i <= n; i++) {
+    const r = row((deck.length * i) / n);
+    const prev = rows[rows.length - 1];
+    if (prev) {
+      for (const th of [BARRIER_OPEN, SLAB_MIN_CLEAR]) {
+        if ((prev.clear - th) * (r.clear - th) >= 0) continue;
+        let a = prev.s, b = r.s;
+        const up = prev.clear < th;
+        for (let k = 0; k < 30; k++) {
+          const m = (a + b) / 2;
+          if ((row(m).clear < th) === up) a = m; else b = m;
+        }
+        const x = row((a + b) / 2);
+        x.clear = th;
+        // Keep rows sorted when both thresholds fall in one interval.
+        let at = rows.length;
+        while (at > 0 && rows[at - 1].s > x.s) at--;
+        rows.splice(at, 0, x);
       }
-      prev = cur;
     }
+    rows.push(r);
+  }
+  return rows;
+}
+
+/**
+ * Concrete barrier along both deck edges on the sidewalk's outer edge: 0.14
+ * tile (≈1.1 m) visible above the carriageway (top at deck + ROAD_LIFT +
+ * 0.14), 0.03 cap, both faces; it fades to nothing on the ramps so the mouth
+ * is open at grade. Under each edge the outer face continues down: a 0.12
+ * fascia plus the underside where the deck clears the ground by > 0.2, and a
+ * retaining face to just below the ground on the ramps below that, so the
+ * approach reads as filled and the span as a slab. The slab's end face at the
+ * ramp also reaches the ground. All PLAIN class.
+ */
+function bridgeStructure(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY): void {
+  const edge = sidewalkEdge(type);
+  const rows = deckRows(deck, groundY);
+  const hi = g.colorFor(CONCRETE), lo = g.colorFor(CONCRETE_LOW), under = g.colorFor(SLAB_UNDER);
+  const v = (r: DeckRow, side: number, off: number, y: number, c: THREE.Color): number =>
+    g.vertFast(r.x - r.dz * side * off, y, r.z + r.dx * side * off, c, undefined, ROAD_CLASS.PLAIN);
+  const rise = ROAD_LIFT + BRIDGE_BARRIER_H - BARRIER_BASE;
+  const fade = (clear: number): number => {
+    const u = Math.max(0, Math.min(1, (clear - BARRIER_OPEN) / (BARRIER_FULL - BARRIER_OPEN)));
+    return rise * u * u * (3 - 2 * u);
+  };
+  /** Strip between consecutive rows; a zero-height end collapses to one triangle (no slivers). */
+  const strip = (a: DeckRow, b: DeckRow, lowV: (r: DeckRow) => number, highV: (r: DeckRow) => number, flatA = false, flatB = false): void => {
+    const a0 = lowV(a), b0 = lowV(b);
+    const a1 = flatA ? a0 : highV(a), b1 = flatB ? b0 : highV(b);
+    if (!flatA) g.tri(a0, b0, a1);
+    if (!flatB) g.tri(a1, b0, b1);
+  };
+  const slab = (r: DeckRow): boolean => r.clear >= SLAB_MIN_CLEAR - 1e-9;
+  const foot = (r: DeckRow): number => r.y - r.clear - 0.02; // just below the ground
+  const base = (r: DeckRow): number => r.y + BARRIER_BASE;
+  for (const side of [-1, 1] as const) {
+    const inner = edge - BARRIER_CAP;
+    for (let i = 1; i < rows.length; i++) {
+      const a = rows[i - 1], b = rows[i];
+      const ha = fade(a.clear), hb = fade(b.clear);
+      if (ha > 1e-6 || hb > 1e-6) {
+        const top = (r: DeckRow): number => base(r) + fade(r.clear);
+        const fa = ha <= 1e-6, fb = hb <= 1e-6;
+        strip(a, b, (r) => v(r, side, inner, base(r), lo), (r) => v(r, side, inner, top(r), hi), fa, fb);
+        strip(a, b, (r) => v(r, side, edge, base(r), hi), (r) => v(r, side, edge, top(r), hi), fa, fb);
+        strip(a, b, (r) => v(r, side, inner, top(r), hi), (r) => v(r, side, edge, top(r), hi));
+      }
+      if (slab(a) && slab(b)) {
+        strip(a, b, (r) => v(r, side, edge, r.y - BRIDGE_SLAB_DEPTH, lo), (r) => v(r, side, edge, base(r), hi));
+      } else if (Math.max(a.clear, b.clear) > 1e-6) {
+        // Ramp: retaining face from just below the ground to the deck edge.
+        strip(a, b, (r) => v(r, side, edge, foot(r), lo), (r) => v(r, side, edge, base(r), hi));
+      }
+    }
+  }
+  for (let i = 1; i < rows.length; i++) {
+    const a = rows[i - 1], b = rows[i];
+    if (!slab(a) || !slab(b)) continue;
+    strip(a, b, (r) => v(r, -1, edge, r.y - BRIDGE_SLAB_DEPTH, under), (r) => v(r, 1, edge, r.y - BRIDGE_SLAB_DEPTH, under));
+  }
+  // End faces where a slab run starts or stops. Toward a ramp it reaches the
+  // ground (no gap under the slab end); at a deck end it is the slab depth.
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (!slab(r)) continue;
+    const prevRamp = i > 0 && !slab(rows[i - 1]), nextRamp = i < rows.length - 1 && !slab(rows[i + 1]);
+    const runEdge = i === 0 || i === rows.length - 1 || prevRamp || nextRamp;
+    if (!runEdge) continue;
+    const y0 = prevRamp || nextRamp ? foot(r) : r.y - BRIDGE_SLAB_DEPTH;
+    const a0 = v(r, -1, edge, y0, lo), a1 = v(r, -1, edge, base(r), hi);
+    const b0 = v(r, 1, edge, y0, lo), b1 = v(r, 1, edge, base(r), hi);
+    g.tri(a0, b0, a1);
+    g.tri(a1, b0, b1);
   }
 }
 
@@ -559,7 +775,7 @@ function pillars(g: Geo, deck: DeckSampler, groundY: GroundY, w?: World, type?: 
         }
       }
     }
-    box(g, cx, cz, base, 0.36, top - base, 0.36, 0, PILLAR);
+    box(g, cx, cz, base, 0.36, top - base, 0.36, 0, PILLAR, PILLAR_LOW);
   }
 }
 
@@ -567,6 +783,7 @@ function pillars(g: Geo, deck: DeckSampler, groundY: GroundY, w?: World, type?: 
 function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY, w?: World): void {
   const hw = sidewalkEdge(type) + 0.2;
   const n = Math.max(1, Math.ceil(deck.length / 0.5));
+  const shade = g.colorFor(DECK_SHADOW);
   let prev: [number, number] | null = null;
   for (let i = 0; i <= n; i++) {
     const s = (deck.length * i) / n;
@@ -574,15 +791,21 @@ function deckShadow(g: Geo, type: RoadType, deck: DeckSampler, groundY: GroundY,
     const tx = Math.floor(p.x), ty = Math.floor(p.z);
     const overRoad = !!w && tx >= 0 && ty >= 0 && tx < w.size && ty < w.size && w.roadSurface[ty * w.size + tx] !== 0;
     const gy = groundY(p.x, p.z);
-    if (!overRoad && gy > 0.08) { prev = null; continue; }
-    const shadowY = overRoad ? gy + 0.075 : 0.05;
+    // Never over a road: an opaque strip there hid the markings below. The
+    // shadow only marks the crossing over water.
+    if (overRoad || gy > 0.08) { prev = null; continue; }
+    // Only under the raised deck: on the ramps the "road below" is the
+    // bridge's own carriageway, which a shadow would paint over.
+    if (deck.yAt(s) - gy < SLAB_MIN_CLEAR + BRIDGE_SLAB_DEPTH) { prev = null; continue; }
+    const shadowY = 0.05;
     const q = deck.pos(Math.min(deck.length, s + 0.05));
     let dx = q.x - p.x, dz = q.z - p.z;
     const l = Math.hypot(dx, dz) || 1;
     dx /= l; dz /= l;
+    // Flat dark tint (PLAIN): no asphalt detail, so no gravel patch below.
     const cur: [number, number] = [
-      g.vert(p.x - dz * hw, shadowY, p.z + dx * hw, DECK_SHADOW),
-      g.vert(p.x + dz * hw, shadowY, p.z - dx * hw, DECK_SHADOW),
+      g.vertFast(p.x - dz * hw, shadowY, p.z + dx * hw, shade, undefined, ROAD_CLASS.PLAIN),
+      g.vertFast(p.x + dz * hw, shadowY, p.z - dx * hw, shade, undefined, ROAD_CLASS.PLAIN),
     ];
     if (prev) {
       g.tri(prev[0], cur[0], prev[1]);
@@ -609,16 +832,17 @@ function portal(g: Geo, m: Pt, dx: number, dz: number, type: RoadType, groundY: 
   const yaw = Math.atan2(dx, dz);
   const px = -dz, pz = dx;
   const post = hw + 0.3;
-  box(g, m.x + px * post, m.z + pz * post, gy - 0.1, 0.36, 1.7, 0.6, yaw, CONCRETE);
-  box(g, m.x - px * post, m.z - pz * post, gy - 0.1, 0.36, 1.7, 0.6, yaw, CONCRETE);
+  box(g, m.x + px * post, m.z + pz * post, gy - 0.1, 0.36, 1.7, 0.6, yaw, CONCRETE, CONCRETE_LOW);
+  box(g, m.x - px * post, m.z - pz * post, gy - 0.1, 0.36, 1.7, 0.6, yaw, CONCRETE, CONCRETE_LOW);
   box(g, m.x, m.z, gy + 1.25, 2 * (hw + 0.48), 0.35, 0.6, yaw, CONCRETE);
   // The opening sits just inside the mouth so the lintel frames it.
   const ix = m.x - dx * 0.05, iz = m.z - dz * 0.05;
   const ow = hw + 0.1;
-  const a = g.vert(ix + px * ow, gy + 1.28, iz + pz * ow, PORTAL_DARK);
-  const b = g.vert(ix - px * ow, gy + 1.28, iz - pz * ow, PORTAL_DARK);
-  const c = g.vert(ix - px * ow, gy + 0.02, iz - pz * ow, PORTAL_DARK);
-  const d = g.vert(ix + px * ow, gy + 0.02, iz + pz * ow, PORTAL_DARK);
+  const dark = g.colorFor(PORTAL_DARK);
+  const a = g.vertFast(ix + px * ow, gy + 1.28, iz + pz * ow, dark, undefined, ROAD_CLASS.PLAIN);
+  const b = g.vertFast(ix - px * ow, gy + 1.28, iz - pz * ow, dark, undefined, ROAD_CLASS.PLAIN);
+  const c = g.vertFast(ix - px * ow, gy + 0.02, iz - pz * ow, dark, undefined, ROAD_CLASS.PLAIN);
+  const d = g.vertFast(ix + px * ow, gy + 0.02, iz + pz * ow, dark, undefined, ROAD_CLASS.PLAIN);
   g.tri(a, b, c);
   g.tri(a, c, d);
 }
@@ -628,7 +852,8 @@ function portal(g: Geo, m: Pt, dx: number, dz: number, type: RoadType, groundY: 
 /** Zebra crossing and inbound-only stop line at an asphalt mouth. */
 function zebra(
   g: Geo, cx: number, cz: number, dx: number, dz: number,
-  halfWidth: number, trim: number, groundY: GroundY, atlas = false,
+  halfWidth: number, trim: number, stopSides: readonly [number, number] | null,
+  groundY: GroundY, atlas = false,
 ): void {
   const hw = halfWidth;
   // The whole zebra lies inside the patch; its outer edge meets max trim.
@@ -639,11 +864,13 @@ function zebra(
     // One textured quad per marking instead of one quad per stripe.
     const c = (along: number, side: number) => ({ x: zx + dx * along + px * side, z: zz + dz * along + pz * side });
     g.texQuad([c(-0.16, -hw * 0.92), c(-0.16, hw * 0.92), c(0.16, hw * 0.92), c(0.16, -hw * 0.92)],
-      NODE_MARK_LIFT, groundY, ROAD_CLASS.CROSSWALK);
-    const bx = cx + dx * (trim + 0.38), bz = cz + dz * (trim + 0.38);
-    const b = (along: number, side: number) => ({ x: bx + dx * along + px * side, z: bz + dz * along + pz * side });
-    g.texQuad([b(-0.02, -hw * 0.92), b(-0.02, 0), b(0.02, 0), b(0.02, -hw * 0.92)],
-      NODE_MARK_LIFT, groundY, ROAD_CLASS.STOP_BAR);
+      MARK_LIFT, groundY, ROAD_CLASS.CROSSWALK);
+    if (stopSides) {
+      const bx = cx + dx * (trim + 0.38), bz = cz + dz * (trim + 0.38);
+      const b = (along: number, side: number) => ({ x: bx + dx * along + px * side, z: bz + dz * along + pz * side });
+      g.texQuad([b(-0.02, stopSides[0]), b(-0.02, stopSides[1]), b(0.02, stopSides[1]), b(0.02, stopSides[0])],
+        MARK_LIFT, groundY, ROAD_CLASS.STOP_BAR);
+    }
     return;
   }
   const stripes = Math.max(4, Math.round(hw * 9));
@@ -656,17 +883,177 @@ function zebra(
       sx - dx * 0.13 + px * sw, sz - dz * 0.13 + pz * sw,
       sx - dx * 0.13 - px * sw, sz - dz * 0.13 - pz * sw,
       sx + dx * 0.13 - px * sw, sz + dz * 0.13 - pz * sw,
-      NODE_MARK_LIFT, ZEBRA, groundY,
+      MARK_LIFT, ZEBRA, groundY,
     );
   }
-  const lx = cx + dx * (trim + 0.38), lz = cz + dz * (trim + 0.38);
-  g.quad(
-    lx - px * hw * 0.92 + dx * 0.02, lz - pz * hw * 0.92 + dz * 0.02,
-    lx + dx * 0.02, lz + dz * 0.02,
-    lx - dx * 0.02, lz - dz * 0.02,
-    lx - px * hw * 0.92 - dx * 0.02, lz - pz * hw * 0.92 - dz * 0.02,
-    NODE_MARK_LIFT, ZEBRA, groundY,
-  );
+  if (stopSides) {
+    const lx = cx + dx * (trim + 0.38), lz = cz + dz * (trim + 0.38);
+    g.quad(
+      lx + px * stopSides[0] + dx * 0.02, lz + pz * stopSides[0] + dz * 0.02,
+      lx + px * stopSides[1] + dx * 0.02, lz + pz * stopSides[1] + dz * 0.02,
+      lx + px * stopSides[1] - dx * 0.02, lz + pz * stopSides[1] - dz * 0.02,
+      lx + px * stopSides[0] - dx * 0.02, lz + pz * stopSides[0] - dz * 0.02,
+      MARK_LIFT, ZEBRA, groundY,
+    );
+  }
+}
+
+/**
+ * Lane lines through a taper pad (lead's gate: the pad read as a blank plate).
+ * In the wide arm's outward frame, lateral lerps from the wide arm's value at
+ * s = L to the narrow arm's at s = 0:
+ *  - dashed boundaries between consecutive kept lanes of one direction
+ *    (left-aligned: kept wide lanes map in order onto the narrow lanes);
+ *  - for two-way roads, the dashed direction separator (wide centre -> narrow
+ *    centre), starting past a planted/barrier median's nose;
+ *  - solid edge lines along each tapering edge where a profile has a shoulder.
+ * Dropped/added lanes are the wide-only lanes; their own boundary dashes are
+ * drawn by drawTaperMarks. Each quad must fit inside the ring, else skipped.
+ */
+function taperLaneLines(
+  l: JunctionLayout, arm: JunctionLayout["arms"][number], L: number,
+  at: (s: number, lat: number) => Pt, fits: (q: Pt[]) => boolean, emit: (q: Pt[]) => void,
+  diags: string[], w: World,
+): void {
+  const taper = l.taper!;
+  const narrow = l.arms[1 - taper.wideArm];
+  if (!narrow) return;
+  const pw = profileOf(arm.type), pn = profileOf(narrow.type);
+  const seg = w.segments.find((sg) => sg.id === arm.segId);
+  const oneWay = seg?.oneWay ?? specOf(arm.type).oneWay;
+  const wideOnly = [...taper.droppedLanes, ...taper.addedLanes].map((d) => d.offset);
+  const kept = pw.laneCentres.filter((c) => !wideOnly.some((o) => Math.abs(o - c) < 1e-6));
+  const groups: [number[], number[]][] = oneWay
+    ? [[kept, [...pn.laneCentres]]]
+    : [[kept.filter((c) => c < 0), pn.laneCentres.filter((c) => c < 0)], [kept.filter((c) => c > 0), pn.laneCentres.filter((c) => c > 0)]];
+  const HALF = 0.012, DASH = 0.25;
+  const line = (latW: number, latN: number, s0: number, s1: number, dashed: boolean): void => {
+    const lat = (s: number): number => latN + (latW - latN) * (s / L);
+    const step = dashed ? DASH * 2 : DASH;
+    // Stay clear of the two mouth edges (the ring's across lines).
+    s0 = Math.max(s0, 0.03); s1 = Math.min(s1, L - 0.03);
+    for (let a = s1; a > s0 + 1e-6; a -= step) {
+      const b = Math.max(s0, a - DASH);
+      if (a - b < 0.05) continue;
+      const q = [at(b, lat(b) - HALF), at(b, lat(b) + HALF), at(a, lat(a) + HALF), at(a, lat(a) - HALF)];
+      if (fits(q)) emit(q);
+      else diags.push(`taper-mark-skipped: node ${l.nodeId} lane line at ${lat((a + b) / 2).toFixed(3)}`);
+    }
+  };
+  for (const [kw, kn] of groups) {
+    const ws = [...kw].sort((a, b) => a - b), ns = [...kn].sort((a, b) => a - b);
+    if (ws.length !== ns.length) continue;
+    for (let j = 0; j + 1 < ws.length; j++) line((ws[j] + ws[j + 1]) / 2, (ns[j] + ns[j + 1]) / 2, 0, L, true);
+  }
+  if (!oneWay && pn.medianHalf <= 0) {
+    const nose = pw.median === "planted" || pw.median === "barrier" ? pw.medianHalf : 0;
+    line(0, 0, 0, L - nose - 0.05, true);
+  }
+  if (pw.shoulder > 0 || pn.shoulder > 0) {
+    for (const side of [-1, 1]) {
+      line(side * (pw.asphaltHalf - pw.shoulder), side * (pn.asphaltHalf - pn.shoulder), 0, L, false);
+    }
+  }
+}
+
+/** True when p is inside the ring and at least `margin` from every ring edge. */
+function insideWithMargin(p: Pt, ring: Pt[], margin: number): boolean {
+  if (!pointInPolygon(p, ring)) return false;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length];
+    const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz;
+    const t = l2 < 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2));
+    if (Math.hypot(a.x + dx * t - p.x, a.z + dz * t - p.z) < margin) return false;
+  }
+  return true;
+}
+
+/**
+ * Merge arrows and dropped-lane edge dashes, all within the taper pad.
+ * `droppedLanes` offsets/sides are already in the wide arm's outward frame
+ * (lateral +1 = (-dz, dx)); the kept lanes sit on +perp, the left of travel
+ * (travel runs toward the node, -arm direction). A mark that does not fit
+ * inside the ring, even slid toward the kept lane by half a lane, is skipped
+ * and reported in `diags` instead of being drawn outside the pad.
+ */
+function drawTaperMarks(g: Geo, l: JunctionLayout, groundY: GroundY, diags: string[], w: World): void {
+  const taper = l.taper!;
+  const arm = l.arms[taper.wideArm];
+  const L = taper.length;
+  const lw = profileOf(arm.type).laneWidth;
+  const MARGIN = 0.01, STEP = 0.005;
+  const px = -arm.dz, pz = arm.dx;               // +perp: toward the kept lanes
+  const at = (s: number, lat: number): Pt => ({
+    x: l.centre.x + arm.dx * s + px * lat,
+    z: l.centre.z + arm.dz * s + pz * lat,
+  });
+  const fits = (q: Pt[]): boolean => q.every((p) => insideWithMargin(p, l.asphalt, MARGIN));
+  // Arrow: along travel, bent toward +perp (left of travel, the kept lane).
+  const tx = -arm.dx + px * 0.35, tz = -arm.dz + pz * 0.35;
+  const tl = Math.hypot(tx, tz);
+  const ux = tx / tl, uz = tz / tl, nx = -uz, nz = ux;
+  const arrowAt = (s: number, lat: number): Pt[] => {
+    const c = at(s, lat);
+    const q = (a: number, b: number): Pt => ({ x: c.x + ux * a + nx * b, z: c.z + uz * a + nz * b });
+    return [q(-0.3, -0.12), q(-0.3, 0.12), q(0.3, 0.12), q(0.3, -0.12)];
+  };
+  /** Station/lateral box of a quad (arm frame), for arrow-arrow overlap. */
+  const box = (q: Pt[]): [number, number, number, number] => {
+    let s0 = Infinity, s1 = -Infinity, l0 = Infinity, l1 = -Infinity;
+    for (const p of q) {
+      const rx = p.x - l.centre.x, rz = p.z - l.centre.z;
+      const s = rx * arm.dx + rz * arm.dz, lat = rx * px + rz * pz;
+      s0 = Math.min(s0, s); s1 = Math.max(s1, s); l0 = Math.min(l0, lat); l1 = Math.max(l1, lat);
+    }
+    return [s0, s1, l0, l1];
+  };
+  const placed: [number, number, number, number][] = [];
+  const clear = (q: Pt[]): boolean => {
+    const [a0, a1, b0, b1] = box(q);
+    return placed.every(([c0, c1, d0, d1]) => a1 + 0.02 < c0 || c1 + 0.02 < a0 || b1 + 0.02 < d0 || d1 + 0.02 < b0);
+  };
+  taperLaneLines(l, arm, L, at, fits, (q) => {
+    const [a, b, c, e] = q;
+    g.quad(a.x, a.z, b.x, b.z, c.x, c.z, e.x, e.z, MARK_LIFT, LINE, groundY);
+  }, diags, w);
+  // Outermost dropped lane first: it needs the widest station.
+  const dropped = [...taper.droppedLanes].sort((a, b) => a.offset - b.offset);
+  for (const d of dropped) {
+    let arrow: Pt[] | null = null;
+    for (const f of [0.6, 0.75, 0.88]) {
+      const s = Math.min(L * f, L - 0.35);
+      for (let slide = 0; slide <= lw * 0.5 + 1e-9 && !arrow; slide += STEP) {
+        const q = arrowAt(s, d.offset + slide);
+        if (fits(q) && clear(q)) arrow = q;
+      }
+      if (arrow) break;
+    }
+    if (arrow) {
+      placed.push(box(arrow));
+      g.texQuad(arrow, MARK_LIFT, groundY, ROAD_CLASS.ARROW);
+    } else {
+      diags.push(`taper-mark-skipped: node ${l.nodeId} arrow lane ${d.offset.toFixed(4)}`);
+    }
+
+    // Three short dashes on the dropped lane's kept-side edge toward the seam.
+    for (let k = 0; k < 3; k++) {
+      const s0 = L * (0.1 + k * 0.3), s1 = s0 + 0.15;
+      const dashAt = (edge: number): Pt[] =>
+        [at(s0, edge - 0.012), at(s0, edge + 0.012), at(s1, edge + 0.012), at(s1, edge - 0.012)];
+      let dash: Pt[] | null = null;
+      const edge = d.offset + 0.5 * lw;
+      for (let slide = 0; slide <= lw * 0.5 + 1e-9 && !dash; slide += STEP) {
+        const q = dashAt(edge + slide);
+        if (fits(q)) dash = q;
+      }
+      if (!dash) {
+        diags.push(`taper-mark-skipped: node ${l.nodeId} dash ${k} lane ${d.offset.toFixed(4)}`);
+        continue;
+      }
+      const [a, b, c, e] = dash;
+      g.quad(a.x, a.z, b.x, b.z, c.x, c.z, e.x, e.z, MARK_LIFT, LINE, groundY);
+    }
+  }
 }
 
 /** Centre dashes through pairs that are visually straight, clipped to trims. */
@@ -685,7 +1072,7 @@ function junctionGuides(g: Geo, l: JunctionLayout, groundY: GroundY): void {
       const e = Math.min(len - 0.04, s + 0.16), ww = 0.012;
       g.quad(ax + dx * s + px * ww, az + dz * s + pz * ww, ax + dx * e + px * ww, az + dz * e + pz * ww,
         ax + dx * e - px * ww, az + dz * e - pz * ww, ax + dx * s - px * ww, az + dz * s - pz * ww,
-        NODE_MARK_LIFT + 0.002, LINE, groundY);
+        MARK_LIFT + 0.002, LINE, groundY);
     }
   }
 }
@@ -701,7 +1088,7 @@ function junctionLaneArrows(g: Geo, l: JunctionLayout, groundY: GroundY): void {
   for (const arrow of l.laneArrows) {
     if (!arrow.turns.length) continue;
     const arm = l.arms[arrow.arm];
-    if (!arm || arm.markingsSuppressed) continue;
+    if (!arm || arm.markingsSuppressed || !specOf(arm.type).junctionMarkings) continue;
     // Connector paths and decals must use the same segment-to-arm conversion.
     const off = inboundArmOffset(arm, arrow.lane);
     if (off === undefined) continue;
@@ -733,7 +1120,7 @@ function junctionLaneArrows(g: Geo, l: JunctionLayout, groundY: GroundY): void {
       // head
       tris.push([q(along - headLen, -headW), q(along - headLen, headW), q(along, 0)]);
     });
-    if (tris.length) emitTris(g, tris, NODE_MARK_LIFT + 0.002, "#e9e4d4", groundY);
+    if (tris.length) emitTris(g, tris, MARK_LIFT + 0.002, "#e9e4d4", groundY);
   }
 }
 
@@ -771,31 +1158,138 @@ function emitTris(
 /**
  * Junction patch from the layout rings: one asphalt polygon (ear clipping,
  * never a centre fan), the kerb band asphalt→kerbOuter and the sidewalk band
- * kerbOuter→sidewalkOuter in the ribbon kerb material. Bands ride above the
- * ribbon ends by lift, like the asphalt rides above the bands. When a band
- * has no valid triangulation (degenerate input), the full outer ring is
- * stacked underneath instead — same lifts, hidden by the inner surface.
+ * kerbOuter→sidewalkOuter in the ribbon kerb material. Pad and ribbon share
+ * one lift per layer (asphalt ROAD_LIFT, bands KERB_LIFT); ribbons start on
+ * each ring's across-mouth edge, so the two never overlap at one height. When
+ * a band has no valid triangulation (degenerate input), the full outer ring
+ * is stacked just below the asphalt instead.
  */
+/**
+ * Rounded nose where a planted or barrier median ends at a pad mouth: a
+ * half-disc of radius medianHalf (8 segments) from the mouth line into the
+ * pad, instead of the ribbon's square cut. Just under the markings.
+ */
+function medianNoses(g: Geo, l: JunctionLayout, groundY: GroundY, atlas: boolean): void {
+  if (l.asphalt.length < 3) return;
+  const SEG = 8;
+  for (const arm of l.arms) {
+    const prof = profileOf(arm.type);
+    if (prof.medianHalf <= 0 || (prof.median !== "planted" && prof.median !== "barrier")) continue;
+    const M = arm.mouth?.asphalt?.centre ?? Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt);
+    const r = prof.medianHalf, px = -arm.dz, pz = arm.dx;
+    const cx = l.centre.x + arm.dx * M, cz = l.centre.z + arm.dz * M;
+    const col = g.colorFor(atlas ? (prof.median === "planted" ? ATLAS_MEDIAN : CONCRETE) : prof.median === "planted" ? MEDIAN : HW_EDGE);
+    const cls = atlas ? ROAD_CLASS.PLAIN : ROAD_CLASS.FLAT;
+    const y = MARK_LIFT - 0.002;
+    const c = g.vertFast(cx, groundY(cx, cz) + y, cz, col, undefined, cls);
+    let prev = -1;
+    for (let k = 0; k <= SEG; k++) {
+      const t = (Math.PI * k) / SEG; // +perp -> toward the node -> -perp
+      const x = cx + r * (Math.cos(t) * px - Math.sin(t) * arm.dx);
+      const z = cz + r * (Math.cos(t) * pz - Math.sin(t) * arm.dz);
+      const v = g.vertFast(x, groundY(x, z) + y, z, col, undefined, cls);
+      if (prev >= 0) g.tri(c, prev, v);
+      prev = v;
+    }
+  }
+}
+
+type Tri2 = [Pt, Pt, Pt];
+type MouthLayerName = "asphalt" | "kerb" | "sidewalk";
+
+/**
+ * Band between two nested layer rings, split into one piece per corner. The
+ * junction gives every layer ring the same across-mouth station, so the band
+ * pinches to zero width at each mouth; triangulating the corner pieces
+ * (inner chain + reversed outer chain) keeps band geometry off the
+ * carriageway. Null when the rings cannot be split at matching mouth points
+ * (the caller then uses the whole-ring band).
+ */
+function cornerBand(l: JunctionLayout, inner: Pt[], outer: Pt[], innerL: MouthLayerName, outerL: MouthLayerName): Tri2[] | null {
+  const breaks = (ring: Pt[], layer: MouthLayerName): Map<number, string> | null => {
+    const out = new Map<number, string>();
+    l.arms.forEach((arm, ai) => {
+      const m = arm.mouth?.[layer];
+      if (!m) return;
+      for (const [side, ms] of [["n", m.neg], ["p", m.pos]] as const) {
+        const k = ring.findIndex((r) => Math.abs(r.x - ms.p.x) < 1e-9 && Math.abs(r.z - ms.p.z) < 1e-9);
+        if (k >= 0 && !out.has(k)) out.set(k, `${ai}${side}`);
+      }
+    });
+    return out.size >= 2 && out.size % 2 === 0 ? out : null;
+  };
+  const bi = breaks(inner, innerL), bo = breaks(outer, outerL);
+  if (!bi || !bo || bi.size !== bo.size) return null;
+  /** Chains between consecutive break vertices, keyed "from>to". */
+  const chains = (ring: Pt[], b: Map<number, string>): { key: string; pts: Pt[] }[] => {
+    const idx = [...b.keys()].sort((x, y) => x - y);
+    return idx.map((from, k) => {
+      const to = idx[(k + 1) % idx.length];
+      const pts: Pt[] = [];
+      for (let i = from; ; i = (i + 1) % ring.length) { pts.push(ring[i]); if (i === to) break; }
+      return { key: `${b.get(from)}>${b.get(to)}`, pts };
+    });
+  };
+  const ci = chains(inner, bi), co = chains(outer, bo);
+  // Across edges and corner chains alternate; the across phase is the one
+  // whose chains are all single edges.
+  const phase = [0, 1].find((ph) => ci.every((c, k) => (k % 2 !== ph) || c.pts.length === 2));
+  if (phase === undefined) return null;
+  const out: Tri2[] = [];
+  for (let k = 0; k < ci.length; k++) {
+    if (k % 2 === phase) continue;
+    const a = ci[k], b = co.find((c) => c.key === a.key);
+    if (!b) return null;
+    const poly = [...a.pts, ...b.pts.slice().reverse()];
+    const tris = triangulateRing(poly);
+    if (tris.length === 0) return null;
+    out.push(...tris);
+  }
+  return out;
+}
+
+const bandCache = new WeakMap<JunctionLayout, { kerb: Tri2[] | null; walk: Tri2[] | null }>();
+
+/** Pad kerb and sidewalk band triangles (per corner when possible), cached per layout. */
+export function padBandTriangles(l: JunctionLayout): { kerb: Tri2[] | null; walk: Tri2[] | null } {
+  // Layouts are cached by junctionsOf, so per-corner bands are too.
+  let bands = bandCache.get(l);
+  if (!bands) {
+    const kerb = l.kerbOuter.length >= 3 ? l.kerbOuter : null;
+    const walk = l.sidewalkOuter.length >= 3 ? l.sidewalkOuter : null;
+    bands = {
+      kerb: kerb ? cornerBand(l, l.asphalt, kerb, "asphalt", "kerb") ?? triangulateBand(l.asphalt, kerb) : null,
+      walk: kerb && walk ? cornerBand(l, kerb, walk, "kerb", "sidewalk") ?? triangulateBand(kerb, walk) : null,
+    };
+    bandCache.set(l, bands);
+  }
+  return bands;
+}
+
 function drawJunctionPatch(g: Geo, l: JunctionLayout, groundY: GroundY, atlas = false): void {
   if (l.asphalt.length < 3) return;
-  const bandLift = NODE_ASPHALT_LIFT + 0.004;
-  const fallbackLift = NODE_ASPHALT_LIFT - 0.004;
+  const bandLift = KERB_LIFT;
+  const fallbackLift = ROAD_LIFT - 0.004;
   const kerb = l.kerbOuter.length >= 3 ? l.kerbOuter : null;
   const walk = l.sidewalkOuter.length >= 3 ? l.sidewalkOuter : null;
+  const bands = padBandTriangles(l);
+  // Atlas tier: the ribbon bands come from the road textures, so the pad
+  // bands take the textures' kerb/sidewalk mean in the flat PLAIN class
+  // (the vertex-colour KERB path read brighter). Low tier: KERB as the ribbons.
+  const bandCol = atlas ? ATLAS_SIDEWALK : KERB;
+  const bandCls = atlas ? ROAD_CLASS.PLAIN : ROAD_CLASS.FLAT;
   if (kerb) {
-    const band = triangulateBand(l.asphalt, kerb);
-    if (band) emitTris(g, band, bandLift, KERB, groundY);
-    else emitTris(g, triangulateRing(kerb), fallbackLift, KERB, groundY);
+    if (bands.kerb) emitTris(g, bands.kerb, bandLift, bandCol, groundY, undefined, bandCls);
+    else emitTris(g, triangulateRing(kerb), fallbackLift, bandCol, groundY, undefined, bandCls);
   }
   if (kerb && walk) {
-    const band = triangulateBand(kerb, walk);
-    if (band) emitTris(g, band, bandLift, KERB, groundY);
-    else emitTris(g, triangulateRing(walk), fallbackLift, KERB, groundY);
+    if (bands.walk) emitTris(g, bands.walk, bandLift, bandCol, groundY, undefined, bandCls);
+    else emitTris(g, triangulateRing(walk), fallbackLift, bandCol, groundY, undefined, bandCls);
   }
   const patchCol = atlas ? "#ffffff" : ASPHALT;
   const patchCls = atlas ? ROAD_CLASS.JUNCTION : ROAD_CLASS.FLAT;
-  const uvOf = atlas ? (p: Pt): [number, number] => [p.x / JUNCTION_TILE, p.z / JUNCTION_TILE] : undefined;
-  emitTris(g, triangulateRing(l.asphalt), NODE_ASPHALT_LIFT, patchCol, groundY, uvOf, patchCls);
+  const uvOf = atlas ? (p: Pt): [number, number] => [p.x / JUNCTION_TILE, p.z / JUNCTION_TILE_V] : undefined;
+  emitTris(g, triangulateRing(l.asphalt), ROAD_LIFT, patchCol, groundY, uvOf, patchCls);
 }
 
 /**
@@ -808,6 +1302,8 @@ function drawJunctionPatch(g: Geo, l: JunctionLayout, groundY: GroundY, atlas = 
 export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hideBridges?: boolean; atlas?: boolean }): THREE.BufferGeometry {
   const atlas = !!opts?.atlas;
   const g = new Geo();
+  /** Render-side diagnostics (e.g. a taper mark that cannot fit), on geometry.userData.diagnostics. */
+  const diags: string[] = [];
   const layouts = junctionsOf(w);
   const layoutOf = (id: number): JunctionLayout | null => layouts.byNode.get(id) ?? null;
   // Ribbon trims for one segment end from its node layout. Layout sides are in
@@ -815,17 +1311,33 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
   // Excluded (bridge/tunnel) arms have no layout arm: their ribbons run to
   // the node centre.
   const trimsFor = (layout: JunctionLayout | null, seg: RoadSegment, end: "a" | "b"):
-    Pick<RibbonOpts, "aNeg" | "aPos" | "kNeg" | "kPos" | "sNeg" | "sPos"> => {
+    Pick<RibbonOpts, "aNeg" | "aPos" | "kNeg" | "kPos" | "sNeg" | "sPos" | "mA"> => {
     const zero = { aNeg: 0, aPos: 0, kNeg: 0, kPos: 0, sNeg: 0, sPos: 0 };
     if (!layout) return zero;
     const arm = layout.arms.find((a) => a.segId === seg.id && a.end === end);
     if (!arm) return zero;
     const neg = end === "a" ? arm.trimNeg : arm.trimPos;
     const pos = end === "a" ? arm.trimPos : arm.trimNeg;
+    const prof = profileOf(seg.type);
+    const line = (m: JunctionMouthLayer | undefined, R: number, fallback?: MouthLine): MouthLine => {
+      if (!m) return fallback ? { nS: fallback.nS, pS: fallback.pS, R } : { nS: 0, pS: 0, R };
+      const n = end === "a" ? m.neg : m.pos, p = end === "a" ? m.pos : m.neg;
+      return { nS: n.s, pS: p.s, nP: n.p, pP: p.p, R };
+    };
+    const asphalt = line(arm.mouth?.asphalt, prof.asphaltHalf);
+    const band = arm.mouth?.sidewalk
+      ? line(arm.mouth.sidewalk, prof.asphaltHalf + prof.kerb + prof.sidewalk)
+      : line(arm.mouth?.kerb, prof.asphaltHalf + prof.kerb, asphalt);
+    // Inner ring corners that sit on the band's mouth edge (same station) are
+    // used verbatim: lerped copies would leave quantisation slivers.
+    band.snaps = ([[arm.mouth?.asphalt, prof.asphaltHalf], [arm.mouth?.kerb, prof.asphaltHalf + prof.kerb]] as const)
+      .filter(([m]) => m)
+      .map(([m, off]) => ({ off, n: end === "a" ? m!.neg : m!.pos, p: end === "a" ? m!.pos : m!.neg }));
     return {
       aNeg: neg.asphalt, aPos: pos.asphalt,
       kNeg: neg.kerb, kPos: pos.kerb,
       sNeg: neg.sidewalk, sPos: pos.sidewalk,
+      mA: arm.mouth ? { asphalt, band } : undefined,
     };
   };
   for (const seg of w.segments) {
@@ -865,10 +1377,11 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
       eKPos: tb.kPos,
       eSNeg: tb.sNeg,
       eSPos: tb.sPos,
+      mB: tb.mA,
     };
     ribbon(g, seg.pts, seg.type, trim, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0, atlas);
     if (deck) {
-      parapets(g, seg.type, deck);
+      bridgeStructure(g, seg.type, deck, groundY);
       pillars(g, deck, groundY, w, seg.type);
       deckShadow(g, seg.type, deck, groundY, w);
     }
@@ -880,12 +1393,23 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     // Dead ends (kind "end") draw their square cap here; middle/transition
     // and non-ground nodes carry no rings and are skipped inside.
     drawJunctionPatch(g, l, groundY, atlas);
+    medianNoses(g, l, groundY, atlas);
+    if (l.kind === "taper" && l.taper) drawTaperMarks(g, l, groundY, diags, w);
     if (l.arms.length >= 3) {
       for (const arm of l.arms) {
-        if (arm.markingsSuppressed) continue;
+        const spec = specOf(arm.type);
+        if (arm.markingsSuppressed || !spec.junctionMarkings) continue;
+        const seg = w.segments.find((candidate) => candidate.id === arm.segId);
+        const oneWay = seg?.oneWay ?? spec.oneWay;
+        const dir = seg?.dir ?? 1;
+        const inbound = arm.end === (dir === 1 ? "b" : "a");
+        const halfWidth = profileOf(arm.type).asphaltHalf;
+        const stopSides: readonly [number, number] | null = oneWay
+          ? inbound ? [-halfWidth, halfWidth] : null
+          : [-halfWidth, 0];
         zebra(g, l.centre.x, l.centre.z, arm.dx, arm.dz,
-          profileOf(arm.type).asphaltHalf,
-          Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt), groundY, atlas);
+          halfWidth, Math.max(arm.trimNeg.asphalt, arm.trimPos.asphalt),
+          stopSides, groundY, atlas);
       }
       // Roundabout ring nodes read as circulation: no straight-through guides.
       const onRing = l.arms.some((arm) => w.segments.find((sg) => sg.id === arm.segId)?.roundabout);
@@ -924,13 +1448,15 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
             sx - arm.dx * 0.05 + px * hw2 * 0.28, sz - arm.dz * 0.05 + pz * hw2 * 0.28,
             sx - arm.dx * 0.05 - px * hw2 * 0.28, sz - arm.dz * 0.05 - pz * hw2 * 0.28,
             sx + arm.dx * 0.05 - px * hw2 * 0.28, sz + arm.dz * 0.05 - pz * hw2 * 0.28,
-            NODE_MARK_LIFT, ZEBRA, groundY,
+            MARK_LIFT, ZEBRA, groundY,
           );
         }
       }
     }
   }
-  return g.build();
+  const built = g.build();
+  built.userData.diagnostics = diags;
+  return built;
 }
 
 /**

@@ -35,6 +35,7 @@ gap is historical). Rule 11 in `AGENTS.md`: visible geometry must follow one of 
 | [23-flora-assets.md](23-flora-assets.md) | Flora recipe: pack trees, ground texture layers, cloud banks. |
 | [24-service-usage.md](24-service-usage.md) | Service usage numbers (`facilityUsage`), tier balance table, service models. |
 | [25-tool-state.md](25-tool-state.md) | Tool state reducer and menu rules (`src/ui/tool-state.ts`). |
+| [26-roads-cycle1.md](26-roads-cycle1.md) | Roads cycle 1: single road profile table, junction surfaces, tapers, one-way, 3+3 highway, ramps, interchange, road tool. |
 | [junction-gate.md](junction-gate.md) | Junction and road quality gate G1-G5 (headless `src/sim/showcase-gate.test.ts`). |
 | [look-target.md](look-target.md) | Visual look target (P1-C/P1-D). |
 | `process.json`, `05-phases.json`, `04-regras.json` | Machine-readable phase and rule data used by the docs above. |

@@ -55,4 +55,20 @@ describe("junction lane graph", () => {
     const g = buildLaneConnectors({x:0,z:0}, arms, [{x:-2,z:-2},{x:2,z:-2},{x:2,z:2},{x:-2,z:2}]);
     expect(g.arrows.filter(a => a.arm === 0)).toHaveLength(0);
   });
+
+  it("reports legal arm pairs whose connectors cannot stay on asphalt", () => {
+    const arms = [
+      {segId:1,end:"a" as const,type:ROAD.STREET,dx:1,dz:0,trim:1},
+      {segId:2,end:"a" as const,type:ROAD.STREET,dx:-1,dz:0,trim:1},
+    ];
+    const g = buildLaneConnectors(
+      {x:0,z:0}, arms,
+      [{x:-.1,z:-.1},{x:.1,z:-.1},{x:.1,z:.1},{x:-.1,z:.1}],
+    );
+    expect(g.connectors).toEqual([]);
+    expect(g.missing).toEqual([
+      {inArm:0,outArm:1,turn:"straight"},
+      {inArm:1,outArm:0,turn:"straight"},
+    ]);
+  });
 });

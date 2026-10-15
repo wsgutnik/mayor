@@ -2,6 +2,7 @@ import { makeRng } from "./rng";
 import type { ConstructionState, OrientedLot, ZoneBlockSet, ZoningMode } from "./zonecells";
 import type { RoadNode } from "./roads";
 import { updateNetworkCoverage, facilityLinks } from "./networks";
+import { ROAD_SPECS, rankOf, type RoadSpec } from "./roadprofile";
 
 export const ZONE = { NONE: 0, RES: 1, COM: 2, IND: 3 } as const;
 export type ZoneType = (typeof ZONE)[keyof typeof ZONE];
@@ -121,11 +122,13 @@ export interface TransitLine {
 export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3, ONEWAY_STREET: 4, ONEWAY_AVENUE: 5 } as const;
 export type RoadType = 1 | 2 | 3 | 4 | 5;
 /** Tiles of width a road occupies on the grid, and its drawn width in world units. */
-export const ROAD_TILE_WIDTH: Record<RoadType, number> = { 1: 1, 2: 2, 3: 3, 4: 1, 5: 2 };
-export const ROAD_DRAW_WIDTH: Record<RoadType, number> = { 1: 0.9, 2: 1.8, 3: 2.8, 4: 0.9, 5: 1.8 };
-export const ROAD_COST: Record<RoadType, number> = { 1: 20, 2: 45, 3: 90, 4: 22, 5: 48 };
-export const ROAD_UPKEEP: Record<RoadType, number> = { 1: 3, 2: 7, 3: 14, 4: 3, 5: 7 };
-export const ROAD_NAME: Record<RoadType, string> = { 1: "Street", 2: "Avenue", 3: "Highway", 4: "One-way street", 5: "One-way avenue" };
+const fromSpec = <K extends keyof RoadSpec>(k: K) =>
+  Object.fromEntries(Object.values(ROAD_SPECS).map((s) => [s.type, s[k]])) as Record<RoadType, RoadSpec[K]>;
+export const ROAD_TILE_WIDTH: Record<RoadType, number> = fromSpec("tileWidth");
+export const ROAD_DRAW_WIDTH: Record<RoadType, number> = fromSpec("drawWidth");
+export const ROAD_COST: Record<RoadType, number> = fromSpec("cost");
+export const ROAD_UPKEEP: Record<RoadType, number> = fromSpec("upkeep");
+export const ROAD_NAME: Record<RoadType, string> = fromSpec("nameKey");
 
 /** True for the one-way road classes (4/5). */
 export const isOneWayType = (t: RoadType): boolean => t === 4 || t === 5;
@@ -645,10 +648,10 @@ export function rebuildRoadRaster(w: World): void {
   for (const seg of w.segments) {
     const elev = segElevation(seg);
     for (const t of seg.tiles) {
-      if (w.road[t] < seg.type) w.road[t] = seg.type;
-      if (elev === "ground" && w.roadSurface[t] < seg.type) w.roadSurface[t] = seg.type;
-      else if (elev === "bridge" && w.roadDeck[t] < seg.type) w.roadDeck[t] = seg.type;
-      else if (elev === "tunnel" && w.roadTunnel[t] < seg.type) w.roadTunnel[t] = seg.type;
+      if (rankOf(w.road[t]) < rankOf(seg.type)) w.road[t] = seg.type;
+      if (elev === "ground" && rankOf(w.roadSurface[t]) < rankOf(seg.type)) w.roadSurface[t] = seg.type;
+      else if (elev === "bridge" && rankOf(w.roadDeck[t]) < rankOf(seg.type)) w.roadDeck[t] = seg.type;
+      else if (elev === "tunnel" && rankOf(w.roadTunnel[t]) < rankOf(seg.type)) w.roadTunnel[t] = seg.type;
     }
   }
   // Ramp links: nodes shared by ground and elevated segments allow layer switches.

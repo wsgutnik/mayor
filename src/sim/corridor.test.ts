@@ -66,14 +66,14 @@ describe("road corridor profiles", () => {
     for (const type of TYPES) {
       const p = profileOf(type);
       expect(p.laneCentres).toHaveLength(p.lanes);
-      expect(p.laneWidth).toBeCloseTo((2 * (p.asphaltHalf - p.medianHalf)) / p.lanes, 9);
+      expect(p.laneWidth).toBeCloseTo((2 * (p.asphaltHalf - p.medianHalf - p.shoulder)) / p.lanes, 9);
       for (let i = 0; i < p.laneCentres.length; i++) {
         expect(p.laneCentres[i]).toBeCloseTo(-p.laneCentres[p.laneCentres.length - 1 - i], 9);
         expect(Math.abs(p.laneCentres[i]) + p.laneWidth / 2).toBeLessThanOrEqual(p.asphaltHalf + 1e-9);
         expect(Math.abs(p.laneCentres[i]) - p.laneWidth / 2).toBeGreaterThanOrEqual(p.medianHalf - 1e-9);
       }
     }
-    for (const [type, want] of [[1, [-0.19, 0.19]], [2, [-0.6475, -0.3225, 0.3225, 0.6475]], [3, [-1.05, -0.35, 0.35, 1.05]]] as const) {
+    for (const [type, want] of [[1, [-0.19, 0.19]], [2, [-0.6475, -0.3225, 0.3225, 0.6475]], [3, [-1.1, -0.7, -0.3, 0.3, 0.7, 1.1]]] as const) {
       const got = profileOf(type).laneCentres;
       expect(got).toHaveLength(want.length);
       for (let i = 0; i < want.length; i++) expect(got[i]).toBeCloseTo(want[i], 9);

@@ -19,13 +19,14 @@
  * - classification and rings use ground arms only; bridge/tunnel arms are
  *   listed in excludedArms (their ribbons run to the node centre).
  */
+import { specOf } from "./roadprofile";
 import {
-  baseRoadType, curvePoints, segElevation,
+  curvePoints, segElevation,
   type Pt, type RoadSegment, type RoadType, type World,
 } from "./world";
 import { nodeArms, nodeById, segById } from "./roads";
 import { corridorsOf, profileOf } from "./corridor";
-import { buildLaneConnectors, type LaneArrow, type LaneConnector } from "./lanes";
+import { armOffset, buildLaneConnectors, laneOffsets, type LaneArrow, type LaneConnector } from "./lanes";
 import { zpEnd, zpStart } from "./zoneprof";
 
 // ---------------------------------------------------------------- constants
@@ -48,21 +49,16 @@ const MIN_RIBBON = 0.12;
 /** Crosswalk + stop-bar clearance required before end markings may coexist. */
 const MARKING_RIBBON = 0.72;
 
-/** Kerb return radius at the asphalt edge, by road class (07 recipe table). */
-export function cornerRadiusFor(type: RoadType): number {
-  const b = baseRoadType(type);
-  return b === 1 ? 0.45 : b === 2 ? 0.6 : 1.2;
-}
+/** Kerb return radius at the asphalt edge, by road class (roadprofile.ts). */
+export function cornerRadiusFor(type: RoadType): number { return specOf(type).cornerRadius; }
 
-/** Boundary clearance outside the sidewalk, by road class. */
-export function clearanceFor(type: RoadType): number {
-  return baseRoadType(type) === 3 ? 0.25 : 0.1;
-}
+/** Boundary clearance outside the sidewalk, by road class (roadprofile.ts). */
+export function clearanceFor(type: RoadType): number { return specOf(type).clearance; }
 
 // ---------------------------------------------------------------- types
 
 export type JunctionKind =
-  | "end" | "middle" | "bend" | "transition" | "junction" | "roundabout" | "non-ground";
+  | "end" | "middle" | "bend" | "transition" | "taper" | "junction" | "roundabout" | "non-ground";
 export type JunctionTemplate =
   | "end-square" | "straight" | "bend" | "tee" | "cross" | "general" | "none";
 export type JunctionLayerName = "asphalt" | "kerb" | "sidewalk" | "boundary";
@@ -86,7 +82,17 @@ export interface JunctionArm {
   trimPos: JunctionTrimSet;
   /** The facing junction leaves too little ribbon for independent end marks. */
   markingsSuppressed?: boolean;
+  /** Where each layer ring crosses this arm (render-only, not hashed). */
+  mouth?: JunctionMouth;
 }
+
+/** One side of a layer's across-mouth edge: station along the arm (outward)
+ * and the ring point itself (exact ring vertex when the ring has one there). */
+export interface JunctionMouthSide { s: number; p: Pt }
+/** A layer ring's across-mouth edge on one arm, in the arm's outward frame.
+ * `centre` is the centreline station on that edge (offsets are symmetric). */
+export interface JunctionMouthLayer { neg: JunctionMouthSide; pos: JunctionMouthSide; centre: number }
+export type JunctionMouth = Partial<Record<"asphalt" | "kerb" | "sidewalk", JunctionMouthLayer>>;
 
 export type FilletKind = "convex" | "reflex" | "straight" | "merged";
 
@@ -163,6 +169,12 @@ export interface JunctionLayout {
   connectors: LaneConnector[];
   /** Allowed turn arrows for each inbound lane; exported for road markings. */
   laneArrows: LaneArrow[];
+  taper?: {
+    wideArm: number;
+    length: number;
+    droppedLanes: { side: -1 | 1; offset: number }[];
+    addedLanes: { side: -1 | 1; offset: number }[];
+  };
   hash: string;
   diagnostics: JunctionDiagnostic[];
 }
@@ -442,7 +454,7 @@ function nominalCorner(cx: number, cz: number, a: JArm, b: JArm, g: Gap): Nomina
   if (g.kind !== "convex") {
     return { tA: 0, tB: 0, ox: cx, oz: cz, ok: true };
   }
-  const R = Math.max(a.R, b.R);
+  const R = Math.min(a.R, b.R);
   const o = lineHit(
     cx + nax * (a.h + R), cz + naz * (a.h + R), a.dx, a.dz,
     cx + nbx * (b.h + R), cz + nbz * (b.h + R), b.dx, b.dz,
@@ -490,8 +502,22 @@ function getNoms(w: World, nodeId: number, cache?: Map<number, NodeNoms>): NodeN
   return out;
 }
 
+/** Unclamped taper length for a width step (0.6..3 tiles). */
+const taperWant = (wide: JArm, narrow: JArm): number =>
+  q(Math.min(3, Math.max(0.6, 6 * Math.abs(wide.h - narrow.h))));
+
+/** Wanted taper length on `segId` at a taper node when it is the wide arm, else 0. */
+function taperTrimAt(w: World, nodeId: number, segId: number, cache?: Map<number, NodeNoms>): number {
+  const nn = getNoms(w, nodeId, cache);
+  if (!nn || nn.ground.length !== 2 || classify(nn.ground, nn.raw).kind !== "taper") return 0;
+  const [a, b] = nn.ground;
+  const wide = a.h >= b.h ? a : b, narrow = wide === a ? b : a;
+  return wide.segId === segId ? taperWant(wide, narrow) : 0;
+}
+
 /** Nominal (unbudgeted) trim of one segment end on one side; 0 when the end
- * has no corner there. Side flips at the far end (same physical edge). */
+ * has no corner there. Side flips at the far end (same physical edge). A
+ * taper's wide arm reports its wanted taper length, so neighbours budget it. */
 function nominalTrimAt(
   w: World, nodeId: number, segId: number, side: -1 | 1, cache?: Map<number, NodeNoms>,
 ): number {
@@ -500,6 +526,8 @@ function nominalTrimAt(
   const ground = nn.ground;
   const idx = ground.findIndex((a) => a.segId === segId);
   if (idx < 0) return 0;
+  const tapered = taperTrimAt(w, nodeId, segId, cache);
+  if (tapered > 0) return tapered;
   if (ground.length < 2) {
     const p = profileOf(ground[idx].type);
     return Math.max(p.kerb + p.sidewalk, 0.1);
@@ -546,7 +574,7 @@ function finalizeConvex(
   cx: number, cz: number, a: JArm, b: JArm, g: Gap, nom: Nominal,
   allowA: number, allowB: number, diags: JunctionDiagnostic[],
 ): FinalCorner {
-  const R = Math.max(a.R, b.R);
+  const R = Math.min(a.R, b.R);
   if (nom.tA <= allowA + 1e-9 && nom.tB <= allowB + 1e-9) {
     // Signed: a negative station is the wider arm's edge continuing past
     // the node to the fillet (recorded trims clamp to >= 0 later).
@@ -652,10 +680,11 @@ function footOnLine(p: Pt, lx: number, lz: number, dx: number, dz: number): Pt {
 }
 
 function finalizeRing(pts: Pt[]): Pt[] {
-  const clean = pts.filter((p, k) => k === 0 || p.x !== pts[k - 1].x || p.z !== pts[k - 1].z);
+  const close = (a: Pt, b: Pt): boolean => Math.hypot(a.x - b.x, a.z - b.z) < 1e-6;
+  const clean = pts.filter((p, k) => k === 0 || !close(p, pts[k - 1]));
   if (clean.length > 1) {
     const f = clean[0], l = clean[clean.length - 1];
-    if (f.x === l.x && f.z === l.z) clean.pop();
+    if (close(f, l)) clean.pop();
   }
   // Quantisation can turn two nearly coincident constructed points (a miter
   // point and its edge station, a mouth corner and a chain end) into a
@@ -667,14 +696,12 @@ function finalizeRing(pts: Pt[]): Pt[] {
       const n = clean.length;
       const a = clean[(i - 1 + n) % n], b = clean[i], c = clean[(i + 1) % n];
       const cr = (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
-      const back = (b.x - a.x) * (c.x - b.x) + (b.z - a.z) * (c.z - b.z) < 0;
-      if (a.x === c.x && a.z === c.z) {
+      if (close(a, c)) {
         clean.splice(i, 1);
-        clean.splice(i % clean.length, 1);
         changed = true;
         break;
       }
-      if (Math.abs(cr) < 1e-12 && back) {
+      if (Math.abs(cr) < 1e-12) {
         clean.splice(i, 1);
         changed = true;
         break;
@@ -711,7 +738,8 @@ function classify(ground: JArm[], gaps: Gap[]): { kind: JunctionKind; template: 
     const same = ground[0].h === ground[1].h &&
       ground[0].kerb === ground[1].kerb && ground[0].sidewalk === ground[1].sidewalk;
     if (straight && same) return { kind: "middle", template: "straight" };
-    if (straight) return { kind: "transition", template: "straight" };
+    const taperStraight = gaps.some((g) => Math.abs(g.gap - Math.PI) <= (10 * Math.PI) / 180);
+    if (taperStraight && !same) return { kind: "taper", template: "straight" };
     return same
       ? { kind: "bend", template: "bend" }
       : { kind: "transition", template: "bend" };
@@ -792,6 +820,44 @@ function buildAnchors(
   return out;
 }
 
+/**
+ * Export each layer ring's across-mouth edge per arm, so ribbons start exactly
+ * where the pad's layer ring crosses the road (no same-height overlap). `rec`
+ * gives the station the ring builder actually used (stepped / merged mouths);
+ * otherwise the side's own trim is the crossing station.
+ */
+function attachMouths(
+  cx: number, cz: number, arms: JunctionArm[], ground: JArm[], rings: Pt[][],
+  rec?: (armIdx: number, li: number, side: -1 | 1) => { t: number; p: Pt } | undefined,
+): void {
+  arms.forEach((arm, ai) => {
+    const g = ground.find((x) => x.segId === arm.segId && x.end === arm.end);
+    if (!g) return;
+    const mouth: JunctionMouth = {};
+    for (let li = 0; li < 3; li++) {
+      const ring = rings[li];
+      if (!ring || ring.length < 3) continue;
+      const L = LAYERS[li], off = L.off(g);
+      const at = (sd: -1 | 1): JunctionMouthSide => {
+        const known = rec?.(ai, li, sd);
+        // The builder knows the exact point it pushed: use it verbatim.
+        if (known) return { s: known.t, p: { x: known.p.x, z: known.p.z } };
+        const s = (sd < 0 ? arm.trimNeg : arm.trimPos)[L.name];
+        const p = { x: cx + arm.dx * s - arm.dz * sd * off, z: cz + arm.dz * s + arm.dx * sd * off };
+        let best: Pt | null = null, bd = 1.5e-3;
+        for (const r of ring) {
+          const d = Math.hypot(r.x - p.x, r.z - p.z);
+          if (d < bd) { bd = d; best = r; }
+        }
+        return { s, p: best ? { x: best.x, z: best.z } : p };
+      };
+      const neg = at(-1), pos = at(1);
+      mouth[L.name as "asphalt" | "kerb" | "sidewalk"] = { neg, pos, centre: (neg.s + pos.s) / 2 };
+    }
+    arm.mouth = mouth;
+  });
+}
+
 function hashLayout(l: JunctionLayout): string {
   const parts = [l.kind, l.template, `${l.centre.x.toFixed(3)},${l.centre.z.toFixed(3)}`];
   const t = (s: JunctionTrimSet) =>
@@ -801,6 +867,114 @@ function hashLayout(l: JunctionLayout): string {
     parts.push(r.map((p) => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(";"));
   }
   return fnv1a(parts.join("#"));
+}
+
+interface TaperBuild {
+  arms: JunctionArm[];
+  asphalt: Pt[];
+  kerbOuter: Pt[];
+  sidewalkOuter: Pt[];
+  boundary: Pt[];
+  connectors: LaneConnector[];
+  laneArrows: LaneArrow[];
+  taper: NonNullable<JunctionLayout["taper"]>;
+  diagnostics: JunctionDiagnostic[];
+}
+
+/** Build a real asphalt transition on the wider arm. Connector endpoints sit
+ * inside the trapezoid; lane containment is never bypassed. */
+function buildTaper(
+  cx: number, cz: number, wide: JArm, narrow: JArm, wSeg: RoadSegment, nSeg: RoadSegment,
+  maxLength = Infinity,
+): TaperBuild {
+  // Never longer than the wide segment's share (see the taper branch of
+  // buildJunction); the clamp is diagnosed there.
+  const length = q(Math.min(taperWant(wide, narrow), maxLength));
+  const P = (a: JArm, s: number, off: number): Pt => qpt({
+    x: cx + a.dx * s - a.dz * off,
+    z: cz + a.dz * s + a.dx * off,
+  });
+  // Outward arm frames face opposite ways. The same physical flank therefore
+  // has opposite signed offsets at the node and at the wide mouth.
+  const ring = (wideOff: number, narrowOff: number): Pt[] => finalizeRing([
+    P(narrow, 0, narrowOff),
+    P(wide, length, -wideOff),
+    P(wide, length, wideOff),
+    P(narrow, 0, -narrowOff),
+  ]);
+  const offsets = (a: JArm): [number, number, number, number] => [
+    a.h,
+    a.h + a.kerb,
+    a.h + a.kerb + a.sidewalk,
+    a.h + a.kerb + a.sidewalk + a.clearance,
+  ];
+  const wo = offsets(wide), no = offsets(narrow);
+  const bySeg = new Map<number, RoadSegment>([[wSeg.id, wSeg], [nSeg.id, nSeg]]);
+  const arms = [wide, narrow]
+    .sort((a, b) => a.angle - b.angle || a.segId - b.segId)
+    .map((a): JunctionArm => {
+      const trim = a.segId === wide.segId ? length : 0;
+      const set = { asphalt: trim, kerb: trim, sidewalk: trim, boundary: trim };
+      return {
+        segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz, angle: a.angle,
+        trimNeg: { ...set }, trimPos: { ...set },
+      };
+    });
+  const asphalt = ring(wo[0], no[0]);
+  const laneArms = arms.map((a) => {
+    const seg = bySeg.get(a.segId)!;
+    return {
+      segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz,
+      trim: a.segId === wide.segId ? length : 0,
+      oneWay: seg.oneWay ?? specOf(a.type).oneWay, dir: seg.dir ?? 1,
+    };
+  });
+  const laneGraph = buildLaneConnectors({ x: cx, z: cz }, laneArms, asphalt, "leftAligned");
+  const compatible = laneOffsets(laneArms[0], true).length > 0 && laneOffsets(laneArms[1], false).length > 0 ||
+    laneOffsets(laneArms[1], true).length > 0 && laneOffsets(laneArms[0], false).length > 0;
+  const conflict = (laneArms[0].oneWay || laneArms[1].oneWay) && !compatible;
+  const diagnostics: JunctionDiagnostic[] = [];
+  for (const m of laneGraph.missing) {
+    diagnostics.push({ code: "connector-missing", detail: `${m.inArm}->${m.outArm}:${m.turn}` });
+  }
+  if (conflict) {
+    diagnostics.push({ code: "taper-direction-conflict" });
+  }
+
+  const wideArm = arms.findIndex((a) => a.segId === wide.segId);
+  const narrowArm = 1 - wideArm;
+  const droppedLanes: { side: -1 | 1; offset: number }[] = [];
+  const addedLanes: { side: -1 | 1; offset: number }[] = [];
+  if (!conflict) {
+    // Lanes are left-aligned (laneOffsets lists left to right of travel), so
+    // the excess lanes are always the rightmost ones: wide→narrow they merge
+    // into the last narrow lane, narrow→wide they are fed from it.
+    const wideIn = laneOffsets(laneArms[wideArm], true);
+    const narrowOut = laneOffsets(laneArms[narrowArm], false);
+    if (narrowOut.length > 0) {
+      for (let lane = narrowOut.length; lane < wideIn.length; lane++) {
+        droppedLanes.push({ side: 1, offset: armOffset(laneArms[wideArm], wideIn[lane]) });
+      }
+    }
+    const narrowIn = laneOffsets(laneArms[narrowArm], true);
+    const wideOut = laneOffsets(laneArms[wideArm], false);
+    if (narrowIn.length > 0) {
+      for (let lane = narrowIn.length; lane < wideOut.length; lane++) {
+        addedLanes.push({ side: 1, offset: armOffset(laneArms[wideArm], wideOut[lane]) });
+      }
+    }
+  }
+  return {
+    arms,
+    asphalt,
+    kerbOuter: wide.kerb === 0 && narrow.kerb === 0 ? [] : ring(wo[1], no[1]),
+    sidewalkOuter: wide.sidewalk === 0 && narrow.sidewalk === 0 ? [] : ring(wo[2], no[2]),
+    boundary: ring(wo[3], no[3]),
+    connectors: conflict ? [] : laneGraph.connectors,
+    laneArrows: laneGraph.arrows,
+    taper: { wideArm, length, droppedLanes, addedLanes },
+    diagnostics,
+  };
 }
 
 // ---------------------------------------------------------------- builder
@@ -851,6 +1025,29 @@ export function buildJunction(
   // --- dead end: square cap.
   if (ground.length === 1) {
     const a = ground[0];
+    // A bridge/tunnel continuing straight on is no dead end: no cap (its kerb
+    // band would cross the deck's carriageway); both ribbons meet at the node.
+    const through = excluded.some((e) => {
+      const seg = segById(w, e.segId);
+      if (!seg || seg.pts.length < 2) return false;
+      const n = seg.pts.length;
+      const p0 = e.end === "a" ? seg.pts[0] : seg.pts[n - 1], p1 = e.end === "a" ? seg.pts[1] : seg.pts[n - 2];
+      const l = Math.hypot(p1.x - p0.x, p1.z - p0.z) || 1;
+      return (a.dx * (p1.x - p0.x) + a.dz * (p1.z - p0.z)) / l < -0.94;
+    });
+    if (through) {
+      const layout: JunctionLayout = {
+        ...base, kind: "end", template: "none",
+        arms: [{
+          segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz, angle: a.angle,
+          trimNeg: emptyTrims(), trimPos: emptyTrims(),
+        }],
+        asphalt: [], kerbOuter: [], sidewalkOuter: [], boundary: [],
+        fillets: [], lotAnchors: [], hash: "",
+      };
+      layout.hash = hashLayout(layout);
+      return layout;
+    }
     const seg = segById(w, a.segId)!;
     const L = segLength(w, seg);
     const nbr = a.end === "a" ? seg.b : seg.a;
@@ -876,18 +1073,47 @@ export function buildJunction(
       asphalt: rings[0], kerbOuter: rings[1], sidewalkOuter: rings[2], boundary: rings[3],
       fillets: [], lotAnchors: buildAnchors(cx, cz, ground, rings[3]), hash: "",
     };
+    attachMouths(cx, cz, layout.arms, ground, rings);
     layout.hash = hashLayout(layout);
     return layout;
   }
 
   const { kind, template } = classify(ground, gaps);
 
-  // --- middle / straight transition: a straight joint, no node geometry.
-  // The straight transition is a hard width step (no taper in P2; taper is
-  // P5): both ribbons butt at the node and the narrower cap sits inside the
-  // wider one, so there is nothing to patch. The kind still matters for P4
-  // (lane merge markings) and traffic (lane drops).
-  if (kind === "middle" || (kind === "transition" && template === "straight")) {
+  if (kind === "taper") {
+    const wide = ground[0].h >= ground[1].h ? ground[0] : ground[1];
+    const narrow = wide === ground[0] ? ground[1] : ground[0];
+    // Clamp to the wide segment: the far end's trim (or taper) and a minimum
+    // visible ribbon must still fit. Two ends share the length in proportion
+    // to what each wants (allowance), as the corner budget does.
+    const wSeg = segById(w, wide.segId)!;
+    const far = wide.end === "a" ? wSeg.b : wSeg.a;
+    const want = taperWant(wide, narrow);
+    const farTrim = far === nodeId ? 0 : Math.max(
+      nominalTrimAt(w, far, wide.segId, 1, nomsCache), nominalTrimAt(w, far, wide.segId, -1, nomsCache));
+    const share = allowance(segLength(w, wSeg), want, farTrim, MIN_RIBBON);
+    // Below 0.6 the taper still never overlaps: it shortens (shortest valid taper, floor 0.05).
+    const maxLength = Math.max(0.05, Math.floor(share * 1000) / 1000);
+    if (maxLength < want - 1e-9) {
+      diags.push({ code: "trim-clamped", detail: `taper ${want.toFixed(2)}->${maxLength.toFixed(3)}` });
+    }
+    const taper = buildTaper(cx, cz, wide, narrow, wSeg, segById(w, narrow.segId)!, maxLength);
+    diags.push(...taper.diagnostics);
+    const layout: JunctionLayout = {
+      ...base, kind, template, arms: taper.arms,
+      asphalt: taper.asphalt, kerbOuter: taper.kerbOuter,
+      sidewalkOuter: taper.sidewalkOuter, boundary: taper.boundary,
+      fillets: [], lotAnchors: buildAnchors(cx, cz, [wide, narrow], taper.boundary),
+      connectors: taper.connectors, laneArrows: taper.laneArrows,
+      taper: taper.taper, hash: "", diagnostics: diags,
+    };
+    attachMouths(cx, cz, layout.arms, [wide, narrow], [taper.asphalt, taper.kerbOuter, taper.sidewalkOuter]);
+    layout.hash = hashLayout(layout);
+    return layout;
+  }
+
+  // --- middle: a same-profile straight joint needs no node geometry.
+  if (kind === "middle") {
     const layout: JunctionLayout = {
       ...base, kind, template,
       arms: ground.map((a) => ({
@@ -998,7 +1224,7 @@ export function buildJunction(
       const a = ground[g.i], b = ground[g.j];
       if (g.kind === "convex") {
         const f = finalizeConvex(cx, cz, a, b, g, noms[k], allowA.get(k)!, allowB.get(k)!, sd);
-        return { rNom: Math.max(a.R, b.R), rEff: f.rEff, chamfered: f.chamfered, tA: f.tA, tB: f.tB, mx: f.ox, mz: f.oz };
+        return { rNom: Math.min(a.R, b.R), rEff: f.rEff, chamfered: f.chamfered, tA: f.tA, tB: f.tB, mx: f.ox, mz: f.oz };
       }
       return { rNom: 0, rEff: 0, chamfered: false, tA: 0, tB: 0, mx: cx, mz: cz };
     });
@@ -1346,6 +1572,19 @@ export function buildJunction(
   diags.push(...S.diags);
   const { finals, layerData, mouth } = S;
   const ugaps = S.gaps;
+  // Which layer rings exist (a network without kerbs/sidewalks has none).
+  const hasLayer = LAYERS.map((L) =>
+    !(L.name === "kerb" && ground.every((a) => a.kerb === 0)) &&
+    !(L.name === "sidewalk" && ground.every((a) => a.sidewalk === 0)));
+  // A merged unit's one mouth line is shared by its asphalt, kerb and sidewalk
+  // rings (max over them), so trims and rings agree and no band crosses it.
+  units.forEach((u, ui) => {
+    if (!u.merged) return;
+    let m = 0;
+    for (let li = 0; li < 3; li++) if (hasLayer[li]) m = Math.max(m, mouth[ui][li]);
+    for (let li = 0; li < 3; li++) mouth[ui][li] = m;
+    mouth[ui][3] = Math.max(mouth[ui][3], m);
+  });
 
   const fillets: JunctionFillet[] = gaps.map((rg, r) => {
     if (rg.kind === "merged") {
@@ -1422,12 +1661,35 @@ export function buildJunction(
     }
   }
 
-  // Actual across-edge station per unit per layer: an outer layer's
-  // across-edge never sits inside the inner layer's (mitered layers included).
+  // One across-mouth station per unit for the asphalt, kerb and sidewalk
+  // rings (max over those layers): their across edges are then collinear, so
+  // the pad bands (ring differences) never cross the carriageway. Pass 1
+  // computes each layer's own station exactly as the ring assembly would.
   const acrossAt: number[][] = units.map(() => LAYERS.map(() => 0));
+  for (let li = 0; li < LAYERS.length; li++) {
+    if (!hasLayer[li]) continue;
+    layerData[li].forEach((c, k) => {
+      const g = ugaps[k];
+      if (units[g.uj].merged) return;
+      const nk = (k + 1) % layerData[li].length;
+      const nc = layerData[li][nk], gn = ugaps[nk];
+      const tB = c.tB, tA = nc.tA;
+      const miterStep = c.miter || nc.miter;
+      const floor = Math.max(S.forced[g.uj] ? mouth[g.uj][0] : 0, li > 0 ? acrossAt[g.uj][li - 1] : 0);
+      const mx = Math.max(miterStep ? Math.max(tB, tA, 0) : mouth[g.uj][li], floor);
+      acrossAt[g.uj][li] = gn.sideA !== g.sideB && mx > Math.min(tB, tA) + 1e-9 ? mx : Math.max(tB, tA);
+    });
+  }
+  const unitMouth = units.map((u, ui) => {
+    let m = 0;
+    for (let li = 0; li < 3; li++) if (hasLayer[li]) m = Math.max(m, u.merged ? mouth[ui][li] : acrossAt[ui][li]);
+    return m;
+  });
+  // Station (and exact ring point) each ring crosses arm k on side, per layer (mouth export).
+  const mouthRec = new Map<string, { t: number; p: Pt }>();
+  const rec = (k: number, li: number, side: number, t: number, p: Pt): void => { mouthRec.set(`${k}:${li}:${side}`, { t, p }); };
   const rings = LAYERS.map((L, li) => {
-    if (L.name === "kerb" && ground.every((a) => a.kerb === 0)) return [];
-    if (L.name === "sidewalk" && ground.every((a) => a.sidewalk === 0)) return [];
+    if (!hasLayer[li]) return [];
     const off = (idx: number): number => L.off(ground[idx]);
     const pts: Pt[] = [];
     layerData[li].forEach((c, k) => {
@@ -1443,28 +1705,36 @@ export function buildJunction(
         // One merged mouth: out along the CW flank's edge to the mouth line,
         // across it, back along the CCW flank's edge.
         // A mouth corner that coincides with the chain end IS that point.
-        const M = mouth[g.uj][li];
-        pts.push(qpt(Math.abs(M - projV(u, c.eB)) < 1e-9 ? c.eB
-          : E(g.j, g.sideB, onMouth(u, g.j, g.sideB, off(g.j), M), off(g.j))));
-        pts.push(qpt(Math.abs(M - projV(u, nc.eA)) < 1e-9 ? nc.eA
-          : E(gn.i, gn.sideA, onMouth(u, gn.i, gn.sideA, off(gn.i), M), off(gn.i))));
+        const M = li < 3 ? unitMouth[g.uj] : Math.max(mouth[g.uj][li], unitMouth[g.uj]);
+        for (const k of u.arms) for (const sd of [-1, 1]) {
+          const t = onMouth(u, k, sd, off(k), M);
+          rec(k, li, sd, t, qpt(E(k, sd, t, off(k))));
+        }
+        const pB = qpt(Math.abs(M - projV(u, c.eB)) < 1e-9 ? c.eB
+          : E(g.j, g.sideB, onMouth(u, g.j, g.sideB, off(g.j), M), off(g.j)));
+        const pA = qpt(Math.abs(M - projV(u, nc.eA)) < 1e-9 ? nc.eA
+          : E(gn.i, gn.sideA, onMouth(u, gn.i, gn.sideA, off(gn.i), M), off(gn.i)));
+        rec(g.j, li, g.sideB, onMouth(u, g.j, g.sideB, off(g.j), M), pB);
+        rec(gn.i, li, gn.sideA, onMouth(u, gn.i, gn.sideA, off(gn.i), M), pA);
+        pts.push(pB, pA);
         return;
       }
-      // Mouth step on the shared arm, routed via the arm's mouth station:
+      // Mouth step on the shared arm, routed via the unit's one mouth station:
       // along the low-side edge out, across at the station. (Equal trims
       // collapse to a straight mouth via dedupe.)
       const tB = c.tB, tA = nc.tA;
-      const miterStep = c.miter || nc.miter;
-      const floor = Math.max(S.forced[g.uj] ? mouth[g.uj][0] : 0, li > 0 ? acrossAt[g.uj][li - 1] : 0);
-      const mx = Math.max(miterStep ? Math.max(tB, tA, 0) : mouth[g.uj][li], floor);
+      const mx = li < 3 ? unitMouth[g.uj] : Math.max(acrossAt[g.uj][li], acrossAt[g.uj][2], unitMouth[g.uj]);
       if (gn.sideA !== g.sideB && mx > Math.min(tB, tA) + 1e-9) {
         // A mouth corner at the chain end's own station IS that point (a
         // recomputed copy would round to a neighbouring grid point).
-        pts.push(qpt(Math.abs(mx - tB) < 1e-9 ? c.eB : E(g.j, g.sideB, mx, off(g.j))));
-        pts.push(qpt(Math.abs(mx - tA) < 1e-9 ? nc.eA : E(g.j, gn.sideA, mx, off(g.j))));
+        const pB = qpt(Math.abs(mx - tB) < 1e-9 ? c.eB : E(g.j, g.sideB, mx, off(g.j)));
+        const pA = qpt(Math.abs(mx - tA) < 1e-9 ? nc.eA : E(g.j, gn.sideA, mx, off(g.j)));
+        pts.push(pB, pA);
         acrossAt[g.uj][li] = mx;
+        rec(g.j, li, g.sideB, mx, pB); rec(g.j, li, gn.sideA, mx, pA);
       } else {
         acrossAt[g.uj][li] = Math.max(tB, tA);
+        rec(g.j, li, g.sideB, tB, qpt(c.eB)); rec(g.j, li, gn.sideA, tA, qpt(nc.eA));
       }
     });
     return finalizeRing(pts);
@@ -1475,14 +1745,22 @@ export function buildJunction(
     asphalt: rings[0], kerbOuter: rings[1], sidewalkOuter: rings[2], boundary: rings[3],
     fillets, lotAnchors: buildAnchors(cx, cz, ground, rings[3]), hash: "",
   };
+  attachMouths(cx, cz, arms, ground, rings, (k, li, side) => mouthRec.get(`${k}:${li}:${side}`));
   // Ported lane graph is derived from the exact post-budget pad, never the
   // tile raster.  This keeps every accepted vehicle path inside asphalt.
-  const laneGraph = buildLaneConnectors(layout.centre, layout.arms.map(a => ({
-    segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz,
-    trim: Math.max(a.trimNeg.asphalt, a.trimPos.asphalt),
-  })), layout.asphalt);
+  const laneGraph = buildLaneConnectors(layout.centre, layout.arms.map(a => {
+    const seg = segById(w, a.segId);
+    return {
+      segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz,
+      trim: Math.max(a.trimNeg.asphalt, a.trimPos.asphalt),
+      oneWay: seg?.oneWay ?? (a.type === 4 || a.type === 5), dir: seg?.dir ?? 1,
+    };
+  }), layout.asphalt);
   layout.connectors = laneGraph.connectors;
   layout.laneArrows = laneGraph.arrows;
+  for (const m of laneGraph.missing) {
+    layout.diagnostics.push({ code: "connector-missing", detail: `${m.inArm}->${m.outArm}:${m.turn}` });
+  }
   layout.hash = hashLayout(layout);
   return layout;
 }
@@ -1492,7 +1770,7 @@ export function buildJunction(
 const KNOWN_CODES = new Set([
   "radius-shrunk", "chamfered-corner", "trim-clamped", "crosswalk-dropped",
   "stopline-dropped", "min-gap-merged", "layer-excluded",
-  "non-ground-node", "pad-node-deferred", "short-segment",
+  "non-ground-node", "pad-node-deferred", "short-segment", "taper-direction-conflict", "connector-missing",
 ]);
 
 function nearestVert(ring: Pt[], p: Pt): Pt {
@@ -1521,7 +1799,7 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
   const has = (c: string): boolean => l.diagnostics.some((d) => d.code === c);
   if (l.kind === "end" && n > 1) err("end with more than 1 arm");
   if (l.kind === "end" && n === 0 && !has("pad-node-deferred")) err("end with 0 arms but no pad diagnostic");
-  if ((l.kind === "middle" || l.kind === "bend" || l.kind === "transition") && n !== 2) {
+  if ((l.kind === "middle" || l.kind === "bend" || l.kind === "transition" || l.kind === "taper") && n !== 2) {
     err(`${l.kind} must have 2 arms`);
   }
   if (l.kind === "junction" && n < 3) err("junction must have 3+ arms");
@@ -1743,7 +2021,8 @@ function nodeSignature(w: World, id: number): string {
   return n.segs.slice().sort((a, b) => a - b).map((sid) => {
     const s = segById(w, sid);
     if (!s) return `${sid}:gone`;
-    return `${sid}:${s.type}:${s.a}:${s.b}:${s.pts.map(p => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(";")}`;
+    // One-way direction drives taper dropped/added lanes and connectors: flipping it must rebuild.
+    return `${sid}:${s.type}:${s.a}:${s.b}:${s.oneWay ? `ow${s.dir ?? 1}` : "tw"}:${s.pts.map(p => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(";")}`;
   }).join("|");
 }
 

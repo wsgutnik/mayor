@@ -1,4 +1,5 @@
 import { makeRng } from "./rng";
+import { rankOf } from "./roadprofile";
 import { isRaining } from "./weather";
 import { placeBusStop, registerMetroStation, registerTrainStation, removeStopAt, transitUpkeep, updateTransit } from "./transit";
 import {
@@ -446,6 +447,31 @@ function planWithSpan(
     const issue = placementIssue(w, type, pieces[i].pts, pieces[i].elevation, [i === 0, i === pieces.length - 1]);
     if (issue) return bad(PLACEMENT_REASON[issue], tiles, crossings);
   }
+  if (isOneWayType(type)) {
+    const cos10 = Math.cos((10 * Math.PI) / 180);
+    for (const piece of pieces) {
+      for (const atStart of [true, false]) {
+        const tip = piece.pts[atStart ? 0 : piece.pts.length - 1];
+        const next = piece.pts[atStart ? 1 : piece.pts.length - 2];
+        const len = Math.hypot(next.x - tip.x, next.z - tip.z);
+        if (len < 1e-9) continue;
+        const dx = (next.x - tip.x) / len, dz = (next.z - tip.z) / len;
+        const node = w.nodes.find((n) => Math.hypot(n.x - tip.x, n.z - tip.z) <= SNAP_RADIUS);
+        if (!node) continue;
+        const existing = nodeArms(w, node.id).filter((a) => segElevation(segById(w, a.segId)!) === "ground");
+        if (existing.length !== 1) continue;
+        const arm = existing[0];
+        if (dx * arm.dx + dz * arm.dz > -cos10) continue;
+        const seg = segById(w, arm.segId)!;
+        if (!(seg.oneWay ?? isOneWayType(seg.type))) continue;
+        const existingIncoming = (arm.end === "b") === ((seg.dir ?? 1) === 1);
+        const newIncoming = !atStart;
+        if (existingIncoming === newIncoming) {
+          return bad("One-way direction conflicts with the road it joins", tiles, crossings);
+        }
+      }
+    }
+  }
   // A tile shared by two pieces (shore joints) is priced once, at the higher rate,
   // and counts as ground when any piece there is at grade.
   const rate = new Map<number, number>();
@@ -480,7 +506,7 @@ function planWithSpan(
     const layerExisting = elevated
       ? (span?.kind === "tunnel" ? w.roadTunnel[t] : w.roadDeck[t])
       : w.road[t];
-    if (layerExisting < type) {
+    if (rankOf(layerExisting) < rankOf(type)) {
       newTiles++;
       cost += rate.get(t)! * ROAD_COST[type];
     }

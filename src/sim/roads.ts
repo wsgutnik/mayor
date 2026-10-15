@@ -1009,6 +1009,8 @@ export function toggleOneWayAt(w: World, pts: Pt[]): boolean {
     const rev = dist(p0.x, p0.z, nb.x, nb.z) <= SNAP_RADIUS && dist(p1.x, p1.z, na.x, na.z) <= SNAP_RADIUS;
     if ((fwd || rev) && coincides(seg.pts, pts)) {
       seg.dir = seg.dir === -1 ? 1 : -1;
+      // Junction layouts (taper drops, lane connectors) depend on direction.
+      touchGraph(w);
       return true;
     }
   }

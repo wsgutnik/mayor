@@ -1,4 +1,5 @@
 import { makeRng } from "./rng";
+import { ROAD_SPECS, derive } from "./roadprofile";
 import { CityState } from "./sim";
 import { ROAD, World, ZONE, heightAt, idx, inBounds, isTunnelTile, TransitKind, updateConnectivity, layerClass, RoadLayer, curvePoints } from "./world";
 import { SignalInfo, hasSignal, signalNodes, signalPhaseAt } from "./roads";
@@ -10,8 +11,8 @@ import { ClaimSet, PRIORITY_CLAIM_TIMEOUT, newClaimSet, priorityTableOf, resolve
 import { AdaptiveSignalState, newAdaptiveSignal, stepAdaptiveSignalInPlace } from "./signals";
 
 /** Tiles per second on an empty road, and vehicles a tile holds before it slows, by class. */
-export const ROAD_SPEED: Record<number, number> = { [ROAD.STREET]: 3, [ROAD.AVENUE]: 4.5, [ROAD.HIGHWAY]: 7, [ROAD.ONEWAY_STREET]: 3, [ROAD.ONEWAY_AVENUE]: 4.5 };
-export const ROAD_CAPACITY: Record<number, number> = { [ROAD.STREET]: 4, [ROAD.AVENUE]: 10, [ROAD.HIGHWAY]: 20, [ROAD.ONEWAY_STREET]: 4, [ROAD.ONEWAY_AVENUE]: 10 };
+export const ROAD_SPEED: Record<number, number> = Object.fromEntries(Object.values(ROAD_SPECS).map((s) => [s.type, s.speed]));
+export const ROAD_CAPACITY: Record<number, number> = Object.fromEntries(Object.values(ROAD_SPECS).map((s) => [s.type, derive(s.type).capacity]));
 
 const MAX_VEHICLES = 260;
 const MIN_SPEED_FACTOR = 0.15;

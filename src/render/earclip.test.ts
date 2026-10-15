@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { Pt } from "../sim/world";
-import { triangulateBand, triangulateRing, triangulateStrip } from "./earclip";
+import type { Pt, RoadType } from "../sim/world";
+import { PAD_MIN_ANGLE, triangulateBand, triangulateRing, triangulateStrip } from "./earclip";
+import { junctionsOf } from "../sim/junction";
+import { blankShowcaseCity } from "../sim/showcase-cases";
+import { placeRoad } from "../sim/sim";
 
 const area = (ring: Pt[]): number => {
   let a = 0;
@@ -133,4 +136,39 @@ describe("ear clipping", () => {
     for (const p of ring) { p.x *= 2; p.z *= 2; }
     expect(triangulateRing(ring).reduce((s, t) => s + triArea(t), 0)).toBeCloseTo(16, 9);
   });
+});
+
+describe("pad refinement budget", () => {
+  // Real junction pads: the refinement must reach the 2° floor without
+  // blanketing the pad in Steiner points (edit rebuilds pay for every pad).
+  const pads = (): { name: string; ring: { x: number; z: number }[] }[] => {
+    const mk = (name: string, roads: [RoadType, { x: number; z: number }[]][]) => {
+      const s = blankShowcaseCity();
+      for (const [t, p] of roads) placeRoad(s, t, p);
+      const l = [...junctionsOf(s.world).byNode.values()].filter((x) => x.kind === "junction")
+        .sort((a, b) => b.asphalt.length - a.asphalt.length)[0];
+      return { name, ring: l.asphalt };
+    };
+    return [
+      mk("street x avenue", [[2, [{ x: 20.5, z: 30.5 }, { x: 40.5, z: 30.5 }]], [1, [{ x: 30.5, z: 20.5 }, { x: 30.5, z: 40.5 }]]]),
+      mk("diagonal", [[2, [{ x: 20.5, z: 30.5 }, { x: 40.5, z: 30.5 }]], [1, [{ x: 24.5, z: 24.5 }, { x: 36.5, z: 36.5 }]]]),
+      mk("av x av", [[2, [{ x: 20.5, z: 30.5 }, { x: 40.5, z: 30.5 }]], [2, [{ x: 30.5, z: 20.5 }, { x: 30.5, z: 40.5 }]]]),
+      mk("5-arm", [[2, [{ x: 20.5, z: 30.5 }, { x: 40.5, z: 30.5 }]], [1, [{ x: 30.5, z: 20.5 }, { x: 30.5, z: 30.5 }]],
+        [1, [{ x: 30.5, z: 30.5 }, { x: 36.5, z: 40.5 }]], [1, [{ x: 30.5, z: 30.5 }, { x: 24.5, z: 40.5 }]]]),
+    ];
+  };
+  for (const { name, ring } of pads()) {
+    it(`${name}: >= ${PAD_MIN_ANGLE}° with at most 2 triangles per ring vertex`, () => {
+      const tris = triangulateRing(ring.map((p) => ({ ...p })));
+      const minAng = Math.min(...tris.map(([a, b, c]) => {
+        const f = (p: typeof a, q: typeof a, r: typeof a): number => {
+          const ux = q.x - p.x, uz = q.z - p.z, vx = r.x - p.x, vz = r.z - p.z;
+          return Math.acos(Math.max(-1, Math.min(1, (ux * vx + uz * vz) / (Math.hypot(ux, uz) * Math.hypot(vx, vz))))) * 180 / Math.PI;
+        };
+        return Math.min(f(a, b, c), f(b, c, a), f(c, a, b));
+      }));
+      expect(minAng).toBeGreaterThanOrEqual(PAD_MIN_ANGLE);
+      expect(tris.length).toBeLessThanOrEqual(2 * ring.length);
+    });
+  }
 });

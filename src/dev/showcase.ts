@@ -2,9 +2,10 @@ import type { CityRenderer } from "../render/scene";
 import type { CityState } from "../sim/sim";
 import { buildJunction } from "../sim/junction";
 import { junctionDebugGeometry } from "../render/roads";
+import { triangulateRing } from "../render/earclip";
 import {
   SHOWCASE_CASES, SHOWCASE_TITLES, ShowcaseCaseName, buildShowcaseWorld,
-  fanTris, minTriAngleDeg, ringSelfIntersects, triArea2,
+  Tri, fanTris, minTriAngleDeg, ringSelfIntersects, triArea2,
 } from "../sim/showcase-cases";
 
 /**
@@ -122,7 +123,13 @@ export function initShowcase(deps: Deps): ShowcaseApi {
       if (d.asphalt.length < 3) continue;
       rings++;
       if (ringSelfIntersects(d.asphalt)) nonSimple++;
-      for (const t of fanTris(l.centre.x, l.centre.z, d.asphalt)) {
+      // Taper pads put the node on the ring's narrow edge, so a centre fan
+      // degenerates there; measure the ear-clip triangles the renderer draws
+      // (same rule as showcase-gate.test.ts).
+      const tris: Tri[] = l.kind === "taper"
+        ? triangulateRing(d.asphalt).map(([a, b, c]) => ({ ax: a.x, az: a.z, bx: b.x, bz: b.z, cx: c.x, cz: c.z }))
+        : fanTris(l.centre.x, l.centre.z, d.asphalt);
+      for (const t of tris) {
         minArea = Math.min(minArea, triArea2(t) / 2);
         minAngle = Math.min(minAngle, minTriAngleDeg(t));
       }

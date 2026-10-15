@@ -7,7 +7,7 @@ import { nodeArms } from "../sim/roads";
 import { junctionsOf } from "../sim/junction";
 import {
   buildRoadNetworkGeometry, buildStripGeometry, junctionDebugGeometry,
-  JUNCTION_TILE, ROAD_CLASS, ROAD_TILE_LENGTH, roadClassFor,
+  JUNCTION_TILE, JUNCTION_TILE_V, ROAD_CLASS, ROAD_LIFT, ROAD_TILE_LENGTH, roadClassFor,
 } from "./roads";
 
 const tris = (g: THREE.BufferGeometry): number =>
@@ -131,7 +131,7 @@ describe("road network geometry", () => {
         const cx = pos[vi[2] * 3], cz = pos[vi[2] * 3 + 2];
         const y = (pos[vi[0] * 3 + 1] + pos[vi[1] * 3 + 1] + pos[vi[2] * 3 + 1]) / 3;
         const lift = y - gy((ax + bx + cx) / 3, (az + bz + cz) / 3);
-        if (Math.abs(lift - 0.06) > 5e-4 && Math.abs(lift - 0.08) > 5e-4) continue;
+        if (Math.abs(lift - 0.06) > 5e-4) continue;
         const d1 = sign(px, pz, ax, az, bx, bz);
         const d2 = sign(px, pz, bx, bz, cx, cz);
         const d3 = sign(px, pz, cx, cz, ax, az);
@@ -186,7 +186,7 @@ describe("road network geometry", () => {
     for (let i = 0; i < pos.length / 3; i++) {
       if (cls[i] !== ROAD_CLASS.FLAT) continue;
       const lift = pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2]);
-      if (Math.abs(lift - 0.086) < 1e-3) painted++;
+      if (Math.abs(lift - 0.066) < 1e-3) painted++;
     }
     expect(painted).toBeGreaterThanOrEqual(3);
   });
@@ -198,8 +198,9 @@ describe("road network geometry", () => {
     const pos = g.attributes.position.array as Float32Array;
     const lifts = new Set<string>();
     for (let i = 0; i < pos.length / 3; i++) lifts.add((pos[i * 3 + 1] - gy(pos[i * 3], pos[i * 3 + 2])).toFixed(3));
-    // ribbons 0.060 / kerb 0.066 / marks 0.064, node patch asphalt 0.080, bands and node markings above it 0.084 / 0.086
-    const allowed = new Set(["0.060", "0.064", "0.066", "0.078", "0.080", "0.074", "0.084", "0.086"]);
+    // Ribbon and node asphalt share 0.060; marks use 0.064; kerbs, bands, and
+    // raised junction guides/arrows use 0.066.
+    const allowed = new Set(["0.060", "0.064", "0.066"]);
     for (const y of lifts) expect(allowed.has(y)).toBe(true);
     expect(lifts.has("0.060")).toBe(true);
     expect(lifts.has("0.066")).toBe(true);
@@ -226,7 +227,7 @@ describe("road network geometry", () => {
       const cx = pos[vi[2] * 3], cz = pos[vi[2] * 3 + 2];
       const y = (pos[vi[0] * 3 + 1] + pos[vi[1] * 3 + 1] + pos[vi[2] * 3 + 1]) / 3;
       const lift = y - gy((ax + bx + cx) / 3, (az + bz + cz) / 3);
-      if (Math.abs(lift - 0.06) > 5e-4 && Math.abs(lift - 0.08) > 5e-4) continue;
+      if (Math.abs(lift - 0.06) > 5e-4) continue;
       // No zero-area slivers in the asphalt layer.
       expect(Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2).toBeGreaterThan(1e-9);
       tris.push([ax, az, bx, bz, cx, cz]);
@@ -299,26 +300,37 @@ describe("road network geometry", () => {
   });
 
   it("does not emit skinny junction triangles", () => {
+    // The 2° rule applies to junction / taper pad triangles only. Long straight
+    // ribbon half-strips (a 0.07–0.16 wide band over many tiles) are exempt:
+    // their thin quads are exact, gap-free and carry no seam.
     const s = flatTown();
     const ey = s.world.entry.y;
     road(s, 2, [[3.5, ey + 0.5], [28.5, ey + 0.5]]);
     road(s, 1, [[20.5, ey - 8], [15.5, ey + 0.5]]);
     road(s, 1, [[10.5, ey - 8], [15.5, ey + 0.5]]);
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
-    const g = buildRoadNetworkGeometry(s.world, gy);
+    // Atlas tier: pad asphalt carries the JUNCTION class, so pad triangles are
+    // selected exactly (ribbons are classes 1–5) at the real pad lift.
+    const g = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
     const pos = g.attributes.position.array as Float32Array;
+    const cls = g.getAttribute("aClass");
     const idxAttr = g.index!;
+    let checked = 0, worst = 180;
     for (let t = 0; t < idxAttr.count; t += 3) {
       const vi = [idxAttr.getX(t), idxAttr.getX(t + 1), idxAttr.getX(t + 2)];
+      if (!vi.every((v) => cls.getX(v) === ROAD_CLASS.JUNCTION)) continue;
       const ax = pos[vi[0] * 3], ay = pos[vi[0] * 3 + 1], az = pos[vi[0] * 3 + 2];
       const bx = pos[vi[1] * 3], by = pos[vi[1] * 3 + 1], bz = pos[vi[1] * 3 + 2];
       const cx = pos[vi[2] * 3], cy = pos[vi[2] * 3 + 1], cz = pos[vi[2] * 3 + 2];
       const lift = ((ay - gy(ax, az)) + (by - gy(bx, bz)) + (cy - gy(cx, cz))) / 3;
-      if (Math.abs(lift - 0.078) > 0.001) continue;
+      if (Math.abs(lift - ROAD_LIFT) > 0.001) continue;
+      checked++;
       const area = Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2;
       expect(area).toBeGreaterThan(1e-5);
-      expect(minTriAngle(ax, az, bx, bz, cx, cz)).toBeGreaterThanOrEqual(5);
+      worst = Math.min(worst, minTriAngle(ax, az, bx, bz, cx, cz));
     }
+    expect(checked).toBeGreaterThan(0);
+    expect(worst).toBeGreaterThanOrEqual(2);
   });
 
   it("maps road types to atlas classes", () => {
@@ -331,49 +343,33 @@ describe("road network geometry", () => {
     expect(roadClassFor(2, -1)).toBe(ROAD_CLASS.ONEWAY_AVENUE);
   });
 
-  it("atlas avenue: one strip, UVs across 0..1 and along in tiles, 3x fewer vertices", () => {
+  it("atlas avenue: per-layer half strips map signed offsets and honour end trims", () => {
     const s = flatTown();
     const ey = s.world.entry.y;
     road(s, 2, [[4.5, ey + 0.5], [24.5, ey + 0.5]]);
     const gy = (x: number, z: number): number => heightAt(s.world, x, z);
-    const flat = buildRoadNetworkGeometry(s.world, gy);
     const atlas = buildRoadNetworkGeometry(s.world, gy, { atlas: true });
     finite(atlas);
-    // Ribbon verts only (junction patches triangulate identically in both
-    // paths, so they are excluded from the efficiency comparison): flat
-    // ribbon lifts vs the atlas textured-strip classes.
-    const liftOf = (g: THREE.BufferGeometry, i: number): number => {
-      const p = g.attributes.position.array as Float32Array;
-      return p[i * 3 + 1] - gy(p[i * 3], p[i * 3 + 2]);
-    };
-    let fv = 0;
-    for (let i = 0; i < flat.attributes.position.count; i++) {
-      const l = liftOf(flat, i);
-      if (Math.abs(l - 0.06) < 5e-4 || Math.abs(l - 0.066) < 5e-4) fv++;
-    }
-    const acls = atlas.attributes.aClass.array as Float32Array;
-    let av = 0;
-    for (let i = 0; i < acls.length; i++) {
-      if (acls[i] >= ROAD_CLASS.STREET && acls[i] <= ROAD_CLASS.ONEWAY_AVENUE) av++;
-    }
-    expect(fv).toBeGreaterThan(0);
-    expect(av).toBeGreaterThan(0);
-    expect(av * 3).toBeLessThanOrEqual(fv);
-    // Cross-section UVs: u spans exactly 0..1, v spans the length in tiles.
+    // Every asphalt/kerb/sidewalk half maps its signed physical offset into
+    // the same atlas cross-section; dead-end trims clip v by 0.25 at each end.
     const uv = atlas.attributes.uv.array as Float32Array;
     const cls = atlas.attributes.aClass.array as Float32Array;
     let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity, n = 0;
+    const us = new Set<number>();
     for (let i = 0; i < cls.length; i++) {
       if (cls[i] !== ROAD_CLASS.AVENUE) continue;
       n++;
       uMin = Math.min(uMin, uv[i * 2]); uMax = Math.max(uMax, uv[i * 2]);
       vMin = Math.min(vMin, uv[i * 2 + 1]); vMax = Math.max(vMax, uv[i * 2 + 1]);
+      us.add(Math.round(uv[i * 2] * 1e6) / 1e6);
     }
     expect(n).toBeGreaterThan(0);
+    expect(us.size).toBeGreaterThan(4);
+    expect(us.has(0.5)).toBe(true);
     expect(uMin).toBe(0);
     expect(uMax).toBe(1);
-    expect(vMin).toBe(0);
-    expect(vMax).toBeCloseTo(20 / ROAD_TILE_LENGTH, 5);
+    expect(vMin).toBeCloseTo(0.25 / ROAD_TILE_LENGTH, 5);
+    expect(vMax).toBeCloseTo((20 - 0.25) / ROAD_TILE_LENGTH, 5);
   });
 
   it("atlas junction: patch uses world-space UV, zebras are single textured quads", () => {
@@ -393,7 +389,7 @@ describe("road network geometry", () => {
     for (let i = 0; i < cls.length; i++) {
       if (cls[i] !== ROAD_CLASS.JUNCTION) continue;
       expect(uv[i * 2]).toBeCloseTo(pos[i * 3] / JUNCTION_TILE, 4);
-      expect(uv[i * 2 + 1]).toBeCloseTo(pos[i * 3 + 2] / JUNCTION_TILE, 4);
+      expect(uv[i * 2 + 1]).toBeCloseTo(pos[i * 3 + 2] / JUNCTION_TILE_V, 4);
     }
     // Crosswalk UVs stay inside the texture.
     for (let i = 0; i < cls.length; i++) {

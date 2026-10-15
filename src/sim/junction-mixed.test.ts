@@ -133,6 +133,16 @@ describe("mixed-width mouth assembly", () => {
     expect(Math.min(ave.trimNeg.asphalt, ave.trimPos.asphalt)).toBeGreaterThanOrEqual(0);
   });
 
+  it("keeps the wider arm's kerb continuous at a straight taper", () => {
+    const l = build([{ type: AVENUE, deg: 180 }, { type: STREET, deg: 0 }]);
+    expect(l.kind).toBe("taper");
+    const ave = l.arms.find((a) => a.type === AVENUE)!;
+    const mouthX = C.x + ave.dx * l.taper!.length;
+    const seam = l.kerbOuter.filter((p) =>
+      Math.abs(p.x - mouthX) < 2e-3 && Math.abs(Math.abs(p.z - C.z) - 0.9) < 2e-3);
+    expect(seam.length).toBe(2);
+  });
+
   it("wraps the wider arm's kerb around a straight width step", () => {
     // Avenue ends at the node, street continues straight on: the avenue's
     // kerb and sidewalk wrap the step face (kerbOuter is never collinear

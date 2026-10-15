@@ -16,6 +16,7 @@ Lane markings, edge lines, crosswalk stripes, stop bars, arrows and wear live
 in the textures; geometry stays a single strip per segment. Every file is
 kept under 400 KB, the set under 2 MB.
 """
+import json
 import os
 import shutil
 
@@ -25,6 +26,7 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "textures_road")
 PUB = os.path.join(HERE, "..", "public", "textures", "road")
+PROFILES = json.load(open(os.path.join(PUB, "profiles.json")))
 W, H = 512, 1024
 LIMIT = 400_000
 rng = np.random.default_rng(20261013)
@@ -111,61 +113,56 @@ WHITE = (216, 214, 196, 255)
 CREAM = (232, 228, 200, 255)
 
 
+def u_of(p, off):
+    """Texture u for signed tile offset across the strip spanning ±sidewalkEdge."""
+    return 0.5 + off / (2 * p["sidewalkEdge"])
+
+
+def px(u):
+    return int(round(u * (W - 1)))
+
+
 def cross_section(kind):
     """RGB float array for one road class. u: 0..1 across, v: 0..1 along."""
-    if kind == "highway":
-        img = asphalt_base(tone=0.34)
-        img = wear_bands(img, [0.22, 0.5, 0.78], 0.13)
-        rgb = to_rgb(img)
-        im = Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8), "RGB").convert("RGBA")
-        d = ImageDraw.Draw(im)
-        for x in (int(W * 0.045), int(W * 0.955)):  # edge lines
-            d.rectangle([x - 3, 0, x + 3, H], fill=WHITE)
-        for u in (1 / 3, 2 / 3):  # lane dashes
-            v_dash(d, int(W * u), 5, WHITE)
-        return np.asarray(im.convert("RGB")).astype(float) / 255
-
-    img = asphalt_base()
-    # Kerb + sidewalk edge bands.
-    kerb_u = 0.078 if "avenue" not in kind else 0.05
-    grass_median = kind in ("road_avenue", "road_oneway_avenue")
-    med_u = 0.089  # median half-width as fraction of full width
+    p = PROFILES[kind if kind in PROFILES else "road_" + kind]
+    tone = 0.34 if p["median"] == "barrier" else 0.30
+    img = asphalt_base(tone=tone)
+    img = wear_bands(img, [u_of(p, c) for c in p["laneCentres"]], 0.13)
     rgb = to_rgb(img)
     im = Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8), "RGB").convert("RGBA")
     d = ImageDraw.Draw(im)
-    for side in (0, 1):
-        x0 = 0 if side == 0 else int(W * (1 - kerb_u))
-        x1 = int(W * kerb_u) if side == 0 else W
-        d.rectangle([x0, 0, x1, H], fill=(168, 172, 178, 255))  # kerb/sidewalk
-        kx = int(W * kerb_u) if side == 0 else int(W * (1 - kerb_u))
-        d.rectangle([kx - 2, 0, kx + 2, H], fill=(226, 229, 233, 255))  # kerb highlight
-        for y in range(0, H, 128):  # sidewalk paving joints
-            d.rectangle([x0, y, x1, y + 2], fill=(128, 132, 138, 255))
-    if grass_median:
-        cx = W // 2
-        mw = int(W * med_u)
-        d.rectangle([cx - mw, 0, cx + mw, H], fill=(86, 122, 66, 255))
-        for kx in (cx - mw, cx + mw):  # median kerb highlights
-            d.rectangle([kx - 2, 0, kx + 2, H], fill=(226, 229, 233, 255))
-    if kind == "road_street":
-        v_dash(d, W // 2, 5, CREAM)
-    elif kind == "road_oneway_street":
-        v_dash(d, W // 2, 5, (245, 197, 66, 255))  # amber one-way centre dashes
-    elif kind in ("road_avenue", "road_oneway_avenue"):
-        for u in (0.25, 0.75):
-            v_dash(d, int(W * u), 5, CREAM)
-    out = np.asarray(im.convert("RGB")).astype(float) / 255
-    if grass_median:  # grass grain on the median band
-        cx, mw = W // 2, int(W * med_u)
-        band = out[:, cx - mw:cx + mw]
-        grain = (tile_noise(band.shape[1], H, 16, 32, 2) - 0.5) * 0.16
-        out[:, cx - mw:cx + mw] = np.clip(band + grain[..., None], 0, 1)
-    factor = wear_bands(np.ones((H, W)), [0.25, 0.75] if "avenue" in kind else [0.5], 0.35)
-    return np.clip(out * (1 - 0.10 * (1 - factor))[..., None], 0, 1)
+    ah, se = p["asphaltHalf"], p["sidewalkEdge"]
+    for side in (-1, 1):
+        if p["kerb"] > 0 or p["sidewalk"] > 0:
+            a, b = sorted((px(u_of(p, side * ah)), px(u_of(p, side * se))))
+            d.rectangle([a, 0, b, H], fill=(168, 172, 178, 255))
+            k = px(u_of(p, side * ah))
+            d.rectangle([k - 2, 0, k + 2, H], fill=(226, 229, 233, 255))
+            for y in range(0, H, 128): d.rectangle([a, y, b, y + 2], fill=(128, 132, 138, 255))
+        if p["shoulder"] > 0:
+            e = px(u_of(p, side * (ah - p["shoulder"])))
+            d.rectangle([e - 3, 0, e + 3, H], fill=WHITE)
+    mh = p["medianHalf"]
+    if p["median"] == "planted":
+        a, b = px(u_of(p, -mh)), px(u_of(p, mh))
+        d.rectangle([a, 0, b, H], fill=(86, 122, 66, 255))
+        for k in (a, b): d.rectangle([k - 2, 0, k + 2, H], fill=(226, 229, 233, 255))
+    elif p["median"] == "barrier":
+        a, b = px(u_of(p, -mh)), px(u_of(p, mh))
+        d.rectangle([a, 0, b, H], fill=(150, 150, 146, 255))
+        for k in (a, b): d.rectangle([k - 3, 0, k + 3, H], fill=(236, 200, 70, 255))
+    elif p["median"] == "paint":
+        v_dash(d, px(0.5), 5, CREAM)
+    c = p["laneCentres"]
+    for i in range(len(c) - 1):
+        mid = (c[i] + c[i + 1]) / 2
+        same_dir = p["oneWay"] or (c[i] > 0) == (c[i + 1] > 0)
+        if same_dir: v_dash(d, px(u_of(p, mid)), 5, WHITE)
+    return np.asarray(im.convert("RGB")).astype(float) / 255
 
 
 def junction():
-    img = asphalt_base(tone=0.31)
+    img = asphalt_base(tone=0.30)
     img = wear_bands(img, [0.3, 0.7], 0.08)
     return to_rgb(img)
 

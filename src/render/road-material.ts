@@ -15,6 +15,14 @@ import { applyMaterialTargets } from "./material-targets";
 
 export type RoadLayer = "asphalt" | "kerb" | "flat";
 
+/**
+ * Junction asphalt tone: junction_asphalt.png is ~3.5% lighter than the ribbon
+ * lanes of road_street/road_avenue (decoded means 0.296 vs 0.285); the pad is
+ * scaled to the lane mean so the taper/junction plate does not read lighter
+ * (roads-polish.test.ts measures it).
+ */
+export const JUNCTION_TONE = 0.963;
+
 /** Which detail layer a road vertex colour belongs to (mirrors src/render/roads.ts palette). */
 export function roadLayerForColor(hex: string): RoadLayer {
   switch (hex.toLowerCase()) {
@@ -245,17 +253,22 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
         varying vec2 vRoadUv;
         varying vec2 vWorldXz;`)
       .replace("#include <map_fragment>", `
-        if (uAtlasOn > 0.5 && vRoadClass > 0.5) {
+        if (vRoadClass > 9.5) {
+          // PLAIN (roads.ts ROAD_CLASS.PLAIN): bridge/portal concrete, deck
+          // shadow, atlas-matched pad bands and median noses keep their vertex
+          // colour; no atlas, no world-uv detail. Same day dimming as the atlas.
+          if (uAtlasOn > 0.5) diffuseColor.rgb *= (0.55 + 0.45 * uDayFactor) * (1.0 - 0.18 * uWet);
+        } else if (uAtlasOn > 0.5 && vRoadClass > 0.5) {
           vec3 roadCol;
           if (vRoadClass < 1.5) roadCol = texture2D(uTexStreet, vRoadUv).rgb;
           else if (vRoadClass < 2.5) roadCol = texture2D(uTexAvenue, vRoadUv).rgb;
           else if (vRoadClass < 3.5) roadCol = texture2D(uTexOnewayStreet, vRoadUv).rgb;
           else if (vRoadClass < 4.5) roadCol = texture2D(uTexOnewayAvenue, vRoadUv).rgb;
           else if (vRoadClass < 5.5) roadCol = texture2D(uTexHighway, vRoadUv).rgb;
-          else if (vRoadClass < 6.5) roadCol = texture2D(uTexJunction, vRoadUv).rgb;
+          else if (vRoadClass < 6.5) roadCol = texture2D(uTexJunction, vRoadUv).rgb * ${JUNCTION_TONE.toFixed(4)};
           else if (vRoadClass < 7.5) { vec4 m = texture2D(uTexCrosswalk, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
           else if (vRoadClass < 8.5) { vec4 m = texture2D(uTexStopBar, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
-          else { vec4 m = texture2D(uTexArrow, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
+          else { vec4 m = texture2D(uTexArrow, vRoadUv); if (m.a < 0.5) discard; roadCol = m.rgb; }
           roadCol *= 0.55 + 0.45 * uDayFactor;
           roadCol *= 1.0 - 0.18 * uWet;
           diffuseColor.rgb = roadCol;
@@ -267,7 +280,7 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
                              texture2D(uSidewalkMap, vMapUv).rgb / max(uAvgSidewalk, vec3(0.05)), 0.6);
           diffuseColor.rgb *= mix(baseDet, kerbDet, kerbness);
         }
-        if (uTrafficOn > 0.5 && vRoadClass > 0.5) {
+        if (uTrafficOn > 0.5 && vRoadClass > 0.5 && vRoadClass < 9.5) {
           float tLoad = texture2D(uTrafficTex, vWorldXz / uMapSize).r;
           diffuseColor.rgb = mix(vec3(0.13, 0.62, 0.20), vec3(0.85, 0.10, 0.07), smoothstep(0.0, 1.0, tLoad));
         }`)

@@ -1,8 +1,9 @@
 import {
-  ROAD_DRAW_WIDTH, ROAD_TILE_WIDTH, baseRoadType, curvePoints, segElevation,
+  curvePoints, segElevation,
   type Pt, type RoadSegment, type RoadType, type World,
 } from "./world";
 
+import { derive, specOf, type MedianKind } from "./roadprofile";
 export type CorridorOffsetName = "asphaltEdge" | "kerbEdge" | "sidewalkEdge" | "setbackLine";
 export type CorridorSide = "left" | "right";
 
@@ -16,9 +17,12 @@ export interface RoadProfile {
   lanes: number;
   /** Signed lane-centre offsets (tiles; +z is south, so POSITIVE = right of a→b); right-hand traffic. */
   laneCentres: number[];
-  /** Half width of the centre median (avenue only); 0 otherwise. */
+  /** Half width of the centre median (avenue planted, highway barrier); 0 otherwise. */
   medianHalf: number;
-  /** Lane width: 2 * (asphaltHalf - medianHalf) / lanes. */
+  median: MedianKind;
+  /** Asphalt outside the outer lane, per side (highway). */
+  shoulder: number;
+  /** Lane width (roadprofile.ts). */
   laneWidth: number;
   propOffsets: {
     streetlight: number;
@@ -57,58 +61,29 @@ const PROFILES: Record<RoadType, RoadProfile> = {
 
 const corridorCache = new WeakMap<World, CorridorSet>();
 
-function kerbFor(type: RoadType): number {
-  const b = baseRoadType(type);
-  return b === 1 ? 0.07 : b === 2 ? 0.09 : 0;
-}
-
-function sidewalkFor(type: RoadType): number {
-  const b = baseRoadType(type);
-  return b === 1 ? 0.12 : b === 2 ? 0.16 : 0;
-}
-
-function medianHalfFor(type: RoadType): number {
-  return baseRoadType(type) === 2 ? 0.16 : 0;
-}
-
-function laneCentresFor(asphaltHalf: number, medianHalf: number, lanes: number): { centres: number[]; width: number } {
-  const width = (2 * (asphaltHalf - medianHalf)) / lanes;
-  if (medianHalf > 0) {
-    const inner = medianHalf + width / 2;
-    const outer = medianHalf + width * 1.5;
-    return { centres: [-outer, -inner, inner, outer], width };
-  }
-  const centres: number[] = [];
-  for (let i = 0; i < lanes; i++) centres.push((i - (lanes - 1) / 2) * width);
-  return { centres, width };
-}
-
 function makeProfile(type: RoadType): RoadProfile {
-  const kerb = kerbFor(type);
-  const asphaltHalf = ROAD_DRAW_WIDTH[type] / 2 - kerb;
-  const drawHalf = ROAD_DRAW_WIDTH[type] / 2;
-  const sidewalk = sidewalkFor(type);
-  const sidewalkEdge = drawHalf + sidewalk;
-  const medianHalf = medianHalfFor(type);
-  const lanes = baseRoadType(type) === 2 ? 4 : baseRoadType(type) === 3 ? 4 : 2;
-  const { centres, width } = laneCentresFor(asphaltHalf, medianHalf, lanes);
+  const s = specOf(type), d = derive(type);
+  // Same arithmetic as before the table (drawHalf + sidewalk) so prop offsets stay bit-identical.
+  const edge = d.drawHalf + s.sidewalk;
   return {
     type,
-    asphaltHalf,
-    kerb,
-    sidewalk,
-    setback: Math.max(0, ROAD_TILE_WIDTH[type] / 2 - sidewalkEdge),
-    drawHalf,
-    lanes,
-    laneCentres: centres,
-    medianHalf,
-    laneWidth: width,
+    asphaltHalf: d.asphaltHalf,
+    kerb: s.kerb,
+    sidewalk: s.sidewalk,
+    setback: Math.max(0, s.tileWidth / 2 - edge),
+    drawHalf: d.drawHalf,
+    lanes: d.totalLanes,
+    laneCentres: d.laneCentres,
+    medianHalf: s.medianHalf,
+    median: s.median,
+    shoulder: s.shoulder,
+    laneWidth: s.laneWidth,
     propOffsets: {
-      streetlight: sidewalkEdge + 0.2,
-      hydrant: sidewalkEdge + 0.14,
-      bench: sidewalkEdge + 0.2,
-      planter: sidewalkEdge + 0.2,
-      signal: sidewalkEdge + 0.08,
+      streetlight: edge + 0.2,
+      hydrant: edge + 0.14,
+      bench: edge + 0.2,
+      planter: edge + 0.2,
+      signal: edge + 0.08,
     },
   };
 }

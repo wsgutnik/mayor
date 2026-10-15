@@ -87,3 +87,15 @@ stopped).
 ### Docs (this pass, uncommitted)
 - `docs/process/18-facility-snapping.md` renamed to `docs/process/19-facility-snapping.md` (two docs shared the number 18; `src/dev/scenario.ts` links the touch notes, so the touch notes keep 18).
 - New: this changelog, `docs/STATUS-2026-10-15.md`, `docs/WEB-DEMO.md`, `docs/process/README.md`. Updated: README, PROGRESS, PLAN, AGENTS, IOS, SIGNING, App Store runbook, status page source, NOTICE flora paragraph.
+
+## 2026-10-15 — Roads cycle 1A (branch `agent/roads-render`, not yet on `main`)
+
+Design: `docs/process/26-roads-cycle1.md` (section 11 has the observed result). Plan: `docs/superpowers/plans/2026-10-15-roads-1a-profiles-junctions.md`.
+- Single road profile table `src/sim/roadprofile.ts`; every road table is a view of it; tile class by rank. Tests: A `src/sim/roadprofile.test.ts`, A `src/sim/roadprofile-consumers.test.ts`, M `src/sim/corridor.test.ts`.
+- One-way lanes over the full width, lanes ordered left to right of travel, direction carried into junctions. Tests: A `src/sim/lanes-oneway.test.ts`.
+- Taper junctions with left-aligned lanes, merge/added lanes, direction conflict, connector-missing diagnostics, narrower-arm corner radius. Tests: A `src/sim/junction-taper.test.ts`, A `src/sim/junction-reasons.test.ts`, A `src/sim/junction-missing-wiring.test.ts`, M `src/sim/junction.test.ts`, `junction-mixed.test.ts`, `showcase-gate.test.ts` (taper pads checked by ear-clip, min angle 2°).
+- Road atlas generated from `public/textures/road/profiles.json` (`npm run roads:profiles`). Tests: A `src/render/road-profiles-json.test.ts`.
+- Atlas ribbons honour junction trims at one shared across-mouth station; pad and ribbon one surface; pad refinement to ≥ 2°; taper marks; full-width one-way stop bars; no marks on highways. Tests: A `src/render/roads-atlas.test.ts`, `roads-taper.test.ts`, `roads-polish.test.ts`, M `src/render/roads.test.ts`.
+- Bridges: 1.1 m barriers open at grade, retaining faces, slab edge and underside, plain concrete. Tests: A `src/render/roads-bridges.test.ts`, M `src/render/road-material.test.ts`.
+- Dev: `?scenario=roads` regression scene with fixed cameras. Tests: A `src/dev/scenario-roads.test.ts`.
+

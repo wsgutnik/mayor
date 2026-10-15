@@ -1,0 +1,95 @@
+{
+  "road_street": {
+    "type": 1,
+    "sidewalkEdge": 0.57,
+    "drawHalf": 0.45,
+    "asphaltHalf": 0.38,
+    "kerb": 0.07,
+    "sidewalk": 0.12,
+    "medianHalf": 0,
+    "median": "paint",
+    "shoulder": 0,
+    "laneCentres": [
+      -0.19,
+      0.19
+    ],
+    "laneWidth": 0.38,
+    "oneWay": false
+  },
+  "road_avenue": {
+    "type": 2,
+    "sidewalkEdge": 1.06,
+    "drawHalf": 0.9,
+    "asphaltHalf": 0.81,
+    "kerb": 0.09,
+    "sidewalk": 0.16,
+    "medianHalf": 0.16,
+    "median": "planted",
+    "shoulder": 0,
+    "laneCentres": [
+      -0.6475,
+      -0.3225,
+      0.3225,
+      0.6475
+    ],
+    "laneWidth": 0.325,
+    "oneWay": false
+  },
+  "road_highway": {
+    "type": 3,
+    "sidewalkEdge": 1.4,
+    "drawHalf": 1.4,
+    "asphaltHalf": 1.4,
+    "kerb": 0,
+    "sidewalk": 0,
+    "medianHalf": 0.1,
+    "median": "barrier",
+    "shoulder": 0.1,
+    "laneCentres": [
+      -1.1,
+      -0.7,
+      -0.3,
+      0.3,
+      0.7,
+      1.1
+    ],
+    "laneWidth": 0.4,
+    "oneWay": false
+  },
+  "road_oneway_street": {
+    "type": 4,
+    "sidewalkEdge": 0.57,
+    "drawHalf": 0.45,
+    "asphaltHalf": 0.38,
+    "kerb": 0.07,
+    "sidewalk": 0.12,
+    "medianHalf": 0,
+    "median": "none",
+    "shoulder": 0,
+    "laneCentres": [
+      -0.19,
+      0.19
+    ],
+    "laneWidth": 0.38,
+    "oneWay": true
+  },
+  "road_oneway_avenue": {
+    "type": 5,
+    "sidewalkEdge": 1.06,
+    "drawHalf": 0.9,
+    "asphaltHalf": 0.81,
+    "kerb": 0.09,
+    "sidewalk": 0.16,
+    "medianHalf": 0,
+    "median": "none",
+    "shoulder": 0,
+    "laneCentres": [
+      -0.6075,
+      -0.2025,
+      0.2025,
+      0.6075
+    ],
+    "laneWidth": 0.405,
+    "oneWay": true
+  }
+}

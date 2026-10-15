@@ -61,3 +61,19 @@ describe("roadLayerForColor", () => {
     expect(roadLayerForColor("#C4C7CC")).toBe("kerb");
   });
 });
+
+describe("plain structure class", () => {
+  it("keeps bridge/portal concrete off the atlas, the detail maps and the traffic tint", () => {
+    const { shader } = patched();
+    const f = shader.fragmentShader;
+    const plain = f.indexOf("if (vRoadClass > 9.5)");
+    expect(plain).toBeGreaterThan(-1);
+    // The plain branch comes first, so neither the atlas nor the detail branch runs for it.
+    expect(plain).toBeLessThan(f.indexOf("uAtlasOn > 0.5 && vRoadClass > 0.5"));
+    expect(f).toContain("uTrafficOn > 0.5 && vRoadClass > 0.5 && vRoadClass < 9.5");
+    // Rain darkens plain pad bands and noses like the ribbon bands (final review).
+    const plainBranch = f.slice(plain, f.indexOf("uAtlasOn > 0.5 && vRoadClass > 0.5"));
+    expect(plainBranch).toContain("1.0 - 0.18 * uWet");
+    expect(f.slice(f.indexOf("uAtlasOn > 0.5 && vRoadClass > 0.5"))).toContain("1.0 - 0.18 * uWet");
+  });
+});
