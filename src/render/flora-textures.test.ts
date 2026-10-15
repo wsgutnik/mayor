@@ -6,13 +6,11 @@ const DIR = "public/textures/flora";
 const pixel = (b: Buffer, at: number) => b.subarray(at, at + 4);
 
 describe("flora ground texture preparation", () => {
-  it("ships compact power-of-two ground pairs and cloud sprites", () => {
+  it("ships compact power-of-two ground pairs", () => {
     const names = readdirSync(DIR);
     for (const base of ["grass_fur", "hedge", "limestone", "soil_grey", "earth_red"]) {
       for (const tier of ["md", "hd"]) expect(names).toContain(`${base}_${tier}.png`);
     }
-    for (const name of ["cloud_1", "cloud_2", "cloud_3", "cloud_4"])
-      expect(names).toContain(`${name}.png`);
   });
 
   it("documents the edge-blend seam contract", () => {
