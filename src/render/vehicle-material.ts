@@ -106,10 +106,10 @@ float metalnessFactor = vSurf.z;
 float envBoost = 1.0;
 if (vCls > 1.5 && vCls < 3.5) {          // glazing: a sharp, dark, sky-reflecting pane
   roughnessFactor = 0.06; metalnessFactor = 0.0; envBoost = 1.3;
-} else if (vCls > 0.5 && vCls < 1.5) {   // body paint
+} else if (vCls > 0.5 && vCls < 1.5) {   // body paint: glossy automotive clearcoat look
   float film = 1.0 - smoothstep(0.012, 0.054, vLocalY);
-  roughnessFactor = mix(0.30, 0.52, film * 0.65);
-  metalnessFactor = 0.0;
+  roughnessFactor = mix(0.12, 0.30, film * 0.65);
+  metalnessFactor = 0.0; envBoost = 1.35;
 } else if (vCls > 3.5 && vCls < 4.5) {   // chrome and bright trim
   roughnessFactor = 0.15; metalnessFactor = 1.0; envBoost = 1.35;
 } else if (vCls > 4.5 && vCls < 5.5) {   // tyres stay matte
