@@ -621,3 +621,13 @@ body {
 .fly-body .tool.active { background: rgba(233, 185, 73, .18); }
 .tool .fp { background: rgba(233, 185, 73, .18); color: var(--gold); font-weight: 700; }
 .snap-group { gap: 8px; }
+
+/* Flyout breathing room: menus were glued together, roads worst of all */
+.fly { max-height: calc(52vh / var(--ui-scale, 1)); }
+.fly-body { gap: 12px; padding: 12px; }
+.fly-sec { gap: 6px; padding: 9px; }
+.fly-row { gap: 6px; }
+.fly-body .tool { min-height: 58px; padding: 9px 10px 7px; }
+.road-fly { width: min(calc(860px / var(--ui-scale, 1)), calc((100% - 16px) / var(--ui-scale, 1))); }
+.toolbar { gap: 6px; padding: 9px; }
+.fly-head { padding: 12px 16px 10px; }

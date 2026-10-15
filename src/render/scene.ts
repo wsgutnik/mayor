@@ -1492,6 +1492,8 @@ export class CityRenderer {
     this.hemi.intensity = under ? 1.8 : (0.4 + 0.95 * day + 0.5 * night) * (raining ? 0.85 : 1);
     // Bright enough to cross the bloom threshold after dark (see postfx.ts).
     this.winMat.emissiveIntensity = Math.max(0, 1 - day * 1.6) * 1.7;
+    // Daylight keeps bloom faint (sun glints only); after dark it opens up for windows and lamps.
+    this.postFx?.setStrength(0.1 + (1 - day) * 0.28);
     this.nightGlow = this.winMat.emissiveIntensity;
     if (this.streetLightFx) this.streetLightFx.setNight(this.nightGlow);
     for (const g of this.glowMats) {

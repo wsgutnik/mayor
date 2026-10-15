@@ -95,6 +95,25 @@ function strip(
   }
 }
 
+function shade(hex: string, f: number): string {
+  const c = new THREE.Color(hex);
+  c.multiplyScalar(f);
+  return `#${c.getHexString()}`;
+}
+
+function lighten(hex: string, t: number): string {
+  const c = new THREE.Color(hex);
+  c.lerp(new THREE.Color("#ffffff"), t);
+  return `#${c.getHexString()}`;
+}
+
+/** A pipe with volume: dark casing, coloured body and a bright core line. */
+function pipe(r: Ribbons, pts: { x: number; z: number }[], style: NetStyle, groundY: GroundY, solid: boolean): void {
+  strip(r, pts, { ...style, color: shade(style.color, 0.42), halfWidth: style.halfWidth * 1.85, depth: style.depth + 0.014 }, groundY, solid);
+  strip(r, pts, style, groundY, solid);
+  strip(r, pts, { ...style, color: lighten(style.color, 0.38), halfWidth: style.halfWidth * 0.38, depth: style.depth - 0.012 }, groundY, solid);
+}
+
 /** Tunnel centrelines for the underground view: dark conduits with a dashed guide line. Pure (tested). */
 export function tunnelPolylines(w: World): { pts: { x: number; z: number }[]; type: RoadType }[] {
   const out: { pts: { x: number; z: number }[]; type: RoadType }[] = [];
@@ -155,13 +174,13 @@ function buildRibbons(w: World, groundY: GroundY): { water: Ribbons; util: Ribbo
         if (t === undefined || !(w.nets[t] & bit)) continue;
         const cx = (t % w.size) + 0.5, cz = ((t / w.size) | 0) + 0.5;
         const s = 0.3;
-        strip(target, [{ x: cx - s, z: cz }, { x: cx + s, z: cz }], style, groundY, true);
+        pipe(target, [{ x: cx - s, z: cz }, { x: cx + s, z: cz }], style, groundY, true);
         continue;
       }
       // Quads only where both ends sit on a live tile: dry stretches show no pipe.
       let run: { x: number; z: number }[] = [];
       const flush = () => {
-        if (run.length >= 2) strip(target, run, style, groundY, false);
+        if (run.length >= 2) pipe(target, run, style, groundY, false);
         run = [];
       };
       for (let i = 0; i < samples.length; i++) {
@@ -180,7 +199,7 @@ function buildRibbons(w: World, groundY: GroundY): { water: Ribbons; util: Ribbo
     const n = Math.max(1, Math.ceil(Math.hypot(ex - fx, ez - fz) / 0.5));
     const pts: { x: number; z: number }[] = [];
     for (let i = 0; i <= n; i++) pts.push({ x: fx + ((ex - fx) * i) / n, z: fz + ((ez - fz) * i) / n });
-    strip(target, pts, style, groundY, false);
+    pipe(target, pts, style, groundY, false);
   }
   return { water, util };
 }

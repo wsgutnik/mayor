@@ -19,6 +19,8 @@ export interface PostFx {
   render(): void;
   setSize(width: number, height: number, pixelRatio: number): void;
   setEnabled(enabled: boolean): void;
+  /** Bloom strength; the scene lowers it in daylight so sun glints stay calm. */
+  setStrength(strength: number): void;
   readonly enabled: boolean;
   dispose(): void;
 }
@@ -48,6 +50,9 @@ export function createPostFx(
     setEnabled(next: boolean) {
       enabled = next;
       bloom.enabled = next;
+    },
+    setStrength(strength: number) {
+      bloom.strength = strength;
     },
     render() {
       if (enabled) composer.render();
