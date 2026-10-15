@@ -20,7 +20,7 @@ export interface Prefs {
 
 const KEY = "mayor:prefs";
 /** 2 = street-aligned lots became the default; an explicit choice saved at this version is kept. */
-const ZONING_PREF_VERSION = 2;
+const ZONING_PREF_VERSION = 3; // 3: every player returns to the street-aligned model once (tile zoning ignores street angles)
 
 /** Slider range for the interface-scale setting. */
 export const UI_SCALE = { min: 0.8, max: 1.4, step: 0.1, def: 1 } as const;

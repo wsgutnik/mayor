@@ -53,6 +53,12 @@ describe("zoning preference", () => {
     expect(loadPrefs().zoning).toBe("oriented");
     store.set("mayor:prefs", JSON.stringify({ zoning: "diagonal", zoningV: 2 }));
     expect(loadPrefs().zoning).toBe("oriented");
+    // v3 return: prefs written under the previous cutover version that kept tile zoning go back once.
+    store.set("mayor:prefs", JSON.stringify({ zoning: "tiles", zoningV: 2 }));
+    expect(loadPrefs().zoning).toBe("oriented");
+    // Under the current version a deliberate choice of tiles is respected.
+    savePrefs({ ...defaultPrefs(), zoning: "tiles" });
+    expect(loadPrefs().zoning).toBe("tiles");
   });
 
   it("a bare generated world is classic with empty oriented state (the game applies the preference)", () => {
