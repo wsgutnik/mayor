@@ -1,6 +1,7 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, reconcileZones, setZoningMode, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
+import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, FACILITY_OF_TOOL, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, reconcileZones, setZoningMode, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
+import { planFacilityPlacement } from "./sim/facilityplace";
 import { History } from "./sim/history";
 import { deserialize, serialize } from "./sim/save";
 import { newTraffic, tickTraffic, TrafficState } from "./sim/traffic";
@@ -877,7 +878,8 @@ bindInput(renderer, {
     if (isFacilityTool(tool)) {
       const t = renderer.pick(cx, cy);
       const fp = facilityToolFootprint(tool);
-      renderer.setZoneRect(t, t ? { x: t.x + fp - 1, y: t.y + fp - 1 } : null, toolColor(tool));
+      const p = t ? planFacilityPlacement(state.world, FACILITY_OF_TOOL[tool], t.x + .5, t.y + .5) : null;
+      renderer.setFacilityHover(p ? { cx: p.cx, cz: p.cz, yaw: p.yaw, side: fp } : null, p?.ok ? toolColor(tool) : "#e45454");
       return;
     }
     if (isZoneLike(tool) && zoneMode === "fill") updateFillHint(cx, cy);

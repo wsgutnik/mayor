@@ -295,16 +295,20 @@ function validateFacilityAnchors(w: World): void {
     if (!a || !Number.isInteger(a.x) || !Number.isInteger(a.y) || !Number.isInteger(a.w) || !Number.isInteger(a.h)) bad();
     if (!Number.isInteger(a.kind) || a.kind <= FAC.NONE || a.kind > FAC.SUBSTATION) bad();
     const fp = facilityFootprint(a.kind as FacilityKind);
-    if (a.w !== fp || a.h !== fp || fp === 1) bad();
+    if (a.w < 1 || a.h < 1 || a.w > fp + 1 || a.h > fp + 1) bad();
+    if ((a.cx !== undefined || a.cz !== undefined || a.yaw !== undefined) &&
+      (!Number.isFinite(a.cx) || !Number.isFinite(a.cz) || !Number.isFinite(a.yaw) || Math.abs(a.yaw!) > Math.PI * 2)) bad();
     if (!inBounds(w, a.x, a.y) || a.x + a.w > w.size || a.y + a.h > w.size) bad();
     const key = `${a.x}:${a.y}`;
     if (anchorKeys.has(key)) bad();
     anchorKeys.add(key);
+    let matched = 0;
     for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) {
       const i = idx(w, x, y);
-      if (taken[i] || w.facility[i] !== a.kind) bad();
-      taken[i] = 1;
+      // Rotated mirrors have empty conservative-box corners.
+      if (w.facility[i] === a.kind) { if (taken[i]) bad(); taken[i] = 1; matched++; }
     }
+    if (!matched) bad();
   }
 }
 
@@ -407,7 +411,8 @@ export function deserialize(json: string): CityState {
     throw new SaveError("The save file is damaged");
   }
   if (f.facilityAnchors !== undefined && !Array.isArray(f.facilityAnchors)) throw new SaveError("The save file is damaged");
-  w.facilityAnchors = (f.facilityAnchors ?? []).map((a) => ({ x: a.x, y: a.y, kind: a.kind, w: a.w, h: a.h }));
+  w.facilityAnchors = (f.facilityAnchors ?? []).map((a) => ({ x: a.x, y: a.y, kind: a.kind, w: a.w, h: a.h,
+    ...(Number.isFinite(a.cx) && Number.isFinite(a.cz) && Number.isFinite(a.yaw) ? { cx: a.cx, cz: a.cz, yaw: a.yaw } : {}) }));
   validateFacilityAnchors(w);
   w.segments = f.segments;
   w.roundabouts = f.roundabouts ?? [];

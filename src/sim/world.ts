@@ -58,7 +58,8 @@ export const FACILITY_INFO: Record<FacilityKind, FacilityInfo> = {
   [FAC.SUBSTATION]: { name: "Substation", cost: 300, upkeep: 20, radius: 14, capacity: 0, bit: COVER.POWER, nearWater: false },
 };
 
-export interface FacilityAnchor { x: number; y: number; kind: FacilityKind; w: number; h: number }
+/** `x/y/w/h` are the conservative tile mirror; pose is optional for old saves. */
+export interface FacilityAnchor { x: number; y: number; kind: FacilityKind; w: number; h: number; cx?: number; cz?: number; yaw?: number }
 
 export const facilityFootprint = (kind: FacilityKind): 1 | 2 => FACILITY_INFO[kind].footprint ?? 1;
 
@@ -66,7 +67,13 @@ export function facilityAnchorAt(w: World, tile: number): FacilityAnchor | undef
   const anchors = w.facilityAnchors;
   if (!anchors?.length) return undefined;
   const x = tile % w.size, y = (tile / w.size) | 0;
-  return anchors.find((a) => x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h);
+  return anchors.find((a) => {
+    if (x < a.x || x >= a.x + a.w || y < a.y || y >= a.y + a.h) return false;
+    // The conservative box contains a few empty corners for rotated footprints.
+    if (a.cx === undefined || a.cz === undefined || a.yaw === undefined) return true;
+    const dx = x + .5 - a.cx, dz = y + .5 - a.cz, c = Math.cos(a.yaw), s = Math.sin(a.yaw);
+    return Math.abs(dx * c - dz * s) <= a.w / 2 + 1e-6 && Math.abs(dx * s + dz * c) <= a.h / 2 + 1e-6;
+  });
 }
 
 /** Walking reach of a bus stop, in tiles. */

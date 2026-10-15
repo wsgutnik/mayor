@@ -20,6 +20,7 @@ import {
 import { zpEnd, zpStart } from "./zoneprof";
 import { zoneHooks } from "./zonehooks";
 import { tileOnRoad } from "./roadsurface";
+import { planFacilityPlacement } from "./facilityplace";
 import { lotsReady } from "./orientedlots";
 import { evolveOrientedLot } from "./lot-evolution";
 import { cellIndex, cellPose, type ZoneBlockSet } from "./zoneblocks";
@@ -35,7 +36,7 @@ export type FacilityTool =
   | "hospital" | "highschool" | "library" | "community" | "museum" | "cityhall" | "substation";
 export type ToolId = "pan" | "road" | "res" | "com" | "ind" | "bulldoze" | "busstop" | "busline" | "metroline" | "roundabout" | FacilityTool;
 
-const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
+export const FACILITY_OF_TOOL: Record<FacilityTool, FacilityKind> = {
   power: FAC.POWER, water: FAC.WATER, sewage: FAC.SEWAGE, landfill: FAC.LANDFILL,
   police: FAC.POLICE, fire: FAC.FIRE, clinic: FAC.CLINIC, school: FAC.SCHOOL, park: FAC.PARK, metro: FAC.METRO,
   hospital: FAC.HOSPITAL, highschool: FAC.HIGHSCHOOL, library: FAC.LIBRARY, community: FAC.COMMUNITY,
@@ -1196,12 +1197,6 @@ function facilityUpkeep(w: World): number {
   return total;
 }
 
-function footprintTiles(w: World, x: number, y: number, size: 1 | 2): number[] {
-  const out: number[] = [];
-  for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) out.push(idx(w, x + dx, y + dy));
-  return out;
-}
-
 function footprintTouchesLinkedRoad(w: World, x: number, y: number, size: 1 | 2): boolean {
   if (w.connectivityDirty) updateConnectivity(w);
   for (let fy = y; fy < y + size; fy++) for (let fx = x; fx < x + size; fx++) {
@@ -1218,8 +1213,11 @@ function footprintTouchesLinkedRoad(w: World, x: number, y: number, size: 1 | 2)
 function clearFacilityAt(w: World, tile: number): void {
   const a = facilityAnchorAt(w, tile);
   if (a) {
-    if (a.kind === FAC.METRO) for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) removeStopAt(w, idx(w, x, y));
-    for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) w.facility[idx(w, x, y)] = 0;
+    for (let y = a.y; y < a.y + a.h; y++) for (let x = a.x; x < a.x + a.w; x++) {
+      const t = idx(w, x, y); if (facilityAnchorAt(w, t) !== a) continue;
+      if (a.kind === FAC.METRO) removeStopAt(w, t);
+      w.facility[t] = 0;
+    }
     w.facilityAnchors = (w.facilityAnchors ?? []).filter((b) => b !== a);
   } else {
     if (w.facility[tile] === FAC.METRO) removeStopAt(w, tile);
@@ -1297,9 +1295,9 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
   if (isFacilityTool(tool)) {
     const type = FACILITY_OF_TOOL[tool];
     const info = FACILITY_INFO[type];
-    const fp = facilityFootprint(type);
-    if (x + fp > w.size || y + fp > w.size) return { ok: false, reason: "Facility footprint is outside the map" };
-    const tiles = footprintTiles(w, x, y, fp);
+    const placement = planFacilityPlacement(w, type, x + .5, y + .5);
+    if (!placement.ok) return { ok: false, reason: placement.reason ?? "No room beside the street here" };
+    const tiles = placement.tiles;
     for (const t of tiles) {
       const tx = t % w.size, ty = (t / w.size) | 0;
       if (!isLand(w, tx, ty)) return { ok: false, reason: "Cannot build on water" };
@@ -1311,14 +1309,17 @@ export function applyTool(s: CityState, tool: ToolId, x: number, y: number, road
     if (info.nearWater && !tiles.some((t) => nearWater(w, t % w.size, (t / w.size) | 0, 3))) {
       return { ok: false, reason: `${info.name} must be within 3 tiles of water` };
     }
-    if (!footprintTouchesLinkedRoad(w, x, y, fp)) return { ok: false, reason: "Facility must be within 5 tiles of a connected road" };
+    // Existing utility linking is intentionally tile-mirror based; rotated tiles remain compatible.
+    if (!tiles.some((t) => footprintTouchesLinkedRoad(w, t % w.size, (t / w.size) | 0, 1))) return { ok: false, reason: "Facility must be within 5 tiles of a connected road" };
     if (s.money < cost) return { ok: false, reason: "Not enough money" };
     for (const t of tiles) {
       const tx = t % w.size, ty = (t / w.size) | 0;
       flattenTile(w, tx, ty);
       w.facility[t] = type;
     }
-    if (fp > 1) (w.facilityAnchors ??= []).push({ x, y, kind: type, w: fp, h: fp });
+    let x0 = w.size, y0 = w.size, x1 = -1, y1 = -1;
+    for (const t of tiles) { const tx = t % w.size, ty = (t / w.size) | 0; x0 = Math.min(x0, tx); y0 = Math.min(y0, ty); x1 = Math.max(x1, tx); y1 = Math.max(y1, ty); }
+    (w.facilityAnchors ??= []).push({ x: x0, y: y0, kind: type, w: x1 - x0 + 1, h: y1 - y0 + 1, cx: placement.cx, cz: placement.cz, yaw: placement.yaw });
     if (type === FAC.METRO) registerMetroStation(w, i);
     w.coverageDirty = true;
     dirtyObstacles(w);

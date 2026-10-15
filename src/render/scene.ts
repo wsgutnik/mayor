@@ -875,10 +875,10 @@ export class CityRenderer {
           const mesh = this.fMeshes.get(kind);
           if (mesh) {
             const scale = anchor && !this.fX2Loaded.has(kind) ? 1.8 : 1;
-            const px = anchor ? anchor.x + anchor.w / 2 : x + 0.5;
-            const pz = anchor ? anchor.y + anchor.h / 2 : y + 0.5;
+            const px = anchor?.cx ?? (anchor ? anchor.x + anchor.w / 2 : x + 0.5);
+            const pz = anchor?.cz ?? (anchor ? anchor.y + anchor.h / 2 : y + 0.5);
             const ph = anchor ? heightAt(w, px, pz) : h;
-            this.placeModel(mesh, counts, px, pz, ph, scale, 1, tint.setScalar(1), x, y);
+            this.placeModel(mesh, counts, px, pz, ph, scale, 1, tint.setScalar(1), x, y, anchor?.yaw);
           }
         } else if (blocksBuilding(w, i)) {
           // Drawn as ribbons (see buildRoadGeometry). Tunnels fall through: ground above keeps its trees.
@@ -1223,12 +1223,12 @@ export class CityRenderer {
     return Math.floor(hash(x + 5, y + 9) * 4) * (Math.PI / 2);
   }
 
-  private placeModel(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, x: number, y: number, h: number, scaleXZ: number, scaleY: number, tint: THREE.Color, faceX = Math.floor(x), faceY = Math.floor(y)): void {
+  private placeModel(mesh: THREE.InstancedMesh, counts: Map<THREE.InstancedMesh, number>, x: number, y: number, h: number, scaleXZ: number, scaleY: number, tint: THREE.Color, faceX = Math.floor(x), faceY = Math.floor(y), yaw?: number): void {
     const n = counts.get(mesh) ?? 0;
     if (n >= mesh.instanceMatrix.count) return;
     const d = this.dummy;
     d.position.set(x, h + 0.04, y);
-    d.rotation.set(0, this.facing(faceX, faceY), 0);
+    d.rotation.set(0, yaw ?? this.facing(faceX, faceY), 0);
     d.scale.set(scaleXZ, scaleY, scaleXZ);
     d.updateMatrix();
     mesh.setMatrixAt(n, d.matrix);
@@ -1903,6 +1903,16 @@ export class CityRenderer {
     this.hover.position.set(pose.x, heightAt(this.world, pose.x, pose.z) + 0.1, pose.z);
     this.hover.rotation.set(0, pose.yaw, 0);
     this.hover.scale.set(1, 1, 1);
+    (this.hover.material as THREE.MeshBasicMaterial).color.set(color);
+    this.hover.visible = true;
+  }
+
+  /** Rotated service-building placement ghost; shares the one reusable hover mesh. */
+  setFacilityHover(pose: { cx: number; cz: number; yaw: number; side: number } | null, color = "#ffffff"): void {
+    if (!pose) { this.hover.visible = false; return; }
+    this.hover.position.set(pose.cx, heightAt(this.world, pose.cx, pose.cz) + .1, pose.cz);
+    this.hover.rotation.set(0, pose.yaw, 0);
+    this.hover.scale.set(pose.side, 1, pose.side);
     (this.hover.material as THREE.MeshBasicMaterial).color.set(color);
     this.hover.visible = true;
   }

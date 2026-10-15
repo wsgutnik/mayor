@@ -112,7 +112,11 @@ describe("save and load", () => {
     expect(applyTool(s, "hospital", 12, ey + 2).ok).toBe(true);
     const json = serialize(s);
     const raw = JSON.parse(json);
-    expect(raw.facilityAnchors).toContainEqual({ x: 12, y: ey + 2, kind: FAC.HOSPITAL, w: 2, h: 2 });
+    const anchor = raw.facilityAnchors.find((a: { kind: number }) => a.kind === FAC.HOSPITAL);
+    expect(anchor).toMatchObject({ kind: FAC.HOSPITAL });
+    expect(anchor.cx).toBeTypeOf("number");
+    expect(anchor.cz).toBeTypeOf("number");
+    expect(anchor.yaw).toBeTypeOf("number");
     const back = deserialize(json);
     expect(back.world.facilityAnchors).toEqual(s.world.facilityAnchors);
     delete raw.facilityAnchors;
