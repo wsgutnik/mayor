@@ -59,7 +59,7 @@ cd ~/mayor-site && npx vercel deploy            # preview: check the landing pag
 cd ~/mayor-site && npx vercel deploy --prod     # production
 ```
 
-Last refresh: 2026-10-15 from `main` (owner's note; the exact commit was not recorded; record it next time).
+Last refresh: 2026-10-16 from `main` 0293f71 (v0.1.0-m36: Roads 1A+1B, service worker mayor-v3; previous bundle backed up as ~/mayor-site/game.pre-m36.tar.gz).
 
 ## Deploy
 
