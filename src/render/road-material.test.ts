@@ -37,7 +37,7 @@ describe("traffic tint", () => {
 
   it("carries its own program cache key so stock materials never reuse it", () => {
     const { detail } = patched();
-    expect(detail.material.customProgramCacheKey!()).toBe("road-atlas-v2");
+    expect(detail.material.customProgramCacheKey!()).toBe("road-atlas-v3");
   });
 });
 
@@ -62,6 +62,15 @@ describe("roadLayerForColor", () => {
   });
 });
 
+describe("ramp atlas class", () => {
+  it("the shader samples the ramp texture for class 11 and keeps PLAIN for 10", () => {
+    const { shader } = patched();
+    const src = shader.fragmentShader;
+    expect(src).toMatch(/vRoadClass\s*>\s*10\.5[\s\S]*uTexRamp/);
+    expect(src).toMatch(/uWet/);
+  });
+});
+
 describe("plain structure class", () => {
   it("keeps bridge/portal concrete off the atlas, the detail maps and the traffic tint", () => {
     const { shader } = patched();
@@ -70,7 +79,7 @@ describe("plain structure class", () => {
     expect(plain).toBeGreaterThan(-1);
     // The plain branch comes first, so neither the atlas nor the detail branch runs for it.
     expect(plain).toBeLessThan(f.indexOf("uAtlasOn > 0.5 && vRoadClass > 0.5"));
-    expect(f).toContain("uTrafficOn > 0.5 && vRoadClass > 0.5 && vRoadClass < 9.5");
+    expect(f).toContain("uTrafficOn > 0.5 && vRoadClass > 0.5 && (vRoadClass < 9.5 || vRoadClass > 10.5)");
     // Rain darkens plain pad bands and noses like the ribbon bands (final review).
     const plainBranch = f.slice(plain, f.indexOf("uAtlasOn > 0.5 && vRoadClass > 0.5"));
     expect(plainBranch).toContain("1.0 - 0.18 * uWet");

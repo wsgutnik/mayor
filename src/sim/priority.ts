@@ -116,6 +116,8 @@ export function trafficHand(centre: Pt, arms: readonly PriorityArm[], connectors
 }
 
 export function armRank(type: RoadType): number {
+  // A ramp yields wherever it lands on another road (it is a link, not a through route).
+  if (type === 6) return profileOf(type).asphaltHalf;
   return baseRoadType(type) * 10 + profileOf(type).asphaltHalf;
 }
 

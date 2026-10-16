@@ -16,10 +16,10 @@ import { applyMaterialTargets } from "./material-targets";
 export type RoadLayer = "asphalt" | "kerb" | "flat";
 
 /**
- * Junction asphalt tone: junction_asphalt.png is ~3.5% lighter than the ribbon
- * lanes of road_street/road_avenue (decoded means 0.296 vs 0.285); the pad is
- * scaled to the lane mean so the taper/junction plate does not read lighter
- * (roads-polish.test.ts measures it).
+ * Junction asphalt tone: junction_asphalt.png is ~3.6% lighter than the ribbon
+ * lanes (decoded means 0.301 vs 0.291); the pad is scaled to the lane mean so
+ * the taper/junction/gore plate matches the ribbon tone instead of reading
+ * lighter or darker (roads-polish.test.ts measures it per strip).
  */
 export const JUNCTION_TONE = 0.963;
 
@@ -120,6 +120,44 @@ export function loadRoadDetailMaps(
   }
 }
 
+/**
+ * Marking atlas (public/textures/road/markings.png, see
+ * blender/make_road_atlas.py): the three RGBA marking decals stacked
+ * vertically in one 512x896 texture. Packing them into a single sampler
+ * keeps the road fragment shader at 11 custom sampler2D uniforms, under
+ * the 16 texture-unit limit (see road-sampler-budget.test.ts).
+ */
+export const MARKINGS_ATLAS_SIZE = { width: 512, height: 896 } as const;
+
+export interface MarkingSlice { u0: number; u1: number; v0: number; v1: number; }
+
+/**
+ * UV slices in flipY-loaded texture space (v=1 is the PNG top row).
+ * crosswalk: PNG rows [0,256) full width; stopBar: rows [256,384) full
+ * width; arrow: rows [384,896), cols [0,256) (the arrow source is 256
+ * wide and sits left-aligned, the right half stays transparent).
+ */
+export const MARKING_SLICES = {
+  crosswalk: { u0: 0, u1: 1, v0: 640 / 896, v1: 1 },
+  stopBar: { u0: 0, u1: 1, v0: 512 / 896, v1: 640 / 896 },
+  arrow: { u0: 0, u1: 0.5, v0: 0, v1: 512 / 896 },
+} as const satisfies Record<string, MarkingSlice>;
+
+/** Slice for a marking ROAD_CLASS id (7/8/9), or null for other classes. */
+export function markingSliceForClass(cls: number): MarkingSlice | null {
+  if (cls === 7) return MARKING_SLICES.crosswalk;
+  if (cls === 8) return MARKING_SLICES.stopBar;
+  if (cls === 9) return MARKING_SLICES.arrow;
+  return null;
+}
+
+/** Remap a marking-quad uv (0..1) into the marking atlas slice for `cls`. */
+export function markingAtlasUv(cls: number, u: number, v: number): [number, number] {
+  const s = markingSliceForClass(cls);
+  if (!s) throw new Error(`not a marking class: ${cls}`);
+  return [s.u0 + u * (s.u1 - s.u0), s.v0 + v * (s.v1 - s.v0)];
+}
+
 /** Cross-section atlas set (public/textures/road/, see blender/make_road_atlas.py). */
 export interface RoadAtlasMaps {
   street: THREE.Texture;
@@ -128,9 +166,8 @@ export interface RoadAtlasMaps {
   onewayAvenue: THREE.Texture;
   highway: THREE.Texture;
   junction: THREE.Texture;
-  crosswalk: THREE.Texture;
-  stopBar: THREE.Texture;
-  arrow: THREE.Texture;
+  markings: THREE.Texture;
+  ramp: THREE.Texture;
 }
 
 let atlasCache: RoadAtlasMaps | null = null;
@@ -158,9 +195,8 @@ export function loadRoadAtlas(
     ["onewayAvenue", "/textures/road/road_oneway_avenue.png"],
     ["highway", "/textures/road/road_highway.png"],
     ["junction", "/textures/road/junction_asphalt.png"],
-    ["crosswalk", "/textures/road/crosswalk.png"],
-    ["stopBar", "/textures/road/stop_bar.png"],
-    ["arrow", "/textures/road/arrow_oneway.png"],
+    ["markings", "/textures/road/markings.png"],
+    ["ramp", "/textures/road/road_ramp.png"],
   ];
   const out = {} as RoadAtlasMaps;
   let pending = files.length;
@@ -214,14 +250,22 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
     uTexOnewayAvenue: { value: white as THREE.Texture },
     uTexHighway: { value: white as THREE.Texture },
     uTexJunction: { value: white as THREE.Texture },
-    uTexCrosswalk: { value: white as THREE.Texture },
-    uTexStopBar: { value: white as THREE.Texture },
-    uTexArrow: { value: white as THREE.Texture },
+    uTexMarkings: { value: white as THREE.Texture },
+    uTexRamp: { value: white as THREE.Texture },
     // Traffic infoview (F11): R8 load-ratio texture sampled at world xz.
     uTrafficTex: { value: white as THREE.Texture },
     uTrafficOn: { value: 0 },
     uMapSize: { value: 96 },
   };
+
+  // Marking-quad uv -> atlas-slice uv, emitted from MARKING_SLICES so the
+  // shader and the unit-tested remap table cannot drift apart.
+  const f8 = (n: number): string => n.toFixed(8);
+  const sliceUv = (s: MarkingSlice): string =>
+    `vec2(mix(${f8(s.u0)}, ${f8(s.u1)}, vRoadUv.x), mix(${f8(s.v0)}, ${f8(s.v1)}, vRoadUv.y))`;
+  const uvCrosswalk = sliceUv(MARKING_SLICES.crosswalk);
+  const uvStopBar = sliceUv(MARKING_SLICES.stopBar);
+  const uvArrow = sliceUv(MARKING_SLICES.arrow);
 
   const material = new THREE.MeshStandardMaterial({
     vertexColors: true, side: THREE.DoubleSide, map: fallbackAsphalt,
@@ -243,7 +287,8 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
       .replace("#include <common>", `#include <common>
         uniform sampler2D uKerbMap, uSidewalkMap;
         uniform sampler2D uTexStreet, uTexAvenue, uTexOnewayStreet, uTexOnewayAvenue;
-        uniform sampler2D uTexHighway, uTexJunction, uTexCrosswalk, uTexStopBar, uTexArrow;
+        uniform sampler2D uTexHighway, uTexJunction, uTexMarkings;
+        uniform sampler2D uTexRamp;
         uniform vec3 uAvgBase, uAvgKerb, uAvgSidewalk;
         uniform vec3 uKerbColor;
         uniform float uDetailOn, uAtlasOn, uDayFactor, uWet;
@@ -253,7 +298,13 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
         varying vec2 vRoadUv;
         varying vec2 vWorldXz;`)
       .replace("#include <map_fragment>", `
-        if (vRoadClass > 9.5) {
+        if (vRoadClass > 10.5) {
+          // RAMP (roads.ts ROAD_CLASS.RAMP): own cross-section strip, ribbon tone.
+          vec3 rampCol = texture2D(uTexRamp, vRoadUv).rgb;
+          rampCol *= 0.55 + 0.45 * uDayFactor;
+          rampCol *= 1.0 - 0.18 * uWet;
+          diffuseColor.rgb = rampCol;
+        } else if (vRoadClass > 9.5) {
           // PLAIN (roads.ts ROAD_CLASS.PLAIN): bridge/portal concrete, deck
           // shadow, atlas-matched pad bands and median noses keep their vertex
           // colour; no atlas, no world-uv detail. Same day dimming as the atlas.
@@ -266,9 +317,9 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
           else if (vRoadClass < 4.5) roadCol = texture2D(uTexOnewayAvenue, vRoadUv).rgb;
           else if (vRoadClass < 5.5) roadCol = texture2D(uTexHighway, vRoadUv).rgb;
           else if (vRoadClass < 6.5) roadCol = texture2D(uTexJunction, vRoadUv).rgb * ${JUNCTION_TONE.toFixed(4)};
-          else if (vRoadClass < 7.5) { vec4 m = texture2D(uTexCrosswalk, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
-          else if (vRoadClass < 8.5) { vec4 m = texture2D(uTexStopBar, vRoadUv); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
-          else { vec4 m = texture2D(uTexArrow, vRoadUv); if (m.a < 0.5) discard; roadCol = m.rgb; }
+          else if (vRoadClass < 7.5) { vec4 m = texture2D(uTexMarkings, ${uvCrosswalk}); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
+          else if (vRoadClass < 8.5) { vec4 m = texture2D(uTexMarkings, ${uvStopBar}); roadCol = mix(vec3(0.16, 0.17, 0.19), m.rgb, m.a); }
+          else { vec4 m = texture2D(uTexMarkings, ${uvArrow}); if (m.a < 0.5) discard; roadCol = m.rgb; }
           roadCol *= 0.55 + 0.45 * uDayFactor;
           roadCol *= 1.0 - 0.18 * uWet;
           diffuseColor.rgb = roadCol;
@@ -280,15 +331,15 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
                              texture2D(uSidewalkMap, vMapUv).rgb / max(uAvgSidewalk, vec3(0.05)), 0.6);
           diffuseColor.rgb *= mix(baseDet, kerbDet, kerbness);
         }
-        if (uTrafficOn > 0.5 && vRoadClass > 0.5 && vRoadClass < 9.5) {
+        if (uTrafficOn > 0.5 && vRoadClass > 0.5 && (vRoadClass < 9.5 || vRoadClass > 10.5)) {
           float tLoad = texture2D(uTrafficTex, vWorldXz / uMapSize).r;
           diffuseColor.rgb = mix(vec3(0.13, 0.62, 0.20), vec3(0.85, 0.10, 0.07), smoothstep(0.0, 1.0, tLoad));
         }`)
       .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, 0.32,
-          uWet * uAtlasOn * step(0.5, vRoadClass) * step(vRoadClass, 6.5));`);
+          uWet * uAtlasOn * step(0.5, vRoadClass) * (step(vRoadClass, 6.5) + step(10.5, vRoadClass)));`);
   };
-  material.customProgramCacheKey = () => "road-atlas-v2";
+  material.customProgramCacheKey = () => "road-atlas-v3";
   const v3 = (a: [number, number, number]) => new THREE.Vector3(...a);
   return {
     material,
@@ -309,9 +360,8 @@ export function createRoadDetailMaterial(fallbackAsphalt: THREE.Texture): RoadDe
       uniforms.uTexOnewayAvenue.value = m.onewayAvenue;
       uniforms.uTexHighway.value = m.highway;
       uniforms.uTexJunction.value = m.junction;
-      uniforms.uTexCrosswalk.value = m.crosswalk;
-      uniforms.uTexStopBar.value = m.stopBar;
-      uniforms.uTexArrow.value = m.arrow;
+      uniforms.uTexMarkings.value = m.markings;
+      uniforms.uTexRamp.value = m.ramp;
       uniforms.uAtlasOn.value = 1;
       material.needsUpdate = true;
     },

@@ -9,7 +9,7 @@ import { roadFacts } from "../ui/road-facts";
 import { blankShowcaseCity } from "./showcase-cases";
 import { placeRoad, planRoad } from "./sim";
 
-const TYPES: RoadType[] = [1, 2, 3, 4, 5];
+const TYPES: RoadType[] = [1, 2, 3, 4, 5, 6];
 
 describe("every road table is a view of ROAD_SPECS", () => {
   it("world, corridor, traffic, junction and UI agree with the spec", () => {
@@ -34,15 +34,15 @@ describe("every road table is a view of ROAD_SPECS", () => {
       expect(f.lanesPerDir).toEqual(s.lanesPerDir);
       expect(f.descKey).toBe(s.descKey);
     }
-    expect(Object.keys(ROAD_SPECS)).toHaveLength(5);
+    expect(Object.keys(ROAD_SPECS)).toHaveLength(6);
   });
 
   it("pins the spec literals the consumers expose (not derived from the table)", () => {
-    expect([1, 2, 3, 4, 5].map((t) => ROAD_CAPACITY[t])).toEqual([4, 10, 30, 4, 10]);
+    expect([1, 2, 3, 4, 5, 6].map((t) => ROAD_CAPACITY[t])).toEqual([4, 10, 30, 4, 10, 5]);
     expect([1, 2, 3, 4, 5].map((t) => ROAD_SPEED[t])).toEqual([3, 4.5, 7, 3, 4.5]);
-    expect(TYPES.map((t) => cornerRadiusFor(t))).toEqual([0.45, 0.6, 1.2, 0.25, 0.35]);
-    expect(TYPES.map((t) => clearanceFor(t))).toEqual([0.1, 0.1, 0.25, 0.1, 0.1]);
-    expect(TYPES.map((t) => ROAD_DRAW_WIDTH[t])).toEqual([0.9, 1.8, 2.8, 0.9, 1.8]);
+    expect(TYPES.map((t) => cornerRadiusFor(t))).toEqual([0.45, 0.6, 1.2, 0.25, 0.35, 0.45]);
+    expect(TYPES.map((t) => clearanceFor(t))).toEqual([0.1, 0.1, 0.25, 0.1, 0.1, 0.25]);
+    expect(TYPES.map((t) => ROAD_DRAW_WIDTH[t])).toEqual([0.9, 1.8, 2.8, 0.9, 1.8, 0.85]);
     expect(profileOf(3).laneCentres).toEqual([-1.1, -0.7, -0.3, 0.3, 0.7, 1.1]);
     expect(profileOf(5).laneCentres).toEqual([-0.6075, -0.2025, 0.2025, 0.6075]);
     expect(profileOf(4).laneCentres).toEqual([-0.19, 0.19]);

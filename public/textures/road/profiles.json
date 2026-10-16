@@ -91,5 +91,21 @@
     ],
     "laneWidth": 0.405,
     "oneWay": true
+  },
+  "road_ramp": {
+    "type": 6,
+    "sidewalkEdge": 0.425,
+    "drawHalf": 0.425,
+    "asphaltHalf": 0.425,
+    "kerb": 0,
+    "sidewalk": 0,
+    "medianHalf": 0,
+    "median": "none",
+    "shoulder": 0.2,
+    "laneCentres": [
+      0
+    ],
+    "laneWidth": 0.45,
+    "oneWay": true
   }
 }

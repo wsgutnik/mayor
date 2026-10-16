@@ -1,5 +1,5 @@
 import {
-  Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints, isOneWayType, rasterizeRoad, ROAD_DRAW_WIDTH,
+  Pt, ROAD, RoadSegment, RoadType, World, baseRoadType, curvePoints, isOneWayType, rasterizeRoad, ROAD_DRAW_WIDTH,
   Elevation, segElevation,
 } from "./world";
 import { profileOf } from "./corridor";
@@ -605,6 +605,10 @@ function lineAngle(ax: number, az: number, bx: number, bz: number): number {
 /** A real crossing that is too sharp (flatter than ALONG_DEG is running along the road: the overlap test's call). */
 const sharpCrossing = (ang: number): boolean => ang >= ALONG_DEG && ang < MIN_CROSSING_ANGLE_DEG - 1e-6;
 
+/** Ramps join highways at 10-30° by design: the 20° minimum never applies between a ramp arm and a highway arm. */
+const rampHighwayPair = (a: RoadType, b: RoadType): boolean =>
+  (a === ROAD.RAMP && baseRoadType(b) === 3) || (baseRoadType(a) === 3 && b === ROAD.RAMP);
+
 /** Unit direction from a road end into the road (control point aware). */
 function endDir(pts: Pt[], atStart: boolean): { dx: number; dz: number } {
   const tip = atStart ? pts[0] : pts[pts.length - 1];
@@ -712,13 +716,13 @@ export function placementIssue(
         if (!seg || segElevation(seg) !== elevation) continue;
         segs.push(seg.id);
         const ang = Math.acos(Math.max(-1, Math.min(1, dx * arm.dx + dz * arm.dz))) * DEG;
-        if (ang < MIN_CROSSING_ANGLE_DEG - 1e-6) sharp = true;
+        if (ang < MIN_CROSSING_ANGLE_DEG - 1e-6 && !rampHighwayPair(type, seg.type)) sharp = true;
       }
       meetings.push({ x: node.x, z: node.z, dx, dz, node: node.id, segs });
     } else if (foot) {
       if (segElevation(foot.seg) !== elevation) continue; // other layers: classifyCrossings decides
       const t = nearestOnPolyline(samplesOf(foot.seg), foot);
-      if (lineAngle(dx, dz, t.tx, t.tz) < MIN_CROSSING_ANGLE_DEG - 1e-6) sharp = true;
+      if (lineAngle(dx, dz, t.tx, t.tz) < MIN_CROSSING_ANGLE_DEG - 1e-6 && !rampHighwayPair(type, foot.seg.type)) sharp = true;
       meetings.push({ x: foot.x, z: foot.z, dx, dz, segs: [foot.seg.id] });
     } else {
       free.push(p);

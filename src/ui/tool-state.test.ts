@@ -87,7 +87,7 @@ describe("tool state: upgrade and interchange", () => {
     const { state, fx } = reduceTool(run(drafting(), [{ kind: "group", flyout: "road" }]), { kind: "interchange" });
     expect(state).toMatchObject({ tool: "road", pendingInterchange: true, draft: 0, flyout: null });
     expect(fx.clearDraft).toBe(true);
-    expect(hintFor(state)).toEqual({ key: "Tap a bridge crossing to stamp an interchange" });
+    expect(hintFor(state)).toEqual({ key: "Tap where a road crosses a highway to build an interchange" });
     // Taps while armed never start a draft.
     expect(reduceTool(state, { kind: "draftPoint" }).state.draft).toBe(0);
     const done = reduceTool(state, { kind: "interchangeDone" }).state;

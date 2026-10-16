@@ -12,7 +12,8 @@ import {
   ringSelfIntersects, ringsOverlap, triArea2, ShowcaseCaseName,
 } from "./showcase-cases";
 
-const SHOT_DIR = "/tmp/mayor-agents/fqual-shots";
+/** Opt-in SVG dumps: set SHOWCASE_SVG=<dir>. Default CI writes no files. */
+const SHOT_DIR = process.env.SHOWCASE_SVG;
 
 /** Asphalt-layer triangles of the built road mesh (ribbon 0.06 + patch 0.08 lifts). */
 function asphaltTris(s: CityState): { tris: Tri[]; total: number } {
@@ -48,6 +49,7 @@ const onBoundary = (poly: Pt[], p: Pt): boolean =>
 
 /** Plan-view SVG: asphalt rings, kerbs, centrelines, nodes, focus. */
 function dumpCaseSvg(name: ShowcaseCaseName, s: CityState, focus: Pt): void {
+  if (!SHOT_DIR) return;
   fs.mkdirSync(SHOT_DIR, { recursive: true });
   const w = s.world;
   const polys: Pt[][] = [];
@@ -238,7 +240,8 @@ function checkCase(name: ShowcaseCaseName): CaseMetrics {
     // flip this to an assertion (docs/process/junction-gate.md G3).
     if (ringSelfIntersects(d.asphalt)) m.nonSimple++;
     expect(polyArea(d.asphalt), `${name}: node ${node.id} ring has no area`).toBeGreaterThan(1e-6);
-    const padTris = l.kind === "taper"
+    const earClippedPad = l.kind === "taper" || l.kind === "merge" || l.kind === "diverge";
+    const padTris = earClippedPad
       ? triangulateRing(d.asphalt).map(([a, b, c]): Tri => ({
         ax: a.x, az: a.z, bx: b.x, bz: b.z, cx: c.x, cz: c.z,
       }))
@@ -249,8 +252,8 @@ function checkCase(name: ShowcaseCaseName): CaseMetrics {
       m.minFanArea = Math.min(m.minFanArea, a);
       m.minFanAngle = Math.min(m.minFanAngle, angle);
       expect(a, `${name}: node ${node.id} pad sliver`).toBeGreaterThan(1e-9);
-      if (l.kind === "taper") {
-        expect(angle, `${name}: node ${node.id} taper ear-clip angle`).toBeGreaterThanOrEqual(2);
+      if (earClippedPad) {
+        expect(angle, `${name}: node ${node.id} ${l.kind} ear-clip angle`).toBeGreaterThanOrEqual(2);
       }
     }
     for (const line of d.kerbs) {
@@ -315,16 +318,7 @@ function checkCase(name: ShowcaseCaseName): CaseMetrics {
 describe("showcase gate: junction/road hard cases", () => {
   for (const name of SHOWCASE_CASES) {
     it(`builds ${name} with overlap/gap/sliver-free geometry`, () => {
-      const m = checkCase(name);
-      const f = (v: number): string => (v === Infinity ? "n/a" : v.toExponential(1));
-      const a = (v: number): string => (v === Infinity ? "n/a" : v.toFixed(1));
-      console.log(
-        `gate ${name}: segs=${m.segs} nodes=${m.nodes} junctions=${m.junctions} rings=${m.rings} ` +
-        `fanArea>=${f(m.minFanArea)} fanAng>=${a(m.minFanAngle)} ` +
-        `kerbArea>=${f(m.minKerbArea)} kerbAng>=${a(m.minKerbAngle)} ` +
-        `coverage=${m.coverage - m.coverageMiss}/${m.coverage} ` +
-        `ringOverlap~${m.maxRingOverlap.toExponential(1)} nonSimple=${m.nonSimple}`,
-      );
+      checkCase(name);
     });
   }
 

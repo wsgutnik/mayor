@@ -317,10 +317,6 @@ function dumpSvg(s: Scene, dir: string, zoned: { q: Float32Array }[], polys: Pt[
 
 describe("zoned cells attach to their road (05 §1.4-§1.5)", () => {
   const all = scenes().map(measure);
-  const table = all.map((m) =>
-    `${m.name.padEnd(8)} cells=${String(m.cells).padStart(4)} lots=${String(m.lots).padStart(3)} cover=${m.cover.toFixed(3)} ` +
-    `worst=${m.worstCover.toFixed(3)} gap=${m.maxGap.toFixed(2)} contested=${m.contested} misassigned=${m.misassigned} intrude=${m.intrude} lotLot=${m.lotLot} lotRoad=${m.lotRoad}`);
-  console.log(`zone-attach metrics\n${table.join("\n")}`);
   if (process.env.ZATTACH_SIDES) for (const m of all) for (const sd of m.sides) console.log(m.name, JSON.stringify(sd));
 
   for (const m of all) {

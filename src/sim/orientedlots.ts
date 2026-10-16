@@ -1,5 +1,5 @@
 // Portions adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10): zoning/ZoneGrid.js#_buildFrame, #rebuildLots, #_makeLot; buildings/lots.js#lotsOverlap.
-import { ROAD, curvePoints } from "./world";
+import { isMotorway, curvePoints } from "./world";
 import type { Pt, World, ZoneType } from "./world";
 import type { OrientedLot, ZoneBlock, ZoneBlockSet } from "./zonecells";
 import { CELL_DEPTH } from "./zonecells";
@@ -319,7 +319,7 @@ function touchesConnectedRoad(w: World, x: number, y: number): boolean {
       const nx = x + dx, ny = y + dy;
       if (nx < 0 || ny < 0 || nx >= w.size || ny >= w.size) continue;
       const j = ny * w.size + nx;
-      if (w.connected[j] && w.roadSurface[j] && w.roadSurface[j] !== ROAD.HIGHWAY) return true;
+      if (w.connected[j] && w.roadSurface[j] && !isMotorway(w.roadSurface[j])) return true;
     }
   }
   return false;

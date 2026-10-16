@@ -1,3 +1,5 @@
+import { isMotorway } from "./world";
+import type { RoadType } from "./world";
 import { FAC, World, baseRoadType, curvePoints, idx, inBounds, isLand, segElevation } from "./world";
 import { nodeArms } from "./roads";
 import { corridorsOf, profileOf, profileOffset, type SegmentCorridor } from "./corridor";
@@ -86,7 +88,7 @@ export function planProps(w: World, density = 1): PropPlacement[] {
   const nearestRoad = (x: number, z: number) => {
     let best: { dx: number; dz: number; type: number; dist: number } | undefined;
     for (const seg of w.segments) {
-      if (segElevation(seg) !== "ground" || baseRoadType(seg.type) === 3) continue;
+      if (segElevation(seg) !== "ground" || isMotorway(seg.type)) continue;
       const pts = curvePoints(seg.pts, 0.3);
       for (let i = 1; i < pts.length; i++) {
         const ax = pts[i - 1].x, az = pts[i - 1].z;
@@ -119,15 +121,15 @@ export function planProps(w: World, density = 1): PropPlacement[] {
       continue;
     }
     const normalX = -road.dz, normalZ = road.dx;
-    const prof = profileOf(road.type as 1 | 2 | 3 | 4 | 5);
+    const prof = profileOf(road.type as RoadType);
     const baseOff = prof.drawHalf + prof.sidewalk;
     placedStop: for (const side of [1, -1]) {
       const yaw = Math.atan2(-normalX * side, -normalZ * side);
       for (const shift of [0, 1.25, -1.25]) {
         const sx = cx + normalX * side * (baseOff + 0.28) + road.dx * shift;
         const sz = cz + normalZ * side * (baseOff + 0.28) + road.dz * shift;
-        if (!add(baseRoadType(road.type as 1 | 2 | 3 | 4 | 5) === 2 ? "shelter_glass" : "shelter_small", sx, sz, yaw, 53, true)) continue;
-        const signalOff = profileOf(road.type as 1 | 2 | 3 | 4 | 5).propOffsets.signal;
+        if (!add(baseRoadType(road.type as RoadType) === 2 ? "shelter_glass" : "shelter_small", sx, sz, yaw, 53, true)) continue;
+        const signalOff = profileOf(road.type as RoadType).propOffsets.signal;
         add("stop_sign_bus", cx + normalX * side * signalOff + road.dx * shift,
           cz + normalZ * side * signalOff + road.dz * shift, yaw, 54, true);
         break placedStop;
@@ -137,7 +139,7 @@ export function planProps(w: World, density = 1): PropPlacement[] {
 
   for (const seg of w.segments) {
     const base = baseRoadType(seg.type);
-    if (base === 3 || segElevation(seg) !== "ground") continue;
+    if (isMotorway(seg.type) || segElevation(seg) !== "ground") continue;
     const corridor = corridorsOf(w).bySeg.get(seg.id);
     const prof = profileOf(seg.type);
     const pts = curvePoints(seg.pts, 0.5);

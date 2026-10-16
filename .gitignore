@@ -11,6 +11,9 @@ screenshots/
 # Junction-gate captures (scripts/showcase-shots.md): local, never versioned
 shots/
 
+# Agent scratch reports: local, never versioned
+agent-report/
+
 # Raw extractions kept out of git
 docs/img/brand/kit/
 

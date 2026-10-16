@@ -1,6 +1,7 @@
+import { isOneWayType } from "../sim/world";
 import * as THREE from "three";
 import {
-  Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints,
+  Pt, RoadSegment, RoadType, World, baseRoadType, curvePoints, heightAt,
   makeDeckSampler, segElevation, DeckSampler,
 } from "../sim/world";
 import { nodeArms, nodeById } from "../sim/roads";
@@ -56,6 +57,8 @@ export const ROAD_CLASS = {
   /** Structures (bridge barrier, slab, piers, tunnel portal, deck shadow):
    * plain vertex colour, never the atlas nor the asphalt/kerb detail maps. */
   PLAIN: 10,
+  /** Ramp (type 6): its own cross-section strip with shoulders, no kerb. */
+  RAMP: 11,
 } as const;
 /** World units covered by one cross-section texture tile along the road. */
 export const ROAD_TILE_LENGTH = 4;
@@ -69,9 +72,10 @@ export const ATLAS_SIDEWALK = "#a7abb1";
 export const ATLAS_MEDIAN = "#567a42";
 
 export function roadClassFor(type: RoadType, dirSign: number): number {
+  if (type === 6) return ROAD_CLASS.RAMP;
   const base = baseRoadType(type);
   if (base === 3) return ROAD_CLASS.HIGHWAY;
-  if (dirSign !== 0 || type === 4 || type === 5) {
+  if (dirSign !== 0 || isOneWayType(type)) {
     return base === 2 ? ROAD_CLASS.ONEWAY_AVENUE : ROAD_CLASS.ONEWAY_STREET;
   }
   return base === 2 ? ROAD_CLASS.AVENUE : ROAD_CLASS.STREET;
@@ -252,6 +256,26 @@ interface RibbonOpts {
   /** Across-mouth lines (junction ring crossings) at the near / far end. */
   mA?: RibbonMouth;
   mB?: RibbonMouth;
+  /**
+   * Gore notch (follows arm at a merge/diverge): the ramp-side half routes its
+   * outer boundary through these stations so it stops where the gore pad
+   * starts instead of cutting over the pad nose. Ribbon stations, ribbon side.
+   */
+  notchA?: GoreNotch;
+  notchB?: GoreNotch;
+  /**
+   * Barrier start/end stations (near/far end) from the layout's gore ring. The
+   * mouth-average stop would leave the barrier's half width inside the pad on
+   * the shallow gore diagonal. Absent: mouth average ± medianHalf.
+   */
+  barrierA?: number;
+  barrierB?: number;
+}
+
+/** Outer-boundary via rows (exact points) for one ribbon side at one end. */
+interface GoreNotch {
+  side: -1 | 1;
+  rows: { s: number; p: Pt }[];
 }
 
 /**
@@ -318,12 +342,14 @@ function ribbon(
     side: -1 | 1, st: RowEnd, en: RowEnd,
     inner: number, outer: number,
     y: number, color: string, uv?: (off: number) => number, cls = 0,
+    via: { s: number; p: Pt }[] = [],
   ): void => {
     const clamp = (s: number): number => Math.max(0, Math.min(total, s));
     const si = clamp(st.inner), so = clamp(st.outer);
     const ei = clamp(en.inner), eo = clamp(en.outer);
     if (Math.max(ei - si, eo - so) < 0.02) return;
-    const rows: RowEnd[] = [{ inner: si, outer: so, pi: st.pi, po: st.po }];
+    const first: RowEnd = { inner: si, outer: so, pi: st.pi, po: st.po };
+    const last: RowEnd = { inner: ei, outer: eo, pi: en.pi, po: en.po };
     // Straight roads on flat ground need no intermediate stations; curves and
     // slopes follow the samples so the ribbon hugs the terrain.
     let dense = pts.length > 2;
@@ -333,13 +359,29 @@ function ribbon(
       const ya = groundY(pa.x, pa.z), ym = groundY(pm.x, pm.z), yb = groundY(pb.x, pb.z);
       dense = Math.max(ya, ym, yb) - Math.min(ya, ym, yb) > 0.06;
     }
+    const interior: RowEnd[] = [];
     if (dense) {
       const commonStart = Math.max(si, so), commonEnd = Math.min(ei, eo);
       for (const p of samples) {
-        if (p.s > commonStart + 0.01 && p.s < commonEnd - 0.01) rows.push({ inner: p.s, outer: p.s });
+        if (p.s > commonStart + 0.01 && p.s < commonEnd - 0.01) interior.push({ inner: p.s, outer: p.s });
       }
     }
-    rows.push({ inner: ei, outer: eo, pi: en.pi, po: en.po });
+    // Gore-notch via rows splice into the interior in station order; samples
+    // too close to a via row are dropped so no sliver spans the notch.
+    const lo = Math.max(si, so), hi = Math.min(ei, eo);
+    for (const v of via) {
+      if (v.s > lo + 1e-6 && v.s < hi - 1e-6) interior.push({ inner: v.s, outer: v.s, po: v.p });
+    }
+    interior.sort((r1, r2) => (r1.inner + r1.outer) - (r2.inner + r2.outer));
+    const rows: RowEnd[] = [first];
+    if (via.length === 0) rows.push(...interior);
+    else for (const r of interior) {
+      const prevRow = rows[rows.length - 1];
+      const gap = Math.min(r.inner, r.outer) - Math.max(prevRow.inner, prevRow.outer);
+      if (gap < 0.03 && !r.po) continue; // sample hugs a via row: keep the exact point
+      rows.push(r);
+    }
+    rows.push(last);
     let prev0 = -1, prev1 = -1;
     const c = g.colorFor(uv ? "#ffffff" : color);
     const anchorStart = st.anchor !== false, anchorEnd = en.anchor !== false;
@@ -438,10 +480,14 @@ function ribbon(
     if (zeroEnd) asphaltBridge(mB.asphalt, false, bridgeDepth, uv, cls);
     const asphaltCol = type === 3 ? HW_ASPHALT : ASPHALT;
     for (const side of [-1, 1] as const) {
+      const via = [
+        ...(o.notchA && o.notchA.side === side ? o.notchA.rows : []),
+        ...(o.notchB && o.notchB.side === side ? o.notchB.rows : []),
+      ];
       half(side,
         zeroStart ? { inner: startCentre, outer: startCentre, anchor: false } : rowOn(mA.asphalt, side, 0, hw, true),
         zeroEnd ? { inner: endCentre, outer: endCentre, anchor: false } : rowOn(mB.asphalt, side, 0, hw, false),
-        0, hw, ROAD_LIFT, asphaltCol, uv, cls);
+        0, hw, ROAD_LIFT, asphaltCol, uv, cls, via);
       // Kerb and sidewalk both start on the outermost band ring's mouth edge:
       // the pad bands fill everything between the asphalt ring and it.
       if (kw > 0) half(side, rowOn(mA.band, side, hw, hw + kw, true), rowOn(mB.band, side, hw, hw + kw, false),
@@ -451,6 +497,19 @@ function ribbon(
     }
   };
   surface(atlasUv, atlasCls);
+  // Jersey barrier on the median in both tiers (never on preview ghosts).
+  if (!tint && baseRoadType(type) === 3) {
+    // The ribbon's own dense rule: straight flat spans need only the end
+    // rows; curves, slopes and decks follow the sampled stations.
+    const bA = o.barrierA ?? startMouth + prof.medianHalf, bB = o.barrierB ?? endMouth - prof.medianHalf;
+    let dense = pts.length > 2;
+    if (!dense && bB - bA > 0.5) {
+      const pa = walk(bA), pm = walk((bA + bB) / 2), pb = walk(bB);
+      const ya = groundY(pa.x, pa.z), ym = groundY(pm.x, pm.z), yb = groundY(pb.x, pb.z);
+      dense = Math.max(ya, ym, yb) - Math.min(ya, ym, yb) > 0.06;
+    }
+    jerseyBarrier(g, samples, walk, bA, bB, groundY, dense);
+  }
   if (atlasUv) {
     // One-way arrows are atlas decals; keep them clear of both junction pads.
     if (dirSign !== 0) {
@@ -467,12 +526,12 @@ function ribbon(
     return;
   }
   // Markings above the asphalt: dashes, avenue median, highway lines.
-  const mark = (offset: number, halfW: number, color: string): void => {
+  const mark = (offset: number, halfW: number, color: string, a0 = aMin, b0 = mEnd): void => {
     const every = 4, on = 2;
-    const a = aMin;
-    if (mEnd - a < 0.3) return;
-    const n = Math.max(2, Math.ceil((mEnd - a) / 0.25) + 1);
-    const step = (mEnd - a) / (n - 1);
+    const a = a0;
+    if (b0 - a < 0.3) return;
+    const n = Math.max(2, Math.ceil((b0 - a) / 0.25) + 1);
+    const step = (b0 - a) / (n - 1);
     const c = g.colorFor(color);
     const dashQuad = (i0: number, i1: number): void => {
       const p0 = walk(a + i0 * step), p1 = walk(a + i1 * step);
@@ -487,7 +546,7 @@ function ribbon(
       g.tri(v1, v3, v2);
     };
     // Straight+flat: dashes span known station pairs; walk only those.
-    if (rangeIsStraightFlat(walk, groundY, a, mEnd)) {
+    if (rangeIsStraightFlat(walk, groundY, a, b0)) {
       for (let k = 0; k * every < n; k++) {
         const i0 = k * every, i1 = Math.min(i0 + on - 1, n - 1);
         if (i1 > i0) dashQuad(i0, i1);
@@ -514,10 +573,16 @@ function ribbon(
     }
   };
   const base = baseRoadType(type);
-  const laneLines = (): void => {
+  const laneLines = (range?: (offset: number) => [number, number]): void => {
     const c = prof.laneCentres;
     for (let i = 0; i < c.length - 1; i++) {
-      if (dirSign !== 0 || (c[i] > 0) === (c[i + 1] > 0)) mark((c[i] + c[i + 1]) / 2, 0.012, AVE_LINE);
+      if (dirSign !== 0 || (c[i] > 0) === (c[i + 1] > 0)) {
+        const off = (c[i] + c[i + 1]) / 2;
+        if (range) {
+          const [a0, b0] = range(off);
+          mark(off, 0.012, AVE_LINE, a0, b0);
+        } else mark(off, 0.012, AVE_LINE);
+      }
     }
   };
   if (dirSign !== 0) {
@@ -538,10 +603,18 @@ function ribbon(
     strip(g, samples, aMin, mEnd, prof.medianHalf, MARK_LIFT, MEDIAN, groundY);
     laneLines();
   } else {
-    strip(g, samples, aMin, mEnd, prof.medianHalf, MARK_LIFT, HW_EDGE, groundY);
-    mark(prof.asphaltHalf - prof.shoulder, 0.012, LINE);
-    mark(-(prof.asphaltHalf - prof.shoulder), 0.012, LINE);
-    laneLines();
+    // Gore-aware: each marking runs only where its own side's ribbon runs, so
+    // the ramp-side shoulder and lane lines stop where the gore pad starts.
+    const sideRange = (offset: number): [number, number] =>
+      offset > 0 ? [o.aPos, total - o.eAPos]
+      : offset < 0 ? [o.aNeg, total - o.eANeg]
+      : [startMouth, endMouth];
+    strip(g, samples, startMouth, endMouth, prof.medianHalf, MARK_LIFT, HW_EDGE, groundY);
+    const [ap0, ap1] = sideRange(1);
+    const [an0, an1] = sideRange(-1);
+    mark(prof.asphaltHalf - prof.shoulder, 0.012, LINE, ap0, ap1);
+    mark(-(prof.asphaltHalf - prof.shoulder), 0.012, LINE, an0, an1);
+    laneLines(sideRange);
   }
   g.force = null;
 }
@@ -597,6 +670,53 @@ function strip(
       g.tri(prev[1], v1, v0);
     }
     prev = [v0, v1];
+  }
+}
+
+/** Jersey barrier cross-section: (lateral offset, height above the road surface). */
+const JERSEY_PROFILE: [number, number][] = [
+  [-0.06, 0], [-0.045, 0.03], [-0.025, 0.10],
+  [0.025, 0.10], [0.045, 0.03], [0.06, 0],
+];
+
+/**
+ * Concrete Jersey barrier along a highway centreline: one quad strip per face
+ * per station row (lower and upper face per side plus the flat top) at the
+ * ribbon's own stations — just the end rows when straight and flat, the
+ * sampled stations on curves, slopes and decks; PLAIN class, merged into the
+ * road geometry. Both ends close with a cap over the profile.
+ */
+function jerseyBarrier(
+  g: Geo, samples: Sample[], walk: (s: number) => { x: number; z: number; dx: number; dz: number },
+  s0: number, s1: number, gy: (x: number, z: number) => number, dense: boolean,
+): void {
+  if (s1 - s0 < 0.05) return;
+  const rows = dense
+    ? [s0, ...samples.map((p) => p.s).filter((s) => s > s0 + 0.01 && s < s1 - 0.01), s1]
+    : [s0, s1];
+  const c = g.colorFor(CONCRETE);
+  const pt = (s: number, off: number, h: number): number => {
+    const f = walk(s);
+    const x = f.x - f.dz * off, z = f.z + f.dx * off;
+    return g.vertFast(x, gy(x, z) + ROAD_LIFT + h, z, c, undefined, ROAD_CLASS.PLAIN);
+  };
+  // Faces as profile index pairs: lower/upper per side, then the flat top.
+  const faces: [number, number][] = [[0, 1], [1, 2], [3, 4], [4, 5], [2, 3]];
+  let prev: number[] | null = null;
+  for (const s of rows) {
+    const cur = JERSEY_PROFILE.map(([off, h]) => pt(s, off, h));
+    if (prev) {
+      for (const [a, b] of faces) {
+        g.tri(prev[a], prev[b], cur[a]);
+        g.tri(prev[b], cur[b], cur[a]);
+      }
+    }
+    prev = cur;
+  }
+  // End caps: convex hexagon fan.
+  for (const s of [s0, s1]) {
+    const hex = JERSEY_PROFILE.map(([off, h]) => pt(s, off, h));
+    for (let k = 1; k + 1 < hex.length; k++) g.tri(hex[0], hex[k], hex[k + 1]);
   }
 }
 
@@ -1056,6 +1176,128 @@ function drawTaperMarks(g: Geo, l: JunctionLayout, groundY: GroundY, diags: stri
   }
 }
 
+/**
+ * Gore paint triangle of a merge/diverge layout: the node gore-side corner O,
+ * the follows-arm mouth gore-side point F1, and the ramp mouth far corner R1.
+ * Null when the layout carries no usable gore mouths.
+ */
+export function goreTriangle(l: JunctionLayout): [Pt, Pt, Pt] | null {
+  const gore = l.gore;
+  if (!gore || (l.kind !== "merge" && l.kind !== "diverge")) return null;
+  const follows = l.arms.find((a) => a.type === 3 && (a.trimNeg.asphalt > 0 || a.trimPos.asphalt > 0));
+  const ramp = l.arms[gore.rampArm];
+  const mouth = follows?.mouth?.asphalt;
+  const rampMouth = ramp?.mouth?.asphalt;
+  if (!follows || !mouth || !rampMouth) return null;
+  const F1 = mouth.neg.s >= mouth.pos.s ? mouth.neg.p : mouth.pos.p;
+  const goreLocal = follows.trimPos.asphalt > 0 ? 1 : -1;
+  const px = -follows.dz, pz = follows.dx;
+  const gated = l.asphalt.filter((v) =>
+    ((v.x - l.centre.x) * px + (v.z - l.centre.z) * pz) * goreLocal > 0);
+  if (gated.length === 0) return null;
+  const O = gated.sort((a, b) =>
+    Math.hypot(a.x - l.centre.x, a.z - l.centre.z) - Math.hypot(b.x - l.centre.x, b.z - l.centre.z))[0];
+  const corners = [rampMouth.neg.p, rampMouth.pos.p].sort((a, b) =>
+    Math.hypot(a.x - F1.x, a.z - F1.z) - Math.hypot(b.x - F1.x, b.z - F1.z));
+  return [O, F1, corners[1]!];
+}
+
+const GORE_WHITE = "#ffffff";
+
+/**
+ * Gore paint for a merge/diverge layout, both tiers: solid edge lines along
+ * both gore edges from the nose to the node, three chevrons inside the gore
+ * triangle, and a dashed line (0.3 on / 0.3 off) along the ramp-side outer
+ * lane boundary over gore.length. All white at MARK_LIFT, every mark clipped
+ * to the gore pad.
+ */
+function drawGoreMarks(g: Geo, l: JunctionLayout, groundY: GroundY): void {
+  const tri = goreTriangle(l);
+  const gore = l.gore;
+  if (!tri || !gore || l.asphalt.length < 3) return;
+  const [O, F1, R1] = tri;
+  const c = g.colorFor(GORE_WHITE);
+  const barCorners = (a: Pt, b: Pt, halfW: number): [Pt, Pt, Pt, Pt] | null => {
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    if (len < 1e-6) return null;
+    const nx = (-dz / len) * halfW, nz = (dx / len) * halfW;
+    return [
+      { x: a.x + nx, z: a.z + nz }, { x: a.x - nx, z: a.z - nz },
+      { x: b.x + nx, z: b.z + nz }, { x: b.x - nx, z: b.z - nz },
+    ];
+  };
+  const emitBar = (q: [Pt, Pt, Pt, Pt]): void => {
+    const v0 = g.vertFast(q[0].x, groundY(q[0].x, q[0].z) + MARK_LIFT, q[0].z, c);
+    const v1 = g.vertFast(q[1].x, groundY(q[1].x, q[1].z) + MARK_LIFT, q[1].z, c);
+    const v2 = g.vertFast(q[2].x, groundY(q[2].x, q[2].z) + MARK_LIFT, q[2].z, c);
+    const v3 = g.vertFast(q[3].x, groundY(q[3].x, q[3].z) + MARK_LIFT, q[3].z, c);
+    g.tri(v0, v1, v2);
+    g.tri(v1, v3, v2);
+  };
+  const quad = (a: Pt, b: Pt, halfW: number, margin: number): void => {
+    const q = barCorners(a, b, halfW);
+    if (!q || !q.every((p) => insideWithMargin(p, l.asphalt, margin))) return;
+    emitBar(q);
+  };
+  const lerp = (a: Pt, b: Pt, t: number): Pt => ({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
+  // Follows-side edge: on the pad boundary, so inset it just inside the pad.
+  const ex = O.x - F1.x, ez = O.z - F1.z, eLen = Math.hypot(ex, ez) || 1;
+  let inx = -ez / eLen, inz = ex / eLen;
+  if (!pointInPolygon({ x: (O.x + F1.x) / 2 + inx * 0.04, z: (O.z + F1.z) / 2 + inz * 0.04 }, l.asphalt)) {
+    inx = -inx; inz = -inz;
+  }
+  const edge1 = [F1, O].map((p) => ({ x: p.x + inx * 0.04, z: p.z + inz * 0.04 }));
+  const segs1 = Math.max(1, Math.ceil(Math.hypot(F1.x - O.x, F1.z - O.z)));
+  for (let k = 0; k < segs1; k++) {
+    quad(lerp(edge1[0], edge1[1], k / segs1), lerp(edge1[0], edge1[1], (k + 1) / segs1), 0.02, 0.012);
+  }
+  // Ramp-side edge: chord from the ramp mouth near corner to the node corner,
+  // kept runs only where the chord stays inside the pad.
+  const ramp = l.arms[gore.rampArm]!;
+  const near = [ramp.mouth!.asphalt!.neg.p, ramp.mouth!.asphalt!.pos.p].sort((a, b) =>
+    Math.hypot(a.x - F1.x, a.z - F1.z) - Math.hypot(b.x - F1.x, b.z - F1.z))[0]!;
+  const segs2 = Math.max(1, Math.ceil(Math.hypot(near.x - O.x, near.z - O.z) / 0.25));
+  for (let k = 0; k < segs2; k++) {
+    quad(lerp(near, O, k / segs2), lerp(near, O, (k + 1) / segs2), 0.02, 0.012);
+  }
+  // Three chevrons between the node corner and the nose, apexes toward the
+  // nose. Mouth-based spans assumed the short old triangle; the fixed ring
+  // stretches it until half of every V clips away, so each span shrinks to
+  // fit the ring and both bars draw only when both fit (never a half-V).
+  const axisLen = Math.hypot(near.x - O.x, near.z - O.z) || 1;
+  const ax = (near.x - O.x) / axisLen, az = (near.z - O.z) / axisLen;
+  let px = -az, pz = ax;
+  if ((R1.x - O.x) * px + (R1.z - O.z) * pz < 0) { px = -px; pz = -pz; }
+  for (const t of [0.25, 0.5, 0.75]) {
+    const cx = O.x + ax * axisLen * t, cz = O.z + az * axisLen * t;
+    const reach = 0.13, barHalf = 0.0175;
+    for (let span = 0.25; span >= 0.06; span *= 0.75) {
+      const A = { x: cx + ax * reach, z: cz + az * reach };
+      const E1 = { x: cx - ax * reach - px * span, z: cz - az * reach - pz * span };
+      const E2 = { x: cx - ax * reach + px * span, z: cz - az * reach + pz * span };
+      const q1 = barCorners(A, E1, barHalf), q2 = barCorners(A, E2, barHalf);
+      if (q1 && q2 && [...q1, ...q2].every((p) => insideWithMargin(p, l.asphalt, 0))) {
+        emitBar(q1);
+        emitBar(q2);
+        break;
+      }
+    }
+  }
+  // Dashed outer-lane boundary over gore.length, clipped to the pad.
+  const follows = l.arms.find((a) => a.type === 3 && (a.trimNeg.asphalt > 0 || a.trimPos.asphalt > 0))!;
+  const centres = profileOf(3).laneCentres.filter((v) => (v > 0) === (gore.side > 0)).sort((a, b) => a - b);
+  const outer = gore.side > 0 ? centres.slice(-2) : centres.slice(0, 2);
+  const boundary = (outer[0]! + outer[1]!) / 2;
+  const armOff = (follows.end === "a" ? 1 : -1) * gore.side * boundary;
+  const at = (s: number): Pt => ({
+    x: l.centre.x + follows.dx * s + (-follows.dz) * armOff,
+    z: l.centre.z + follows.dz * s + follows.dx * armOff,
+  });
+  for (let a = 0.15; a < gore.length; a += 0.6) {
+    quad(at(a), at(Math.min(gore.length, a + 0.3)), 0.012, 0.008);
+  }
+}
+
 /** Centre dashes through pairs that are visually straight, clipped to trims. */
 function junctionGuides(g: Geo, l: JunctionLayout, groundY: GroundY): void {
   for (let i = 0; i < l.arms.length; i++) for (let j = i + 1; j < l.arms.length; j++) {
@@ -1171,6 +1413,8 @@ function emitTris(
  */
 function medianNoses(g: Geo, l: JunctionLayout, groundY: GroundY, atlas: boolean): void {
   if (l.asphalt.length < 3) return;
+  // At a merge/diverge the barrier ends in a cap before the gore pad; no nose.
+  if (l.kind === "merge" || l.kind === "diverge") return;
   const SEG = 8;
   for (const arm of l.arms) {
     const prof = profileOf(arm.type);
@@ -1293,6 +1537,95 @@ function drawJunctionPatch(g: Geo, l: JunctionLayout, groundY: GroundY, atlas = 
 }
 
 /**
+ * Barrier stop at a merge/diverge end, from the layout's own gore ring: march
+ * the arm outward until the full barrier cross-section clears the pad for a
+ * further medianHalf, so the end cap lands outside with margin. The
+ * mouth-average stop assumes a steep mouth diagonal; the fixed gore ring (up
+ * to 12 long) goes shallow enough to swallow the barrier's half width.
+ * Ribbon stations; undefined keeps the default stop (non-gore ends, or a pad
+ * the march cannot clear).
+ */
+function goreBarrierStop(l: JunctionLayout | null, seg: RoadSegment, end: "a" | "b", total: number): number | undefined {
+  const gore = l?.gore;
+  if (!gore || (l.kind !== "merge" && l.kind !== "diverge")) return undefined;
+  if (!l.arms.some((a) => a.segId === seg.id && a.end === end && a.type === 3)) return undefined;
+  if (l.asphalt.length < 3) return undefined;
+  const medianHalf = profileOf(3).medianHalf;
+  const half = Math.max(...JERSEY_PROFILE.map(([off]) => Math.abs(off)));
+  const walk = makeWalker(sampleCurve(seg.pts));
+  const toRibbon = (a: number): number => (end === "a" ? a : total - a);
+  const inside = (a: number): boolean => {
+    const f = walk(toRibbon(a));
+    for (const off of [-half, 0, half]) {
+      if (pointInPolygon({ x: f.x - f.dz * off, z: f.z + f.dx * off }, l.asphalt)) return true;
+    }
+    return false;
+  };
+  // The pad reaches gore.length along the arm; a clear span past it always
+  // exists on a sane segment (the march limit keeps pathological ones safe).
+  // The cap itself keeps medianHalf (0.1) from the pad edge, like plain
+  // junctions: the first outside station only touches it.
+  const capClear = (a: number): boolean => {
+    const f = walk(toRibbon(a));
+    for (const [off] of JERSEY_PROFILE) {
+      const p = { x: f.x - f.dz * off, z: f.z + f.dx * off };
+      if (pointInPolygon(p, l.asphalt) || distToRing(p, l.asphalt) < medianHalf - 1e-9) return false;
+    }
+    return true;
+  };
+  const limit = Math.min(total, gore.length + 1);
+  for (let a = 0; a <= limit; a += 0.05) {
+    if (inside(a)) continue;
+    let clear = true;
+    for (let b = a + 0.025; b <= a + medianHalf + 1e-9; b += 0.025) {
+      if (b > limit || inside(b)) { clear = false; break; }
+    }
+    if (clear && capClear(a)) return toRibbon(a);
+  }
+  return undefined;
+}
+
+/**
+ * Gore notch for the follows arm of a merge/diverge: the fixed ring puts the
+ * nose crossing inside the pad span (length ≥ noseStation + 0.5), so the old
+ * nose-past-the-mouth trigger can no longer fire. What remains is a curve
+ * chord sagging across the mouth just outside it: sample the true outer edge
+ * against the ring, and when samples land inside, route via rows through the
+ * true edge so the chords clear the pad. Ribbon stations, ribbon side;
+ * undefined when the edge already clears (ribbons byte-identical without it).
+ */
+function goreNotch(l: JunctionLayout | null, seg: RoadSegment, end: "a" | "b", total: number): GoreNotch | undefined {
+  if (!l?.gore || (l.kind !== "merge" && l.kind !== "diverge")) return undefined;
+  const arm = l.arms.find((a) => a.segId === seg.id && a.end === end);
+  if (!arm || arm.type !== 3) return undefined;
+  const goreLocal = arm.trimPos.asphalt > 0 ? 1 : arm.trimNeg.asphalt > 0 ? -1 : 0;
+  if (goreLocal === 0 || l.asphalt.length < 3) return undefined;
+  const mouth = arm.mouth?.asphalt;
+  if (!mouth) return undefined;
+  const mouthS = Math.max(mouth.neg.s, mouth.pos.s);
+  const hw = profileOf(arm.type).asphaltHalf;
+  // Ribbon frame: stations from end "a", lateral +1 = (-dz, dx) of a→b.
+  const walk = makeWalker(sampleCurve(seg.pts));
+  const toRibbonS = (a: number): number => (end === "a" ? a : total - a);
+  const ribbonSide = (end === "a" ? goreLocal : -goreLocal) as -1 | 1;
+  const edge = (a: number): Pt => {
+    const f = walk(toRibbonS(a));
+    return { x: f.x - f.dz * ribbonSide * hw, z: f.z + f.dx * ribbonSide * hw };
+  };
+  let lo = -1, hi = -1;
+  const endA = Math.min(total, mouthS + 2);
+  for (let a = mouthS + 0.05; a <= endA + 1e-9; a += 0.05) {
+    if (pointInPolygon(edge(a), l.asphalt)) { if (lo < 0) lo = a; hi = a; }
+  }
+  if (lo < 0) return undefined;
+  const rows: { s: number; p: Pt }[] = [];
+  for (let a = Math.max(mouthS + 0.02, lo - 0.15); a <= hi + 0.15 + 1e-9; a += 0.05) {
+    rows.push({ s: toRibbonS(a), p: edge(a) });
+  }
+  return { side: ribbonSide, rows };
+}
+
+/**
  * Full road network in one geometry: trimmed ribbons, one asphalt polygon per
  * junction with kerb and sidewalk bands, square dead-end caps, zebras on 3+
  * arm nodes. Bridges ride their deck profile with parapets, piers and a water
@@ -1378,6 +1711,10 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
       eSNeg: tb.sNeg,
       eSPos: tb.sPos,
       mB: tb.mA,
+      notchA: goreNotch(la, seg, "a", total),
+      notchB: goreNotch(lb, seg, "b", total),
+      barrierA: goreBarrierStop(la, seg, "a", total),
+      barrierB: goreBarrierStop(lb, seg, "b", total),
     };
     ribbon(g, seg.pts, seg.type, trim, gy, undefined, seg.oneWay ? (seg.dir === -1 ? -1 : 1) : 0, atlas);
     if (deck) {
@@ -1394,6 +1731,7 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
     // and non-ground nodes carry no rings and are skipped inside.
     drawJunctionPatch(g, l, groundY, atlas);
     medianNoses(g, l, groundY, atlas);
+    if ((l.kind === "merge" || l.kind === "diverge") && l.gore) drawGoreMarks(g, l, groundY);
     if (l.kind === "taper" && l.taper) drawTaperMarks(g, l, groundY, diags, w);
     if (l.arms.length >= 3) {
       for (const arm of l.arms) {
@@ -1457,6 +1795,77 @@ export function buildRoadNetworkGeometry(w: World, groundY: GroundY, opts?: { hi
   const built = g.build();
   built.userData.diagnostics = diags;
   return built;
+}
+
+/** Shortest distance from p to any ring edge. */
+function distToRing(p: Pt, ring: Pt[]): number {
+  let best = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length];
+    const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz;
+    const t = l2 < 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2));
+    best = Math.min(best, Math.hypot(a.x + dx * t - p.x, a.z + dz * t - p.z));
+  }
+  return best;
+}
+
+/** True when p is inside the ring or within `margin` of any ring edge (pad exclusion for lamps). */
+function nearPad(p: Pt, ring: Pt[], margin: number): boolean {
+  if (pointInPolygon(p, ring)) return true;
+  return distToRing(p, ring) < margin;
+}
+
+/**
+ * Lamp positions for highways and ramps (pure): a twin-arm lamp on the median
+ * barrier every 3 tiles per highway segment, and per ramp segment a single
+ * lamp at asphaltHalf + 0.15 on the outer (right-of-travel) side every 3
+ * tiles. Nothing within 1.0 of a node or inside any junction pad (plus a 0.5
+ * margin, so no pole floats on pad asphalt where the barrier is cut). yaw aims
+ * the lamp arm over the road (scene rotation.y maps +x to (cos yaw,
+ * -sin yaw)); the scene loop adds the twin lamp's second head at yaw + π. y
+ * is the mount height: the deck profile on bridge segments, the ground
+ * otherwise, plus the barrier top for twins (they stand on the barrier) or
+ * the verge lift for singles.
+ */
+export function highwayLampPositions(w: World): { x: number; z: number; yaw: number; twin: boolean; y: number }[] {
+  const out: { x: number; z: number; yaw: number; twin: boolean; y: number }[] = [];
+  const barrierTop = ROAD_LIFT + Math.max(...JERSEY_PROFILE.map(([, h]) => h));
+  const pads = [...junctionsOf(w).byNode.values()].map((l) => l.asphalt).filter((ring) => ring.length >= 3);
+  for (const seg of w.segments) {
+    const isHighway = seg.type === 3, isRamp = seg.type === 6;
+    if (!isHighway && !isRamp) continue;
+    if (segElevation(seg) === "tunnel") continue;
+    const samples = sampleCurve(seg.pts);
+    const total = samples[samples.length - 1].s;
+    if (total < 1) continue;
+    const deck = segElevation(seg) === "bridge" ? makeDeckSampler(w, seg.pts) : null;
+    const walk = makeWalker(samples);
+    for (let s = 1.5; s < total - 0.5; s += 3) {
+      const p = walk(s);
+      let x = p.x, z = p.z, nx = -p.dz, nz = p.dx;
+      const twin = isHighway;
+      if (isRamp) {
+        // Outer side = right of travel: +offset is right of a→b, flipped for dir -1.
+        const side = seg.dir === -1 ? -1 : 1;
+        const off = side * (profileOf(6).asphaltHalf + 0.15);
+        x = p.x - p.dz * off; z = p.z + p.dx * off;
+        nx = side * p.dz; nz = -side * p.dx;
+      }
+      let near = false;
+      for (const node of w.nodes) {
+        if (Math.hypot(x - node.x, z - node.z) < 1.0) { near = true; break; }
+      }
+      if (near) continue;
+      let inPad = false;
+      for (const ring of pads) {
+        if (nearPad({ x, z }, ring, 0.5)) { inPad = true; break; }
+      }
+      if (inPad) continue;
+      const surface = deck ? deck.yAt(s) : heightAt(w, x, z);
+      out.push({ x, z, yaw: Math.atan2(-nz, nx), twin, y: surface + (twin ? barrierTop : 0.05) });
+    }
+  }
+  return out;
 }
 
 /**

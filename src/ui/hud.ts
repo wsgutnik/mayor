@@ -1,3 +1,5 @@
+import { ROAD_TYPES } from "../sim/world";
+import { specOf } from "../sim/roadprofile";
 import { CityState, COST, ToolId, UtilityKey, CivicKey, dateOf, DAYS_PER_MONTH, FACILITY_OF_TOOL, facilityToolFootprint, isFacilityTool } from "../sim/sim";
 import { facilityUsage } from "../sim/facility-usage";
 import { usageRows } from "./facility-usage-view";
@@ -73,7 +75,7 @@ export const TOOL_I18N_KEYS: string[] = Object.values(T).flatMap((t) => [t.label
 /** Section titles and row labels the flyouts render (strings.test.ts checks pt-BR). */
 export const FLYOUT_I18N_KEYS: string[] = [
   "Type", "Draw", "Level", "Tools", "Zone", "Shape", "Stops", "Lines", "Lanes", "Width", "One-way", "per tile", "Footprint",
-  "Tap a start, then an end", "Tap start, a bend point, then the end", "Tap a bridge crossing to stamp an interchange",
+  "Tap a start, then an end", "Tap start, a bend point, then the end", "Tap where a road crosses a highway to build an interchange",
   "Tap a road to change its class", "Press E to cycle", "Both legs are planned together and undo as one",
   "Interchange", "Upgrade road", "Roundabout", "Infoview", "On", "Off", "Back", "Buildings",
 ];
@@ -109,7 +111,7 @@ const ROAD_LEVELS: { level: RoadLevel; glyph: string }[] = [
   { level: "tunnel", glyph: "⌄" },
 ];
 
-const ROAD_GLYPH: Record<RoadType, string> = { 1: "─", 2: "═", 3: "≡", 4: "→", 5: "⇒" };
+const ROAD_GLYPH: Record<RoadType, string> = { 1: "─", 2: "═", 3: "≡", 4: "→", 5: "⇒", 6: "↗" };
 
 const LAYERS: { layer: OverlayLayer; label: string; glyph: string; color: string; img?: string }[] = [
   { layer: 0, label: "Off", glyph: "○", color: "#ffffff" },
@@ -572,10 +574,10 @@ export class Hud {
     road.fly.insertBefore(head, road.body);
 
     const typeRow = road.section(tr("Type"));
-    for (const t of [1, 2, 3, 4, 5] as RoadType[]) {
+    for (const t of ROAD_TYPES) {
       const f = roadFacts(t);
       const lanes = Array.from({ length: f.lanes }, () => "<i></i>").join("");
-      const roadThumb = ["/ui/thumbs/rd-two.jpg", "/ui/thumbs/rd-four.jpg", "/ui/thumbs/rd-highway.jpg", "/ui/thumbs/rd-two.jpg", "/ui/thumbs/rd-four.jpg"][t - 1];
+      const roadThumb = specOf(t).thumb;
       const b = el("button", "tool", `<img class="road-thumb" src="${roadThumb}" alt="" draggable="false"><span>${tr(f.name)}</span><small>$${f.costPerTile}/${tr("tile")}</small><span class="road-mini" aria-hidden="true">${lanes}</span>`);
       b.addEventListener("click", () => {
         pendingRoadType = t;
@@ -621,10 +623,10 @@ export class Hud {
     roundaboutBtn.prepend(roundaboutImg);
     toolsRow.appendChild(roundaboutBtn);
     const trevo = el("button", "tool", `<span class="ic">✥</span><span>${tr("Interchange")}</span>`);
-    trevo.title = tr("Tap a bridge crossing to stamp an interchange");
+    trevo.title = tr("Tap where a road crosses a highway to build an interchange");
     trevo.setAttribute("aria-pressed", "false");
     trevo.addEventListener("click", () => this.hooks.onEvent({ kind: "interchange" }));
-    this.tooltip.attach(trevo, () => ({ icon: "✥", title: tr("Interchange"), desc: tr("Tap a bridge crossing to stamp an interchange"), color: T.road.color }));
+    this.tooltip.attach(trevo, () => ({ icon: "✥", title: tr("Interchange"), desc: tr("Tap where a road crosses a highway to build an interchange"), color: T.road.color }));
     this.interchangeBtn = trevo;
     toolsRow.appendChild(trevo);
     const up = el("button", "tool", `<span class="ic">⇪</span><span>${tr("Upgrade road")}</span><small>${tr("Off")}</small>`);

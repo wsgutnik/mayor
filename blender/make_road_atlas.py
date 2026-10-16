@@ -11,6 +11,8 @@ to blender/textures_road/ and copies them to public/textures/road/:
     v along the length; one tile = TILE_WORLD world units at runtime.
   * junction_asphalt.png -- seamless 1024 asphalt for node discs (world UV).
   * crosswalk.png (512x256), stop_bar.png, arrow_oneway.png -- RGBA markings.
+  * markings.png -- the three markings stacked in one 512x896 atlas (the
+    shader samples this; the individual files remain for tests/inspection).
 
 Lane markings, edge lines, crosswalk stripes, stop bars, arrows and wear live
 in the textures; geometry stays a single strip per segment. Every file is
@@ -61,17 +63,19 @@ def speckle(w, h, density, amp):
 
 
 def asphalt_base(w=W, h=H, tone=0.30):
-    """Dark asphalt with grain, hairline cracks and patch variation."""
+    """Dark asphalt with grain, hairline cracks and soft tonal patches."""
     img = np.full((h, w), tone)
-    img += (tile_noise(w, h, 6, 12, 3) - 0.5) * 0.10
+    img += (tile_noise(w, h, 6, 12, 3) - 0.5) * 0.08
     img += (tile_noise(w, h, 48, 96, 2) - 0.5) * 0.05
     img += speckle(w, h, 0.02, 0.05)
-    # Hairline cracks: ridged noise thresholded thin, tileable.
+    # Hairline cracks: ridged noise thresholded thin, tileable. Kept faint
+    # so a crack crossing one 8x8 block never steps like a patch edge.
     v = tile_noise(w, h, 10, 20, 3)
-    crack = np.clip((np.abs(2 * v - 1) - 0.965) / 0.035, 0, 1)
-    img *= 1 - 0.35 * crack
-    # A repaired patch: slightly darker rectangle, kept off the seams.
-    img[int(h * 0.58):int(h * 0.74), int(w * 0.15):int(w * 0.45)] *= 0.90
+    crack = np.clip((np.abs(2 * v - 1) - 0.972) / 0.028, 0, 1)
+    img *= 1 - 0.25 * crack
+    # Old repairs read as soft large-scale tonal drift (tileable, no hard
+    # edges): the previous dark rectangle showed as a plate on pads.
+    img *= 1 + (tile_noise(w, h, 2, 3, 2) - 0.5) * 0.06
     return img
 
 
@@ -125,8 +129,9 @@ def px(u):
 def cross_section(kind):
     """RGB float array for one road class. u: 0..1 across, v: 0..1 along."""
     p = PROFILES[kind if kind in PROFILES else "road_" + kind]
-    tone = 0.34 if p["median"] == "barrier" else 0.30
-    img = asphalt_base(tone=tone)
+    # One asphalt tone for every strip: the old lighter highway base made the
+    # gore pads read as dark plates against the highway ribbon.
+    img = asphalt_base(tone=0.30)
     img = wear_bands(img, [u_of(p, c) for c in p["laneCentres"]], 0.13)
     rgb = to_rgb(img)
     im = Image.fromarray((np.clip(rgb, 0, 1) * 255).astype(np.uint8), "RGB").convert("RGBA")
@@ -149,8 +154,11 @@ def cross_section(kind):
         for k in (a, b): d.rectangle([k - 2, 0, k + 2, H], fill=(226, 229, 233, 255))
     elif p["median"] == "barrier":
         a, b = px(u_of(p, -mh)), px(u_of(p, mh))
-        d.rectangle([a, 0, b, H], fill=(150, 150, 146, 255))
-        for k in (a, b): d.rectangle([k - 3, 0, k + 3, H], fill=(236, 200, 70, 255))
+        # Plain concrete matching the 3D Jersey barrier (CONCRETE #a8adb5 in
+        # src/render/roads.ts) with thin yellow edge lines only: the old wide
+        # yellow bands read as a yellow strip from game zoom.
+        d.rectangle([a, 0, b, H], fill=(168, 173, 181, 255))
+        for k in (a, b): d.rectangle([k - 1, 0, k + 1, H], fill=(236, 200, 70, 255))
     elif p["median"] == "paint":
         v_dash(d, px(0.5), 5, CREAM)
     c = p["laneCentres"]
@@ -161,10 +169,15 @@ def cross_section(kind):
     return np.asarray(im.convert("RGB")).astype(float) / 255
 
 
+# Pad base tone: the shader darkens the pad by JUNCTION_TONE (0.963), so the
+# PNG runs ~3.8% lighter than the ribbon lanes to render at the same tone.
+JUNCTION_TONE = 0.30
+
+
 def junction():
-    img = asphalt_base(tone=0.30)
-    img = wear_bands(img, [0.3, 0.7], 0.08)
-    return to_rgb(img)
+    # No wear bands: on world-UV pads they would repeat as stripes every tile
+    # instead of following lanes.
+    return to_rgb(asphalt_base(tone=JUNCTION_TONE))
 
 
 def crosswalk():
@@ -197,6 +210,25 @@ def arrow():
     return np.asarray(im).astype(float) / 255
 
 
+MARK_W, MARK_H = 512, 896
+
+
+def markings_atlas(cw, sb, ar):
+    """Stack the three RGBA marking decals into one 512x896 atlas.
+
+    Layout (top-down PNG rows): crosswalk [0,256) full width, stop_bar
+    [256,384) full width, arrow [384,896) left-aligned (the arrow source is
+    256x512; the right half stays transparent). One sampler instead of
+    three keeps the road shader under MAX_TEXTURE_IMAGE_UNITS. Must match
+    MARKING_SLICES in src/render/road-material.ts.
+    """
+    atlas = np.zeros((MARK_H, MARK_W, 4))
+    atlas[0:256, 0:512] = cw
+    atlas[256:384, 0:512] = sb
+    atlas[384:896, 0:256] = ar
+    return atlas
+
+
 if __name__ == "__main__":
     total = 0
     for name in ("road_street", "road_avenue", "road_oneway_street",
@@ -204,21 +236,30 @@ if __name__ == "__main__":
         kind = name if name != "road_highway" else "highway"
         total += save(name, cross_section(kind), palette=True)
     total += save("junction_asphalt", junction(), palette=True)
-    total += save("crosswalk", crosswalk(), palette=True)
-    total += save("stop_bar", stop_bar(), palette=True)
-    total += save("arrow_oneway", arrow(), palette=True)
+    # The arrays are reused for the atlas below. Note: every texture draws
+    # from one shared rng stream, so changing any generator reshuffles the
+    # noise in the textures generated after it; that is accepted (all PNGs
+    # regenerate together) — keep this call order stable anyway.
+    cw, sb, ar = crosswalk(), stop_bar(), arrow()
+    total += save("crosswalk", cw, palette=True)
+    total += save("stop_bar", sb, palette=True)
+    total += save("arrow_oneway", ar, palette=True)
+    total += save("road_ramp", cross_section("road_ramp"), palette=True)
+    total += save("markings", markings_atlas(cw, sb, ar))
     print(f"total {total // 1024} KB (limit 2048 KB)")
     # Contact sheet for a visual pass.
     names = ["road_street", "road_avenue", "road_oneway_street",
-             "road_oneway_avenue", "road_highway", "junction_asphalt",
-             "crosswalk", "stop_bar", "arrow_oneway"]
+             "road_oneway_avenue", "road_highway", "road_ramp", "junction_asphalt",
+             "crosswalk", "stop_bar", "arrow_oneway", "markings"]
     thumbs = []
     for n in names:
         im = Image.open(os.path.join(OUT, n + ".png")).convert("RGBA")
         im.thumbnail((256, 256))
         thumbs.append(im)
-    sheet = Image.new("RGBA", (256 * 3, 256 * 3), (40, 40, 44, 255))
+    cols = 3
+    rows = (len(thumbs) + cols - 1) // cols
+    sheet = Image.new("RGBA", (256 * cols, 256 * rows), (40, 40, 44, 255))
     for i, im in enumerate(thumbs):
-        sheet.paste(im, ((i % 3) * 256, (i // 3) * 256), im)
+        sheet.paste(im, ((i % cols) * 256, (i // cols) * 256), im)
     sheet.convert("RGB").save("/tmp/road-atlas-sheet.png", optimize=True)
     print("wrote /tmp/road-atlas-sheet.png")

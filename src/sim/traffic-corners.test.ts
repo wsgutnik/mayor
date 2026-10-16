@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { newCity, placeRoad } from "./sim";
 import { findPath, pointAtRouteArc, routeArcIndex, routeArcLengths, routePath } from "./traffic";
+import { corridorsOf, profileOf } from "./corridor";
+import { junctionsOf } from "./junction";
+import { pointInPolygon } from "./lanes";
 import { cidx, idx } from "./world";
 
 function flat(s: ReturnType<typeof newCity>) {
@@ -8,32 +11,60 @@ function flat(s: ReturnType<typeof newCity>) {
   s.money = 1e7;
 }
 
-/** Fraction of points sampled along the route (every 0.1 tile) that lie on a non-road tile. */
+/**
+ * Fraction of points sampled along the route (every 0.1 tile) that lie off
+ * the road. TRUE on-road test: a sample counts as on-road when its distance
+ * to some corridor centreline is within that corridor's asphalt half-width
+ * (profileOf(type).asphaltHalf), or it lies inside a junction asphalt
+ * polygon. (The tile-or-8-neighbour proxy this replaces accepted points a
+ * full tile off a 1-tile road.)
+ */
 function offRoadFraction(s: ReturnType<typeof newCity>, route: Float32Array): number {
   const w = s.world;
+  const corridors = [...corridorsOf(w).bySeg.values()];
+  const pads = [...junctionsOf(w).byNode.values()].map((l) => l.asphalt).filter((p) => p.length >= 3);
+  const onRoad = (x: number, z: number): boolean => {
+    for (const c of corridors) {
+      const half = profileOf(c.type).asphaltHalf;
+      const pts = c.centre;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        const vx = b.x - a.x, vz = b.z - a.z;
+        const l2 = vx * vx + vz * vz || 1;
+        const u = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / l2));
+        if (Math.hypot(a.x + vx * u - x, a.z + vz * u - z) <= half) return true;
+      }
+    }
+    for (const pad of pads) if (pointInPolygon({ x, z }, pad)) return true;
+    return false;
+  };
   let total = 0, off = 0;
   for (let i = 0; i + 1 < route.length / 2; i++) {
     const ax = route[i * 2], az = route[i * 2 + 1], bx = route[i * 2 + 2], bz = route[i * 2 + 3];
     const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.1));
     for (let k = 0; k <= n; k++) {
       const x = ax + ((bx - ax) * k) / n, z = az + ((bz - az) * k) / n;
-      const tile = idx(w, Math.floor(x), Math.floor(z));
       total++;
-      if (!w.road[tile]) off++;
+      if (!onRoad(x, z)) off++;
     }
   }
   return off / total;
 }
 
+function streetGrid(): ReturnType<typeof newCity> {
+  const s = newCity(5, 64);
+  flat(s);
+  const roads: [number, number][][] = [
+    [[6.5, 6.5], [40.5, 6.5]], [[40.5, 6.5], [40.5, 36.5]], [[40.5, 36.5], [6.5, 36.5]], [[6.5, 36.5], [6.5, 6.5]],
+    [[6.5, 6.5], [40.5, 36.5]],
+  ];
+  for (const r of roads) expect(placeRoad(s, 1, r.map(([x, z]) => ({ x, z }))).ok).toBe(true);
+  return s;
+}
+
 describe("routes through junctions stay on the carriageway", () => {
   it("a street grid with 90-degree turns and a diagonal never leaves the road tiles", () => {
-    const s = newCity(5, 64);
-    flat(s);
-    const roads: [number, number][][] = [
-      [[6.5, 6.5], [40.5, 6.5]], [[40.5, 6.5], [40.5, 36.5]], [[40.5, 36.5], [6.5, 36.5]], [[6.5, 36.5], [6.5, 6.5]],
-      [[6.5, 6.5], [40.5, 36.5]],
-    ];
-    for (const r of roads) expect(placeRoad(s, 1, r.map(([x, z]) => ({ x, z }))).ok).toBe(true);
+    const s = streetGrid();
     const w = s.world;
     const pick = (x: number, y: number) => idx(w, x, y);
     const pairs: [number, number][] = [[pick(6, 6), pick(40, 36)], [pick(40, 6), pick(6, 36)], [pick(6, 20), pick(40, 20)]];
@@ -44,6 +75,10 @@ describe("routes through junctions stay on the carriageway", () => {
       const route = routePath(w, tiles);
       expect(offRoadFraction(s, route)).toBeLessThan(0.02);
     }
+  });
+  it("the gate bites: a line far from any road scores fully off-road", () => {
+    const s = streetGrid();
+    expect(offRoadFraction(s, new Float32Array([45.5, 50.5, 55.5, 50.5]))).toBe(1);
   });
 });
 

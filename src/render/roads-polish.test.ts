@@ -9,7 +9,7 @@ import { junctionsOf, type JunctionLayout } from "../sim/junction";
 import { pointInPolygon } from "../sim/lanes";
 import { blankShowcaseCity } from "../sim/showcase-cases";
 import { placeRoad } from "../sim/sim";
-import { cidx, heightAt } from "../sim/world";
+import { cidx, heightAt, type RoadType } from "../sim/world";
 import { profileOf, sidewalkEdge } from "../sim/corridor";
 import { decodePng, meanColumns } from "./test-png";
 
@@ -94,8 +94,10 @@ describe("4. one-way arrow decal is transparent outside the arrow", () => {
     };
     createRoadDetailMaterial(fallback).material.onBeforeCompile!(shader as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
     const f = shader.fragmentShader;
-    const arrow = f.slice(f.indexOf("texture2D(uTexArrow"));
-    expect(arrow.slice(0, 120)).toContain("discard");
+    // The arrow branch is the last uTexMarkings sample; the remapped UV
+    // expression is longer than the old plain vRoadUv, hence the wider window.
+    const arrow = f.slice(f.lastIndexOf("texture2D(uTexMarkings"));
+    expect(arrow.slice(0, 200)).toContain("discard");
     const img = decodePng(`${TEX}/arrow_oneway.png`);
     expect(img.channels).toBe(4);
     expect(img.data[3]).toBe(0); // corner texel is transparent
@@ -139,6 +141,63 @@ describe("1b/5. pad asphalt and bands match the ribbon atlas", () => {
       expect(v.cls).toBe(ROAD_CLASS.PLAIN);
       expect(Math.abs(v.r - want.r) + Math.abs(v.g - want.g) + Math.abs(v.b - want.b)).toBeLessThan(1e-5);
     }
+  });
+});
+
+describe("1B polish: pads share the ribbon's asphalt tone, median reads as concrete", () => {
+  const STRIPS: [string, RoadType][] = [
+    ["road_street", 1], ["road_avenue", 2], ["road_oneway_street", 4],
+    ["road_oneway_avenue", 5], ["road_highway", 3], ["road_ramp", 6],
+  ];
+
+  it("rendered pad tone matches every strip's asphalt lanes within 3%", () => {
+    const laneMean = (file: string, t: RoadType): number => {
+      const img = decodePng(`${TEX}/${file}.png`), p = profileOf(t), E = sidewalkEdge(t);
+      const u = (o: number) => 0.5 + o / (2 * E);
+      const lanes = p.laneCentres.map((c) => lum(meanColumns(img, u(c - 0.06), u(c + 0.06))));
+      return lanes.reduce((a, b) => a + b, 0) / lanes.length;
+    };
+    const pad = lum(meanColumns(decodePng(`${TEX}/junction_asphalt.png`), 0, 1)) * JUNCTION_TONE;
+    for (const [f, t] of STRIPS) {
+      const lane = laneMean(f, t);
+      expect(Math.abs(pad - lane) / lane, f).toBeLessThan(0.03);
+    }
+  });
+
+  it("junction asphalt has no hard-edged rectangle", () => {
+    // Max |step| between neighbouring 8x8 block means. The old texture hit
+    // 0.0388 at the repaired-patch edges (a run of 8 contiguous >0.03 steps
+    // along the patch top edge); the regenerated texture peaks at 0.0335 on
+    // smooth tonal gradients. 0.036 separates the two (deterministic PNG).
+    const img = decodePng(`${TEX}/junction_asphalt.png`);
+    const B = 8, bw = Math.floor(img.width / B), bh = Math.floor(img.height / B);
+    const mean = (bx: number, by: number): number => {
+      let s = 0;
+      for (let y = by * B; y < (by + 1) * B; y++) for (let x = bx * B; x < (bx + 1) * B; x++) {
+        const i = (y * img.width + x) * img.channels;
+        s += (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3 / 255;
+      }
+      return s / (B * B);
+    };
+    let worst = 0;
+    for (let by = 0; by < bh; by++) for (let bx = 0; bx < bw; bx++) {
+      if (bx + 1 < bw) worst = Math.max(worst, Math.abs(mean(bx, by) - mean(bx + 1, by)));
+      if (by + 1 < bh) worst = Math.max(worst, Math.abs(mean(bx, by) - mean(bx, by + 1)));
+    }
+    expect(worst).toBeLessThan(0.036);
+  });
+
+  it("highway median band is concrete grey, not a yellow strip", () => {
+    const img = decodePng(`${TEX}/road_highway.png`), p = profileOf(3), E = sidewalkEdge(3);
+    const u = (o: number) => 0.5 + o / (2 * E);
+    // Band centre matches the 3D Jersey barrier concrete (#a8adb5).
+    const centre = meanColumns(img, u(-0.02), u(0.02));
+    const concrete = [168 / 255, 173 / 255, 181 / 255];
+    for (let k = 0; k < 3; k++) expect(Math.abs(centre[k] - concrete[k]), `channel ${k}`).toBeLessThan(0.03);
+    // Whole band (edges included) carries no yellow cast: old texture
+    // (r+g)/2-b was 0.123 from the wide yellow bands, now 0.009.
+    const band = meanColumns(img, u(-p.medianHalf), u(p.medianHalf));
+    expect((band[0] + band[1]) / 2 - band[2]).toBeLessThan(0.05);
   });
 });
 

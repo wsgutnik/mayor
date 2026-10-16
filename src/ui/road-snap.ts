@@ -1,5 +1,5 @@
 /** Road-draft snapping: pure geometry and option plumbing (DOM-free, tested). */
-import { baseRoadType, curvePoints, segElevation, type Pt, type RoadSegment, type RoadType, type World } from "../sim/world";
+import { ROAD, baseRoadType, curvePoints, segElevation, type Pt, type RoadSegment, type RoadType, type World } from "../sim/world";
 import { nearestOnSegment, nodeArms, nodeById, segById, SNAP_RADIUS, type RoadNode } from "../sim/roads";
 import { profileOf } from "../sim/corridor";
 import { teeSpacing, TOO_CLOSE_TO_JUNCTION_REASON } from "../sim/sim";
@@ -167,12 +167,12 @@ export interface SnapQuery {
   prev?: SnapTarget | null;
 }
 
-/** Can a ground road of `type` end on `seg`? Highways only join highways; decks and tunnels never. */
-function connectable(seg: RoadSegment, type: RoadType): boolean {
+/** Can a ground road of `type` end on `seg`? Highways join highways and ramps; decks and tunnels never. */
+export function connectable(seg: RoadSegment, type: RoadType): boolean {
   if (segElevation(seg) !== "ground") return false;
   if (seg.pts.length < 2) return false;
   const hw = baseRoadType(seg.type) === 3;
-  return !hw || baseRoadType(type) === 3;
+  return !hw || baseRoadType(type) === 3 || type === ROAD.RAMP;
 }
 
 function tangentAt(seg: RoadSegment, t: number): number {

@@ -1,6 +1,6 @@
 import "./ui/style.css";
 import "./ui/touch.css";
-import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, FACILITY_OF_TOOL, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, reconcileZones, setZoningMode, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
+import { applyTool, applyZoneAt, applyZoneBulk, bulldozeAt, CityState, FACILITY_OF_TOOL, facilityToolFootprint, findUpgradeTarget, getZoneBlocks, isFacilityTool, isFillOpenTile, newCity, placeRoad, planRoad, planRoadPair, planRoadUpgrade, previewZoneBulk, setZoningMode, step, syncLots, ToolId, ToolResult, upgradeRoad, ZoneBulkTool } from "./sim/sim";
 import { planFacilityPlacement } from "./sim/facilityplace";
 import { History } from "./sim/history";
 import { deserialize, serialize } from "./sim/save";
@@ -16,7 +16,7 @@ import { bindInput } from "./input";
 import { Hud, toolColor } from "./ui/hud";
 import { checkToolState, hintFor, initialToolState, reduceTool, renderHint, type ToolEvent, type ToolState } from "./ui/tool-state";
 import { cityEvents } from "./ui/events";
-import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, idx, rebuildRoadRaster, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
+import { Pt, ROAD_NAME, RoadType, ZONE, heightAt, segmentLength, tileHeight, UNDERGROUND_LAYER } from "./sim/world";
 import { formatRoadReadout, maxSlopePercent, resolveReadoutMode } from "./ui/road-readout";
 import { exitAngle, loadRoadSnap, resolveRoadSnap, saveRoadSnap, snapRadiusTiles, worldPerPixel, type RoadSnapOptions, type SnapHit, type SnapTarget } from "./ui/road-snap";
 import { guideAngles, resolveGuide, type RoadGuide } from "./ui/road-guides";
@@ -24,8 +24,8 @@ import { isTouchLongPress, touchDraftPoint } from "./ui/touch-road";
 import { loadRoadParallel, offsetPolyline, parallelOffset, saveRoadParallel, type RoadParallelOptions } from "./ui/road-parallel";
 import { cellPose, nearestCell } from "./sim/zoneblocks";
 import { floodFill, rectangleTiles, ZONE_FILL_CAP, type ZoneMode, type ZoneTile } from "./ui/zone-tools";
-import { diamondRamps, summarizeCrossings } from "./sim/crossings";
-import { addSegment } from "./sim/roads";
+import { summarizeCrossings } from "./sim/crossings";
+import { planInterchange, placeInterchange } from "./sim/interchange";
 import { setLang, tr, trReason, getLang } from "./i18n";
 import { MapData, MapIndex } from "./sim/maps";
 import { newCityFromMap } from "./sim/map-world";
@@ -499,43 +499,11 @@ function stampInterchangeAt(cx: number, cy: number): void {
   const raw = renderer.pickPoint(cx, cy);
   dispatch({ kind: "interchangeDone" });
   if (!raw) return;
-  const w = state.world;
-  const tx = Math.floor(raw.x), ty = Math.floor(raw.z);
-  let tile = -1;
-  for (let r = 0; r <= 2 && tile < 0; r++) {
-    for (let dy = -r; dy <= r && tile < 0; dy++) for (let dx = -r; dx <= r; dx++) {
-      const x = tx + dx, y = ty + dy;
-      if (x < 0 || y < 0 || x >= w.size || y >= w.size) continue;
-      const t = idx(w, x, y);
-      if (w.roadDeck[t] && w.roadSurface[t]) { tile = t; break; }
-    }
-  }
-  if (tile < 0) { hud.showToast(tr("Tap a bridge crossing to stamp an interchange")); return; }
-  const deck = w.segments.find((sg) => (sg.elevation ?? "ground") === "bridge" && sg.tiles.includes(tile));
-  const ground = w.segments.find((sg) => (sg.elevation ?? "ground") === "ground" && sg.tiles.includes(tile));
-  if (!deck || !ground) return;
-  const dirOf = (pts: Pt[]) => {
-    const dx = pts[pts.length - 1].x - pts[0].x, dz = pts[pts.length - 1].z - pts[0].z;
-    const l = Math.hypot(dx, dz) || 1;
-    return { dx: dx / l, dz: dz / l };
-  };
-  const hwSeg = [deck, ground].find((sg) => sg.type === 3) ?? ground;
-  const crossSeg = hwSeg === deck ? ground : deck;
-  const cxp = (tile % w.size) + 0.5, czp = ((tile / w.size) | 0) + 0.5;
-  const ramps = diamondRamps(cxp, czp, dirOf(hwSeg.pts), dirOf(crossSeg.pts));
-  const cost = Math.round(ramps.reduce((a, r) => a + segmentLength(r), 0) * 22);
-  if (state.money < cost) { hud.notify("error", trReason("Not enough money")); return; }
-  history.push(serialize(state));
-  for (const ramp of ramps) addSegment(w, 4, ramp);
-  rebuildRoadRaster(w);
-  // New ramps cover ground: zones there go, like every other road edit (05 §1.8).
-  w.roadRevision++; w.zoneRevision++; w.obstacleRevision++; w.lotsDirty = true;
-  reconcileZones(state);
-  state.money -= cost;
-  state.monthExpenses += cost;
-  w.coverageDirty = true;
-  w.revision++;
-  refreshHistoryButtons();
+  const plan = planInterchange(state, raw.x, raw.z);
+  if (!plan.ok) { hud.showToast(trReason(plan.reason!)); return; }
+  const result = attempt(() => placeInterchange(state, plan));
+  if (!result.ok) { hud.notify("error", trReason(result.reason!)); return; }
+  cityEvents.emit("roads:changed");
   hud.notify("success", tr("Interchange"));
 }
 

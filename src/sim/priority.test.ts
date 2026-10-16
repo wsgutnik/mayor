@@ -45,7 +45,7 @@ function car(s: CityState, id: number, from: number, to: number, v = 2, before =
   const mv = routeMovesOf(pts)!;
   const arc = Math.max(0, arcs[mv.i0[0]] - before - halfLength(0));
   return {
-    id, kind: 0, tiles, pts, progress: 0, arc, arcs, speedFactor: 1, v, vf: 1,
+    id, kind: 0, lane: 0, tiles, pts, progress: 0, arc, arcs, speedFactor: 1, v, vf: 1,
     vmax: vmaxAt(pts), brake: 0, blink: 0, seed: 0, stuck: false,
   };
 }
@@ -383,20 +383,15 @@ describe("stress: 600 s at 20 spawns/s", () => {
 
   it("never deadlocks, keeps >= 70% of baseline throughput, and never overlaps conflicting movements", () => {
     const { s, t } = stressFixture(7);
-    let hard = 0, soft = 0, worstStep = 0;
+    let hard = 0, soft = 0;
     const perMinute: number[] = [];
     let last = 0;
-    const t0 = performance.now();
     for (let i = 0; i < 6000; i++) {
-      const a = performance.now();
       tickTraffic(s, t, 0.1);
-      worstStep = Math.max(worstStep, performance.now() - a);
       const v = violations(t);
       hard += v.hard; soft += v.timedOut;
       if (i % 600 === 599) { perMinute.push(t.completed - last); last = t.completed; }
     }
-    const ms = performance.now() - t0;
-    console.info(`PRIO completed=${t.completed} baseline=${BASELINE_COMPLETED_600S} ratio=${(t.completed / BASELINE_COMPLETED_600S).toFixed(3)} perMinute=${perMinute.join(",")} alive=${t.vehicles.length} timeouts=${t.prioTimeouts} overruns=${t.prioOverruns} hard=${hard} timedOutOverlap=${soft} ms=${ms.toFixed(0)} worstTick=${worstStep.toFixed(2)}`);
     expect(hard).toBe(0);
     expect(t.completed).toBeGreaterThanOrEqual(0.7 * BASELINE_COMPLETED_600S);
     for (const n of perMinute) expect(n).toBeGreaterThan(0); // flow in every minute: no gridlock

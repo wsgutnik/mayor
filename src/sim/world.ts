@@ -119,8 +119,10 @@ export interface TransitLine {
 }
 
 /** Road classes. The grid stores the class per tile (0 = none). Types 4/5 are the one-way variants of street/avenue. */
-export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3, ONEWAY_STREET: 4, ONEWAY_AVENUE: 5 } as const;
-export type RoadType = 1 | 2 | 3 | 4 | 5;
+export const ROAD = { NONE: 0, STREET: 1, AVENUE: 2, HIGHWAY: 3, ONEWAY_STREET: 4, ONEWAY_AVENUE: 5, RAMP: 6 } as const;
+export type RoadType = 1 | 2 | 3 | 4 | 5 | 6;
+/** Every road type id, in menu order of the spec table. */
+export const ROAD_TYPES: readonly RoadType[] = [1, 2, 3, 4, 5, 6];
 /** Tiles of width a road occupies on the grid, and its drawn width in world units. */
 const fromSpec = <K extends keyof RoadSpec>(k: K) =>
   Object.fromEntries(Object.values(ROAD_SPECS).map((s) => [s.type, s[k]])) as Record<RoadType, RoadSpec[K]>;
@@ -131,9 +133,11 @@ export const ROAD_UPKEEP: Record<RoadType, number> = fromSpec("upkeep");
 export const ROAD_NAME: Record<RoadType, string> = fromSpec("nameKey");
 
 /** True for the one-way road classes (4/5). */
-export const isOneWayType = (t: RoadType): boolean => t === 4 || t === 5;
+export const isOneWayType = (t: RoadType): boolean => t === 4 || t === 5 || t === 6;
 /** The two-way class a road type draws and behaves like (one-way variants map to their base class). */
-export const baseRoadType = (t: RoadType): 1 | 2 | 3 => (t === 4 ? 1 : t === 5 ? 2 : t);
+export const baseRoadType = (t: RoadType): 1 | 2 | 3 | 6 => (t === 4 ? 1 : t === 5 ? 2 : t);
+/** Roads without frontage, stops or street furniture: highway and ramp. */
+export const isMotorway = (t: number): boolean => t === 3 || t === 6;
 
 /** A point on the ground plane; tile (x, y) covers [x, x+1) × [y, y+1). */
 export interface Pt { x: number; z: number }
@@ -471,7 +475,7 @@ export function isServed(w: World, x: number, y: number): boolean {
     const nx = x + dx, ny = y + dy;
     if (!inBounds(w, nx, ny)) continue;
     const j = idx(w, nx, ny);
-    if (w.connected[j] && w.road[j] !== ROAD.HIGHWAY) return true;
+    if (w.connected[j] && !isMotorway(w.road[j])) return true;
   }
   return false;
 }
@@ -678,6 +682,14 @@ export function rebuildRoadRaster(w: World): void {
   // centreline in its travel direction (a→b, flipped when dir is -1).
   w.dirX.fill(0);
   w.dirZ.fill(0);
+  // A two-way surface road owns the movement rules on every tile in its
+  // footprint. A one-way road may share those raster tiles at a T/cross, but
+  // its direction must not turn the underlying two-way road into a one-way.
+  const twoWayGround = new Uint8Array(w.size * w.size);
+  for (const seg of w.segments) {
+    if (segElevation(seg) !== "ground" || seg.oneWay) continue;
+    for (const t of seg.tiles) twoWayGround[t] = 1;
+  }
   for (const seg of w.segments) {
     if (!seg.oneWay) continue;
     const sign = seg.dir === -1 ? -1 : 1;
@@ -694,6 +706,7 @@ export function rebuildRoadRaster(w: World): void {
           const tx = Math.floor(p.x), ty = Math.floor(p.z);
           if (!inBounds(w, tx, ty)) continue;
           const t = ty * w.size + tx;
+          if (twoWayGround[t] && !seg.roundabout) continue;
           w.dirX[t] = vx / l;
           w.dirZ[t] = vz / l;
         } else {
@@ -702,6 +715,7 @@ export function rebuildRoadRaster(w: World): void {
             const tx = x0 + dx, ty = y0 + dy;
             if (!inBounds(w, tx, ty)) continue;
             const t = ty * w.size + tx;
+            if (twoWayGround[t] && !seg.roundabout) continue;
             w.dirX[t] = vx / l;
             w.dirZ[t] = vz / l;
           }

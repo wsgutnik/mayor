@@ -37,7 +37,6 @@ describe("road hot-path performance", () => {
       }
       checksMs.push(performance.now() - start);
     }
-    console.info(`PERF geometry=${median(geometryMs).toFixed(3)}ms signals=${median(checksMs).toFixed(3)}ms segments=${w.segments.length}`);
     expect(median(geometryMs)).toBeLessThan(40); // ~13 ms idle
     expect(median(checksMs)).toBeLessThan(6);
   });

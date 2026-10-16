@@ -1,3 +1,4 @@
+import { tr } from "../i18n";
 import { CityState, CAPACITY, lotDemographics, syncLots } from "./sim";
 import { CATALOG, CatalogEntry, facilityEntry, pickLotEntry, thumbnailOf, tileHash } from "./catalog";
 import { COVER, FACILITY_INFO, FacilityKind, ROAD_NAME, RoadType, ZONE, facilityFootprint, idx, inBounds } from "./world";
@@ -37,7 +38,6 @@ export interface TileInfo {
   demographics?: { children: number; working: number; seniors: number; workers: number };
 }
 
-const ROAD_PT: Record<number, string> = { 1: "Rua", 2: "Avenida", 3: "Autoestrada" };
 
 /** Describe the tile at (x, y), or null when it is outside the map. */
 export function describeTile(s: CityState, x: number, y: number): TileInfo | null {
@@ -73,7 +73,7 @@ export function describeTile(s: CityState, x: number, y: number): TileInfo | nul
   }
   if (w.road[i]) {
     const t = w.road[i] as RoadType;
-    return { ...base, kind: "road", name: ROAD_PT[t], nameEn: ROAD_NAME[t], category: `V${t}` };
+    return { ...base, kind: "road", name: tr(ROAD_NAME[t]), nameEn: ROAD_NAME[t], category: `V${t}` };
   }
   const z = w.zone[i];
   if (z) {

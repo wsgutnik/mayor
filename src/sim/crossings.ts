@@ -1,7 +1,9 @@
 import {
-  Pt, RoadType, World, baseRoadType, curvePoints, heightAt, idx, inBounds, segElevation, segmentLength,
+  Pt, ROAD, RoadType, World, baseRoadType, curvePoints, heightAt, idx, inBounds, segElevation, segmentLength,
 } from "./world";
 import { TUNNEL_RISE, detectSpan } from "./elevation";
+import { profileOf } from "./corridor";
+import { junctionsOf } from "./junction";
 
 /** How a planned road meets an existing road at one point. */
 export type CrossingKind = "junction" | "overpass" | "underpass" | "blocked";
@@ -25,7 +27,7 @@ export interface Crossing {
   /** True when a ground plan must be elevated to achieve this crossing. */
   autoElevate?: boolean;
   /** Machine reason for blocked crossings. */
-  blockedReason?: "interchange" | "elevated-join";
+  blockedReason?: "interchange" | "elevated-join" | "ramp-angle" | "ramp-direction" | "ramp-curvature" | "gore-proximity";
 }
 
 /** A highway crossing needs this much clear road at both ends for ramps. */
@@ -34,8 +36,17 @@ export const HIGHWAY_END_CLEARANCE = 4;
 export const RAMP_FALLBACK_TILES = 3;
 export const INTERCHANGE_REASON = "Highways need an interchange";
 export const ELEVATED_JOIN_REASON = "Cannot connect to a bridge or tunnel";
+/** Ramps join a highway only at a shallow merge/diverge angle, in its direction. */
+export const RAMP_MIN_ANGLE_DEG = 10;
+export const RAMP_MAX_ANGLE_DEG = 30;
+export const RAMP_ANGLE_REASON = "Ramps join a highway at 10 to 30 degrees";
+export const RAMP_DIRECTION_REASON = "Ramp joins the highway against its direction";
+export const RAMP_CURVATURE_REASON = "Ramps need a straight stretch of highway";
+export const GORE_PROXIMITY_REASON = "Too close to another ramp";
 
 const SNAP = 0.6;
+const GORE_TAIL_FRACTION = 0.17;
+const SAME_DIRECTION_MARGIN = 0.25;
 const dist = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz);
 const rank = (e: "ground" | "bridge" | "tunnel") => (e === "bridge" ? 2 : e === "ground" ? 1 : 0);
 
@@ -84,6 +95,187 @@ function rawHits(w: World, poly: Pt[]): RawHit[] {
     }
   }
   return hits;
+}
+
+/** Unit tangent of a segment's centreline at the point nearest `p`, oriented a→b. */
+function tangentAtNearest(seg: { pts: Pt[] }, p: Pt): { dx: number; dz: number } {
+  const q = curvePoints(seg.pts, 0.1);
+  let bi = 0, bd = Infinity;
+  q.forEach((s, i) => { const d = dist(p.x, p.z, s.x, s.z); if (d < bd) { bd = d; bi = i; } });
+  const a = q[Math.max(0, bi - 1)], b = q[Math.min(q.length - 1, bi + 1)];
+  const l = Math.hypot(b.x - a.x, b.z - a.z);
+  return l < 1e-9 ? { dx: 1, dz: 0 } : { dx: (b.x - a.x) / l, dz: (b.z - a.z) / l };
+}
+
+/**
+ * Ramps join only straight highway: the segment must be a 2-point line and,
+ * where the contact is a node shared with other highway segments, those must
+ * be straight too and continue the line within 2 degrees.
+ */
+export function rampHighwayCurvatureOk(w: World, hwSegId: number, contact: Pt): boolean {
+  const seg = w.segments.find((s) => s.id === hwSegId);
+  if (!seg) return true;
+  if (seg.pts.length !== 2) return false;
+  for (const end of [seg.pts[0], seg.pts[1]]) {
+    if (dist(end.x, end.z, contact.x, contact.z) > SNAP) continue;
+    const away = (sg: { pts: Pt[] }): { dx: number; dz: number } => {
+      const q = sg.pts, atA = dist(q[0].x, q[0].z, end.x, end.z) <= SNAP;
+      const from = atA ? q[0] : q[q.length - 1], to = atA ? q[1] : q[q.length - 2];
+      const l = Math.hypot(to.x - from.x, to.z - from.z) || 1;
+      return { dx: (to.x - from.x) / l, dz: (to.z - from.z) / l };
+    };
+    const mine = away(seg);
+    for (const other of w.segments) {
+      if (other.id === seg.id || baseRoadType(other.type) !== ROAD.HIGHWAY || segElevation(other) !== "ground") continue;
+      const touches = dist(other.pts[0].x, other.pts[0].z, end.x, end.z) <= SNAP
+        || dist(other.pts[other.pts.length - 1].x, other.pts[other.pts.length - 1].z, end.x, end.z) <= SNAP;
+      if (!touches) continue;
+      if (other.pts.length !== 2) return false;
+      const o = away(other);
+      const ang = Math.acos(Math.max(-1, Math.min(1, mine.dx * o.dx + mine.dz * o.dz))) * 180 / Math.PI;
+      if (ang < 178) return false;
+    }
+  }
+  return true;
+}
+
+/** Angle in degrees between the ramp's end tangent and the highway at the contact, 0..90. */
+export function rampContactAngle(w: World, rampPts: Pt[], end: "a" | "b", hwSegId: number): number {
+  const n = rampPts.length;
+  const tip = end === "a" ? rampPts[0] : rampPts[n - 1];
+  const inner = end === "a" ? rampPts[1] : rampPts[n - 2];
+  const rl = Math.hypot(inner.x - tip.x, inner.z - tip.z) || 1;
+  const rx = (inner.x - tip.x) / rl, rz = (inner.z - tip.z) / rl;
+  const seg = w.segments.find((s) => s.id === hwSegId);
+  const h = seg ? tangentAtNearest(seg, tip) : { dx: 1, dz: 0 };
+  const dot = Math.abs(Math.max(-1, Math.min(1, rx * h.dx + rz * h.dz)));
+  return (Math.acos(dot) * 180) / Math.PI;
+}
+
+/**
+ * Right-hand traffic: the carriageway on the right of travel a→b is the +offset
+ * side. A ramp on the + side must travel with a→b, on the − side with b→a. The
+ * ramp's travel at the contact leaves (exit) for end "a" and arrives (entry) for
+ * end "b" (one-way dir 1 travels a→b).
+ */
+function rampDirectionOk(w: World, rampPts: Pt[], end: "a" | "b", hwSegId: number): boolean {
+  const seg = w.segments.find((s) => s.id === hwSegId);
+  if (!seg) return false;
+  const n = rampPts.length;
+  const contact = end === "a" ? rampPts[0] : rampPts[n - 1];
+  const far = end === "a" ? rampPts[n - 1] : rampPts[0];
+  const h = tangentAtNearest(seg, contact);
+  const side = h.dx * (far.z - contact.z) - h.dz * (far.x - contact.x);
+  const inner = end === "a" ? rampPts[1] : rampPts[n - 2];
+  const tip = end === "a" ? rampPts[0] : rampPts[n - 1];
+  // One-way travel at the contact: leaves along pts[1]-pts[0] for end "a",
+  // arrives along pts[n-1]-pts[n-2] for end "b".
+  const tx = end === "a" ? inner.x - tip.x : tip.x - inner.x;
+  const tz = end === "a" ? inner.z - tip.z : tip.z - inner.z;
+  const tl = Math.hypot(tx, tz) || 1;
+  const along = (tx * h.dx + tz * h.dz) / tl > 0;
+  return (side > 0) === along;
+}
+
+/** Highway segments connected to segId through highway-only nodes. */
+function highwayComponent(w: World, segId: number): Set<number> {
+  const out = new Set<number>(), pending = [segId];
+  while (pending.length) {
+    const id = pending.pop()!;
+    if (out.has(id)) continue;
+    const seg = w.segments.find((s) => s.id === id);
+    if (!seg || baseRoadType(seg.type) !== 3 || segElevation(seg) !== "ground") continue;
+    out.add(id);
+    for (const nodeId of [seg.a, seg.b]) {
+      const node = w.nodes.find((n) => n.id === nodeId);
+      for (const next of node?.segs ?? []) if (!out.has(next)) pending.push(next);
+    }
+  }
+  return out;
+}
+
+/**
+ * Existing and proposed gores occupy directed intervals on one carriageway.
+ * Refuse only when those intervals overlap on the same side of the same
+ * connected highway; opposite-side and back-to-back merge/diverge pads stay legal.
+ */
+function rampGoreTooClose(w: World, rampPts: Pt[], end: "a" | "b", hwSegId: number): boolean {
+  const contact = end === "a" ? rampPts[0] : rampPts[rampPts.length - 1];
+  const far = end === "a" ? rampPts[rampPts.length - 1] : rampPts[0];
+  const h = tangentAtNearest(w.segments.find((s) => s.id === hwSegId)!, contact);
+  const side = h.dx * (far.z - contact.z) - h.dz * (far.x - contact.x) >= 0 ? 1 : -1;
+  const travel = side > 0 ? h : { dx: -h.dx, dz: -h.dz };
+  // A pad is a wedge that narrows to nothing at its full length. Its extent is
+  // the full length (same formula as goreWants/buildGore) minus the last
+  // GORE_TAIL_FRACTION, where the wedge is under half a tile wide; two pads
+  // may meet there. Measured against the emitted pads, this accepts the pairs
+  // whose pad/pad overlap is <= 1e-4 and refuses every pair that really overlaps.
+  const angle = rampContactAngle(w, rampPts, end, hwSegId) * Math.PI / 180;
+  const hp = profileOf(ROAD.HIGHWAY), rp = profileOf(ROAD.RAMP);
+  const nose = Math.max(1, (hp.asphaltHalf + rp.asphaltHalf * Math.cos(angle)) / Math.max(1e-9, Math.sin(angle)));
+  const wanted = Math.max(2, Math.min(12, 6 * rp.asphaltHalf / Math.max(1e-9, Math.tan(angle))), nose + 0.5);
+  const proposedKind = end === "a" ? "diverge" : "merge";
+  const span = (len: number, same: boolean): number => same ? len + SAME_DIRECTION_MARGIN : len * (1 - GORE_TAIL_FRACTION);
+  const component = highwayComponent(w, hwSegId);
+  for (const layout of junctionsOf(w).byNode.values()) {
+    if (!layout.gore || (layout.kind !== "merge" && layout.kind !== "diverge")) continue;
+    if (!layout.arms.some((a) => a.type === ROAD.HIGHWAY && component.has(a.segId))) continue;
+    const rampArm = layout.arms[layout.gore.rampArm];
+    const rampSeg = w.segments.find((s) => s.id === rampArm.segId);
+    if (!rampSeg) continue;
+    const existingFar = rampArm.end === "a" ? rampSeg.pts[rampSeg.pts.length - 1] : rampSeg.pts[0];
+    const existingSide = h.dx * (existingFar.z - layout.centre.z) - h.dz * (existingFar.x - layout.centre.x) >= 0 ? 1 : -1;
+    if (existingSide !== side) continue;
+    const at = (layout.centre.x - contact.x) * travel.dx + (layout.centre.z - contact.z) * travel.dz;
+    // Same-direction pairs (exit-exit, entry-entry) put the second tail over
+    // the highway ribbon trimmed for the first: use the full pad plus a margin.
+    // Opposite-direction pairs only meet at thin tails.
+    const same = layout.kind === proposedKind;
+    const len = span(layout.gore.length, same);
+    const proposedLen = span(wanted, same);
+    const proposed: [number, number] = end === "a" ? [0, proposedLen] : [-proposedLen, 0];
+    const interval: [number, number] = layout.kind === "diverge" ? [at, at + len] : [at - len, at];
+    if (Math.min(proposed[1], interval[1]) - Math.max(proposed[0], interval[0]) > 1e-4) return true;
+  }
+  return false;
+}
+
+/**
+ * Check a ground node after a type change: if any arm is a highway, every
+ * other arm must be a highway or a ramp, and every ramp arm must meet the
+ * highway at 10-30° in its direction on a straight stretch (same
+ * angle/direction/straightness code
+ * classifyCrossings uses for new ramps; at a bend/mid node the
+ * smallest-angle highway arm wins). Returns the refusal reason, else null.
+ */
+export function highwayNodeIssue(w: World, nodeId: number, typeOverride?: Map<number, RoadType>): string | null {
+  const node = w.nodes.find((n) => n.id === nodeId);
+  if (!node) return null;
+  const arms: { segId: number; hw: boolean; ramp: boolean }[] = [];
+  for (const segId of node.segs) {
+    const seg = w.segments.find((s) => s.id === segId);
+    if (!seg || segElevation(seg) !== "ground") continue;
+    const t = typeOverride?.get(segId) ?? seg.type;
+    arms.push({ segId, hw: baseRoadType(t) === 3, ramp: t === ROAD.RAMP });
+  }
+  if (!arms.some((a) => a.hw)) return null;
+  if (arms.some((a) => !a.hw && !a.ramp)) return INTERCHANGE_REASON;
+  const hwIds = arms.filter((a) => a.hw).map((a) => a.segId);
+  for (const arm of arms.filter((a) => a.ramp)) {
+    const seg = w.segments.find((s) => s.id === arm.segId)!;
+    const end = seg.a === nodeId ? ("a" as const) : ("b" as const);
+    let bestId = hwIds[0];
+    let bestAng = rampContactAngle(w, seg.pts, end, bestId);
+    for (const id of hwIds.slice(1)) {
+      const a = rampContactAngle(w, seg.pts, end, id);
+      if (a < bestAng) { bestAng = a; bestId = id; }
+    }
+    if (bestAng < RAMP_MIN_ANGLE_DEG || bestAng > RAMP_MAX_ANGLE_DEG) return RAMP_ANGLE_REASON;
+    const contact = end === "a" ? seg.pts[0] : seg.pts[seg.pts.length - 1];
+    if (!rampHighwayCurvatureOk(w, bestId, contact)) return RAMP_CURVATURE_REASON;
+    if (!rampDirectionOk(w, seg.pts, end, bestId)) return RAMP_DIRECTION_REASON;
+  }
+  return null;
 }
 
 /** Parameter of `p` along a segment (0 at a, 1 at b), by nearest sample. */
@@ -178,8 +370,8 @@ export function classifyCrossings(w: World, type: RoadType, pts: Pt[], level: Pl
     let onGround: RawHit | null = null;
     const nearNode = w.nodes.find((n) => dist(n.x, n.z, p.x, p.z) <= SNAP);
     if (nearNode) {
-      const hw = nearNode.segs.find((id) => { const s = w.segments.find((x) => x.id === id); return s && baseRoadType(s.type) === 3 && segElevation(s) === "ground"; });
-      if (hw !== undefined) onHighway = { x: p.x, z: p.z, segIds: [hw] };
+      const hwIds = nearNode.segs.filter((id) => { const s = w.segments.find((x) => x.id === id); return s && baseRoadType(s.type) === 3 && segElevation(s) === "ground"; });
+      if (hwIds.length) onHighway = { x: p.x, z: p.z, segIds: hwIds };
     }
     for (const seg of w.segments) {
       const q = curvePoints(seg.pts, 0.25);
@@ -195,6 +387,25 @@ export function classifyCrossings(w: World, type: RoadType, pts: Pt[], level: Pl
     if (onElevated) {
       const c = base(onElevated, onElevated.segIds[0], true, along);
       c.kind = "blocked"; c.blockedReason = "elevated-join";
+      out.push(c);
+    } else if (onHighway && level === "ground" && type === ROAD.RAMP) {
+      const end = endIdx === 0 ? "a" as const : "b" as const;
+      let bestId = onHighway.segIds[0];
+      let ang = rampContactAngle(w, pts, end, bestId);
+      for (const id of onHighway.segIds.slice(1)) {
+        const a = rampContactAngle(w, pts, end, id);
+        if (a < ang) { ang = a; bestId = id; }
+      }
+      const c = base(onHighway, bestId, true, along);
+      if (ang < RAMP_MIN_ANGLE_DEG || ang > RAMP_MAX_ANGLE_DEG) {
+        c.kind = "blocked"; c.blockedReason = "ramp-angle";
+      } else if (!rampHighwayCurvatureOk(w, bestId, p)) {
+        c.kind = "blocked"; c.blockedReason = "ramp-curvature";
+      } else if (!rampDirectionOk(w, pts, end, bestId)) {
+        c.kind = "blocked"; c.blockedReason = "ramp-direction";
+      } else if (rampGoreTooClose(w, pts, end, bestId)) {
+        c.kind = "blocked"; c.blockedReason = "gore-proximity";
+      }
       out.push(c);
     } else if (onHighway && level === "ground" && baseRoadType(type) !== 3) {
       const c = base(onHighway, onHighway.segIds[0], true, along);

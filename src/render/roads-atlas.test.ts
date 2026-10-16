@@ -1,12 +1,16 @@
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { buildRoadNetworkGeometry, padBandTriangles, ROAD_CLASS, ROAD_LIFT } from "./roads";
 import { checkJunction, junctionsOf, type JunctionLayout } from "../sim/junction";
 import { pointInPolygon } from "../sim/lanes";
 import { blankShowcaseCity } from "../sim/showcase-cases";
-import { placeRoad } from "../sim/sim";
+import { placeRoad, planRoad } from "../sim/sim";
 import type { RoadType } from "../sim/world";
 import { PAD_MIN_ANGLE, triangulateRing } from "./earclip";
+import { minTriAngleDeg } from "../sim/showcase-cases";
 
 type Case = { name: string; roads: [RoadType, { x: number; z: number }[]][]; slope?: boolean };
 const CASES: Case[] = [
@@ -248,7 +252,7 @@ describe("atlas ribbons stop at the junction trims", () => {
     expect(has(-0.7)).toBe(false);
   });
 
-  it("rebuild time on a dense grid (report only)", () => {
+  it.skipIf(process.env.MAYOR_PERF !== "1")("rebuild time on a dense grid (report only, MAYOR_PERF=1)", () => {
     const s = blankShowcaseCity();
     for (let k = 0; k < 8; k++) {
       placeRoad(s, k % 2 ? 1 : 2, [{ x: 8.5, z: 8.5 + k * 6 }, { x: 56.5, z: 8.5 + k * 6 }]);
@@ -265,7 +269,8 @@ describe("atlas ribbons stop at the junction trims", () => {
     // Warm: JIT settled, best of 15 (the iPad budget is a warm rebuild).
     let warm = Infinity;
     for (let i = 0; i < 15; i++) warm = Math.min(warm, once());
-    console.log(`[roads-1a] atlas rebuild cold mean ${(cold.reduce((a, b) => a + b, 0) / cold.length).toFixed(2)} ms, warm best ${warm.toFixed(2)} ms`);
+    const mean = cold.reduce((a, b) => a + b, 0) / cold.length;
+    writeFileSync(join(tmpdir(), "mayor-atlas-rebuild-timing.txt"), `cold mean ${mean.toFixed(2)} ms, warm best ${warm.toFixed(2)} ms\n`);
   });
 });
 
@@ -323,6 +328,100 @@ describe("taper clamped to its wide segment", () => {
           expect(overlap, `${band ? "bands" : "asphalt"} ribbon/node ${pads[p].nodeId}`).toBeLessThanOrEqual(1e-4);
         }
       }
+    });
+  }
+});
+
+/**
+ * Task 4 gores: on a straight highway a merge/diverge pad must not overlap the
+ * highway ribbon at the same height (exact clipping, asphalt and band levels)
+ * and its ear-clip triangles keep a 2 degree minimum angle.
+ */
+describe("merge and diverge gores", () => {
+  for (const entry of [false, true]) for (const deg of [10.5, 12, 15, 17.5, 20, 25, 29]) {
+    it(`${entry ? "merge" : "diverge"} at ${deg} degrees`, () => {
+      const s = blankShowcaseCity(), w = s.world;
+      expect(placeRoad(s, 3, [{ x: 10.5, z: 40.5 }, { x: 70.5, z: 40.5 }]).ok).toBe(true);
+      const a = deg * Math.PI / 180, len = 16;
+      const far = { x: 40.5 + (entry ? -1 : 1) * len * Math.cos(a), z: 40.5 + len * Math.sin(a) };
+      const ramp = placeRoad(s, 6, entry ? [far, { x: 40.5, z: 40.5 }] : [{ x: 40.5, z: 40.5 }, far]);
+      expect(ramp.ok, "reason" in ramp ? String(ramp.reason) : undefined).toBe(true);
+      const layouts = [...junctionsOf(w).byNode.values()];
+      const pads = layouts.filter((l) => l.asphalt.length >= 3);
+      const gore = layouts.find((l) => l.gore)!;
+      expect(gore).toBeTruthy();
+      for (const tri of triangulateRing(gore.asphalt)) {
+        expect(minTriAngleDeg({ ax: tri[0].x, az: tri[0].z, bx: tri[1].x, bz: tri[1].z, cx: tri[2].x, cz: tri[2].z }))
+          .toBeGreaterThanOrEqual(2);
+      }
+      const groundY = () => 0;
+      const geo = buildRoadNetworkGeometry(w, groundY, { atlas: true });
+      for (const band of [false, true]) {
+        const byPad = pads.map((l) => padTriangles(l, band));
+        const ribbons = ribbonTriangles(geo, true, ROAD_LIFT + (band ? 0.006 : 0), new PadIndex(byPad.flat()), groundY);
+        for (let p = 0; p < pads.length; p++) {
+          let overlap = 0;
+          for (const r of ribbons) for (const c of byPad[p]) overlap += triangleOverlapArea(r, c);
+          expect(overlap, `${band ? "bands" : "asphalt"} ribbon/node ${pads[p].nodeId}`).toBeLessThanOrEqual(1e-4);
+        }
+      }
+    });
+  }
+});
+
+/**
+ * Two ramps on one carriageway side (bending 3-point ramps so they never cross
+ * each other). At the smallest accepted spacing every pad, and every ribbon
+ * trimmed for them, is clear of the others (exact clipping); half a tile
+ * closer the second ramp is refused.
+ */
+describe("two gores on one carriageway", () => {
+  type Kind = "exit-exit" | "entry-entry" | "exit-entry";
+  const cases: [number, Kind, number][] = [];
+  const smallest: Record<number, { same: number; opp: number }> = {
+    12.5: { same: 6, opp: 10 }, 20: { same: 4, opp: 6 }, 29: { same: 2.5, opp: 4 },
+  };
+  for (const deg of [12.5, 20, 29]) for (const kind of ["exit-exit", "entry-entry", "exit-entry"] as const) {
+    cases.push([deg, kind, kind === "exit-entry" ? smallest[deg].opp : smallest[deg].same]);
+  }
+  const P = (x: number, z: number) => ({ x, z });
+  const ramps = (deg: number, kind: Kind, d: number) => {
+    const a = deg * Math.PI / 180, c = 3, c2 = Math.cos(a), s2 = Math.sin(a);
+    const exit = (x: number) => [P(x, 40.5), P(x + c * c2, 40.5 + c * s2), P(x + c * c2 - 1, 40.5 + c * s2 + 9)];
+    const entry = (x: number) => [P(x - c * c2 + 1, 40.5 + c * s2 + 9), P(x - c * c2, 40.5 + c * s2), P(x, 40.5)];
+    const x0 = 40.5 - d, x1 = 40.5 + d;
+    return kind === "exit-exit" ? [exit(x0), exit(x1)] : kind === "entry-entry" ? [entry(x0), entry(x1)] : [exit(x0), entry(x1)];
+  };
+  for (const [deg, kind, d] of cases) {
+    it(`${kind} at ${deg} degrees: d=${d} accepted and clean, d=${d - 0.5} refused`, () => {
+      const s = blankShowcaseCity(), w = s.world;
+      expect(placeRoad(s, 3, [{ x: 10.5, z: 40.5 }, { x: 70.5, z: 40.5 }]).ok).toBe(true);
+      const [first, second] = ramps(deg, kind, d);
+      expect(placeRoad(s, 6, first).ok).toBe(true);
+      const ok = placeRoad(s, 6, second);
+      expect(ok.ok, "reason" in ok ? String(ok.reason) : undefined).toBe(true);
+      const pads = [...junctionsOf(w).byNode.values()].filter((l) => l.asphalt.length >= 3);
+      const groundY = () => 0;
+      const geo = buildRoadNetworkGeometry(w, groundY, { atlas: true });
+      for (const band of [false, true]) {
+        const byPad = pads.map((l) => padTriangles(l, band));
+        for (let i = 0; i < pads.length; i++) for (let j = i + 1; j < pads.length; j++) {
+          let overlap = 0;
+          for (const a of byPad[i]) for (const b of byPad[j]) overlap += triangleOverlapArea(a, b);
+          expect(overlap, `${band ? "bands" : "asphalt"} pad ${pads[i].nodeId}/${pads[j].nodeId}`).toBeLessThanOrEqual(1e-4);
+        }
+        const ribbons = ribbonTriangles(geo, true, ROAD_LIFT + (band ? 0.006 : 0), new PadIndex(byPad.flat()), groundY);
+        for (let p = 0; p < pads.length; p++) {
+          let overlap = 0;
+          for (const r of ribbons) for (const c of byPad[p]) overlap += triangleOverlapArea(r, c);
+          expect(overlap, `${band ? "bands" : "asphalt"} ribbon/pad ${pads[p].nodeId}`).toBeLessThanOrEqual(1e-4);
+        }
+      }
+      const t = blankShowcaseCity();
+      placeRoad(t, 3, [{ x: 10.5, z: 40.5 }, { x: 70.5, z: 40.5 }]);
+      const [f2, s2] = ramps(deg, kind, d - 0.5);
+      expect(placeRoad(t, 6, f2).ok).toBe(true);
+      expect(planRoad(t, 6, s2).ok).toBe(false);
     });
   }
 });

@@ -1,6 +1,6 @@
 // Portions adapted from Fable Cities (MIT, (c) 2026 raw, github.com/rawprogress/fable-cities @ aea8b10): zoning/ZoneGrid.js#_blocked, #_occupied, #_rasterise, #_buildFrame, #_resolveConflicts, #_better.
 import {
-  baseRoadType, blocksBuilding, curvePoints, heightAt, idx, inBounds, segElevation,
+  blocksBuilding, isMotorway, curvePoints, heightAt, idx, inBounds, segElevation,
   type Pt, type RoadSegment, type World,
 } from "./world";
 import {
@@ -132,7 +132,7 @@ function shapeKey(b: ZoneBlock): string {
 }
 
 function zoneable(seg: RoadSegment): boolean {
-  return segElevation(seg) === "ground" && baseRoadType(seg.type) !== 3 && roughLength(seg.pts) > 0.05;
+  return segElevation(seg) === "ground" && !isMotorway(seg.type) && roughLength(seg.pts) > 0.05;
 }
 
 function roughLength(pts: Pt[]): number {

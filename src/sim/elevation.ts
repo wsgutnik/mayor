@@ -1,7 +1,7 @@
 import { Pt, RoadType, World, curvePoints, idx, isLand, tileHeight } from "./world";
 
 /** Longest water/low span a bridge of each class may cross, in raster tiles. */
-export const BRIDGE_SPAN_LIMIT: Record<RoadType, number> = { 1: 12, 2: 20, 3: 20, 4: 12, 5: 20 };
+export const BRIDGE_SPAN_LIMIT: Record<RoadType, number> = { 1: 12, 2: 20, 3: 20, 4: 12, 5: 20, 6: 12 };
 /** Cost multiplier per tile on the elevated middle piece. */
 export const BRIDGE_COST_MULT = 3;
 export const TUNNEL_COST_MULT = 4;

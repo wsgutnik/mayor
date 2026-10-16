@@ -22,6 +22,8 @@ describe("i18n", () => {
   it("translates simulation reasons, including parametrised ones", () => {
     setLang("pt");
     expect(trReason("Not enough money")).toBe("Dinheiro insuficiente");
+    expect(trReason("Too close to another ramp")).toBe("Muito perto de outra alça");
+    expect(trReason("Ramps need a straight stretch of highway")).toBe("Alças precisam de um trecho reto da rodovia");
     expect(trReason("Water pump must be within 3 tiles of water")).toContain("Bomba d'água");
     expect(trReason("Use only bus stops")).toBe("Use apenas pontos de ônibus");
     setLang("en");

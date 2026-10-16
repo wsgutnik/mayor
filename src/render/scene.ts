@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { CityState } from "../sim/sim";
 import {
   ZONE, COVER, FAC, LAND_VALUE_LAYER, TRAFFIC_LAYER, UNDERGROUND_LAYER, FacilityKind, idx, tileHeight, isLand, World,
-  RoadType, Pt, inBounds, heightAt, Biome, blocksBuilding, isTunnelTile,
+  RoadType, Pt, inBounds, heightAt, Biome, blocksBuilding, isTunnelTile, isMotorway,
   facilityAnchorAt,
 } from "../sim/world";
 import { CameraRig } from "./camera";
@@ -12,7 +12,7 @@ import { createVehicleMaterial, vehicleUniforms } from "./vehicle-material";
 import { boxOf, paintOf } from "./vehicle-palette";
 import { shadowBias } from "./shadow-tuning";
 import { CONTACT_DARK, ContactShadows, VehicleLightPools } from "./vehicle-fx";
-import { StreetLightFx } from "./street-light";
+import { StreetLightFx, assignFxSlots } from "./street-light";
 import { buildModels, makeWindowTextures } from "./models";
 import { zoneEntries, tileHash, pickLotEntry } from "../sim/catalog";
 import { LANDMARKS } from "../sim/landmarks";
@@ -41,11 +41,11 @@ export function facilityModelTransform(anchor: { x: number; y: number; w: number
     scale: anchor ? fallbackScale : 1,
   };
 }
-import { TrafficState, pointAtRouteArc, routeArcLengths } from "../sim/traffic";
+import { TrafficState, pointAtRouteArcInto, routeArcLengths } from "../sim/traffic";
 import { buildCoverageField, coverageRamp, isCoverageLayer } from "../sim/coverage-field";
 import { CoverageOverlay } from "./coverage-overlay";
 import { TrafficTint } from "./traffic-tint";
-import { buildRoadNetworkGeometry, buildStripGeometry } from "./roads";
+import { buildRoadNetworkGeometry, buildStripGeometry, highwayLampPositions } from "./roads";
 import { UndergroundView } from "./underground";
 import { createRoadDetailMaterial, loadRoadAtlas, loadRoadDetailMaps, RoadDetail } from "./road-material";
 import { createTerrainSplatMaterial, loadSplatMaps, SplatTier, TerrainSplat, terrainLayerSet } from "./terrain-splat";
@@ -223,6 +223,7 @@ export class CityRenderer {
   private txP = new THREE.Vector3();
   private fxS = new THREE.Vector3();
   private txS = new THREE.Vector3();
+  private vehRoutePose = { x: 0, z: 0, index: 0, t: 0 };
   private leanX = 0;
   private leanZ = 0;
   private boatMeshes = new Map<string, THREE.InstancedMesh>();
@@ -1122,13 +1123,17 @@ export class CityRenderer {
     if (this.kerbs.instanceColor) this.kerbs.instanceColor.needsUpdate = true;
     const furniturePlan = planProps(w, this.propDensity());
     this.streetLightFx.begin();
+    // Fx candidates collected during mesh placement, then ordered highway
+    // first: street lamps alone can fill the 700 fx slots in a big city.
+    const streetFx: { x: number; y: number; z: number }[] = [];
+    const highwayFx: { x: number; y: number; z: number }[] = [];
     const alternateLamps = furniturePlan.filter((p) => p.kind === "streetlight_b");
     // Street lamps on the verge of every fourth street and avenue tile, arm turned over the road.
     for (let y = 0; y < w.size && nl < this.lampMesh.instanceMatrix.count; y++) {
       for (let x = 0; x < w.size; x++) {
         const i2 = y * w.size + x;
         const cls = w.roadSurface[i2];
-        if (!cls || cls === 3 || (x + y * 3) % 4 !== 0) continue;
+        if (!cls || isMotorway(cls) || (x + y * 3) % 4 !== 0) continue;
         for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
           const nx = x + dx, ny = y + dy;
           if (!inBounds(w, nx, ny) || blocksBuilding(w, ny * w.size + nx) || w.facility[ny * w.size + nx]) continue;
@@ -1141,13 +1146,32 @@ export class CityRenderer {
           d.updateMatrix();
           this.lampMesh.setMatrixAt(nl, d.matrix);
           this.lampMesh.setColorAt(nl++, tint.setScalar(1));
-          this.streetLightFx.add(px, tileHeight(w, x, y) + 0.05, pz);
+          streetFx.push({ x: px, y: tileHeight(w, x, y) + 0.05, z: pz });
           d.rotation.set(0, 0, 0);
           break;
         }
         if (nl >= this.lampMesh.instanceMatrix.count) break;
       }
     }
+    // Highway and ramp lamps after the street lamps, sharing the InstancedMesh
+    // capacity (stop when full). Twin lamps get two heads rotated 180°.
+    for (const lamp of highwayLampPositions(w)) {
+      if (nl >= this.lampMesh.instanceMatrix.count) break;
+      const ly = lamp.y;
+      const heads = lamp.twin ? [lamp.yaw, lamp.yaw + Math.PI] : [lamp.yaw];
+      for (const yaw of heads) {
+        if (nl >= this.lampMesh.instanceMatrix.count) break;
+        d.position.set(lamp.x, ly, lamp.z);
+        d.rotation.set(0, yaw, 0);
+        d.scale.setScalar(1);
+        d.updateMatrix();
+        this.lampMesh.setMatrixAt(nl, d.matrix);
+        this.lampMesh.setColorAt(nl++, tint.setScalar(1));
+      }
+      highwayFx.push({ x: lamp.x, y: ly, z: lamp.z });
+      d.rotation.set(0, 0, 0);
+    }
+    for (const p of assignFxSlots(streetFx, highwayFx)) this.streetLightFx.add(p.x, p.y, p.z);
     this.ambience.setSources(smoke);
     this.lampMesh.count = nl;
     this.streetLightFx.end();
@@ -1614,7 +1638,7 @@ export class CityRenderer {
       const v = t.vehicles[k];
       const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
       const routeArc = v.arc ?? arcs[Math.min(arcs.length - 1, Math.max(0, Math.floor(v.progress)))];
-      const routePose = pointAtRouteArc(v.pts, arcs, routeArc);
+      const routePose = pointAtRouteArcInto(v.pts, arcs, routeArc, this.vehRoutePose);
       const i = Math.min(v.tiles.length - 2, routePose.index);
       if (i < 0) continue;
       // Layer decides height: tunnel hidden, deck rides deckH, ground stays low even under a deck.
@@ -1628,9 +1652,8 @@ export class CityRenderer {
       const segX = pts[i2 + 2] - ax, segZ = pts[i2 + 3] - az;
       const segL = Math.hypot(segX, segZ) || 1;
       const hx = segX / segL, hz = segZ / segL;
-      const lane = v.kind === 1 ? 0.12 : 0.1;
-      const px = ax + segX * routePose.t - hz * lane;
-      const pz = az + segZ * routePose.t + hx * lane;
+      const px = ax + segX * routePose.t;
+      const pz = az + segZ * routePose.t;
       const dx = px - tx, dz = pz - tz;
       const d2 = dx * dx + dz * dz;
       if (d2 > vdMax) continue;
@@ -1674,8 +1697,8 @@ export class CityRenderer {
       const segL = Math.hypot(segX, segZ) || 1;
       const hx = segX / segL, hz = segZ / segL;
       const bus = v.kind === "bus";
-      const px = ax + segX * Math.min(1, v.progress - i) - hz * (bus ? 0.14 : 0);
-      const pz = az + segZ * Math.min(1, v.progress - i) + hx * (bus ? 0.14 : 0);
+      const px = ax + segX * Math.min(1, v.progress - i);
+      const pz = az + segZ * Math.min(1, v.progress - i);
       const dx = px - tx, dz = pz - tz;
       const d2 = dx * dx + dz * dz;
       if (d2 > vdMax) continue;

@@ -14,3 +14,13 @@ export class StreetLightFx {
   end(): void { this.pools.count = this.halos.count = this.n; this.pools.instanceMatrix.needsUpdate = this.halos.instanceMatrix.needsUpdate = true; }
   setNight(night: number): void { this.pm.uniforms.uNight.value = night; this.hm.uniforms.uNight.value = night; this.pools.visible = this.halos.visible = night > .001; }
 }
+
+/**
+ * Fx slot order: highway lamps first, street lamps fill the rest, truncated
+ * to the capacity. A big city holds more street lamps than slots, so plain
+ * first-come order would silently drop every highway pool and halo.
+ */
+export function assignFxSlots<T>(street: readonly T[], highway: readonly T[], cap = CAP): T[] {
+  const keptHighway = highway.slice(0, cap);
+  return [...keptHighway, ...street.slice(0, Math.max(0, cap - keptHighway.length))];
+}

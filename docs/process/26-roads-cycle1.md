@@ -133,19 +133,45 @@ when the JSON is stale. The low-tier vertex-colour markings (`roads.ts:407-430`)
 1. **Highway rendering.** Three lanes per direction, white dashed lane lines, solid edge lines at the shoulders,
    a concrete Jersey barrier on the median as a merged extruded mesh along the ribbon (instanced per segment,
    no per-frame allocation). Atlas and low tier draw the same thing from the profile. Bridges keep parapets.
-2. **Vehicles in lanes.** Render offset = a lane centre from the profile for the vehicle's travel direction;
-   the lane index is deterministic per vehicle id (`id % lanesPerDir`) until lane changing exists. Same for buses
-   (removes the hard-coded 0.14). Trucks prefer the outer lane.
-3. **Ramp class (type 6).** One lane, shoulders, no sidewalk, no junction markings. Joins a highway only at a
-   shallow angle (≤ 30°); that node is kind `"merge"` (entry) or `"diverge"` (exit): a gore with chevrons, a
-   taper into or out of the outer lane, no pad, no stop bar, no signal. The ramp may climb: its elevation profile
-   interpolates from the highway grade to the deck height of the cross road; maximum grade 8 %.
+2. **Vehicles in lanes.** Each vehicle keeps a deterministic lane for its travel direction: `routePath` runs per
+   lane with lane `id % n`, except trucks and buses, which keep the rightmost lane (`n-1`). Leaders are lane-aware
+   with speed-dependent lookahead (braking distance plus the IDM headway term, clamped). No lane changing in this
+   cycle: in a diverge, cars may hop laterally to the outer lane at the connector start.
+3. **Ramp class (type 6).** One lane, shoulders, no sidewalk. The profile has `junctionMarkings: true`, but
+   markings render only at the terminals; gore arms get none. Joins a highway only: the highway segment must be a
+   straight 2-point line (a collinear 2-point continuation within 2° counts as straight), the join angle 10–30°
+   (about 12° effective lower bound), in the carriageway direction. That node is kind `"merge"` (entry) or
+   `"diverge"` (exit): a gore with chevrons and a dashed merge line — painted straight, not curve-aware — a taper
+   into or out of the outer lane, no pad, no stop bar, no signal. Ramps do NOT climb in this cycle: the diamond is
+   at grade with perpendicular terminals (climbing ramps deferred). The gore nose is the true crossing of the ramp's
+   highway-side asphalt edge and the highway outer asphalt edge. Its end stays at least 0.5 tile beyond that
+   crossing. Two gore intervals may not overlap on the same carriageway; planning refuses the later ramp as too
+   close. Ramp raster outranks avenue/one-way avenue (rank 5 vs 3/4), so a cross road's terminal tiles become
+   class 6 (no frontage, no bus stop, speed 5) — intended.
 4. **Interchange.** The "Trevo" tool builds a diamond through `planRoad` (cost and checks included): two exits and
-   two entries of type 6, one per quadrant, merging/diverging on the correct side for right-hand traffic, landing on
-   the cross road with an ordinary junction. Refusal reasons for no room, water, slope.
-5. **Old saves.** Type ids 1-5 are unchanged; type 6 is accepted by `save.ts`. Old interchange ramps (type-4
-   segments) are left as built. Highways in old saves render the new 3+3 profile at the same width. Saves with a
-   type-6 segment do not open in builds older than this cycle (documented in the changelog).
+   two entries of type 6, one per quadrant, merging/diverging on the correct side for right-hand traffic. Let `X` be
+   the true centreline intersection, `h` the highway unit direction, `n` its right normal, and choose cross-road unit
+   direction `c` with `dot(c,n)>0` (crossing angle 70--110 degrees). If the non-ground cross-road piece ends at
+   distances `e+`/`e-` from `X`, then `d+ = e+ + 2`, `d- = e- + 2`, terminals are
+   `T+ = X + c*d+`, `T- = X - c*d-`, and `g = max(d+,d-)/tan(20 degrees) + 2` (no clamp). The highway and ground
+   cross-road approaches must physically contain both gores and terminals; otherwise planning returns
+   `No room for ramp terminals`.
+
+   Each ramp is one quadratic `P0,C,P2`. Its control `C` is the intersection of the ray from its highway gore at
+   20 degrees toward its side and the line through its terminal parallel to `h`. On `+n` (travel `+h`), the exit is
+   `X-h*g -> T+` and entry `T+ -> X+h*g`; on `-n` (travel `-h`), the exit is `X+h*g -> T-` and entry
+   `T- -> X-h*g`, with the `-n` side's gores staggered 6 tiles further out (`g+6`) so no highway node is a 4-arm gore. A terminal within 1.6 tiles of an existing through node of the cross road (the bridge ramp's ground end) is that node. Thus every highway tangent is 20 degrees, every terminal tangent is perpendicular to the cross
+   road, neither ramp crosses the cross-road centreline, and each terminal is exactly a four-ground-arm cross. Ramp
+   raster may meet cross-road raster only in the terminal junction tiles. All four ramps stay at grade (no climbing
+   profile). Auto grade separation lifts only a local span (~11 tiles) around each highway crossing. Planning
+   simulates the four placements in order on a scratch city, so preview cost equals the amount placement spends and
+   any refusal is atomic. During raster rebuild, a tile covered by any two-way ground segment has `(dirX,dirZ)=(0,0)`
+   even when a one-way segment's wider raster also covers it; one-way raster paint never overrides two-way tiles,
+   which preserves every legal movement on the two-way road.
+5. **Old saves.** Type ids 1-5 are unchanged; type 6 is accepted by `save.ts`. `SAVE_VERSION` stays 2: saves
+   containing a type-6 segment do not open in builds older than this change — older builds reject them as invalid
+   (generic invalid-save error, not a version message). Old interchange ramps (type-4 segments) are left as built.
+   Highways in old saves render the new 3+3 profile at the same width.
 
 ## 7. Road tool (1C)
 
@@ -251,3 +277,56 @@ Still open (moved to 1B/1C or later): 3D highway barrier and lighting, ramp clas
 old diamond), vehicles in their lanes, road tool card/preview; deferred minors listed in the SDD ledger summary of
 the cycle report (water-shadow ends, pad dash phase, bridge-continues cap rule for mismatched types, rain darkening of
 pad bands). Traffic IDM constants still assume about 11.4 m per tile while the corridor uses 8 m.
+
+## 12. 1B result (2026-10-15, observed)
+
+Branch `agent/r1b-int`. Plan: `docs/superpowers/plans/2026-10-15-roads-1b-highway-ramps-interchange.md`. Built by
+parallel Codex/Muse implementers from the §9 task briefs (Tasks 1–7 plus polish and perf passes), integrated by the
+lead; every task was reviewed and re-reviewed separately. Section 6 above is aligned to what was built.
+
+What changed:
+- Highway render: 3 lanes per direction with a concrete Jersey barrier mesh that reuses the ribbon's end stations
+  (no 0.25 sampling on straights), lamps every 3 tiles on the barrier (twins) plus singles on ramp outer sides;
+  pads share the ribbon's asphalt tone, the median reads as concrete.
+- Ramp class (type 6): one lane, shoulders, no sidewalk; `junctionMarkings: true` in the profile but markings
+  render only at the terminals. Ramps join only straight 2-point highway segments at 10–30° (about 12° effective
+  lower bound) in the carriageway direction; the node becomes kind `"merge"`/`"diverge"` with chevrons and a dashed
+  merge line (painted straight, not curve-aware). Ramps do NOT climb: at-grade diamond, climbing deferred.
+- Trevo interchange through `planRoad` (cost and checks included): four at-grade ramps with perpendicular
+  terminals, `-n` gores staggered 6 tiles out; refused atomically with reasons (`No room for ramp terminals`, …).
+  Auto grade separation lifts only a local span (~11 tiles) around each highway crossing.
+- One-way raster paint never overrides two-way tiles (`(dirX,dirZ)=(0,0)` on tiles any two-way ground segment
+  covers); this also fixed the pre-existing one-way-street-into-avenue direction on main.
+- Traffic: every vehicle keeps a lane (`id % n`; trucks/buses rightmost, `n-1`); lane-aware leaders with
+  speed-dependent lookahead; routes stay monotone along travel; red-light queues on every lane.
+- Markings (crosswalk, stop bar, one-way arrow) packed into one 512×896 atlas: the road shader stays at 11 custom
+  samplers, under the 16 texture-unit limit. The source images `crosswalk.png`, `stop_bar.png`, `arrow_oneway.png`
+  still ship in `public/textures/road/` because the atlas test verifies them pixel-exact against the pack.
+- `?scenario=interchange`: diamond interchange scene with fixed `interchange`/`gore` cameras (`game`/`close`).
+- RangeError fix (pre-existing crash, not a 1B regression): `findLayeredPath` compares `Math.fround` g-values
+  because g is stored float32 — without it a diagonal avenue re-relaxes forever (`Invalid array length`).
+- Test hygiene: report-only timing tests run only with `MAYOR_PERF=1` and write under `os.tmpdir()`; road tests
+  emit no console output and write no files by default; `agent-report/` is gitignored.
+- Saves: `SAVE_VERSION` stays 2. Saves containing road type 6 do not open in builds older than this change;
+  older builds reject them as invalid (generic error, no version message).
+
+Verification: `npx tsc --noEmit` clean; `npm run ci` green at the branch head (1261 passed, 7 skipped — 4 of them
+`MAYOR_PERF`-gated timing tests — 2 todo, 147 files, plus the vite build). `?scenario=interchange` reproduces the
+diamond. Same-camera hard-case shots (day/night, game/close) were taken once by the lead; re-verification of the
+polish pass and the deferred M2/M3/M5 minors is still open (final-review item 2a).
+
+Measured (Mac, warm median of 10, `MAYOR_PERF=1` dense 96×96 city with 2 interchanges, baseline `18a5b89` → 1B):
+road geometry rebuild atlas 6.48 → 8.30 ms, low tier 7.72 → 9.84 ms (both < 10 ms; single samples up to 15.9 atlas /
+11.3 low); `junctionsOf` after a one-segment edit 1.10 → 1.11 ms; `tickTraffic(0.1)` at 260 vehicles 2.83 → 3.98 ms
+(+25…41% across reruns; the 1B scene also has +24% segments from the 2 interchanges, 111 → 138); layouts +4 diverge
++4 merge. On the saturated avenue-spine traffic fixture: tick +31% (2.04 ms at 260 cars), completed trips 623 → 440
+(ghost overlaps removed), abandoned 66 → 102 (spawn clearance follow-up; knob: spawn demand/capacity). Tap-time
+`planInterchange` 21 ms + `placeInterchange` 29 ms on an empty 96×96 (populated city unmeasured). FPS, iPad and
+Windows results are unmeasured.
+
+Still open (1C or later): ramp/gore rules are not revalidated when the highway is edited later; order dependence
+(highway drawn after the avenue auto-bridges, then the interchange is refused — draw the highway first); no lane
+changing; refusal-text nits (`Not on a highway` for ramps, `Overlaps` for a side street just outside the span edge,
+hill/tunnel span ignored when a highway is also crossed); street→ramp upgrade skips the strand check; legacy 1A
+diamond nodes refuse unrelated upgrades; spawn clearance follow-up (parked). Traffic IDM constants still assume
+about 11.4 m per tile while the corridor uses 8 m.

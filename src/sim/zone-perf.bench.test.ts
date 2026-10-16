@@ -95,7 +95,6 @@ describe("zone pipeline guard", () => {
     const road = best((s) => { placeRoad(s, ROAD.STREET as RoadType, roadPts); });
     const dozer = best((s) => { applyTool(s, "bulldoze", tile.x, tile.y); });
     const paint = best((s) => { applyZoneBulk(s, "ind", rect); });
-    console.info(`ZPERF guard reconcile: road=${road.toFixed(2)}ms bulldoze=${dozer.toFixed(2)}ms paint=${paint.toFixed(2)}ms`);
     expect(road).toBeLessThan(40);
     expect(dozer).toBeLessThan(40);
     expect(paint).toBeLessThan(40);

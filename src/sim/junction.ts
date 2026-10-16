@@ -19,6 +19,7 @@
  * - classification and rings use ground arms only; bridge/tunnel arms are
  *   listed in excludedArms (their ribbons run to the node centre).
  */
+import { isOneWayType } from "./world";
 import { specOf } from "./roadprofile";
 import {
   curvePoints, segElevation,
@@ -26,7 +27,7 @@ import {
 } from "./world";
 import { nodeArms, nodeById, segById } from "./roads";
 import { corridorsOf, profileOf } from "./corridor";
-import { armOffset, buildLaneConnectors, laneOffsets, type LaneArrow, type LaneConnector } from "./lanes";
+import { armOffset, buildGoreLaneConnectors, buildLaneConnectors, laneOffsets, type LaneArrow, type LaneConnector } from "./lanes";
 import { zpEnd, zpStart } from "./zoneprof";
 
 // ---------------------------------------------------------------- constants
@@ -58,7 +59,7 @@ export function clearanceFor(type: RoadType): number { return specOf(type).clear
 // ---------------------------------------------------------------- types
 
 export type JunctionKind =
-  | "end" | "middle" | "bend" | "transition" | "taper" | "junction" | "roundabout" | "non-ground";
+  | "end" | "middle" | "bend" | "transition" | "taper" | "merge" | "diverge" | "junction" | "roundabout" | "non-ground";
 export type JunctionTemplate =
   | "end-square" | "straight" | "bend" | "tee" | "cross" | "general" | "none";
 export type JunctionLayerName = "asphalt" | "kerb" | "sidewalk" | "boundary";
@@ -174,6 +175,13 @@ export interface JunctionLayout {
     length: number;
     droppedLanes: { side: -1 | 1; offset: number }[];
     addedLanes: { side: -1 | 1; offset: number }[];
+  };
+  gore?: {
+    rampArm: number;
+    side: -1 | 1;
+    length: number;
+    noseStation: number;
+    outerLane: number;
   };
   hash: string;
   diagnostics: JunctionDiagnostic[];
@@ -303,16 +311,17 @@ interface JArm {
   sidewalk: number;
   clearance: number;
   R: number;
+  dir: 1 | -1;
 }
 
 function toJArm(
-  segId: number, end: "a" | "b", type: RoadType, dx: number, dz: number, angle: number,
+  segId: number, end: "a" | "b", type: RoadType, dx: number, dz: number, angle: number, dir: 1 | -1,
 ): JArm {
   const p = profileOf(type);
   return {
     segId, end, type, dx, dz, angle,
     h: p.asphaltHalf, kerb: p.kerb, sidewalk: p.sidewalk,
-    clearance: clearanceFor(type), R: cornerRadiusFor(type),
+    clearance: clearanceFor(type), R: cornerRadiusFor(type), dir,
   };
 }
 
@@ -328,7 +337,7 @@ function armsAt(w: World, nodeId: number): { ground: JArm[]; excluded: ExcludedA
       excluded.push({ segId: a.segId, end: a.end, layer });
       continue;
     }
-    ground.push(toJArm(a.segId, a.end, a.type, a.dx, a.dz, a.angle));
+    ground.push(toJArm(a.segId, a.end, a.type, a.dx, a.dz, a.angle, seg?.dir ?? 1));
   }
   ground.sort((x, y) => x.angle - y.angle || x.segId - y.segId);
   excluded.sort((x, y) => x.segId - y.segId);
@@ -506,6 +515,67 @@ function getNoms(w: World, nodeId: number, cache?: Map<number, NodeNoms>): NodeN
 const taperWant = (wide: JArm, narrow: JArm): number =>
   q(Math.min(3, Math.max(0.6, 6 * Math.abs(wide.h - narrow.h))));
 
+interface GoreClass {
+  kind: "merge" | "diverge";
+  rampArm: number;
+  highwayArms: [number, number];
+  followsArm: number;
+  /** Ramp side in the follows-arm's outward frame. */
+  localSide: -1 | 1;
+  angle: number;
+  rampInbound: boolean;
+}
+
+const angleBetween = (a: JArm, b: JArm): number =>
+  Math.acos(Math.max(-1, Math.min(1, a.dx * b.dx + a.dz * b.dz)));
+
+/** Recognise the one legal three-arm motorway shape before general T logic. */
+function classifyGore(ground: JArm[]): GoreClass | null {
+  if (ground.length !== 3) return null;
+  const highway = ground.map((a, i) => ({ a, i })).filter(({ a }) => a.type === 3).map(({ i }) => i);
+  const rampArm = ground.findIndex((a) => a.type === 6);
+  if (highway.length !== 2 || rampArm < 0) return null;
+  const ten = (10 * Math.PI) / 180, thirty = (30 * Math.PI) / 180;
+  if (Math.abs(Math.PI - angleBetween(ground[highway[0]], ground[highway[1]])) > ten + 1e-9) return null;
+  const ranked = highway.map((i) => ({ i, angle: angleBetween(ground[i], ground[rampArm]) }))
+    .sort((a, b) => a.angle - b.angle || a.i - b.i);
+  if (ranked[0].angle < ten - 1e-9 || ranked[0].angle > thirty + 1e-9) return null;
+  const followsArm = ranked[0].i;
+  const follows = ground[followsArm], ramp = ground[rampArm];
+  const lateral = -follows.dz * ramp.dx + follows.dx * ramp.dz;
+  const localSide = (lateral >= 0 ? 1 : -1) as -1 | 1;
+  const rampInbound = ramp.end === (ramp.dir === 1 ? "b" : "a");
+  return {
+    kind: rampInbound ? "merge" : "diverge",
+    rampArm,
+    highwayArms: [highway[0], highway[1]],
+    followsArm,
+    localSide,
+    angle: ranked[0].angle,
+    rampInbound,
+  };
+}
+
+const GORE_MAX_LENGTH = 12;
+
+function goreWants(ground: JArm[], gore: GoreClass): { length: number; noseStation: number; rawLength: number; rawNose: number } {
+  const ramp = ground[gore.rampArm], highway = ground[gore.followsArm];
+  const sin = Math.max(1e-9, Math.sin(gore.angle));
+  const tan = Math.max(1e-9, Math.tan(gore.angle));
+  const rawLength = 6 * ramp.h / tan;
+  // True crossing for straight arms: the highway-side ramp asphalt edge,
+  // rather than the ramp centreline, must reach the highway outer edge.
+  const rawNose = (highway.h + ramp.h * Math.cos(gore.angle)) / sin;
+  const noseStation = q(Math.max(1, rawNose));
+  const boundedLength = q(Math.max(2, Math.min(GORE_MAX_LENGTH, rawLength)));
+  return {
+    length: q(Math.max(boundedLength, noseStation + 0.5)),
+    noseStation,
+    rawLength,
+    rawNose,
+  };
+}
+
 /** Wanted taper length on `segId` at a taper node when it is the wide arm, else 0. */
 function taperTrimAt(w: World, nodeId: number, segId: number, cache?: Map<number, NodeNoms>): number {
   const nn = getNoms(w, nodeId, cache);
@@ -526,6 +596,13 @@ function nominalTrimAt(
   const ground = nn.ground;
   const idx = ground.findIndex((a) => a.segId === segId);
   if (idx < 0) return 0;
+  const gore = classifyGore(ground);
+  if (gore) {
+    const wants = goreWants(ground, gore);
+    if (idx === gore.rampArm) return wants.noseStation;
+    if (idx === gore.followsArm && side === gore.localSide) return wants.length;
+    return 0;
+  }
   const tapered = taperTrimAt(w, nodeId, segId, cache);
   if (tapered > 0) return tapered;
   if (ground.length < 2) {
@@ -745,6 +822,8 @@ function classify(ground: JArm[], gaps: Gap[]): { kind: JunctionKind; template: 
       : { kind: "transition", template: "bend" };
   }
   if (ground.length === 3) {
+    const gore = classifyGore(ground);
+    if (gore) return { kind: gore.kind, template: "general" };
     const degs = gaps.map((g) => (g.gap * 180) / Math.PI).sort((x, y) => x - y);
     const tol = (TEMPLATE_TOL * 180) / Math.PI;
     const tee = Math.abs(degs[0] - 90) < tol && Math.abs(degs[1] - 90) < tol && Math.abs(degs[2] - 180) < tol;
@@ -866,6 +945,9 @@ function hashLayout(l: JunctionLayout): string {
   for (const r of [l.asphalt, l.kerbOuter, l.sidewalkOuter, l.boundary]) {
     parts.push(r.map((p) => `${p.x.toFixed(3)},${p.z.toFixed(3)}`).join(";"));
   }
+  if (l.gore) {
+    parts.push(`gore:${l.gore.rampArm}:${l.gore.side}:${l.gore.length.toFixed(3)}:${l.gore.noseStation.toFixed(3)}:${l.gore.outerLane}`);
+  }
   return fnv1a(parts.join("#"));
 }
 
@@ -879,6 +961,227 @@ interface TaperBuild {
   laneArrows: LaneArrow[];
   taper: NonNullable<JunctionLayout["taper"]>;
   diagnostics: JunctionDiagnostic[];
+}
+
+interface GoreBuild {
+  arms: JunctionArm[];
+  asphalt: Pt[];
+  boundary: Pt[];
+  connectors: LaneConnector[];
+  laneArrows: LaneArrow[];
+  gore: NonNullable<JunctionLayout["gore"]>;
+  diagnostics: JunctionDiagnostic[];
+  mouths: Map<string, { t: number; p: Pt }>;
+}
+
+interface GorePathPoint extends Pt { s: number }
+
+/** Sampled asphalt edges in an arm's outward frame, station-matched to the centreline. */
+function goreArmEdges(w: World, arm: JArm): { neg: GorePathPoint[]; pos: GorePathPoint[]; total: number } {
+  const seg = segById(w, arm.segId)!;
+  const c = corridorsOf(w).bySeg.get(arm.segId);
+  if (!c || c.centre.length < 2 || seg.pts.length === 2) {
+    const total = segLength(w, seg);
+    const tip = arm.end === "a" ? seg.pts[0] : seg.pts[seg.pts.length - 1];
+    const edge = (side: -1 | 1): GorePathPoint[] => [0, total].map((s) => ({
+      ...qpt({ x: tip.x + arm.dx * s - arm.dz * side * arm.h, z: tip.z + arm.dz * s + arm.dx * side * arm.h }),
+      s,
+    }));
+    return { neg: edge(-1), pos: edge(1), total };
+  }
+  const total = c.centre[c.centre.length - 1].s;
+  const make = (side: -1 | 1): GorePathPoint[] => {
+    const segmentSide = (side * (arm.end === "a" ? 1 : -1)) as -1 | 1;
+    const src = segmentSide > 0 ? c.offsets.asphaltEdge.left : c.offsets.asphaltEdge.right;
+    const indices = arm.end === "a" ? src.map((_, i) => i) : src.map((_, i) => src.length - 1 - i);
+    return indices.map((i) => ({
+      x: src[i].x, z: src[i].z,
+      s: q(arm.end === "a" ? c.centre[i].s : total - c.centre[i].s),
+    }));
+  };
+  return { neg: make(-1), pos: make(1), total };
+}
+
+function gorePathAt(path: GorePathPoint[], station: number): Pt {
+  const s = Math.max(0, Math.min(path[path.length - 1].s, station));
+  let i = 0;
+  while (i + 1 < path.length - 1 && path[i + 1].s < s) i++;
+  const a = path[i], b = path[Math.min(path.length - 1, i + 1)];
+  const u = (s - a.s) / Math.max(1e-9, b.s - a.s);
+  return qpt({ x: a.x + (b.x - a.x) * u, z: a.z + (b.z - a.z) * u });
+}
+
+function gorePathSlice(path: GorePathPoint[], from: number, to: number): Pt[] {
+  const lo = Math.min(from, to), hi = Math.max(from, to);
+  const out = [gorePathAt(path, lo)];
+  // Do not leave a tiny final curve chord beside either constructed corner:
+  // its offset miter can fold behind the adjacent edge after 1e-3 rounding.
+  for (const p of path) if (p.s > lo + 0.25 && p.s < hi - 0.25) out.push({ x: p.x, z: p.z });
+  out.push(gorePathAt(path, hi));
+  return from <= to ? out : out.reverse();
+}
+
+function gorePathCross(a: GorePathPoint[], b: GorePathPoint[]): { p: Pt; aS: number; bS: number } | null {
+  let best: { p: Pt; aS: number; bS: number } | null = null;
+  for (let i = 0; i + 1 < a.length; i++) for (let j = 0; j + 1 < b.length; j++) {
+    const p = a[i], p1 = a[i + 1], rX = p1.x - p.x, rZ = p1.z - p.z;
+    const q0 = b[j], q1 = b[j + 1], sX = q1.x - q0.x, sZ = q1.z - q0.z;
+    const den = rX * sZ - rZ * sX;
+    if (Math.abs(den) < 1e-10) continue;
+    const qx = q0.x - p.x, qz = q0.z - p.z;
+    const u = (qx * sZ - qz * sX) / den, v = (qx * rZ - qz * rX) / den;
+    if (u < -1e-8 || u > 1 + 1e-8 || v < -1e-8 || v > 1 + 1e-8) continue;
+    const aS = p.s + (p1.s - p.s) * u, bS = q0.s + (q1.s - q0.s) * v;
+    if (aS < 0.05 || bS < 0.05) continue;
+    const hit = { p: qpt({ x: p.x + rX * u, z: p.z + rZ * u }), aS, bS };
+    if (!best || bS < best.bS) best = hit;
+  }
+  return best;
+}
+
+/** Uniform mitered outward offset of a simple CCW ring. */
+function offsetPolygon(ring: Pt[], distance: number): Pt[] {
+  if (ring.length < 3 || distance <= 0) return ring.map((p) => ({ ...p }));
+  const out: Pt[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const prev = ring[(i - 1 + ring.length) % ring.length], p = ring[i], next = ring[(i + 1) % ring.length];
+    let adx = p.x - prev.x, adz = p.z - prev.z;
+    let bdx = next.x - p.x, bdz = next.z - p.z;
+    const al = Math.hypot(adx, adz) || 1, bl = Math.hypot(bdx, bdz) || 1;
+    adx /= al; adz /= al; bdx /= bl; bdz /= bl;
+    const a0 = { x: p.x + adz * distance, z: p.z - adx * distance };
+    const b0 = { x: p.x + bdz * distance, z: p.z - bdx * distance };
+    const hit = lineHit(a0.x, a0.z, adx, adz, b0.x, b0.z, bdx, bdz);
+    const fallback = { x: p.x + (adz + bdz) * distance / 2, z: p.z - (adx + bdx) * distance / 2 };
+    const candidate = hit ?? fallback;
+    // Quantised curve samples can make consecutive edges differ by a few
+    // microradians.  Their infinite-line miter is kilometres away; cap it to
+    // the same four-width rule as corridor offsets.
+    const d = Math.hypot(candidate.x - p.x, candidate.z - p.z);
+    out.push(qpt(d <= distance * 4 ? candidate : fallback));
+  }
+  return finalizeRing(out);
+}
+
+/** Build the asymmetric highway/ramp pad.  Every emitted connector still
+ * goes through lanes.ts' strict asphalt containment test. */
+function buildGore(
+  w: World,
+  cx: number,
+  cz: number,
+  ground: JArm[],
+  goreClass: GoreClass,
+  maxLength: number,
+): GoreBuild {
+  const wants = goreWants(ground, goreClass);
+  const follows = ground[goreClass.followsArm], ramp = ground[goreClass.rampArm];
+  const otherArm = goreClass.highwayArms.find((i) => i !== goreClass.followsArm)!;
+  const other = ground[otherArm], side = goreClass.localSide;
+  const P = (a: JArm, s: number, off: number): Pt => qpt({
+    x: cx + a.dx * s - a.dz * off,
+    z: cz + a.dz * s + a.dx * off,
+  });
+  const sideCoord = (p: Pt): number =>
+    ((p.x - cx) * -follows.dz + (p.z - cz) * follows.dx) * side;
+  const followsEdges = goreArmEdges(w, follows);
+  const rampEdges = goreArmEdges(w, ramp);
+  const followsOuter = side < 0 ? followsEdges.neg : followsEdges.pos;
+  const rampInnerSide = sideCoord(gorePathAt(rampEdges.neg, Math.min(0.5, rampEdges.total)))
+      <= sideCoord(gorePathAt(rampEdges.pos, Math.min(0.5, rampEdges.total))) ? -1 : 1;
+  const rampInner = rampInnerSide < 0 ? rampEdges.neg : rampEdges.pos;
+  const crossing = gorePathCross(followsOuter, rampInner);
+  const noseStation = q(crossing?.bS ?? wants.noseStation);
+  const highwayNose = q(crossing?.aS ?? wants.noseStation);
+  // A budget may shorten a pad, but it may never move the end corner behind
+  // the true asphalt-edge crossing.  The half-tile tail also removes the
+  // nearly coincident boundary corners that produced sub-2-degree ears.
+  const length = q(Math.max(Math.min(wants.length, maxLength), noseStation + 0.5, highwayNose + 0.5));
+  const rampMouthBySide = {
+    neg: gorePathAt(rampEdges.neg, noseStation),
+    pos: gorePathAt(rampEdges.pos, noseStation),
+  };
+  if (rampInnerSide < 0 && crossing) rampMouthBySide.neg = crossing.p;
+  if (rampInnerSide > 0 && crossing) rampMouthBySide.pos = crossing.p;
+  const rampMouth = [rampMouthBySide.neg, rampMouthBySide.pos].sort((a, b) => sideCoord(a) - sideCoord(b));
+  const otherBySide = { neg: P(other, 0, -other.h), pos: P(other, 0, other.h) };
+  const otherEdges = [otherBySide.neg, otherBySide.pos].sort((a, b) => sideCoord(a) - sideCoord(b));
+  const followsBySide = { neg: P(follows, 0, -follows.h), pos: P(follows, 0, follows.h) };
+  const followsInnerAtNode = side < 0 ? followsBySide.pos : followsBySide.neg;
+  const outerChain = gorePathSlice(followsOuter, length, highwayNose);
+  if (crossing) outerChain[outerChain.length - 1] = crossing.p;
+  const asphalt = finalizeRing([
+    followsInnerAtNode,
+    ...outerChain,
+    rampMouth[1],
+    otherEdges[1],
+    otherEdges[0],
+  ]);
+
+  const arms = ground.map((a, i): JunctionArm => {
+    const neg = emptyTrims(), pos = emptyTrims();
+    if (i === goreClass.followsArm) {
+      const target = side < 0 ? neg : pos;
+      target.asphalt = target.kerb = target.sidewalk = target.boundary = length;
+    } else if (i === goreClass.rampArm) {
+      for (const target of [neg, pos]) {
+        target.asphalt = target.kerb = target.sidewalk = target.boundary = noseStation;
+      }
+    }
+    return {
+      segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz, angle: a.angle,
+      trimNeg: neg, trimPos: pos, markingsSuppressed: true,
+    };
+  });
+
+  // Both highway lane mouths sit just inside the gore side of the node.  The
+  // follows arm needs a tiny positive trim because endpoint() subtracts its
+  // inward epsilon; the opposite arm naturally nudges in the same direction.
+  const laneArms = arms.map((a, i) => ({
+    segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz,
+    trim: i === goreClass.rampArm ? noseStation : i === goreClass.followsArm ? 0.024 : 0,
+    oneWay: a.type === 6, dir: ground[i].dir,
+  }));
+  const laneGraph = buildGoreLaneConnectors(
+    { x: cx, z: cz }, laneArms, asphalt,
+    goreClass.rampArm, goreClass.followsArm, goreClass.rampInbound,
+  );
+  const diagnostics: JunctionDiagnostic[] = [];
+  const rawLengthRounded = q(wants.rawLength);
+  const boundedLength = q(Math.max(2, Math.min(GORE_MAX_LENGTH, wants.rawLength)));
+  const rawNoseRounded = q(wants.rawNose), boundedNose = q(Math.max(1, wants.rawNose));
+  if (rawLengthRounded !== boundedLength || rawNoseRounded !== boundedNose || length < wants.length - 1e-9) {
+    diagnostics.push({ code: "gore-clamped", detail: `length ${wants.rawLength.toFixed(2)}->${length.toFixed(3)}, nose ${wants.rawNose.toFixed(2)}->${noseStation.toFixed(3)}` });
+  }
+  for (const m of laneGraph.missing) {
+    diagnostics.push({ code: "connector-missing", detail: `${m.inArm}->${m.outArm}:${m.turn}` });
+  }
+  const segmentSide = (side * (follows.end === "a" ? 1 : -1)) as -1 | 1;
+  const mouths = new Map<string, { t: number; p: Pt }>();
+  const setMouth = (armIndex: number, mouthSide: -1 | 1, t: number, p: Pt): void => {
+    mouths.set(`${armIndex}:${mouthSide}`, { t, p });
+  };
+  setMouth(goreClass.followsArm, -side as -1 | 1, 0, followsInnerAtNode);
+  setMouth(goreClass.followsArm, side, length, gorePathAt(followsOuter, length));
+  setMouth(goreClass.rampArm, -1, noseStation, rampMouthBySide.neg);
+  setMouth(goreClass.rampArm, 1, noseStation, rampMouthBySide.pos);
+  setMouth(otherArm, -1, 0, otherBySide.neg);
+  setMouth(otherArm, 1, 0, otherBySide.pos);
+  return {
+    arms,
+    asphalt,
+    boundary: offsetPolygon(asphalt, Math.max(follows.clearance, ramp.clearance)),
+    connectors: laneGraph.connectors,
+    laneArrows: laneGraph.arrows,
+    gore: {
+      rampArm: goreClass.rampArm,
+      side: segmentSide,
+      length,
+      noseStation,
+      outerLane: laneGraph.outerLane,
+    },
+    diagnostics,
+    mouths,
+  };
 }
 
 /** Build a real asphalt transition on the wider arm. Connector endpoints sit
@@ -1079,6 +1382,35 @@ export function buildJunction(
   }
 
   const { kind, template } = classify(ground, gaps);
+
+  if (kind === "merge" || kind === "diverge") {
+    const goreClass = classifyGore(ground)!;
+    const wants = goreWants(ground, goreClass);
+    const maxShare = (armIndex: number, want: number): number => {
+      const a = ground[armIndex], seg = segById(w, a.segId)!;
+      const far = a.end === "a" ? seg.b : seg.a;
+      const farTrim = far === nodeId ? 0 : Math.max(
+        nominalTrimAt(w, far, a.segId, 1, nomsCache),
+        nominalTrimAt(w, far, a.segId, -1, nomsCache),
+      );
+      return Math.max(0.05, Math.floor(allowance(segLength(w, seg), want, farTrim, MIN_RIBBON) * 1000) / 1000);
+    };
+    const gore = buildGore(
+      w, cx, cz, ground, goreClass,
+      maxShare(goreClass.followsArm, wants.length),
+    );
+    diags.push(...gore.diagnostics);
+    const layout: JunctionLayout = {
+      ...base, kind, template, arms: gore.arms,
+      asphalt: gore.asphalt, kerbOuter: [], sidewalkOuter: [], boundary: gore.boundary,
+      fillets: [], lotAnchors: [], connectors: gore.connectors, laneArrows: gore.laneArrows,
+      gore: gore.gore, hash: "", diagnostics: diags,
+    };
+    attachMouths(cx, cz, layout.arms, ground, [gore.asphalt, [], []], (arm, layer, side) =>
+      layer === 0 ? gore.mouths.get(`${arm}:${side}`) : undefined);
+    layout.hash = hashLayout(layout);
+    return layout;
+  }
 
   if (kind === "taper") {
     const wide = ground[0].h >= ground[1].h ? ground[0] : ground[1];
@@ -1753,7 +2085,7 @@ export function buildJunction(
     return {
       segId: a.segId, end: a.end, type: a.type, dx: a.dx, dz: a.dz,
       trim: Math.max(a.trimNeg.asphalt, a.trimPos.asphalt),
-      oneWay: seg?.oneWay ?? (a.type === 4 || a.type === 5), dir: seg?.dir ?? 1,
+      oneWay: seg?.oneWay ?? isOneWayType(a.type), dir: seg?.dir ?? 1,
     };
   }), layout.asphalt);
   layout.connectors = laneGraph.connectors;
@@ -1770,7 +2102,7 @@ export function buildJunction(
 const KNOWN_CODES = new Set([
   "radius-shrunk", "chamfered-corner", "trim-clamped", "crosswalk-dropped",
   "stopline-dropped", "min-gap-merged", "layer-excluded",
-  "non-ground-node", "pad-node-deferred", "short-segment", "taper-direction-conflict", "connector-missing",
+  "non-ground-node", "pad-node-deferred", "short-segment", "taper-direction-conflict", "connector-missing", "gore-clamped",
 ]);
 
 function nearestVert(ring: Pt[], p: Pt): Pt {
@@ -1801,6 +2133,13 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
   if (l.kind === "end" && n === 0 && !has("pad-node-deferred")) err("end with 0 arms but no pad diagnostic");
   if ((l.kind === "middle" || l.kind === "bend" || l.kind === "transition" || l.kind === "taper") && n !== 2) {
     err(`${l.kind} must have 2 arms`);
+  }
+  if (l.kind === "merge" || l.kind === "diverge") {
+    if (n !== 3) err(`${l.kind} must have 3 arms`);
+    if (!l.gore) err(`${l.kind} must carry gore metadata`);
+    else if (l.gore.rampArm < 0 || l.gore.rampArm >= n || l.arms[l.gore.rampArm].type !== 6) {
+      err(`${l.kind} gore ramp arm invalid`);
+    }
   }
   if (l.kind === "junction" && n < 3) err("junction must have 3+ arms");
   if (l.kind === "non-ground" && (n !== 0 || !has("non-ground-node"))) {
@@ -1879,7 +2218,10 @@ export function checkJunction(l: JunctionLayout): { ok: boolean; errors: string[
       for (const side of [-1, 1] as const) {
         const t = side < 0 ? a.trimNeg.asphalt : a.trimPos.asphalt;
         if (!Number.isFinite(t)) { err(`seg ${a.segId} side ${side}: trim not finite`); continue; }
-        const e = {
+        const recorded = a.mouth?.asphalt;
+        const recordedSide = recorded ? (side < 0 ? recorded.neg : recorded.pos) : undefined;
+        const curvedGoreMouth = (l.kind === "merge" || l.kind === "diverge") ? recordedSide : undefined;
+        const e = curvedGoreMouth ? curvedGoreMouth.p : {
           x: cx + a.dx * t + -a.dz * side * h,
           z: cz + a.dz * t + a.dx * side * h,
         };

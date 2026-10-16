@@ -1,3 +1,5 @@
+import { isMotorway, isOneWayType, ROAD_TYPES } from "./world";
+import type { RoadType } from "./world";
 import { makeRng } from "./rng";
 import { ROAD_SPECS, derive } from "./roadprofile";
 import { CityState } from "./sim";
@@ -5,7 +7,7 @@ import { ROAD, World, ZONE, heightAt, idx, inBounds, isTunnelTile, TransitKind, 
 import { SignalInfo, hasSignal, signalNodes, signalPhaseAt } from "./roads";
 import { straightTiles } from "./transit";
 import { RAIN_SPEED_FACTOR } from "./weather";
-import { profileOf } from "./corridor";
+import { PROFILES, profileOf } from "./corridor";
 import { JunctionLayout, junctionsOf } from "./junction";
 import { ClaimSet, PRIORITY_CLAIM_TIMEOUT, newClaimSet, priorityTableOf, resolveClaims, sweepClaims, upsertClaim, removeClaim } from "./priority";
 import { AdaptiveSignalState, newAdaptiveSignal, stepAdaptiveSignalInPlace } from "./signals";
@@ -23,6 +25,8 @@ export interface Vehicle {
   id: number;
   /** 0 = commuter car, 1 = goods truck. */
   kind: 0 | 1;
+  /** Lane index, 0 = leftmost lane of travel; derived on spawn, never saved. */
+  lane: number;
   tiles: number[];
   /** Road layer per tile (0 ground, 1 deck, 2 tunnel); absent means ground. */
   layers?: Uint8Array;
@@ -34,6 +38,8 @@ export interface Vehicle {
   arc?: number;
   /** Cumulative geometry distance for `pts`; built once with the route. */
   arcs?: Float32Array;
+  /** Cached route index of `arc`/`progress`; a hint for the hot loop, never saved. */
+  arcIdx?: number;
   /** Current speed as a fraction of free flow (1 = no congestion). */
   speedFactor: number;
   /** Current speed in tiles/s (IDM state). */
@@ -92,6 +98,8 @@ export interface TransitVehicle {
   id: number;
   lineId: number;
   kind: TransitKind;
+  /** Lane index for buses, 0 = leftmost (rightmost by policy); rail ignores it. */
+  lane: number;
   color: string;
   /** Index in line.stops of the stop being driven to. */
   stopIdx: number;
@@ -175,17 +183,18 @@ export function redCrawl(w: World, t: TrafficState, tile: number, next: number, 
   const hx = (next % w.size) - (tile % w.size);
   const hz = ((next / w.size) | 0) - ((tile / w.size) | 0);
   if (hx === 0 && hz === 0) return 1;
-  const hl = Math.hypot(hx, hz);
+  const hl = Math.sqrt(hx * hx + hz * hz);
   const cx = (tile % w.size) + 0.5, cz = ((tile / w.size) | 0) + 0.5;
   const here = t.sigByTile.get(tile);
   const ahead = next === tile ? undefined : t.sigByTile.get(next);
   if (!here && !ahead) return 1;
   const visit = (signals: SignalInfo[] | undefined, skip: SignalInfo[] | undefined): number => {
     if (!signals) return 1;
-    for (const sn of signals) {
+    for (let si = 0; si < signals.length; si++) {
+      const sn = signals[si];
       if (skip?.includes(sn)) continue;
       const vx = sn.x - cx, vz = sn.z - cz;
-      const d = Math.hypot(vx, vz);
+      const d = Math.sqrt(vx * vx + vz * vz);
       if (d > 1.7 || d < 1e-6) continue;
       if ((vx * hx + vz * hz) / (d * hl) < 0.5) continue; // not heading at this node
       const ux = hx / hl, uz = hz / hl;
@@ -226,17 +235,20 @@ export function indexSignals(w: World, signals: SignalInfo[]): Map<number, Signa
 /** Count waiting vehicles on each incoming signal arm without allocating in ticks. */
 function updateAdaptiveSignals(w: World, t: TrafficState, h: number): void {
   for (const q of t.signalQueues.values()) q.fill(0);
-  for (const v of t.vehicles) {
+  const vehicles = t.vehicles;
+  for (let vi = 0; vi < vehicles.length; vi++) {
+    const v = vehicles[vi];
     if (v.tiles.length < 2 || v.v > IDM_V_STOP * 2) continue;
     const s = vehicleArc(v);
     const tile = routeTileAt(w, v, s);
     const candidates = t.sigByTile.get(tile);
     if (!candidates) continue;
-    const p = pointAtRouteArc(v.pts, v.arcs!, s);
-    const ni = routeArcIndex(v.arcs!, Math.min(v.arcs![v.arcs!.length - 1], s + 0.25));
+    const p = pointAtRouteArcInto(v.pts, v.arcs!, s, signalPose, v.arcIdx ?? -1);
+    const ni = routeArcIndex(v.arcs!, Math.min(v.arcs![v.arcs!.length - 1], s + 0.25), p.index);
     const hx = v.pts[Math.min(v.pts.length - 2, ni * 2 + 2)] - p.x;
     const hz = v.pts[Math.min(v.pts.length - 1, ni * 2 + 3)] - p.z;
-    for (const sn of candidates) {
+    for (let ci = 0; ci < candidates.length; ci++) {
+      const sn = candidates[ci];
       let best = 0, bd = -Infinity;
       for (let i = 0; i < sn.arms.length; i++) {
         const d = -(sn.arms[i].dx * hx + sn.arms[i].dz * hz);
@@ -245,7 +257,9 @@ function updateAdaptiveSignals(w: World, t: TrafficState, h: number): void {
       if (bd > 0.3) t.signalQueues.get(sn.id)![sn.arms[best].ns ? 0 : 1]++;
     }
   }
-  for (const sn of t.sigNodes) {
+  const sigNodes = t.sigNodes;
+  for (let ni = 0; ni < sigNodes.length; ni++) {
+    const sn = sigNodes[ni];
     const controller = t.adaptiveSignals.get(sn.id);
     const queues = t.signalQueues.get(sn.id);
     if (controller && queues) stepAdaptiveSignalInPlace(controller, h, queues);
@@ -287,7 +301,7 @@ export function idmCapacityPerLane(speed: number, kind: 0 | 1 = 0): number {
 
 /** Flow capacity of a road tile, used to translate demand into IDM units. */
 export function idmRoadCapacity(type: number, kind: 0 | 1 = 0): number {
-  return idmCapacityPerLane(ROAD_SPEED[type], kind) * profileOf(type as 1 | 2 | 3 | 4 | 5).lanes;
+  return idmCapacityPerLane(ROAD_SPEED[type], kind) * profileOf(type as RoadType).lanes;
 }
 
 function demandCapacityFactor(w: World): number {
@@ -373,9 +387,33 @@ export function routeArcLengths(pts: Float32Array): Float32Array {
 }
 
 /** Locate an arc length on a route.  Equal-length samples resolve forward, deterministically. */
-export function routeArcIndex(arcs: Float32Array, s: number): number {
+export function routeArcIndex(arcs: Float32Array, s: number, hint = -1): number {
   if (arcs.length < 2) return 0;
   const target = Math.max(0, Math.min(arcs[arcs.length - 1], s));
+  // Hot-loop hint: arcs advance monotonically, so the cached index is usually
+  // exact or a few steps behind (scan-ahead samples) or ahead (stale cache).
+  // Bit-identical to the binary search below, including the end clamp to n-2.
+  if (hint >= 0 && hint < arcs.length) {
+    if (target >= arcs[arcs.length - 1]) return arcs.length - 2;
+    if (arcs[hint] <= target && hint + 1 < arcs.length && target < arcs[hint + 1]) {
+      return Math.min(hint, arcs.length - 2);
+    }
+    if (target >= arcs[hint]) {
+      let h = hint;
+      while (h + 2 < arcs.length && arcs[h + 1] <= target) {
+        h++;
+        if (h - hint >= 8) break;
+      }
+      if (arcs[h] <= target && h + 1 < arcs.length && target < arcs[h + 1]) return Math.min(h, arcs.length - 2);
+    } else {
+      let h = hint;
+      while (h > 0 && arcs[h] > target) {
+        h--;
+        if (hint - h >= 8) break;
+      }
+      if (arcs[h] <= target && h + 1 < arcs.length && target < arcs[h + 1]) return Math.min(h, arcs.length - 2);
+    }
+  }
   let lo = 0, hi = arcs.length - 1;
   while (lo + 1 < hi) { const m = (lo + hi) >> 1; if (arcs[m] <= target) lo = m; else hi = m; }
   return lo;
@@ -384,8 +422,8 @@ export function routeArcIndex(arcs: Float32Array, s: number): number {
 /** Interpolate a route at physical distance, for connector samples and legacy polylines alike. */
 export interface RouteArcPose { x: number; z: number; index: number; t: number }
 /** Allocation-free arc sampler for traffic's hot loop. */
-export function pointAtRouteArcInto(pts: Float32Array, arcs: Float32Array, s: number, out: RouteArcPose): RouteArcPose {
-  const i = routeArcIndex(arcs, s);
+export function pointAtRouteArcInto(pts: Float32Array, arcs: Float32Array, s: number, out: RouteArcPose, hint = -1): RouteArcPose {
+  const i = routeArcIndex(arcs, s, hint);
   const a = arcs[i] || 0, b = arcs[Math.min(i + 1, arcs.length - 1)] || a;
   const t = b > a ? Math.max(0, Math.min(1, (s - a) / (b - a))) : 0;
   out.x = pts[i * 2] + (pts[Math.min(i + 1, arcs.length - 1) * 2] - pts[i * 2]) * t;
@@ -401,7 +439,7 @@ export function pointAtRouteArc(pts: Float32Array, arcs: Float32Array, s: number
 /** Tile below an arc position.  This deliberately keeps the existing tile buckets. */
 function routeTileAt(w: World, v: Vehicle, s: number): number {
   const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
-  const p = pointAtRouteArcInto(v.pts, arcs, s, routeTilePose);
+  const p = pointAtRouteArcInto(v.pts, arcs, s, routeTilePose, v.arcIdx ?? -1);
   const x = Math.max(0, Math.min(w.size - 1, Math.floor(p.x)));
   const z = Math.max(0, Math.min(w.size - 1, Math.floor(p.z)));
   const under = z * w.size + x;
@@ -410,6 +448,7 @@ function routeTileAt(w: World, v: Vehicle, s: number): number {
 const routeTilePose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
 const stepPose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
 const leaderPose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
+const signalPose: RouteArcPose = { x: 0, z: 0, index: 0, t: 0 };
 
 /** Keeps old transient hand-built test vehicles valid while making arc authoritative. */
 function vehicleArc(v: Vehicle): number {
@@ -432,7 +471,7 @@ export function turnSide(pts: Float32Array, at: number): number {
   if (at < 0 || at + 2 >= n) return 0;
   const ax = pts[(at + 1) * 2] - pts[at * 2], az = pts[(at + 1) * 2 + 1] - pts[at * 2 + 1];
   const bx = pts[(at + 2) * 2] - pts[(at + 1) * 2], bz = pts[(at + 2) * 2 + 1] - pts[(at + 1) * 2 + 1];
-  const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz);
+  const la = Math.sqrt(ax * ax + az * az), lb = Math.sqrt(bx * bx + bz * bz);
   if (la < 1e-6 || lb < 1e-6) return 0;
   const s = (ax * bz - az * bx) / (la * lb);
   if (s < -0.25) return 1;
@@ -522,14 +561,17 @@ export function routePitchAt(w: World, tiles: number[], layers: Uint8Array | und
 }
 
 /** Per-tile vehicle buckets, rebuilt every substep without allocation. */
-const buckets = { tiles: 0, head: new Int32Array(0), next: new Int32Array(0) };
+const buckets = { tiles: 0, head: new Int32Array(0), next: new Int32Array(0), seen: new Int32Array(0) };
 function ensureBuckets(tiles: number, vehicles: number): void {
   if (buckets.tiles !== tiles) {
     buckets.tiles = tiles;
     buckets.head = new Int32Array(tiles);
   }
   if (buckets.next.length < vehicles) buckets.next = new Int32Array(Math.max(16, vehicles * 2));
+  if (buckets.seen.length < vehicles) buckets.seen = new Int32Array(Math.max(16, vehicles * 2));
 }
+/** Leader-scan stamp: a candidate reached via several tiles is processed once. */
+let scanStamp = 0;
 
 /**
  * Advance one vehicle by `h` game seconds: IDM against the nearest leader in
@@ -538,26 +580,45 @@ function ensureBuckets(tiles: number, vehicles: number): void {
  * Sequential over the (stable-order) vehicle array, so a fixed seed replays
  * exactly; neighbour speeds read the current substep in place.
  */
+/** Scan-sample edge margin: neighbour columns are visited only this close to a tile edge. */
+const SCAN_EDGE = 0.3;
+/**
+ * Leader-scan lookahead (route tiles) is speed-dependent, clamped to
+ * [LEADER_LOOK_MIN, LEADER_LOOK_MAX]: braking distance vv^2/(2*|IDM_DEC|)
+ * plus the IDM headway term vv*IDM_T plus margin. A fixed 2-tile lookahead
+ * sits below braking distance at avenue speed (4.5 needs ~3.9) and highway
+ * speed (7 needs ~8.6), so followers drove through a stopped queue tail.
+ * Queued traffic keeps the 2-tile floor; signals keep IDM_LOOKAHEAD.
+ */
+const LEADER_LOOK_MIN = 2, LEADER_LOOK_MAX = 10;
+
 function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: number): void {
   const v = t.vehicles[k];
   const len = v.tiles.length;
   if (len < 2) return;
   const arcDriven = v.arc !== undefined;
   const arcs = v.arcs ?? (v.arcs = routeArcLengths(v.pts));
-  const routeS = vehicleArc(v);
-  const pose = pointAtRouteArcInto(v.pts, arcs, routeS, stepPose);
+  const routeS = arcDriven ? v.arc! : vehicleArc(v);
+  const pose = pointAtRouteArcInto(v.pts, arcs, routeS, stepPose, v.arcIdx ?? -1);
   const at = pose.index;
   if (at >= arcs.length - 1 || at < 0) return;
-  const tile = routeTileAt(w, v, routeS);
+  v.arcIdx = at;
+  // Tile from the pose just sampled (routeTileAt would resample the same arc).
+  const pux = Math.floor(pose.x), puz = Math.floor(pose.z);
+  const cux = pux < 0 ? 0 : pux >= w.size ? w.size - 1 : pux;
+  const cuz = puz < 0 ? 0 : puz >= w.size ? w.size - 1 : puz;
+  const under = cuz * w.size + cux;
+  const tile = w.road[under] ? under : v.tiles[Math.min(v.tiles.length - 1, pose.index)] ?? under;
   const cls = w.road[tile];
   if (!cls) return;
   const f = pose.t;
   const ax = v.pts[at * 2], az = v.pts[at * 2 + 1];
   const bx = v.pts[at * 2 + 2], bz = v.pts[at * 2 + 3];
-  const segLen = Math.hypot(bx - ax, bz - az) || 1;
+  const segLen = Math.sqrt((bx - ax) * (bx - ax) + (bz - az) * (bz - az)) || 1;
   const hx = (bx - ax) / segLen, hz = (bz - az) / segLen;
   const px = ax + (bx - ax) * f, pz = az + (bz - az) * f;
-  const myHalf = halfLength(v.kind);
+  const myHalf = v.kind === 1 ? 0.3 : 0.2;
+  const myLane = PROFILES[cls as RoadType].laneWidth;
   const vv = v.v ?? 0;
 
   // Desired speed: free flow × driver × weather, capped by congestion (kept as
@@ -578,33 +639,109 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   // Same-direction only (heading dot): cross traffic and oncoming lanes pass
   // through until the lane graph lands, as before.
   let leadGap = Infinity, leadV = 0;
-  const { head, next } = buckets;
-  const last = Math.min(arcs[arcs.length - 1], routeS + IDM_LOOKAHEAD);
+  const { head, next, seen } = buckets;
+  if (++scanStamp > 2000000000) { seen.fill(0); scanStamp = 1; }
+  const stamp = scanStamp;
+  const look = Math.max(LEADER_LOOK_MIN, Math.min(LEADER_LOOK_MAX, (vv * vv) / (2 * -IDM_DEC) + vv * IDM_T + 0.8));
+  const last = Math.min(arcs[arcs.length - 1], routeS + look);
+  const jEnd = routeArcIndex(arcs, last, at);
+  const pts = v.pts;
+  const vehicles = t.vehicles;
+  const size = w.size, road = w.road;
+  const lookLen = last - routeS;
+  // Euclidean/long prefilters: a valid leader sits within lookLen of arc and
+  // 0.2 of the route, so beyond lookLen + margin it cannot project inside.
+  const maxLong = lookLen + 0.25;
+  const maxD = lookLen + 0.3, maxD2 = maxD * maxD;
+  const bandF = myLane / 2, bandF2 = bandF * bandF;
+  const sLo = routeS + 1e-6, sHi = last + 1e-6;
   for (let scan = routeS; scan <= last + 1e-6; scan += 1) {
+    // 1.0-spaced samples can straddle the leader's tile on diagonals and tile
+    // boundaries, so edge samples visit neighbour columns; a mid-tile sample's
+    // leaders stay in its own tile (adjacent samples cover the 0.5-ahead case).
     const scanTile = routeTileAt(w, v, scan);
-    for (let u = head[scanTile]; u >= 0; u = next[u]) {
-      if (u === k) continue;
-      const o = t.vehicles[u];
-      const oarcs = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
-      const op = pointAtRouteArcInto(o.pts, oarcs, vehicleArc(o), leaderPose);
-      const oat = Math.max(0, Math.min(oarcs.length - 2, op.index));
-      const of = op.t;
-      const oax = o.pts[oat * 2], oaz = o.pts[oat * 2 + 1];
-      const obx = o.pts[oat * 2 + 2], obz = o.pts[oat * 2 + 3];
-      const oseg = Math.hypot(obx - oax, obz - oaz) || 1;
-      const ohx = (obx - oax) / oseg, ohz = (obz - oaz) / oseg;
-      const rx = oax + (obx - oax) * of - px, rz = oaz + (obz - oaz) * of - pz;
-      const long = rx * hx + rz * hz;
-      // A vehicle behind us is never a leader.  The old -0.2 tolerance made
-      // two close stopped cars brake one another forever.
-      if (long <= 1e-6) continue;
-      if (Math.abs(rx * hz - rz * hx) > 0.45) continue;
-      if (hx * ohx + hz * ohz < 0.3) continue;
-      const gap = long - myHalf - halfLength(o.kind);
-      // Overlapped cars on different headings (turning/crossing inside a box) can each see the other as
-      // 'ahead': a mutual-leader cycle no light or timeout resolves. The lower id ignores the higher id there.
-      if (gap < -0.02 && o.id > v.id && hx * ohx + hz * ohz < 0.95) continue;
-      if (gap < leadGap) { leadGap = gap; leadV = o.v ?? 0; }
+    let gx0 = -1, gx1 = 1, gz0 = -1, gz1 = 1;
+    const rtx = routeTilePose.x, rtz = routeTilePose.z;
+    const flx = Math.floor(rtx), flz = Math.floor(rtz);
+    const gtx = flx < 0 ? 0 : flx >= size ? size - 1 : flx;
+    const gtz = flz < 0 ? 0 : flz >= size ? size - 1 : flz;
+    if (scanTile === gtz * size + gtx) {
+      const fx = rtx - flx;
+      const fz = rtz - flz;
+      if (fx >= SCAN_EDGE && fx <= 1 - SCAN_EDGE) { gx0 = 0; gx1 = 0; }
+      else if (fx < SCAN_EDGE) { gx0 = -1; gx1 = 0; }
+      else { gx0 = 0; gx1 = 1; }
+      if (fz >= SCAN_EDGE && fz <= 1 - SCAN_EDGE) { gz0 = 0; gz1 = 0; }
+      else if (fz < SCAN_EDGE) { gz0 = -1; gz1 = 0; }
+      else { gz0 = 0; gz1 = 1; }
+    }
+    const sx = scanTile % size, sz = (scanTile / size) | 0;
+    for (let gz = gz0; gz <= gz1; gz++) {
+      const nz = sz + gz;
+      if (nz < 0 || nz >= size) continue;
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const nx = sx + gx;
+        if (nx < 0 || nx >= size) continue;
+        for (let u = head[nz * size + nx]; u >= 0; u = next[u]) {
+          if (u === k || seen[u] === stamp) continue;
+          seen[u] = stamp;
+          const o = vehicles[u];
+          const oarcs = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
+          const os = o.arc !== undefined ? o.arc : vehicleArc(o);
+          const op = pointAtRouteArcInto(o.pts, oarcs, os, leaderPose, o.arcIdx ?? -1);
+          const oat = op.index < 0 ? 0 : op.index > oarcs.length - 2 ? oarcs.length - 2 : op.index;
+          const of = op.t;
+          const oax = o.pts[oat * 2], oaz = o.pts[oat * 2 + 1];
+          const opx = oax + (o.pts[oat * 2 + 2] - oax) * of, opz = oaz + (o.pts[oat * 2 + 3] - oaz) * of;
+          const rx = opx - px, rz = opz - pz;
+          const rr2 = rx * rx + rz * rz;
+          if (rr2 > maxD2) continue;
+          const long = rx * hx + rz * hz;
+          // A vehicle behind us is never a leader.  The old -0.2 tolerance made
+          // two close stopped cars brake one another forever.
+          if (long <= 1e-6 || long > maxLong) continue;
+          const obx = o.pts[oat * 2 + 2], obz = o.pts[oat * 2 + 3];
+          const oseg = Math.sqrt((obx - oax) * (obx - oax) + (obz - oaz) * (obz - oaz)) || 1;
+          const ohx = (obx - oax) / oseg, ohz = (obz - oaz) / oseg;
+          // Lane-aware: a leader must share the follower's lane, i.e. sit within
+          // half the narrower lane width (avenue 0.1625, highway 0.2) of the
+          // follower's own route ahead, heading along it. Both used to be
+          // measured against the follower's current straight segment, which
+          // misses a leader already in a bend or connector (0.2+ off that line,
+          // up to 90 deg rotated, while on our lane). Adjacent lanes run 0.325+
+          // off our route, still excluded.
+          let best = Infinity, btx = hx, btz = hz;
+          for (let j = at; j <= jEnd; j++) {
+            const jx = pts[j * 2], jz = pts[j * 2 + 1];
+            const dx = pts[j * 2 + 2] - jx, dz = pts[j * 2 + 3] - jz;
+            const l2 = dx * dx + dz * dz;
+            if (l2 < 1e-12) continue;
+            let tt = ((opx - jx) * dx + (opz - jz) * dz) / l2;
+            tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+            const ex = opx - (jx + dx * tt), ez = opz - (jz + dz * tt);
+            const d2 = ex * ex + ez * ez;
+            if (d2 >= best) continue;
+            const sp = arcs[j] + (arcs[j + 1] - arcs[j]) * tt;
+            if (sp <= sLo || sp > sHi) continue;
+            best = d2;
+            const il = Math.sqrt(l2);
+            btx = dx / il; btz = dz / il;
+          }
+          if (best > bandF2) continue;
+          const oflx = Math.floor(op.x), oflz = Math.floor(op.z);
+          const oux = oflx < 0 ? 0 : oflx >= size ? size - 1 : oflx;
+          const ouz = oflz < 0 ? 0 : oflz >= size ? size - 1 : oflz;
+          const oLane = PROFILES[(road[ouz * size + oux] || cls) as RoadType].laneWidth;
+          const minBand = (myLane < oLane ? myLane : oLane) / 2;
+          if (best > minBand * minBand) continue;
+          if (btx * ohx + btz * ohz < 0.3) continue;
+          const gap = long - myHalf - (o.kind === 1 ? 0.3 : 0.2);
+          // Overlapped cars on different headings (turning/crossing inside a box) can each see the other as
+          // 'ahead': a mutual-leader cycle no light or timeout resolves. The lower id ignores the higher id there.
+          if (gap < -0.02 && o.id > v.id && hx * ohx + hz * ohz < 0.95) continue;
+          if (gap < leadGap) { leadGap = gap; leadV = o.v ?? 0; }
+        }
+      }
     }
   }
 
@@ -674,7 +811,8 @@ function stepVehicle(w: World, t: TrafficState, k: number, h: number, weather: n
   v.v = nv;
   if (arcDriven) {
     v.arc = Math.min(arcs[arcs.length - 1], routeS + nv * h);
-    const pi = routeArcIndex(arcs, v.arc);
+    const pi = routeArcIndex(arcs, v.arc, at);
+    v.arcIdx = pi;
     const pa = arcs[pi], arcNext = arcs[Math.min(pi + 1, arcs.length - 1)];
     v.progress = pi + (arcNext > pa ? (v.arc - pa) / (arcNext - pa) : 0); // compatibility only
   } else v.progress += nv * h;
@@ -715,11 +853,12 @@ function exitBlocked(w: World, t: TrafficState, k: number, v: Vehicle, sExit: nu
   const arcs = v.arcs!;
   const total = arcs[arcs.length - 1];
   if (sExit >= total - 0.05) return false;
-  const e = pointAtRouteArcInto(v.pts, arcs, sExit, exitPose);
+  const hint = v.arcIdx ?? -1;
+  const e = pointAtRouteArcInto(v.pts, arcs, sExit, exitPose, hint);
   const ex = e.x, ez = e.z;
-  const f = pointAtRouteArcInto(v.pts, arcs, Math.min(total, sExit + 0.25), exitPose2);
+  const f = pointAtRouteArcInto(v.pts, arcs, Math.min(total, sExit + 0.25), exitPose2, e.index);
   let hx = f.x - ex, hz = f.z - ez;
-  const hl = Math.hypot(hx, hz);
+  const hl = Math.sqrt(hx * hx + hz * hz);
   if (hl < 1e-6) return false;
   hx /= hl; hz /= hl;
   const need = 2 * halfLength(v.kind) + PRIO_EXIT_ROOM;
@@ -734,7 +873,7 @@ function exitBlocked(w: World, t: TrafficState, k: number, v: Vehicle, sExit: nu
       const o = t.vehicles[u];
       if ((o.v ?? 0) > 0.5) continue;
       const oarcs = o.arcs ?? (o.arcs = routeArcLengths(o.pts));
-      const op = pointAtRouteArcInto(o.pts, oarcs, vehicleArc(o), leaderPose);
+      const op = pointAtRouteArcInto(o.pts, oarcs, vehicleArc(o), leaderPose, o.arcIdx ?? -1);
       const rx = op.x - ex, rz = op.z - ez;
       const long = rx * hx + rz * hz - halfLength(o.kind);
       if (long < -0.1 || long > need) continue;
@@ -742,7 +881,7 @@ function exitBlocked(w: World, t: TrafficState, k: number, v: Vehicle, sExit: nu
       // Same direction only: oncoming cars waiting at their own line do not fill our exit.
       const oi = Math.max(0, Math.min(oarcs.length - 2, op.index));
       const odx = o.pts[oi * 2 + 2] - o.pts[oi * 2], odz = o.pts[oi * 2 + 3] - o.pts[oi * 2 + 1];
-      if (odx * hx + odz * hz <= 0.3 * Math.hypot(odx, odz)) continue;
+      if (odx * hx + odz * hz <= 0.3 * Math.sqrt(odx * odx + odz * odz)) continue;
       return true;
     }
   }
@@ -942,7 +1081,7 @@ export function findLayeredPath(w: World, load: Uint16Array, from: number, to: n
       for (const l of [0, 1, 2] as RoadLayer[]) {
         if (l === layer || !layerClass(w, tile, l)) continue;
         const ns = tile * 3 + l;
-        const ng = gc + 0.01;
+        const ng = Math.fround(gc + 0.01);
         if (ng < G(ns)) { stamp[ns] = gen; g[ns] = ng; prev[ns] = cur; heap.push(ng + (Math.abs(cx - tx) + Math.abs(cy - ty)) * minCost, ns); }
       }
     }
@@ -955,7 +1094,8 @@ export function findLayeredPath(w: World, load: Uint16Array, from: number, to: n
       if ((w.dirX[tile] || w.dirZ[tile]) && w.dirX[tile] * dx + w.dirZ[tile] * dy < -0.35) continue;
       if ((w.dirX[j] || w.dirZ[j]) && w.dirX[j] * dx + w.dirZ[j] * dy < -0.35) continue;
       const ns = j * 3 + layer;
-      const ng = gc + crossCost(cls, load[j]);
+      // g is stored as float32: compare the rounded value or an up-rounded entry re-relaxes (and re-pushes) forever.
+      const ng = Math.fround(gc + crossCost(cls, load[j]));
       if (ng < G(ns)) {
         stamp[ns] = gen; g[ns] = ng; prev[ns] = cur;
         heap.push(ng + (Math.abs(nx - tx) + Math.abs(ny - ty)) * minCost, ns);
@@ -979,6 +1119,39 @@ export function findPath(w: World, load: Uint16Array, from: number, to: number):
   return findLayeredPath(w, load, from, to)?.tiles ?? null;
 }
 
+/**
+ * Lane centres left to right of travel per road type and travel direction
+ * (fwd = along the segment a→b, back = against it), i.e. `laneOffsets`
+ * semantics without the per-call allocation: two-way a→b travel uses the
+ * positive-side centres ascending, b→a the negative-side centres reversed so
+ * index 0 stays the leftmost lane of travel; one-way roads use all centres.
+ * Signed in the segment frame (+offset is right of a→b); index 0 is leftmost.
+ */
+const LANE_TABLE: Record<RoadType, { fwd: number[]; back: number[] }> = (() => {
+  const out = {} as Record<RoadType, { fwd: number[]; back: number[] }>;
+  for (const t of ROAD_TYPES) {
+    const all = profileOf(t).laneCentres;
+    out[t] = isOneWayType(t)
+      ? { fwd: all.slice(), back: all.slice().reverse() }
+      : { fwd: all.filter((x) => x > 0), back: all.filter((x) => x < 0).reverse() };
+  }
+  return out;
+})();
+
+/** Lanes available in one direction of travel on this road class. */
+export function lanesInDirection(type: RoadType): number {
+  return LANE_TABLE[type].fwd.length;
+}
+
+/**
+ * Deterministic lane assignment: cars spread over the lanes by id, trucks
+ * (and, by the same rule, buses) keep to the rightmost lane. `n` is the
+ * lanes in the direction of travel; callers clamp per tile.
+ */
+export function laneFor(id: number, kind: 0 | 1, n: number): number {
+  return kind === 1 ? n - 1 : id % n;
+}
+
 /** Moving average over tile centres, endpoints pinned, so vehicles round curves. */
 function smoothPath(w: World, tiles: number[]): Float32Array {
   const n = tiles.length;
@@ -998,31 +1171,33 @@ function smoothPath(w: World, tiles: number[]): Float32Array {
 }
 
 /** Per-world index: road centreline polylines (x/z pairs) by segment id, and the segments covering each tile. */
-const centreIndex = new WeakMap<World, { rev: number; lines: Map<number, Float32Array>; byTile: Map<number, number[]> }>();
+const centreIndex = new WeakMap<World, { rev: number; lines: Map<number, Float32Array>; byTile: Map<number, number[]>; types: Map<number, RoadType> }>();
 
-function getCentreIndex(w: World): { lines: Map<number, Float32Array>; byTile: Map<number, number[]> } {
+function getCentreIndex(w: World): { lines: Map<number, Float32Array>; byTile: Map<number, number[]>; types: Map<number, RoadType> } {
   const hit = centreIndex.get(w);
   if (hit && hit.rev === w.graphRevision + w.segments.length * 1e6) return hit;
   const lines = new Map<number, Float32Array>();
   const byTile = new Map<number, number[]>();
+  const types = new Map<number, RoadType>();
   for (const seg of w.segments) {
     const pts = curvePoints(seg.pts, 0.5);
     const a = new Float32Array(pts.length * 2);
     pts.forEach((p, i) => { a[i * 2] = p.x; a[i * 2 + 1] = p.z; });
     lines.set(seg.id, a);
+    types.set(seg.id, seg.type);
     for (const t of seg.tiles) {
       const l = byTile.get(t);
       if (l) l.push(seg.id); else byTile.set(t, [seg.id]);
     }
   }
-  const next = { rev: w.graphRevision + w.segments.length * 1e6, lines, byTile };
+  const next = { rev: w.graphRevision + w.segments.length * 1e6, lines, byTile, types };
   centreIndex.set(w, next);
   return next;
 }
 
-/** Closest point of a polyline to (x, z): returns [px, pz, squared distance]. */
-function nearestOnLine(line: Float32Array, x: number, z: number): [number, number, number] {
-  let bx = x, bz = z, bd = Infinity;
+/** Closest point of a polyline to (x, z): returns [px, pz, squared distance, tangent x, tangent z]. */
+function nearestOnLine(line: Float32Array, x: number, z: number): [number, number, number, number, number] {
+  let bx = x, bz = z, bd = Infinity, tx = 1, tz = 0;
   for (let i = 0; i + 3 < line.length; i += 2) {
     const ax = line[i], az = line[i + 1], cx = line[i + 2], cz = line[i + 3];
     const dx = cx - ax, dz = cz - az;
@@ -1030,19 +1205,26 @@ function nearestOnLine(line: Float32Array, x: number, z: number): [number, numbe
     const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)) : 0;
     const px = ax + dx * t, pz = az + dz * t;
     const d = (px - x) ** 2 + (pz - z) ** 2;
-    if (d < bd) { bd = d; bx = px; bz = pz; }
+    if (d < bd) {
+      bd = d; bx = px; bz = pz;
+      const l = Math.hypot(dx, dz) || 1;
+      tx = dx / l; tz = dz / l;
+    }
   }
-  return [bx, bz, bd];
+  return [bx, bz, bd, tx, tz];
 }
 
 /**
- * Pull a tile-centre path onto the actual road centrelines. The A* path walks tile centres, which on diagonal and
- * curved roads zig-zags and cuts corners outside the road; each point is projected onto the centreline of the
- * segment that owns its tile (staying on the previous segment while it still covers the tile, so junction tiles do
- * not flip between roads). Tiles with no owning segment keep their smoothed position.
+ * Pull a tile-centre path onto the actual road centrelines, then into `lane`
+ * (0 = leftmost of travel, clamped per tile to that tile's road). The A* path
+ * walks tile centres, which on diagonal and curved roads zig-zags and cuts
+ * corners outside the road; each point is projected onto the centreline of the
+ * segment that owns its tile (staying on the previous segment while it still
+ * covers the tile, so junction tiles do not flip between roads). Tiles with no
+ * owning segment keep their smoothed position.
  */
-export function snapToCentrelines(w: World, tiles: number[], pts: Float32Array): Float32Array {
-  const { lines, byTile } = getCentreIndex(w);
+export function snapToCentrelines(w: World, tiles: number[], pts: Float32Array, lane = 0): Float32Array {
+  const { lines, byTile, types } = getCentreIndex(w);
   const out = new Float32Array(pts.length);
   let current = -1;
   let px = NaN, pz = NaN;
@@ -1050,6 +1232,7 @@ export function snapToCentrelines(w: World, tiles: number[], pts: Float32Array):
     const x = pts[i * 2], z = pts[i * 2 + 1];
     const segs = byTile.get(tiles[i]);
     let nx = x, nz = z;
+    let ox = 0, oz = 0;
     if (segs && segs.length) {
       let pick = -1;
       if (segs.includes(current)) pick = current;
@@ -1063,14 +1246,26 @@ export function snapToCentrelines(w: World, tiles: number[], pts: Float32Array):
         }
       }
       const line = pick >= 0 ? lines.get(pick) : undefined;
-      if (line) {
-        const [sx, sz, d2] = nearestOnLine(line, x, z);
+      const type = pick >= 0 ? types.get(pick) : undefined;
+      if (line && type !== undefined) {
+        const [sx, sz, d2, tx, tz] = nearestOnLine(line, x, z);
         // Far from the centreline means the tile only brushes this segment: keep the smoothed point.
-        if (d2 <= 1.5 * 1.5) { nx = sx; nz = sz; current = pick; }
+        if (d2 <= 1.5 * 1.5) {
+          // Travel direction from the route heading dotted with the segment's
+          // a→b tangent; the lane centre is right-of-a→b positive.
+          const pi = Math.max(0, i - 1), ni = Math.min(tiles.length - 1, i + 1);
+          const hx = pts[ni * 2] - pts[pi * 2], hz = pts[ni * 2 + 1] - pts[pi * 2 + 1];
+          const lanes = hx * tx + hz * tz >= 0 ? LANE_TABLE[type].fwd : LANE_TABLE[type].back;
+          const off = lanes[Math.max(0, Math.min(lane, lanes.length - 1))];
+          ox = -tz * off; oz = tx * off;
+          nx = sx + ox; nz = sz + oz;
+          current = pick;
+        }
       }
     }
-    // Two tiles that project to the same spot would give a zero-length step (no heading): keep the smoothed point.
-    if (i > 0 && (nx - px) ** 2 + (nz - pz) ** 2 < 1e-4) { nx = x; nz = z; }
+    // Two tiles that project to the same spot would give a zero-length step (no heading): keep the smoothed
+    // point, but carry this sample's lane offset so the route does not spike back to the bare centreline.
+    if (i > 0 && (nx - px) ** 2 + (nz - pz) ** 2 < 1e-4) { nx = x + ox; nz = z + oz; }
     out[i * 2] = nx; out[i * 2 + 1] = nz;
     px = nx; pz = nz;
   }
@@ -1102,16 +1297,70 @@ export function roundCorners(pts: Float32Array, tiles: number): Float32Array {
 }
 
 /**
- * Vehicle route geometry.  Junction curvature is now owned by the derived
- * lane graph (`lanes.ts` / `JunctionLayout.connectors`); do not blur route
- * points here, because that cuts across the pad and defeats lane containment.
- * The tile route remains the coarse routing index until vehicle progress is
- * migrated from tile indices to lane arc length.
+ * Drop samples that step backward along travel, plus duplicate points. Lane
+ * offset can leave an approach/exit sample past the connector mouth it
+ * splices to (an outer lane's samples fall outside the splice run on a wide
+ * junction): a ~0.4-tile hook whose heading reads dot -1 to followers, so
+ * the same-lane filter drops a leader sitting on it and the queue stacks.
+ * A step is backward only against both the previous segment and the overall
+ * travel chord, so turns and lateral jogs (forward along travel) survive. A
+ * backward step drops its earlier joint when the span over it stays forward
+ * (keeps the connector mouth, drops the past-mouth base sample), else the
+ * candidate (a pre-exit base sample short of the mouth). Returns the kept
+ * points and the old-to-new point index map for the move ranges.
  */
-export function routePath(w: World, tiles: number[]): Float32Array {
-  const snapped = snapToCentrelines(w, tiles, smoothPath(w, tiles));
+function enforceMonotone(out: ArrayLike<number>): { pts: number[]; map: Int32Array } {
+  const n = Math.floor(out.length / 2);
+  const map = new Int32Array(n).fill(-1);
+  const cl = n > 1 ? Math.hypot(out[(n - 1) * 2] - out[0], out[(n - 1) * 2 + 1] - out[1]) : 0;
+  const cux = cl > 1e-9 ? (out[(n - 1) * 2] - out[0]) / cl : 0;
+  const cuz = cl > 1e-9 ? (out[(n - 1) * 2 + 1] - out[1]) / cl : 0;
+  const acc: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (!acc.length) { acc.push(i); continue; }
+    const a = acc[acc.length - 1];
+    const dx = out[i * 2] - out[a * 2], dz = out[i * 2 + 1] - out[a * 2 + 1];
+    const len2 = dx * dx + dz * dz;
+    if (len2 < 1e-12) continue;
+    if (acc.length < 2) { acc.push(i); continue; }
+    const p = acc[acc.length - 2];
+    const pdx = out[a * 2] - out[p * 2], pdz = out[a * 2 + 1] - out[p * 2 + 1];
+    const pl = Math.hypot(pdx, pdz) || 1;
+    const backLocal = (dx * pdx + dz * pdz) / pl < -1e-6;
+    const backChord = cl <= 1e-9 || (dx * cux + dz * cuz) / Math.sqrt(len2) < -1e-6;
+    if (!backLocal || !backChord) { acc.push(i); continue; }
+    let rx = pdx, rz = pdz;
+    if (acc.length > 2) {
+      const q = acc[acc.length - 3];
+      rx = out[p * 2] - out[q * 2]; rz = out[p * 2 + 1] - out[q * 2 + 1];
+    }
+    const rl = Math.hypot(rx, rz) || 1;
+    const qx = out[i * 2] - out[p * 2], qz = out[i * 2 + 1] - out[p * 2 + 1];
+    if ((qx * rx + qz * rz) / rl >= -1e-6) acc[acc.length - 1] = i;
+  }
+  const pts: number[] = [];
+  for (let k = 0; k < acc.length; k++) {
+    map[acc[k]] = k;
+    pts.push(out[acc[k] * 2], out[acc[k] * 2 + 1]);
+  }
+  return { pts, map };
+}
+
+/**
+ * Vehicle route geometry, with every point already in `lane` (0 = leftmost of
+ * travel, clamped per tile to that tile's road).  Junction curvature is now
+ * owned by the derived lane graph (`lanes.ts` / `JunctionLayout.connectors`);
+ * do not blur route points here, because that cuts across the pad and defeats
+ * lane containment.  The tile route remains the coarse routing index until
+ * vehicle progress is migrated from tile indices to lane arc length.
+ */
+export function routePath(w: World, tiles: number[], lane = 0): Float32Array {
+  const snapped = snapToCentrelines(w, tiles, smoothPath(w, tiles), lane);
   const layouts = junctionsOf(w).byNode;
-  if (!layouts.size || snapped.length < 6) return snapped;
+  if (!layouts.size || snapped.length < 6) {
+    const mono = enforceMonotone(snapped);
+    return mono.pts.length === snapped.length ? snapped : new Float32Array(mono.pts);
+  }
   // A wide road can let the tile route cut a junction diagonally with no
   // sample near the node; add the closest point of such a step as a sample.
   const grown: number[] = [];
@@ -1183,14 +1432,40 @@ export function routePath(w: World, tiles: number[]): Float32Array {
     const ix = base[i * 2] - base[i * 2 - 2], iz = base[i * 2 + 1] - base[i * 2 - 1];
     const ox = base[end * 2 + 2] - base[end * 2], oz = base[end * 2 + 3] - base[end * 2 + 1];
     const il = Math.hypot(ix, iz) || 1, ol = Math.hypot(ox, oz) || 1;
-    let ci = bestC[i], cs = -Infinity;
-    for (let q = 0; q < l.connectors.length; q++) {
+    const scoreConn = (q: number): number => {
       const cq = l.connectors[q];
       const ia = l.arms[cq.inArm], oa = l.arms[cq.outArm];
       const a0 = cq.points[0], an = cq.points[cq.points.length - 1];
-      const score = -(ix * ia.dx + iz * ia.dz) / il + (ox * oa.dx + oz * oa.dz) / ol
+      return -(ix * ia.dx + iz * ia.dz) / il + (ox * oa.dx + oz * oa.dz) / ol
         - 0.08 * (Math.hypot(a0.x - base[i * 2], a0.z - base[i * 2 + 1]) + Math.hypot(an.x - base[end * 2], an.z - base[end * 2 + 1]));
+    };
+    let ci = bestC[i], cs = -Infinity;
+    for (let q = 0; q < l.connectors.length; q++) {
+      const score = scoreConn(q);
       if (score > cs) { cs = score; ci = q; }
+    }
+    // Lane continuity: the approach samples already sit in the vehicle's lane,
+    // so among the connectors of the chosen movement prefer the one whose
+    // inbound lane is the vehicle's clamped lane; its first point then
+    // coincides with the lane-offset sample instead of jumping sideways.
+    // Movements the lane cannot make (a turn owned by another lane) keep the
+    // geometric choice.
+    const win = l.connectors[ci];
+    let maxIn = win.inLane;
+    for (let q = 0; q < l.connectors.length; q++) {
+      const cq = l.connectors[q];
+      if (cq.inArm === win.inArm && cq.outArm === win.outArm && cq.inLane > maxIn) maxIn = cq.inLane;
+    }
+    const want = Math.max(0, Math.min(lane, maxIn));
+    if (win.inLane !== want) {
+      let bs = -Infinity, bi = -1;
+      for (let q = 0; q < l.connectors.length; q++) {
+        const cq = l.connectors[q];
+        if (cq.inArm !== win.inArm || cq.outArm !== win.outArm || cq.inLane !== want) continue;
+        const s = scoreConn(q);
+        if (s > bs) { bs = s; bi = q; }
+      }
+      if (bi >= 0) ci = bi;
     }
     // Splice at the sample nearest the node centre.
     let pick = i;
@@ -1216,11 +1491,24 @@ export function routePath(w: World, tiles: number[]): Float32Array {
     i = end + 1;
   }
   push(base[base.length - 2], base[base.length - 1]);
-  const pts = new Float32Array(out);
+  const mono = enforceMonotone(out);
+  const pts = new Float32Array(mono.pts);
   if (mNode.length) {
+    // The filter only drops base samples outside connector spans, so every
+    // recorded endpoint survives; clamp to the nearest kept point regardless.
+    const remap = (oi: number): number => {
+      if (mono.map[oi] >= 0) return mono.map[oi];
+      for (let d = 1; d < mono.map.length; d++) {
+        if (oi + d < mono.map.length && mono.map[oi + d] >= 0) return mono.map[oi + d];
+        if (oi - d >= 0 && mono.map[oi - d] >= 0) return mono.map[oi - d];
+      }
+      return 0;
+    };
+    const i0 = Int32Array.from(mI0, remap), i1 = Int32Array.from(mI1, remap);
+    for (let k = 0; k < i1.length; k++) if (i1[k] < i0[k]) i1[k] = i0[k];
     movesByRoute.set(pts, {
       n: mNode.length, node: Int32Array.from(mNode), conn: Int32Array.from(mConn),
-      i0: Int32Array.from(mI0), i1: Int32Array.from(mI1), layouts: mLayouts,
+      i0, i1, layouts: mLayouts,
     });
   }
   return pts;
@@ -1236,7 +1524,7 @@ function accessTile(w: World, i: number, rng: () => number): number {
     const nx = x + dx, ny = y + dy;
     if (!inBounds(w, nx, ny)) continue;
     const j = idx(w, nx, ny);
-    if (w.connected[j] && w.roadSurface[j] !== ROAD.NONE && w.roadSurface[j] !== ROAD.HIGHWAY) opts.push(j);
+    if (w.connected[j] && w.roadSurface[j] !== ROAD.NONE && !isMotorway(w.roadSurface[j])) opts.push(j);
   }
   return opts.length ? opts[Math.floor(rng() * opts.length)] : -1;
 }
@@ -1271,7 +1559,14 @@ function planLeg(w: World, t: TrafficState, v: TransitVehicle): boolean {
   if (tiles.length < 2) tiles = [from.tile, to.tile];
   v.tiles = tiles;
   v.layers = layers;
-  v.pts = line.kind !== "bus" ? centres(w, tiles) : routePath(w, tiles);
+  if (line.kind !== "bus") {
+    v.lane = 0;
+    v.pts = centres(w, tiles);
+  } else {
+    // Buses keep right like trucks; routePath clamps per tile past this.
+    v.lane = lanesInDirection((w.road[from.tile] || 1) as RoadType) - 1;
+    v.pts = routePath(w, tiles, v.lane);
+  }
   v.progress = 0;
   return true;
 }
@@ -1304,7 +1599,7 @@ function syncTransit(w: World, t: TrafficState): void {
     for (let k = ok.length; k < line.vehicles; k++) {
       const v: TransitVehicle = {
         id: t.nextId++, lineId: line.id, kind: line.kind, color: line.color,
-        stopIdx: 1 % line.stops.length, tiles: [], pts: new Float32Array(0), progress: 0,
+        lane: 0, stopIdx: 1 % line.stops.length, tiles: [], pts: new Float32Array(0), progress: 0,
         dwell: (k * DWELL_SECONDS * 3) / Math.max(1, line.vehicles),
       };
       if (planLeg(w, t, v)) next.push(v);
@@ -1326,7 +1621,9 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
     if (a < 0 || b < 0) continue;
     const lp = findLayeredPath(w, t.load, a, b);
     if (!lp || lp.tiles.length < 2) continue;
-    const pts = routePath(w, lp.tiles);
+    // The id is read, not consumed: failed attempts below must not shift the id sequence.
+    const lane = laneFor(t.nextId, kind, lanesInDirection(w.road[a] as RoadType));
+    const pts = routePath(w, lp.tiles, lane);
     const arcs = routeArcLengths(pts);
     const myHalf = halfLength(kind);
     let v0 = ROAD_SPEED[w.road[a]] * 0.55;
@@ -1351,16 +1648,19 @@ function spawn(s: CityState, t: TrafficState, kind: 0 | 1): void {
     // from vehicles on the access tile or about to enter it.  Tiles come from
     // the arc position: connector samples mean route points no longer index tiles.
     let blocked = false;
-    for (const u of t.vehicles) {
+    const vehicles = t.vehicles;
+    for (let ui = 0; ui < vehicles.length; ui++) {
+      const u = vehicles[ui];
       if (u.tiles.length < 2) continue;
       const us = vehicleArc(u);
       if (routeTileAt(w, u, us) !== a && routeTileAt(w, u, us + 1) !== a) continue;
-      const up = pointAtRouteArcInto(u.pts, u.arcs!, us, leaderPose);
-      if (Math.hypot(up.x - pts[0], up.z - pts[1]) - myHalf - halfLength(u.kind) < IDM_SPAWN_GAP) { blocked = true; break; }
+      const up = pointAtRouteArcInto(u.pts, u.arcs!, us, leaderPose, u.arcIdx ?? -1);
+      const sdx = up.x - pts[0], sdz = up.z - pts[1];
+      if (Math.sqrt(sdx * sdx + sdz * sdz) - myHalf - halfLength(u.kind) < IDM_SPAWN_GAP) { blocked = true; break; }
     }
     if (blocked) continue;
     t.vehicles.push({
-      id: t.nextId++, kind, tiles: lp.tiles, layers: lp.layers, pts,
+      id: t.nextId++, kind, lane, tiles: lp.tiles, layers: lp.layers, pts,
       progress: 0, arc: 0, arcs, speedFactor: 1, v: v0, vf: 0.86 + t.rng() * 0.24,
       vmax: vmaxAt(pts), brake: 0, blink: 0, seed: t.rng() * BLINK_PERIOD, stuck: false,
     });
@@ -1425,8 +1725,14 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
   t.truckCarry = Math.min(t.truckCarry, 3);
 
   t.load.fill(0);
-  for (const v of t.vehicles) t.load[v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))]]++;
-  for (const v of t.transit) {
+  const loadVehicles = t.vehicles;
+  for (let li = 0; li < loadVehicles.length; li++) {
+    const v = loadVehicles[li];
+    t.load[v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))]]++;
+  }
+  const loadTransit = t.transit;
+  for (let li = 0; li < loadTransit.length; li++) {
+    const v = loadTransit[li];
     if (v.kind === "bus" && v.tiles.length) t.load[v.tiles[Math.min(v.tiles.length - 1, Math.floor(v.progress))]]++;
   }
   moveTransit(w, t, dt, s.raining ? RAIN_SPEED_FACTOR : 1);
@@ -1442,9 +1748,12 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
     for (let k = 0; k < t.vehicles.length; k++) {
       const v = t.vehicles[k];
       if (v.tiles.length < 2) continue;
-      const at = Math.max(0, Math.min(v.tiles.length - 1, Math.floor(v.progress)));
-      buckets.next[k] = buckets.head[v.tiles[at]];
-      buckets.head[v.tiles[at]] = k;
+      // File by the tile under the pose: a lane-offset route can ride the
+      // next row of a 2-wide avenue while its coarse tile route stays on the
+      // first, and the routeTileAt leader scan would never visit that bucket.
+      const tile = routeTileAt(w, v, vehicleArc(v));
+      buckets.next[k] = buckets.head[tile];
+      buckets.head[tile] = k;
     }
     updateAdaptiveSignals(w, t, h);
     updatePriority(w, t);
@@ -1453,7 +1762,9 @@ export function tickTraffic(s: CityState, t: TrafficState, dt: number): void {
 
   let slow = 0;
   const alive: Vehicle[] = [];
-  for (const v of t.vehicles) {
+  const aliveVehicles = t.vehicles;
+  for (let ai = 0; ai < aliveVehicles.length; ai++) {
+    const v = aliveVehicles[ai];
     const at = Math.max(0, Math.min(v.tiles.length - 1, Math.floor(v.progress)));
     const tile = v.tiles[at];
     if (!w.road[tile]) continue;

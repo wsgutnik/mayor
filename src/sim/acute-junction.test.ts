@@ -76,7 +76,6 @@ describe("acute junction (reference: iPad capture 2026-10-13, three roads meetin
       for (const ln of lines) for (const p of ln.pts) if (Math.hypot(p.x - cx, p.z - cz) < ln.half - 0.02) { inside = true; break; }
       if (inside) onRoad++;
     }
-    console.log(`acute junction: cellCentresInsideAsphalt=${onRoad}`);
     // Lot kerb strips: should be parallel to, and just beside, a road edge.
     let strips = 0, far = 0, skew = 0;
     for (const l of s.world.olots ?? []) {
@@ -111,9 +110,6 @@ describe("acute junction (reference: iPad capture 2026-10-13, three roads meetin
       if (near > 0.35) skew++;
       void ang;
     }
-    console.log(`acute junction: kerbStrips=${strips} farFromRoad=${far} notParallel=${skew}`);
-    // The ADR 06 target is zero; this records the current state so progress (or regression) is visible.
-    console.log(`acute junction: cells=${cells.length} overlappingPairs=${pairs} totalArea=${total.toFixed(2)} worst=${worst.toFixed(2)}`);
     expect(cells.length).toBeGreaterThan(20);
   });
 
@@ -130,7 +126,6 @@ describe("acute junction (reference: iPad capture 2026-10-13, three roads meetin
     for (let y = e.y - 24; y < e.y + 30; y++) for (let x = e.x; x < e.x + 60; x++) tiles.push({ x, y });
     applyZoneBulk(s, "res", tiles);
     for (let i = 0; i < 30; i++) step(s);
-    const before = (s.world.olots ?? []).length;
     // an acute branch off the middle of the zoned road, then a third road closing the A
     R([[20, 0], [34, -12]]);
     R([[20, 0], [36, 12]]);
@@ -156,7 +151,6 @@ describe("acute junction (reference: iPad capture 2026-10-13, three roads meetin
       const cx = (c.q[0][0] + c.q[2][0]) / 2, cz = (c.q[0][1] + c.q[2][1]) / 2;
       for (const ln of lines) if (ln.pts.some((p) => Math.hypot(p.x - cx, p.z - cz) < ln.half - 0.02)) { onRoad++; break; }
     }
-    console.log(`acute split: lotsBefore=${before} cells=${cells.length} overlappingPairs=${pairs} area=${total.toFixed(2)} centresInAsphalt=${onRoad}`);
     expect(cells.length).toBeGreaterThan(20);
   });
 });

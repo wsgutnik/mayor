@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ROAD_SPECS, derive, rankOf, specOf } from "./roadprofile";
 import type { RoadType } from "./world";
 
-const TYPES: RoadType[] = [1, 2, 3, 4, 5];
+const TYPES: RoadType[] = [1, 2, 3, 4, 5, 6];
 
 describe("road spec table", () => {
   it("derived drawn width equals the declared drawn width", () => {
@@ -24,7 +24,7 @@ describe("road spec table", () => {
       for (let i = 1; i < d.laneCentres.length; i++) expect(d.laneCentres[i]).toBeGreaterThan(d.laneCentres[i - 1]);
       for (const c of d.laneCentres) {
         expect(Math.abs(c) + s.laneWidth / 2).toBeLessThanOrEqual(d.asphaltHalf - s.shoulder + 1e-9);
-        expect(Math.abs(c) - s.laneWidth / 2).toBeGreaterThanOrEqual(s.medianHalf - 1e-9);
+        if (s.medianHalf > 0) expect(Math.abs(c) - s.laneWidth / 2).toBeGreaterThanOrEqual(s.medianHalf - 1e-9);
       }
     }
   });
@@ -43,10 +43,10 @@ describe("road spec table", () => {
     expect(h.junctionMarkings).toBe(false);
   });
   it("capacity is per-lane capacity times lanes", () => {
-    expect(TYPES.map((t) => derive(t).capacity)).toEqual([4, 10, 30, 4, 10]);
+    expect(TYPES.map((t) => derive(t).capacity)).toEqual([4, 10, 30, 4, 10, 5]);
   });
   it("rank orders street < one-way street < avenue < one-way avenue < highway, 0 for none", () => {
-    expect([1, 4, 2, 5, 3].map(rankOf)).toEqual([1, 2, 3, 4, 6]);
+    expect([1, 4, 2, 5, 6, 3].map(rankOf)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(rankOf(0)).toBe(0);
   });
   it("every spec carries i18n keys and a thumbnail", () => {

@@ -1,5 +1,5 @@
 import type { CityState, ToolResult } from "./sim";
-import { ROAD, TransitKind, TransitLine, Stop, World, ZONE, idx, inBounds, BUS_STOP_RADIUS, FACILITY_INFO, FAC } from "./world";
+import { isMotorway, TransitKind, TransitLine, Stop, World, ZONE, idx, inBounds, BUS_STOP_RADIUS, FACILITY_INFO, FAC } from "./world";
 import { findPath } from "./traffic";
 
 export const BUS_STOP_COST = 100;
@@ -32,7 +32,7 @@ export function placeBusStop(s: CityState, x: number, y: number): ToolResult {
   if (!inBounds(w, x, y)) return { ok: false, reason: "Outside the map" };
   const i = idx(w, x, y);
   if (!w.roadSurface[i]) return { ok: false, reason: "Bus stops go on a road" };
-  if (w.roadSurface[i] === ROAD.HIGHWAY) return { ok: false, reason: "Not on a highway" };
+  if (isMotorway(w.roadSurface[i])) return { ok: false, reason: "Not on a highway" };
   if (stopAt(w, i)) return { ok: false, reason: "There is already a stop here" };
   if (s.money < BUS_STOP_COST) return { ok: false, reason: "Not enough money" };
   s.money -= BUS_STOP_COST;

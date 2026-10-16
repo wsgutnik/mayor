@@ -4,6 +4,7 @@ import { blankShowcaseCity } from "../sim/showcase-cases";
 import { diamondRamps } from "../sim/crossings";
 import { addSegment } from "../sim/roads";
 import { rebuildRoadRaster, type Pt } from "../sim/world";
+import { planInterchange, placeInterchange } from "../sim/interchange";
 
 /**
  * Dev-only operation scenarios (?scenario=upgrade[&built=1][&lockcam=1]): a deterministic city staged on an angled
@@ -38,7 +39,7 @@ export function buildUpgradeScenario(built: boolean): { state: CityState; mid: {
 }
 
 export type RoadShot =
-  | "A" | "B" | "C" | "D" | "E" | "lane-reduction" | "four-way" | "parallel" | "bridge" | "tunnel" | "grade" | "upgrade";
+  | "A" | "B" | "C" | "D" | "E-legacy" | "lane-reduction" | "four-way" | "parallel" | "bridge" | "tunnel" | "grade" | "upgrade";
 export interface CameraPose { dist: number; pitch: number; yaw: number }
 export interface CameraShot { x: number; z: number; game: CameraPose; close: CameraPose }
 
@@ -47,8 +48,7 @@ const ROAD_CASES: [RoadShot, (s: CityState, cx: number, cz: number) => void][] =
   ["B", (s, cx, cz) => { placeRoad(s, 2, [P(cx - 8, cz), P(cx + 8, cz)]); placeRoad(s, 4, [P(cx, cz - 8), P(cx, cz)]); }],
   ["C", (s, cx, cz) => { placeRoad(s, 3, [P(cx - 10, cz), P(cx + 10, cz)]); }],
   ["D", (s, cx, cz) => { placeRoad(s, 2, [P(cx - 8, cz), P(cx + 8, cz)]); placeRoad(s, 1, [P(cx - 6, cz - 6), P(cx + 6, cz + 6)]); }],
-  ["E", (s, cx, cz) => {
-    // Today's interchange (main.ts adds four type-4 ramps with addSegment); replaced in 1B.
+  ["E-legacy", (s, cx, cz) => {
     placeRoad(s, 3, [P(cx - 10, cz), P(cx + 10, cz)]); placeRoad(s, 2, [P(cx, cz - 8), P(cx, cz + 8)]);
     for (const r of diamondRamps(cx, cz, { dx: 1, dz: 0 }, { dx: 0, dz: 1 })) addSegment(s.world, 4, r);
     rebuildRoadRaster(s.world);
@@ -84,7 +84,46 @@ export function buildRoadsScenario(): { state: CityState; shots: Record<RoadShot
   return { state: s, shots };
 }
 
+/**
+ * Diamond interchange scene (?scenario=interchange): a highway crossed by an avenue on its own flat map, with the
+ * interchange stamped through the planner. It needs about 30 tiles each way, more than a roads-scenario cell.
+ */
+export function buildInterchangeScenario(): { state: CityState; shots: Record<"interchange" | "gore", CameraShot>; built: boolean } {
+  const s = blankShowcaseCity();
+  s.money = 1e9;
+  const c = 48.5;
+  placeRoad(s, 3, [P(c - 40, c), P(c, c)]);
+  placeRoad(s, 3, [P(c, c), P(c + 40, c)]);
+  placeRoad(s, 2, [P(c, c - 30), P(c, c + 30)]); // auto grade separation lifts only a local span
+  const plan = planInterchange(s, c, c);
+  const built = plan.ok && placeInterchange(s, plan).ok;
+  const gore = s.world.segments.find((g) => g.type === 6);
+  const gp = gore ? gore.pts[0] : P(c - 12, c);
+  return {
+    state: s, built,
+    shots: {
+      interchange: { x: c, z: c, game: { dist: 40, pitch: 0.95, yaw: 0.5 }, close: { dist: 18, pitch: 1.0, yaw: 0.5 } },
+      gore: { x: gp.x, z: gp.z, game: { dist: 14, pitch: 0.95, yaw: 0.5 }, close: { dist: 7, pitch: 1.0, yaw: 0.5 } },
+    },
+  };
+}
+
 export function initScenario(host: ScenarioHost, params: URLSearchParams): void {
+  if (params.get("scenario") === "interchange") {
+    const { state, shots } = buildInterchangeScenario();
+    host.useCity(state);
+    const rig = host.renderer.rig;
+    const shot = (name: "interchange" | "gore", kind: "game" | "close" = "game"): void => {
+      const c = shots[name];
+      rig.target.set(c.x, 0, c.z);
+      Object.assign(rig, c[kind]);
+      rig.apply();
+    };
+    (window as unknown as { __scenario: unknown }).__scenario = { shots, shot };
+    shot("interchange");
+    host.pause();
+    return;
+  }
   if (params.get("scenario") === "roads") {
     const { state, shots } = buildRoadsScenario();
     host.useCity(state);

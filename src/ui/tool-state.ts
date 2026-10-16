@@ -205,7 +205,7 @@ export function hintFor(s: ToolState): Hint | null {
     return null;
   }
   if (t !== "road") return null;
-  if (s.pendingInterchange) return { key: "Tap a bridge crossing to stamp an interchange" };
+  if (s.pendingInterchange) return { key: "Tap where a road crosses a highway to build an interchange" };
   const name = ROAD_NAME[s.roadType];
   if (s.draft === 0 && s.upgradeMode) return { key: "{name}: tap a road to upgrade it", name };
   if (s.draft === 0) return { key: "{name}: tap a start point (or an existing road to connect)", name };

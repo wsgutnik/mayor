@@ -7,6 +7,7 @@ const STEM: Record<number, string> = {
   3: "road_highway",
   4: "road_oneway_street",
   5: "road_oneway_avenue",
+  6: "road_ramp",
 };
 
 export function roadProfilesJson(): Record<string, unknown> {

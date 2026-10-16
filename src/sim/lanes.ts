@@ -7,6 +7,7 @@
  * aea8b10), LaneNetwork.js#bezierConnector and #laneGraph.  Tile units are
  * used here (8 m/tile); the 16 m handle cap becomes 2.0 tiles.
  */
+import { isOneWayType } from "./world";
 import type { Pt, RoadType } from "./world";
 import { profileOf } from "./corridor";
 import { classifyTurn, type TurnKind } from "./signals";
@@ -31,7 +32,7 @@ export function pointInPolygon(p: Pt, ring: readonly Pt[]): boolean {
 /** Signed segment-frame centres which legally travel in this direction. */
 export function laneOffsets(a: Pick<LaneArm, "end" | "type" | "oneWay" | "dir">, incoming: boolean): number[] {
   const all=profileOf(a.type).laneCentres;
-  const oneWay = a.oneWay ?? (a.type === 4 || a.type === 5);
+  const oneWay = a.oneWay ?? isOneWayType(a.type);
   const dir = a.dir ?? 1;
   // a→b exits endpoint a and enters endpoint b (reversed for dir -1).
   if (oneWay && incoming !== ((a.end === "b") === (dir === 1))) return [];
@@ -113,4 +114,66 @@ export function buildLaneConnectors(centre: Pt, arms: readonly LaneArm[], asphal
     allowed.forEach((turns,lane)=>arrows.push({arm:i,lane,turns:turns.sort()}));
   }
   return { connectors, arrows, missing };
+}
+
+/**
+ * Restricted lane graph for a highway gore.  Unlike an ordinary three-arm
+ * junction, a gore permits only the two straight highway movements and one
+ * ramp movement.  `laneOffsets` is left-to-right of travel, so the last
+ * highway lane is always the outer lane under right-hand traffic.
+ */
+export function buildGoreLaneConnectors(
+  centre: Pt,
+  arms: readonly LaneArm[],
+  asphalt: readonly Pt[],
+  rampArm: number,
+  followsArm: number,
+  rampInbound: boolean,
+): { connectors: LaneConnector[]; arrows: LaneArrow[]; missing: MissingLaneMovement[]; outerLane: number } {
+  const connectors: LaneConnector[] = [];
+  const missing: MissingLaneMovement[] = [];
+  const highway = arms.map((a, i) => ({ a, i })).filter(({ a }) => a.type === 3).map(({ i }) => i);
+  const otherArm = highway.find((i) => i !== followsArm) ?? -1;
+
+  const add = (inArm: number, outArm: number, inLane: number, outLane: number): void => {
+    const ins = laneOffsets(arms[inArm], true), outs = laneOffsets(arms[outArm], false);
+    if (ins[inLane] === undefined || outs[outLane] === undefined) return;
+    const p0 = endpoint(centre, arms[inArm], ins[inLane]);
+    const p3 = endpoint(centre, arms[outArm], outs[outLane]);
+    const d = Math.hypot(p3.x-p0.x,p3.z-p0.z), h = Math.min(.46*d,2);
+    const steps = Math.max(3,Math.min(14,Math.ceil(d/.2)));
+    const pts = sampleCubic(
+      p0,
+      { x:p0.x-arms[inArm].dx*h, z:p0.z-arms[inArm].dz*h },
+      { x:p3.x-arms[outArm].dx*h, z:p3.z-arms[outArm].dz*h },
+      p3,
+      steps,
+    );
+    const curvature = polylineCurvature(pts);
+    const limit = 2/Math.min(profileOf(arms[inArm].type).laneWidth,profileOf(arms[outArm].type).laneWidth);
+    const turn = classifyTurn(-arms[inArm].dx,-arms[inArm].dz,arms[outArm].dx,arms[outArm].dz);
+    if (pts.every((p) => pointInPolygon(p, asphalt)) && curvature <= limit+1e-3) {
+      connectors.push({ inArm, outArm, inLane, outLane, turn, points: pts, curvature });
+    } else {
+      missing.push({ inArm, outArm, turn });
+    }
+  };
+
+  if (highway.length === 2 && otherArm >= 0) {
+    for (const inArm of highway) {
+      const outArm = highway[0] === inArm ? highway[1] : highway[0];
+      const n = Math.min(laneOffsets(arms[inArm], true).length, laneOffsets(arms[outArm], false).length);
+      for (let lane = 0; lane < n; lane++) add(inArm, outArm, lane, lane);
+    }
+  }
+
+  const rampHighwayArm = otherArm;
+  const outerLane = rampHighwayArm >= 0
+    ? (rampInbound ? laneOffsets(arms[rampHighwayArm], false) : laneOffsets(arms[rampHighwayArm], true)).length - 1
+    : -1;
+  if (outerLane >= 0) {
+    if (rampInbound) add(rampArm, rampHighwayArm, 0, outerLane);
+    else add(rampHighwayArm, rampArm, outerLane, 0);
+  }
+  return { connectors, arrows: [], missing, outerLane };
 }

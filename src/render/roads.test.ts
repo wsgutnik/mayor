@@ -67,7 +67,9 @@ const minTriAngle = (ax: number, az: number, bx: number, bz: number, cx: number,
 };
 
 const dumpSvg = (name: string, s: CityState): void => {
-  fs.mkdirSync("/tmp/junc2", { recursive: true });
+  const dir = process.env.JUNC_SVG;
+  if (!dir) return;
+  fs.mkdirSync(dir, { recursive: true });
   const chunks: string[] = [];
   const polys: { x: number; z: number }[][] = [];
   const lines: { x: number; z: number }[][] = [];
@@ -89,7 +91,7 @@ const dumpSvg = (name: string, s: CityState): void => {
   for (const p of polys) chunks.push(`<polygon points="${p.map(pt).join(" ")}" fill="#3b3f46" stroke="#111" stroke-width="2"/>`);
   for (const l of lines) chunks.push(`<polyline points="${l.map(pt).join(" ")}" fill="none" stroke="#f5f5f0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`);
   chunks.push(`</svg>`);
-  fs.writeFileSync(`/tmp/junc2/${name}.svg`, chunks.join("\n"));
+  fs.writeFileSync(`${process.env.JUNC_SVG}/${name}.svg`, chunks.join("\n"));
 };
 
 describe("road network geometry", () => {
@@ -341,6 +343,12 @@ describe("road network geometry", () => {
     expect(roadClassFor(5, 0)).toBe(ROAD_CLASS.ONEWAY_AVENUE);
     expect(roadClassFor(1, 1)).toBe(ROAD_CLASS.ONEWAY_STREET);
     expect(roadClassFor(2, -1)).toBe(ROAD_CLASS.ONEWAY_AVENUE);
+  });
+
+  it("ramps draw with their own atlas class", () => {
+    expect(ROAD_CLASS.RAMP).toBe(11);
+    expect(roadClassFor(6, 1)).toBe(ROAD_CLASS.RAMP);
+    expect(roadClassFor(6, -1)).toBe(ROAD_CLASS.RAMP);
   });
 
   it("atlas avenue: per-layer half strips map signed offsets and honour end trims", () => {

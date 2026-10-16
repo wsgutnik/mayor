@@ -1,4 +1,4 @@
-import { ROAD, World, ZoneType, blocksBuilding, idx, isLand, segElevation, tileHeight } from "./world";
+import { isMotorway, World, ZoneType, blocksBuilding, idx, isLand, segElevation, tileHeight } from "./world";
 
 /** Maximum number of cells between a kerb and the back of its zoning strip. */
 export const ZONE_DEPTH = 4;
@@ -79,7 +79,7 @@ export function findFrontage(w: World): FrontageMap {
   // map cell to inspect its full diamond (roads are normally the sparse set).
   for (let ry = 0; ry < w.size; ry++) for (let rx = 0; rx < w.size; rx++) {
     const ri = idx(w, rx, ry), cls = w.roadSurface[ri];
-    if (!cls || cls === ROAD.HIGHWAY) continue;
+    if (!cls || isMotorway(cls)) continue;
     const hRoad = tileHeight(w, rx, ry);
     for (let oy = -ZONE_DEPTH; oy <= ZONE_DEPTH; oy++) {
       const span = ZONE_DEPTH - Math.abs(oy);
@@ -130,7 +130,7 @@ export function computeBlocks(w: World, frontage: FrontageMap = findFrontage(w))
   const queue = new Int32Array(n);
   let components = 0;
   for (let start = 0; start < n; start++) {
-    if (!w.roadSurface[start] || w.roadSurface[start] === ROAD.HIGHWAY || roadComponent[start] >= 0) continue;
+    if (!w.roadSurface[start] || isMotorway(w.roadSurface[start]) || roadComponent[start] >= 0) continue;
     let head = 0, tail = 0; queue[tail++] = start; roadComponent[start] = components;
     while (head < tail) {
       const i = queue[head++], x = i % w.size, y = (i / w.size) | 0;
@@ -138,7 +138,7 @@ export function computeBlocks(w: World, frontage: FrontageMap = findFrontage(w))
         const nx = x + ddx, ny = y + ddy;
         if (nx < 0 || ny < 0 || nx >= w.size || ny >= w.size) continue;
         const j = idx(w, nx, ny);
-        if (w.roadSurface[j] && w.roadSurface[j] !== ROAD.HIGHWAY && roadComponent[j] < 0) {
+        if (w.roadSurface[j] && !isMotorway(w.roadSurface[j]) && roadComponent[j] < 0) {
           roadComponent[j] = components; queue[tail++] = j;
         }
       }
@@ -253,7 +253,7 @@ export function lotsReadyToBuild(w: World, blocks: BlockInfo, lots: readonly Lot
       const y = dy > 0 ? lot.y + lot.h - 1 : dy < 0 ? lot.y : lot.y + a;
       const i = idx(w, x, y);
       const road = blocks.frontage.road[i];
-      if (blocks.depth[i] !== 0 || road < 0 || !w.connected[road] || w.road[road] === ROAD.HIGHWAY) return false;
+      if (blocks.depth[i] !== 0 || road < 0 || !w.connected[road] || isMotorway(w.road[road])) return false;
     }
     return true;
   });

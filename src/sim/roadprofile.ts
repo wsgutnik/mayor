@@ -65,6 +65,10 @@ export const ROAD_SPECS: Record<RoadType, RoadSpec> = {
     tileWidth: 2, drawWidth: 1.8, oneWay: true, lanesPerDir: [4, 0], laneWidth: 0.405, medianHalf: 0, median: "none",
     shoulder: 0, kerb: 0.09, sidewalk: 0.16, speed: 4.5, capacityPerLane: 2.5, cornerRadius: 0.35, clearance: 0.1,
     rank: 4, cost: 48, upkeep: 7, junctionMarkings: true },
+  6: { type: 6, nameKey: "Ramp", descKey: "Ramp, 1 lane with shoulders. Joins a highway at a shallow angle.",
+    thumb: "/ui/thumbs/rd-ramp.jpg", tileWidth: 1, drawWidth: 0.85, oneWay: true, lanesPerDir: [1, 0],
+    laneWidth: 0.45, medianHalf: 0, median: "none", shoulder: 0.2, kerb: 0, sidewalk: 0, speed: 5,
+    capacityPerLane: 5, cornerRadius: 0.45, clearance: 0.25, rank: 5, cost: 60, upkeep: 9, junctionMarkings: true },
 };
 
 export const specOf = (t: RoadType): RoadSpec => ROAD_SPECS[t];

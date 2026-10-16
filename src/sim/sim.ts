@@ -1,3 +1,4 @@
+import { ROAD_TYPES } from "./world";
 import { makeRng } from "./rng";
 import { rankOf } from "./roadprofile";
 import { isRaining } from "./weather";
@@ -5,13 +6,13 @@ import { placeBusStop, registerMetroStation, registerTrainStation, removeStopAt,
 import {
   ZONE, FAC, COVER, FACILITY_INFO, FacilityKind, World, Biome, WorldLot, ZoneType, generateWorld, idx, inBounds,
   isLand, nearWater, updateConnectivity, updateCoverage, updateLandValue, flattenTile, isEntryTile, blocksBuilding,
-  ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, RoadSegment, Pt, baseRoadType, curvePoints, isOneWayType, rasterizeRoad,
+  ROAD, ROAD_COST, ROAD_UPKEEP, ROAD_NAME, RoadType, RoadSegment, Pt, baseRoadType, curvePoints, isOneWayType, rasterizeRoad,
   rebuildRoadRaster, segElevation, segmentLength, levelTiles, facilityFootprint, facilityAnchorAt,
   Elevation, facilityUtility,
 } from "./world";
 import { FACILITY_LINK_RADIUS } from "./networks";
 import { BRIDGE_COST_MULT, TUNNEL_COST_MULT, detectSpan, splitPtsAt } from "./elevation";
-import { Crossing, ELEVATED_JOIN_REASON, INTERCHANGE_REASON, classifyCrossings } from "./crossings";
+import { Crossing, ELEVATED_JOIN_REASON, GORE_PROXIMITY_REASON, INTERCHANGE_REASON, RAMP_ANGLE_REASON, RAMP_CURVATURE_REASON, RAMP_DIRECTION_REASON, classifyCrossings, highwayNodeIssue } from "./crossings";
 import { addSegment, nearestOnSegment, nodeArms, nodeById, placementIssue, rebuildNodes, removeSegment, segById, stampRoundabout, toggleOneWayAt, SNAP_RADIUS, type PlacementIssue } from "./roads";
 import { profileOf } from "./corridor";
 import { cornerRadiusFor } from "./junction";
@@ -374,7 +375,13 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: Ro
   const crossings = classifyCrossings(w, type, pts, level);
   const blocked = crossings.find((c) => c.kind === "blocked");
   if (blocked) {
-    return bad(blocked.blockedReason === "elevated-join" ? ELEVATED_JOIN_REASON : INTERCHANGE_REASON, tiles, crossings);
+    const reason = blocked.blockedReason === "elevated-join" ? ELEVATED_JOIN_REASON
+      : blocked.blockedReason === "ramp-angle" ? RAMP_ANGLE_REASON
+      : blocked.blockedReason === "ramp-curvature" ? RAMP_CURVATURE_REASON
+      : blocked.blockedReason === "ramp-direction" ? RAMP_DIRECTION_REASON
+      : blocked.blockedReason === "gore-proximity" ? GORE_PROXIMITY_REASON
+      : INTERCHANGE_REASON;
+    return bad(reason, tiles, crossings);
   }
   // Explicit Elevado/Subterrâneo: deck/tunnel over everything crossed,
   // with 3-tile ground ramps at both ends (M24). Reuses splitPtsAt/pieces.
@@ -405,13 +412,43 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: Ro
     const len = segmentLength(pts);
     const ramp = Math.min(RAMP_TILES, Math.floor((len - 1) / 2));
     if (ramp < 1) return bad(INTERCHANGE_REASON, tiles, crossings);
-    // Anything else met inside the lifted middle is crossed at that level too.
+    // Lift only a local span around each highway crossing: highway half width + clearance + ramp + 1 tile of
+    // margin each way. Overlapping spans merge; everything outside stays an ordinary ground junction.
+    const spans: [number, number][] = [];
+    for (const c of auto) {
+      const half = profileOf(c.existingType ?? 3).drawHalf + 0.25 + ramp + 1;
+      const lo = Math.max(ramp, c.distFromStart - half), hi = Math.min(len - ramp, c.distFromStart + half);
+      if (hi - lo < 0.05) return bad(INTERCHANGE_REASON, tiles, crossings);
+      spans.push([lo, hi]);
+    }
+    // Water or valley met on the stroke still becomes a deck of its own (merged with a highway span it touches).
+    const water = detectSpan(w, type, pts);
+    if (water.ok && water.span && water.span.kind === kind) {
+      const lo = Math.max(ramp, water.span.t0 * len), hi = Math.min(len - ramp, water.span.t1 * len);
+      if (hi - lo >= 0.05) spans.push([lo, hi]);
+    }
+    spans.sort((a, b) => a[0] - b[0]);
+    // A ground piece shorter than RAMP_TILES between two decks is a sliver: merge the decks.
+    for (let i = 1; i < spans.length;) {
+      if (spans[i][0] - spans[i - 1][1] < RAMP_TILES) {
+        spans[i - 1][1] = Math.max(spans[i - 1][1], spans[i][1]);
+        spans.splice(i, 1);
+      } else i++;
+    }
     const lifted = crossings.map((c) => (!c.atEnd && c.kind === "junction"
-      && c.distFromStart >= ramp && c.distFromEnd >= ramp)
+      && spans.some(([lo, hi]) => c.distFromStart >= lo && c.distFromStart <= hi))
       ? { ...c, kind: kind === "bridge" ? "overpass" as const : "underpass" as const }
       : c);
-    const [before, middle, after] = splitPtsAt(pts, ramp / len, 1 - ramp / len);
-    const span = { kind, before, middle, after };
+    const parts: [Pt[], Elevation][] = [];
+    let rest = pts, off = 0;
+    for (const [lo, hi] of spans) {
+      const restLen = segmentLength(rest);
+      const [b, m, a] = splitPtsAt(rest, (lo - off) / restLen, (hi - off) / restLen);
+      parts.push([b, "ground"], [m, kind]);
+      rest = a; off = hi;
+    }
+    parts.push([rest, "ground"]);
+    const span = { kind, before: parts[0][0], middle: parts[1][0], after: rest, parts };
     return planWithSpan(s, type, pts, tiles, span, bad, lifted);
   }
   const found = detectSpan(w, type, pts);
@@ -421,7 +458,7 @@ export function planRoad(s: CityState, type: RoadType, pts: Pt[], levelInput: Ro
 
 function planWithSpan(
   s: CityState, type: RoadType, pts: Pt[], tiles: number[],
-  span: { kind: "bridge" | "tunnel"; before: Pt[]; middle: Pt[]; after: Pt[] } | null,
+  span: { kind: "bridge" | "tunnel"; before: Pt[]; middle: Pt[]; after: Pt[]; parts?: [Pt[], Elevation][] } | null,
   bad: (reason: string, tiles?: number[], crossings?: Crossing[]) => RoadPlan,
   crossings?: Crossing[],
 ): RoadPlan {
@@ -431,7 +468,7 @@ function planWithSpan(
     pieces = [{ pts, elevation: "ground", tiles }];
   } else {
     // The middle piece is elevated; degenerate (zero-length) approaches are dropped.
-    const parts: [Pt[], Elevation][] = [
+    const parts: [Pt[], Elevation][] = span.parts ?? [
       [span.before, "ground"], [span.middle, span.kind], [span.after, "ground"],
     ];
     pieces = [];
@@ -489,7 +526,7 @@ function planWithSpan(
   // is deck, even when a ground approach overshoots onto it.
   const middle = span ? pieces.find((p) => p.elevation !== "ground") : undefined;
   if (middle && span?.kind === "bridge") {
-    const mset = new Set(middle.tiles);
+    const mset = new Set(pieces.filter((p) => p.elevation !== "ground").flatMap((p) => p.tiles));
     for (const t of [...ground]) {
       if (mset.has(t) && !isLand(w, t % w.size, (t / w.size) | 0)) ground.delete(t);
     }
@@ -620,7 +657,7 @@ export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadTy
   const w = s.world;
   const bad = (reason: string): RoadUpgradePlan => ({ ok: false, reason, tiles: [], newTiles: 0, cost: 0, clearedZones: 0 });
   const seg = segById(w, segmentId);
-  if (!seg || ![1, 2, 3, 4, 5].includes(newType)) return bad("Unknown road");
+  if (!seg || !ROAD_TYPES.includes(newType)) return bad("Unknown road");
   if (seg.type === newType) return { ok: true, tiles: [...seg.tiles], newTiles: 0, cost: 0, clearedZones: 0 };
   if (seg.fixed) return bad("Cannot remove the highway entry");
   if (seg.roundabout) return bad("Cannot upgrade a roundabout");
@@ -644,26 +681,21 @@ export function planRoadUpgrade(s: CityState, segmentId: number, newType: RoadTy
     }
   }
   const newBase = baseRoadType(newType), oldBase = baseRoadType(seg.type);
-  if (elev === "ground" && (newBase === 3) !== (oldBase === 3)) {
-    // Highways meet only highways at grade (same rule classifyCrossings
-    // enforces for new roads): with the new type in place, no endpoint node
-    // may mix highway and street arms. Covers upgrades to highway and
-    // downgrades that would leave a highway ending in a street.
+  const newMotor = newBase === 3 || newType === ROAD.RAMP;
+  const oldMotor = oldBase === 3 || seg.type === ROAD.RAMP;
+  if (elev === "ground") {
+    // Every upgrade/downgrade revalidates both endpoint nodes: highways meet
+    // only highways and ramps at grade, and every ramp on a highway node must
+    // meet it at 10-30° in its direction on a straight stretch
+    // (shared validator, same code as new ramps).
+    const override = new Map([[seg.id, newType]]);
     for (const nodeId of [seg.a, seg.b]) {
-      const node = nodeById(w, nodeId);
-      if (!node) continue;
-      let hw = newBase === 3, other = newBase !== 3;
-      for (const sid of node.segs) {
-        if (sid === seg.id) continue;
-        const o = segById(w, sid);
-        if (!o || segElevation(o) !== "ground") continue;
-        if (baseRoadType(o.type) === 3) hw = true; else other = true;
-      }
-      if (hw && other) return bad(INTERCHANGE_REASON);
+      const issue = highwayNodeIssue(w, nodeId, override);
+      if (issue) return bad(issue);
     }
-    if (newBase === 3) {
-      // A highway serves no lots: any zoned or built tile touching the new
-      // footprint would be stranded (every served strip starts at the kerb).
+    if (newMotor && !oldMotor) {
+      // Highways and ramps serve no lots: any zoned or built tile touching
+      // the new footprint would be stranded (every served strip starts at the kerb).
       const touch = new Set(tiles);
       for (const t of tiles) {
         const x = t % w.size, y = (t / w.size) | 0;

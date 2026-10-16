@@ -51,12 +51,14 @@ export interface CorridorSet {
   bySeg: Map<number, SegmentCorridor>;
 }
 
-const PROFILES: Record<RoadType, RoadProfile> = {
+/** Per-type road profiles; hot loops read `.laneWidth` directly to avoid call overhead. */
+export const PROFILES: Record<RoadType, RoadProfile> = {
   1: makeProfile(1),
   2: makeProfile(2),
   3: makeProfile(3),
   4: makeProfile(4),
   5: makeProfile(5),
+  6: makeProfile(6),
 };
 
 const corridorCache = new WeakMap<World, CorridorSet>();
