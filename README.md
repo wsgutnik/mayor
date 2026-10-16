@@ -19,9 +19,9 @@ TypeScript, Three.js, Vite and a pure TypeScript simulation. It contains no code
 | Platform | Channel | State (2026-10-15) |
 |---|---|---|
 | iPad | App Store ("Mayor: Construtor de Cidades", bundle `com.gutnik.mayor`, iPad only, free) | Build 3 in review; build 4 in TestFlight (internal). See [docs/IOS.md](docs/IOS.md) and [docs/appstore/APPSTORE.md](docs/appstore/APPSTORE.md). |
-| Mac (Apple Silicon) | [GitHub release v0.1.0-m35](https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m35): Developer ID signed, notarized dmg | Released 2026-10-14 |
+| Mac (Apple Silicon) | [GitHub release v0.1.0-m36](https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m36): Developer ID signed, notarized dmg | Released 2026-10-15 |
 | Browser | [mayor-demo.vercel.app](https://mayor-demo.vercel.app): landing page and paid web demo ($4.99 one-time) | Live; ops in [docs/WEB-DEMO.md](docs/WEB-DEMO.md) |
-| iPad (PWA) | `Mayor-m35-ipad-pwa.zip` in the same GitHub release, or `npm run dev` on the local network | Fallback |
+| iPad (PWA) | `Mayor-m36-ipad-pwa.zip` in the same GitHub release, or `npm run dev` on the local network | Fallback |
 | Windows | Tauri config only | Not built |
 
 ## Features
@@ -122,7 +122,7 @@ blender -b --factory-startup --python blender/build_all.py -- --out public/model
 | Lot evolution, demographics, landmarks | done |
 | Catalog 41-84, rail, service tiers | done in the sim; most 41-84 models missing (procedural fallback) |
 | Touch road tool, tool-state reducer, menus | done; touch tested on the simulator only |
-| Mac 0.1.0 (M35) | released, signed and notarized |
+| Mac 0.1.0 (M36) | released, signed and notarized |
 | iPad App Store | in review (build 3), TestFlight build 4 |
 | Web demo | live |
 | M22 | pending: walking pedestrians, Windows build, real-hardware profiling |

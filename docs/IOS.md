@@ -9,7 +9,7 @@ in [docs/appstore/APPSTORE.md](appstore/APPSTORE.md). No credentials are stored 
 | Item | Value |
 |---|---|
 | Bundle id (iOS) | `com.gutnik.mayor`, set in `src-tauri/tauri.ios.conf.json` (merged over `tauri.conf.json` for iOS builds). `com.mayor.game` is registered to another developer team and cannot be used on iOS. The Mac app keeps `com.mayor.game`. |
-| Build number | `bundle.iOS.bundleVersion` in `src-tauri/tauri.ios.conf.json` (currently `"4"`). Raise it for every upload. |
+| Build number | `bundle.iOS.bundleVersion` in `src-tauri/tauri.ios.conf.json` (currently `"5"`). Raise it for every upload. |
 | Marketing version | `version` in `src-tauri/tauri.conf.json` = `package.json` `version` (`0.1.0`) |
 | Team | `4AFHZKZYQ6` (automatic signing in the Xcode project) |
 | Device family | iPad only (`TARGETED_DEVICE_FAMILY = 2` in `src-tauri/gen/apple/project.yml` and `project.pbxproj`) |
@@ -56,7 +56,7 @@ from the iPad to avoid two "Mayor" icons. Simulator captures: `xcrun simctl io b
 
 ## App Store / TestFlight build
 
-1. Raise the build number in `src-tauri/tauri.ios.conf.json` (`"bundleVersion": "5"` for the next upload).
+1. Raise the build number in `src-tauri/tauri.ios.conf.json` (`"bundleVersion": "6"` for the next upload).
    Do not use `--build-number N`: Tauri appends it to the version (`0.1.0.N`), which App Store Connect rejects.
 2. Build and export the signed IPA (Apple Distribution identity, "Mayor App Store" profile):
    ```bash
@@ -92,6 +92,7 @@ from the iPad to avoid two "Mayor" icons. Simulator captures: `xcrun simctl io b
 | 2 | 2026-10-15 | iPad only, MAYOR logo icon (`3028c3e`) | TestFlight (superseded) |
 | 3 | 2026-10-15 | App Store package, About and credits (`1b3408c`) | **Submitted for review 2026-10-15 03:05 PDT, Waiting for Review** |
 | 4 | 2026-10-15 | Tool state reducer and menu rework (`db6c2d9`, `6c0ec5a`) | TestFlight only (not submitted) |
+| 5 | 2026-10-15 | Roads 1A+1B (`d3232c3`) | TestFlight only (not submitted) |
 
 ## Troubleshooting
 

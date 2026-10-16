@@ -105,5 +105,5 @@ no app de iPad: o app não tem fluxo de compra, link nem menção a ele.
 ## Novidades desta versão (limit 4000)
 
 ```text
-Primeira versão na App Store: estradas com curvas, rotatórias, pontes e túneis; zoneamento de uma cidade em crescimento; energia, água, esgoto e serviços públicos; trânsito e transporte; jogo totalmente offline em português ou inglês.
+Atualização de estradas: vias de mão única agora usam a largura toda, mudanças de largura formam junções suaves em taper, autoestradas ganham barreira central de concreto com iluminação, pontes reconstruídas, a nova Rampa de uma faixa que incorpora e sai em ângulos suaves, o trevo losangular em um clique e um trânsito que anda e forma fila em faixas de verdade.
 ```

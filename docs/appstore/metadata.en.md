@@ -128,7 +128,7 @@ app contains no purchase flow, link or reference to the paywall.
 ## What's New in this version (limit 4000)
 
 ```text
-First release on the App Store: draw roads with curves, roundabouts, bridges and tunnels; zone a growing city; run power, water, sewage and public services; manage traffic and transit; play fully offline in Portuguese or English.
+Roads update: one-way roads now use their full width, width changes form smooth taper junctions, highways gain a concrete median barrier with lighting, rebuilt bridges, a new one-lane Ramp that merges and diverges at shallow angles, a one-click diamond interchange, and traffic that drives and queues in real lanes.
 ```
 
 ## App Review contact and notes

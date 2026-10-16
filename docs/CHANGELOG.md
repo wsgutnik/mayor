@@ -88,7 +88,15 @@ stopped).
 - `docs/process/18-facility-snapping.md` renamed to `docs/process/19-facility-snapping.md` (two docs shared the number 18; `src/dev/scenario.ts` links the touch notes, so the touch notes keep 18).
 - New: this changelog, `docs/STATUS-2026-10-15.md`, `docs/WEB-DEMO.md`, `docs/process/README.md`. Updated: README, PROGRESS, PLAN, AGENTS, IOS, SIGNING, App Store runbook, status page source, NOTICE flora paragraph.
 
-## 2026-10-15 — Roads cycle 1A (branch `agent/roads-render`, not yet on `main`)
+## Release `v0.1.0-m36` (2026-10-15)
+
+GitHub pre-release "Mayor 0.1.0 (M36) — macOS Apple Silicon": `Mayor-m36-mac-arm64-signed-notarized.dmg` (Developer
+ID, notarized, stapled), `Mayor-m36-ipad-pwa.zip`, `SHA256SUMS-m36`. Publishes Roads 1A (`18a5b89`) + 1B (`d3232c3`);
+tagged at the bump commit on `main` ("chore(release): v0.1.0-m36 version bump (iOS build 5, sw mayor-v3)"). Suite:
+1261 passed, 7 skipped, 2 todo in 144 files (`npx vitest run --exclude '.claude/**'`); service worker `mayor-v3`;
+iPad build 5 (TestFlight only).
+
+## 2026-10-15 — Roads cycle 1A (branch `agent/roads-render`, on `main` in `v0.1.0-m36`)
 
 Design: `docs/process/26-roads-cycle1.md` (section 11 has the observed result). Plan: `docs/superpowers/plans/2026-10-15-roads-1a-profiles-junctions.md`.
 - Single road profile table `src/sim/roadprofile.ts`; every road table is a view of it; tile class by rank. Tests: A `src/sim/roadprofile.test.ts`, A `src/sim/roadprofile-consumers.test.ts`, M `src/sim/corridor.test.ts`.
@@ -99,7 +107,7 @@ Design: `docs/process/26-roads-cycle1.md` (section 11 has the observed result). 
 - Bridges: 1.1 m barriers open at grade, retaining faces, slab edge and underside, plain concrete. Tests: A `src/render/roads-bridges.test.ts`, M `src/render/road-material.test.ts`.
 - Dev: `?scenario=roads` regression scene with fixed cameras. Tests: A `src/dev/scenario-roads.test.ts`.
 
-## 2026-10-15 — Roads cycle 1B (branch `agent/r1b-int`, not yet on `main`)
+## 2026-10-15 — Roads cycle 1B (branch `agent/r1b-int`, on `main` in `v0.1.0-m36`)
 
 Design: `docs/process/26-roads-cycle1.md` (§6 aligned, §12 has the observed result). Plan: `docs/superpowers/plans/2026-10-15-roads-1b-highway-ramps-interchange.md`.
 - Highway render: concrete Jersey barrier mesh reusing the ribbon's end stations, lamps every 3 tiles on the barrier (twins) plus singles on ramp outer sides; pads share the ribbon's asphalt tone. Tests: A `src/render/roads-highway.test.ts`, A `src/render/street-light.test.ts`, M `src/render/roads-polish.test.ts`, M `src/render/road-material.test.ts`.

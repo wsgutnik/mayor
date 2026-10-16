@@ -1,6 +1,6 @@
 # PROGRESS — Mayor
 
-Updated on 2026-10-15 (head `6c0ec5a`: App Store build 3 in review, TestFlight build 4, web demo live). One-page
+Updated on 2026-10-15 (m36 released from `main`: Roads 1A+1B as `v0.1.0-m36`; App Store build 3 in review, TestFlight build 5, web demo live). One-page
 state: [docs/STATUS-2026-10-15.md](docs/STATUS-2026-10-15.md). Every change since M35 with hashes and tests:
 [docs/CHANGELOG.md](docs/CHANGELOG.md). Status page source: [docs/mayor-status.html](docs/mayor-status.html).
 
@@ -22,8 +22,8 @@ state: [docs/STATUS-2026-10-15.md](docs/STATUS-2026-10-15.md). Every change sinc
 | M25 Crossing detection and textured roads | done | automatic highway rules, marker preview, interchange; road atlas |
 | M26 CS1 zone-cell rules | done | nearer road wins, oldest segment on ties, slope limit, row cut behind obstacles |
 | M27 Oriented zoning | done, **only mode** | street-aligned zoning is the only selectable model since `13812a1` (tile code still in the repo, unreachable) |
-| Roads cycle 1A | done on branch `agent/roads-render` | road profile table, honest junctions, tapers, one-way full width, highway 3+3 texture, bridges; design `docs/process/26-roads-cycle1.md` |
-| Roads cycle 1B | done on branch `agent/r1b-int` (visual-gate re-check open) | highway barrier + lamps, ramp class + Trevo diamond, traffic lanes, markings atlas; facts + numbers in `docs/process/26-roads-cycle1.md` §12 and `docs/CHANGELOG.md` |
+| Roads cycle 1A | done on main (`18a5b89`, `d3232c3`), released in `v0.1.0-m36` | road profile table, honest junctions, tapers, one-way full width, highway 3+3 texture, bridges; design `docs/process/26-roads-cycle1.md` |
+| Roads cycle 1B | done on main (`18a5b89`, `d3232c3`), released in `v0.1.0-m36` | highway barrier + lamps, ramp class + Trevo diamond, traffic lanes, markings atlas; facts + numbers in `docs/process/26-roads-cycle1.md` §12 and `docs/CHANGELOG.md` |
 | M28 Visual assets | done | audit, strict export, manifests, rear facades, detailed fleet, v2 references behind `?visualV2=1` |
 | Junction builder | done | sidewalks wrapping corners, crosswalks, stop bars, guide dashes, arrows, lane graph; vehicles follow connectors; unsignalised priority (`816cc01`) |
 | Zone integrity (zinv) | done | single `reconcileZones`, physical road-surface oracle, zones never invade roads (`8afbab1`); frontage fill (`da3e75d`); incremental pipeline, 46-188 ms down to under 8 ms per edit (`cf1d484`) |
@@ -38,7 +38,7 @@ state: [docs/STATUS-2026-10-15.md](docs/STATUS-2026-10-15.md). Every change sinc
 | UI-2 Road builder | done | Undo/Redo, snapping, upgrade in place, parallel roads, guides; whole-road upgrade stroke still open |
 | UI-3 Zoning tools | partial | Marquee and Fill; densities and lot visualisation open |
 | Procedural buildings | off | rejected visually; behind `?procBuildings=1` |
-| Mac release | done | `v0.1.0-m35`, signed and notarized dmg |
+| Mac release | done | `v0.1.0-m36`, signed and notarized dmg |
 | Native iPad app | **in App Store review** | `com.gutnik.mayor`, iPad only; build 3 submitted 2026-10-15 03:05 PDT, build 4 in TestFlight |
 | Web demo | live | https://mayor-demo.vercel.app, $4.99 Stripe Checkout ([docs/WEB-DEMO.md](docs/WEB-DEMO.md)) |
 | M22 Polish | pending | pedestrians walking, real Windows and iPad hardware validation |
@@ -47,7 +47,7 @@ state: [docs/STATUS-2026-10-15.md](docs/STATUS-2026-10-15.md). Every change sinc
 
 | Measure | Value | Source |
 |---|---|---|
-| Tests | **968 passed, 3 skipped, 2 todo, 117 files** at `db6c2d9` (714 at M34) | `npx vitest run --exclude '.claude/**'`, 2026-10-15 |
+| Tests | **1261 passed, 7 skipped, 2 todo, 144 files** at `d3232c3` (968 at M35) | `npx vitest run --exclude '.claude/**'`, 2026-10-15 |
 | Types | clean | `npx tsc --noEmit`, 2026-10-15 |
 | Zone reconcile, 96x96 fixture | road edit 7.3 ms, bulldoze 6.0 ms, 2000-tile repaint 2.7 ms (was 46-188 ms per edit) | `src/sim/zone-perf.bench.test.ts` guard on the Mac, 2026-10-15 |
 | Gridlock matrix | pop 3000/6000/9000 x street grid/avenue spines: all six complete trips every minute (before: all 260 cars frozen within ~10 min) | `src/sim/traffic-jam.test.ts`, `5ae4fb3` |

@@ -1,6 +1,6 @@
 /* Mayor service worker: app shell precache + runtime cache, so the game runs offline.
    Bump VERSION on every release so old caches are dropped. */
-const VERSION = "mayor-v2";
+const VERSION = "mayor-v3";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/favicon.png", "/mayor-logo.jpg",
   "/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon-180.png"];
 

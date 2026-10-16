@@ -54,13 +54,13 @@ Prerequisites: Node 22, Rust (stable), and WebView2 (already included with Windo
 
 ## Mac (ready-made dmg)
 
-The latest release is M35 (pre-release tag `v0.1.0-m35`, 2026-10-14): https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m35
+The latest release is M36 (pre-release tag `v0.1.0-m36`, 2026-10-15): https://github.com/wsgutnik/mayor/releases/tag/v0.1.0-m36
 
-- `Mayor-m35-mac-arm64-signed-notarized.dmg`: macOS Apple Silicon, Developer ID signed and notarized. Open the dmg and drag Mayor to Applications.
-- `Mayor-m35-ipad-pwa.zip`: the PWA bundle for iPad.
-- `SHA256SUMS-m35`: checksums for the files above.
+- `Mayor-m36-mac-arm64-signed-notarized.dmg`: macOS Apple Silicon, Developer ID signed and notarized. Open the dmg and drag Mayor to Applications.
+- `Mayor-m36-ipad-pwa.zip`: the PWA bundle for iPad.
+- `SHA256SUMS-m36`: checksums for the files above.
 
-M34 (`v0.1.0-m34`) has the same three files with the `m34` prefix.
+M35 (`v0.1.0-m35`) has the same three files with the `m35` prefix.
 
 Fallback when no notarized build is available: `npm run package:adhoc` writes an ad hoc signed dmg to `release-out/`. It is not notarized, so on first launch use right-click > Open. Signing and notarization steps are in [SIGNING.md](SIGNING.md).
 

@@ -1,6 +1,6 @@
 # Signing and Notarizing Mayor (Mac) and Signing for iPad
 
-State (2026-10-15): the Mac releases `v0.1.0-m34` and `v0.1.0-m35` ship `Mayor-mNN-mac-arm64-signed-notarized.dmg`,
+State (2026-10-15): the Mac releases `v0.1.0-m34`, `v0.1.0-m35` and `v0.1.0-m36` ship `Mayor-mNN-mac-arm64-signed-notarized.dmg`,
 signed with `Developer ID Application: Willian Gutnik (4AFHZKZYQ6)`, notarized and stapled, built with
 `npm run release:mac` (`scripts/release-mac.sh`, see "One-command release" below). Ad hoc signing
 (`npm run package:adhoc`) remains the fallback when no identity is available.

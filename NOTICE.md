@@ -23,6 +23,9 @@ read, but not reused.
 illustrations created or commissioned by the author for this project (some generated with AI tools). They are not covered
 by any open license.
 
+`public/textures/road/*` (incl. `markings.png` atlas and `road_ramp.png`) are generated in-repo by
+`blender/make_road_atlas.py`; no third-party art.
+
 ## Libraries
 
 Three.js (MIT), Tauri (MIT or Apache-2.0), Vite, and Vitest (MIT). See `package.json` and `src-tauri/Cargo.toml`.

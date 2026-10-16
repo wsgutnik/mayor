@@ -8,6 +8,7 @@ Mayor is a single-player city-building game for iPad. It works fully offline, ha
 How to play (first 2 minutes):
 1. On first launch a new city opens on an empty landscape with a short highway entry at the left edge. A "Getting started" card (top left) walks through four steps.
 2. Tap Roads (first button in the bottom toolbar), then drag across the ground from the highway entry and release: a street is built (streets, avenues, one-way roads, highways, curves, roundabouts, bridges and tunnels are in the same menu).
+Roads menu also has Ramp and the diamond Interchange tool: draw a highway, pick Ramp and connect at a shallow angle (10–30°) to merge/diverge, or use Interchange on a highway crossing a street to build all four ramps at once.
 3. Tap Zones > Residential and drag over the ground next to the road to paint a zone.
 4. Tap Services and place a Power plant and a Water tower near the road (they feed the network along the roads).
 5. Tap the 2x speed button in the top bar: lots start construction and residents move in within seconds; the R/C/I demand bars (top left) say what to zone next.
