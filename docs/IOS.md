@@ -112,3 +112,11 @@ from the iPad to avoid two "Mayor" icons. Simulator captures: `xcrun simctl io b
 `libc` is pinned to 0.2.189 in `src-tauri/Cargo.lock`. libc 0.2.190 made `mach_task_self` macOS-only, which breaks
 `num_threads 0.1.7` (a dependency of `time`) when building for `aarch64-apple-ios`. Remove the pin once `time`/`num_threads`
 no longer depend on it (`cargo update -p libc` then rebuild for iOS to check).
+
+## Uploading without a password prompt (used for build 5, 2026-10-16)
+
+With the Xcode account signed in, the archive built by `npm run ios:build` can be uploaded straight to App Store
+Connect, no app-specific password: `xcodebuild -exportArchive -archivePath src-tauri/gen/apple/build/app_iOS.xcarchive
+-exportOptionsPlist <plist> -exportPath <dir>` where the plist has `method app-store-connect`, `destination upload`,
+`teamID 4AFHZKZYQ6`, manual signing with the "Apple Distribution" certificate and the "Mayor App Store" profile for
+`com.gutnik.mayor`. Build 5 (0.1.0, Roads 1A+1B) was uploaded this way and is TestFlight only (not submitted for review).
