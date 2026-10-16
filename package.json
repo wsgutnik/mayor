@@ -16,7 +16,7 @@
     "ios:build": "bash scripts/ios-prereq-check.sh && tauri ios build",
     "maps": "node scripts/convert-maps.mjs",
     "roads:profiles": "ROAD_PROFILES_WRITE=1 vitest run src/render/road-profiles-json.test.ts",
-    "ci": "tsc --noEmit && vitest run && vite build",
+    "ci": "tsc --noEmit && vitest run --exclude '.claude/**' && vite build",
     "package": "npm run ci && tauri build",
     "package:signed": "bash scripts/sign-mac.sh",
     "release:mac": "bash scripts/release-mac.sh",
