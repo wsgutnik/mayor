@@ -1,5 +1,12 @@
 # PROGRESS — Mayor
 
+## App Store Connect screenshot — 2026-10-19, 21:03 PDT (owner-provided)
+
+**Mayor City Builder: `iOS 1.0 Waiting for Review` appears on the Apps overview.** This observation was supplied by the owner as a screenshot in chat; no fresh Apple API read was performed and the image was not committed here. The screenshot is evidence of listing status only, **not approval, live availability, exact submitted build, or IAP/AdMob configuration**. iOS 1.0 Waiting for Review on Apple's app overview; screenshot does not establish which build is in review. Verify before release; Mac M36 is a separate distribution channel.
+
+Cross-project audit: [Hype Games Lab portfolio](https://github.com/wsgutnik/hype-games-clone/blob/main/docs/process/PORTFOLIO-2026-10-19.md).
+
+
 ## Portfolio sync — 2026-10-19 (Git-only evidence)
 
 - The current repository history includes road cycles 1A/1B and Mac `v0.1.0-m36` (junction profiles, ramps, highway 3+3 representation) and a logged iOS TestFlight **build 5** (16/10/2026), newer than some rows in the dated status docs.
