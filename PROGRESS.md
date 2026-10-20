@@ -1,5 +1,13 @@
 # PROGRESS — Mayor
 
+## Portfolio sync — 2026-10-19 (Git-only evidence)
+
+- The current repository history includes road cycles 1A/1B and Mac `v0.1.0-m36` (junction profiles, ramps, highway 3+3 representation) and a logged iOS TestFlight **build 5** (16/10/2026), newer than some rows in the dated status docs.
+- The last recorded iPad App Store submission was **build 3 WAITING_FOR_REVIEW** on 15/10/2026, manual release. **No live App Store status was verified in this audit.** Desktop Mac pre-release does not imply an iPad public launch.
+- Current next gates: real-iPad performance/frame time, save export/restore UX, Apple review outcome, remaining road-junction quality and 41–84 building visual fallbacks; protect the road test suite and verify cross-device saves.
+- Gutnik portfolio view: [7-game dashboard](https://github.com/wsgutnik/hype-games-clone/blob/main/docs/process/PORTFOLIO-2026-10-19.md). This is a cross-project documentation sync only; no source/build changes performed.
+
+
 Updated on 2026-10-15 (m36 released from `main`: Roads 1A+1B as `v0.1.0-m36`; App Store build 3 in review, TestFlight build 5, web demo live). One-page
 state: [docs/STATUS-2026-10-15.md](docs/STATUS-2026-10-15.md). Every change since M35 with hashes and tests:
 [docs/CHANGELOG.md](docs/CHANGELOG.md). Status page source: [docs/mayor-status.html](docs/mayor-status.html).
